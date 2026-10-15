@@ -82,7 +82,7 @@ export function StudentDashboard() {
       {active !== 'course-view' && (
         <>
           {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
-          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
+          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
           {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
           {active === 'exams' && <Exams />}
           {active === 'results' && <Results />}
@@ -152,16 +152,8 @@ function Overview({ user, courses, certificates, enrollments }: any) {
   )
 }
 
-function MyCourses({ courses, enrollments, onContinue }: any) {
-  const [certRequests, setCertRequests] = useState<any[]>([])
+function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   const [requesting, setRequesting] = useState<string | null>(null)
-
-  const loadCertRequests = () => {
-    // We don't have user_id here easily; fetch all and filter client-side is not ideal
-    // Instead, use the enrollments to check if a cert request exists
-    // For simplicity, fetch all cert requests and filter by course_id
-  }
-  useEffect(() => { loadCertRequests() }, [])
 
   const requestCertificate = async (course: any) => {
     setRequesting(course.id)
@@ -172,9 +164,9 @@ function MyCourses({ courses, enrollments, onContinue }: any) {
         body: JSON.stringify({
           user_id: course.enrollment.user_id,
           course_id: course.id,
-          student_name: '', // Will be filled by API or admin
+          student_name: studentName || course.enrollment.user_id || 'متدرب',
           course_title: course.title,
-          fee: 0, // Fee determined by admin
+          fee: 0,
         }),
       })
       const data = await res.json()
@@ -234,21 +226,31 @@ function MyCourses({ courses, enrollments, onContinue }: any) {
                   </Button>
                 ) : (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? (
                   <div className="space-y-2">
-                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5" disabled>
+                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
                     </Button>
-                    <Button
-                      size="sm"
-                      className="w-full bg-gold hover:bg-gold-light text-navy"
-                      disabled={requesting === c.id}
-                      onClick={() => requestCertificate(c)}
-                    >
-                      {requesting === c.id ? (
-                        <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري الطلب...</>
-                      ) : (
-                        <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
-                      )}
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-navy/30 text-navy hover:bg-navy/5"
+                        onClick={() => onContinue(c, c.enrollment)}
+                      >
+                        <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-gold hover:bg-gold-light text-navy"
+                        disabled={requesting === c.id}
+                        onClick={() => requestCertificate(c)}
+                      >
+                        {requesting === c.id ? (
+                          <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري...</>
+                        ) : (
+                          <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>

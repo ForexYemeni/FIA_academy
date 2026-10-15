@@ -625,7 +625,7 @@ function AdminPayments() {
                   <div>
                     <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
                     <div className="rounded-lg overflow-hidden border-2 border-gold/30">
-                      <img src={proofUrl} alt="إثبات الدفع" className="w-full h-auto max-h-96 object-contain" />
+                      <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain rounded-lg mx-auto" />
                     </div>
                   </div>
                 ) : (
