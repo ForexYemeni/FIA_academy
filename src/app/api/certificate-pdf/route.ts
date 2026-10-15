@@ -185,17 +185,29 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset - cornerLen)
   ctx.stroke()
 
-  // ===== Logo (top-right interior) — square with rounded corners, navy bg + gold "FIA" =====
-  const logoSize = 50 * scale
+  // ===== Logo (top-right interior) — official FIA logo image =====
+  const logoSize = 70 * scale
   const logoX = innerX + innerW - logoSize - 22 * scale
   const logoY = innerY + 22 * scale
-  fillRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, NAVY)
-  strokeRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, GOLD, 1.5 * scale)
-  setFont(16, 'bold')
-  fill(GOLD)
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('FIA', logoX + logoSize / 2, logoY + logoSize / 2)
+  // Load the official logo
+  const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-official.png')
+  if (fs.existsSync(logoPath)) {
+    const logoBuffer = fs.readFileSync(logoPath)
+    const logoImg = await loadImage(logoBuffer)
+    // White rounded background for the logo
+    fillRoundRect(logoX - 4 * scale, logoY - 4 * scale, logoSize + 8 * scale, logoSize + 8 * scale, 8 * scale, WHITE)
+    strokeRoundRect(logoX - 4 * scale, logoY - 4 * scale, logoSize + 8 * scale, logoSize + 8 * scale, 8 * scale, GOLD, 1 * scale)
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize)
+  } else {
+    // Fallback: navy circle with gold FIA
+    fillRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, NAVY)
+    strokeRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, GOLD, 1.5 * scale)
+    setFont(16, 'bold')
+    fill(GOLD)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('FIA', logoX + logoSize / 2, logoY + logoSize / 2)
+  }
 
   // ===== Title: CERTIFICATE OF COMPLETION (gold, small, all caps) =====
   ctx.textAlign = 'center'
@@ -468,21 +480,34 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       // Bottom-right
       doc.moveTo(innerX + innerW - cornerInset - cornerLen, innerY + innerH - cornerInset).lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset).lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset - cornerLen).stroke()
 
-      // ===== Logo (top-right interior) =====
-      const logoSize = 50
+      // ===== Logo (top-right interior) — official FIA logo image =====
+      const logoSize = 70
       const logoX = innerX + innerW - logoSize - 22
       const logoY = innerY + 22
-      doc.save()
-      roundRectPath(logoX, logoY, logoSize, logoSize, 10)
-      doc.fill(NAVY)
-      doc.restore()
-      doc.save()
-      doc.lineWidth(1.5).strokeColor(GOLD)
-      roundRectPath(logoX, logoY, logoSize, logoSize, 10)
-      doc.stroke()
-      doc.restore()
-      setFont(16, 'bold')
-      doc.fillColor(GOLD).text('FIA', logoX, logoY + logoSize / 2 - 8, { width: logoSize, align: 'center' })
+      const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-official.png')
+      if (fs.existsSync(logoPath)) {
+        // White rounded background for the logo
+        doc.save()
+        roundRectPath(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8, 8)
+        doc.fill(WHITE)
+        doc.lineWidth(1).strokeColor(GOLD)
+        doc.stroke()
+        doc.restore()
+        doc.image(logoPath, logoX, logoY, { width: logoSize, height: logoSize })
+      } else {
+        // Fallback: navy square with gold FIA
+        doc.save()
+        roundRectPath(logoX, logoY, logoSize, logoSize, 10)
+        doc.fill(NAVY)
+        doc.restore()
+        doc.save()
+        doc.lineWidth(1.5).strokeColor(GOLD)
+        roundRectPath(logoX, logoY, logoSize, logoSize, 10)
+        doc.stroke()
+        doc.restore()
+        setFont(16, 'bold')
+        doc.fillColor(GOLD).text('FIA', logoX, logoY + logoSize / 2 - 8, { width: logoSize, align: 'center' })
+      }
 
       // ===== Title: CERTIFICATE OF COMPLETION (gold) =====
       setFont(11, 'bold')

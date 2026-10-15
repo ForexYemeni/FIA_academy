@@ -226,10 +226,10 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
           ))}
 
           <div className="relative p-6 md:p-10">
-            {/* Logo top-right */}
+            {/* Logo top-right — official FIA logo */}
             <div className="absolute top-4 right-4 md:top-6 md:right-6">
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0F172A', border: '1.5px solid #C5A059' }}>
-                <span className="font-bold text-sm md:text-base" style={{ color: '#C5A059' }}>FIA</span>
+              <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #C5A059', padding: '4px' }}>
+                <img src="/fia/logo-official.png" alt="FIA Logo" className="h-12 w-12 md:h-14 md:w-14 object-contain" />
               </div>
             </div>
 

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   keywords: ["أكاديمية المستقبل الدولية", "FIA", "تعليم طبي", "BLS", "ACLS", "تمريض", "طب طوارئ", "شهادات معتمدة", "اليمن", "صنعاء"],
   authors: [{ name: "أكاديمية المستقبل الدولية" }],
   icons: {
-    icon: "/fia/favicon.svg",
+    icon: "/fia/logo-official.png",
   },
   openGraph: {
     title: "أكاديمية المستقبل الدولية (FIA)",
