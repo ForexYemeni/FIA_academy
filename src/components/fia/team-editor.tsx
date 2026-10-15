@@ -301,6 +301,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
   const [avatar, setAvatar] = useState(editing?.avatar || null)
   const [signature, setSignature] = useState(editing?.signature || null)
   const [email, setEmail] = useState(editing?.email || '')
+  const [password, setPassword] = useState('')
   const [phone, setPhone] = useState(editing?.phone || '')
   const [linkedin, setLinkedin] = useState(editing?.linkedin || '')
   const [twitter, setTwitter] = useState(editing?.twitter || '')
@@ -334,6 +335,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       setAvatar(editing.avatar || null)
       setSignature(editing.signature || null)
       setEmail(editing.email || '')
+      setPassword('')
       setPhone(editing.phone || '')
       setLinkedin(editing.linkedin || '')
       setTwitter(editing.twitter || '')
@@ -351,7 +353,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       setUnifiedText(parts.join('\n\n'))
     } else {
       setName(''); setTitle(''); setRole(defaultRole); setAvatar(null); setSignature(null)
-      setEmail(''); setPhone(''); setLinkedin(''); setTwitter(''); setYearsExp(0); setDisplayOrder(0)
+      setEmail(''); setPassword(''); setPhone(''); setLinkedin(''); setTwitter(''); setYearsExp(0); setDisplayOrder(0)
       setUnifiedText('')
     }
   }, [editing, defaultRole])
@@ -408,7 +410,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       qualifications: stringifyArray(parsed.qualifications),
       achievements: stringifyArray(parsed.achievements),
       avatar: avatar || null,
-      signature: signature || null,
+      signature: role === 'founder' ? (signature || null) : null,
       email: email.trim() || null,
       phone: phone.trim() || null,
       linkedin: linkedin.trim() || null,
@@ -440,19 +442,17 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Avatar */}
-          {editing?.id ? (
-            <div className="flex justify-center p-2">
-              <AvatarUploader
-                userId={editing.id}
-                role="team"
-                initialUrl={avatar || undefined}
-                name={name}
-                size="lg"
-                onUploaded={(url) => setAvatar(url)}
-              />
-            </div>
-          ) : null}
+          {/* Avatar — always available (even before save) */}
+          <div className="flex justify-center p-2">
+            <AvatarUploader
+              userId={editing?.id || 'temp-' + Date.now()}
+              role="team"
+              initialUrl={avatar || undefined}
+              name={name || 'عضو'}
+              size="lg"
+              onUploaded={(url) => setAvatar(url)}
+            />
+          </div>
 
           {/* Basic: Name + Title + Role in one row */}
           <div className="grid grid-cols-3 gap-3">
@@ -473,6 +473,20 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             <Label className="text-xs">المسمى الوظيفي</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: المؤسس والمدير التنفيذي" className="mt-1" />
           </div>
+
+          {/* Login credentials — for founder/leader only */}
+          {(role === 'founder' || role === 'leader') && (
+            <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+              <div>
+                <Label className="text-xs">البريد لتسجيل الدخول</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="member@fia.edu" />
+              </div>
+              <div>
+                <Label className="text-xs">كلمة المرور</Label>
+                <Input value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="••••••••" />
+              </div>
+            </div>
+          )}
 
           {/* Unified text field — all professional info in one place */}
           <div className="border-t border-border pt-4">
@@ -557,10 +571,11 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             </div>
           </div>
 
-          {/* Signature */}
+          {/* Signature — founder only */}
+          {role === 'founder' && (
           <div className="border-t border-border pt-4">
             <h3 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
-              <PenTool className="w-4 h-4 text-gold" /> التوقيع (للشهادات)
+              <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات)
             </h3>
             <div className="flex items-center gap-3">
               {signature ? (
@@ -581,6 +596,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
               {signature && <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => setSignature(null)}>إزالة</Button>}
             </div>
           </div>
+          )}
 
           {/* Years + order */}
           <div className="grid grid-cols-2 gap-3">

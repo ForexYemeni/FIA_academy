@@ -208,12 +208,13 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
                 <div className="text-center md:text-right">
                   <div className="relative inline-block">
                     {founder.avatar ? (
-                      <img src={founder.avatar} alt={founder.name} className="w-48 h-48 rounded-2xl object-cover border-4 border-gold/30 mx-auto" />
+                      <img src={founder.avatar} alt={founder.name} className="w-44 h-44 rounded-full object-cover border-4 border-gold/40 mx-auto shadow-xl" />
                     ) : (
-                      <div className="w-48 h-48 rounded-2xl bg-white/10 border-4 border-gold/30 flex items-center justify-center mx-auto">
+                      <div className="w-44 h-44 rounded-full bg-white/10 border-4 border-gold/40 flex items-center justify-center mx-auto shadow-xl">
                         <span className="text-6xl text-gold font-bold">{founder.name?.charAt(0)}</span>
                       </div>
                     )}
+                    <div className="absolute -top-2 right-1/2 translate-x-1/2 text-3xl">👑</div>
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gold text-navy text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
                       ★ المؤسس
                     </div>
