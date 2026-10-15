@@ -331,29 +331,29 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
               </div>
             </div>
 
-            {/* 3 INFO BOXES (Date / Issuer / Status) */}
+            {/* 3 INFO BOXES — UNIFIED PROFESSIONAL DESIGN (all same shape/size) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3 mt-4 md:mt-5 pr-0 md:pr-0">
-              {/* Card 1: Date */}
+              {/* Box 1: Date */}
               <div className="rounded-lg p-2.5 md:p-3 flex items-center gap-3" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #C9A961' }}>
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0A1F44' }}>
-                  <span className="text-xs md:text-sm">📅</span>
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0A1F44' }}>
+                  <span className="text-xs">📅</span>
                 </div>
                 <div className="flex-1 min-w-0 text-right">
-                  <div className="text-[10px] md:text-[11px]" style={{ color: '#6B6B6B' }}>تاريخ الإصدار</div>
+                  <div className="text-[9px] md:text-[10px]" style={{ color: '#6B6B6B' }}>تاريخ الإصدار</div>
                   <div className="text-xs md:text-sm font-bold" style={{ color: '#0A1F44' }}>{issueDate}</div>
                 </div>
               </div>
-              {/* Card 2: Issuer */}
+              {/* Box 2: Issuer */}
               <div className="rounded-lg p-2.5 md:p-3 flex items-center gap-3" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #C9A961' }}>
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0A1F44' }}>
-                  <span className="text-xs md:text-sm">🎓</span>
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0A1F44' }}>
+                  <span className="text-xs">🎓</span>
                 </div>
                 <div className="flex-1 min-w-0 text-right">
-                  <div className="text-[10px] md:text-[11px]" style={{ color: '#6B6B6B' }}>الجهة المصدرة</div>
+                  <div className="text-[9px] md:text-[10px]" style={{ color: '#6B6B6B' }}>الجهة المصدرة</div>
                   <div className="text-xs md:text-sm font-bold" style={{ color: '#0A1F44' }}>أكاديمية المستقبل الدولية</div>
                 </div>
               </div>
-              {/* Card 3: Status */}
+              {/* Box 3: Status — same shape, distinct colored border */}
               {(() => {
                 const isRevoked = result.status === 'ملغاة' || result.status === 'ملغي'
                 const statusColor = isRevoked ? '#A02424' : '#1B7E3A'
@@ -361,13 +361,13 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
                 const statusText = isRevoked ? 'ملغي' : 'صالح'
                 return (
                   <div className="rounded-lg p-2.5 md:p-3 flex items-center gap-3"
-                    style={{ backgroundColor: statusBgColor, border: `2px solid ${statusColor}` }}>
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: statusBgColor, border: `1.5px solid ${statusColor}` }}>
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: statusColor }}>
-                      <span className="text-white text-sm md:text-base font-bold">{isRevoked ? '✕' : '✓'}</span>
+                      <span className="text-white text-xs font-bold">{isRevoked ? '✕' : '✓'}</span>
                     </div>
                     <div className="flex-1 min-w-0 text-right">
-                      <div className="text-[10px] md:text-[11px]" style={{ color: '#6B6B6B' }}>الحالة</div>
+                      <div className="text-[9px] md:text-[10px]" style={{ color: '#6B6B6B' }}>الحالة</div>
                       <div className="text-xs md:text-sm font-bold" style={{ color: statusColor }}>{statusText}</div>
                     </div>
                   </div>
@@ -375,37 +375,35 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
               })()}
             </div>
 
-            {/* Bottom row: QR (left) + Barcode (center) + Signature (right) */}
-            <div className="flex items-end justify-between gap-2 mt-5 pt-3" style={{ borderTop: '1.5px solid #C9A961' }}>
-              {/* QR (left) */}
-              <div className="text-center flex-shrink-0">
+            {/* Bottom row — 3 EQUAL COLUMNS inside inner gold frame */}
+            <div className="grid grid-cols-3 gap-2 mt-5 pt-3" style={{ borderTop: '1.5px solid #C9A961' }}>
+              {/* QR (left column) */}
+              <div className="text-center flex flex-col items-center">
                 <img
                   src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
                   alt="QR"
                   className="w-12 h-12 md:w-14 md:h-14 rounded"
-                  style={{ border: '1.5px solid #C9A961', padding: '3px', backgroundColor: '#FFFFFF' }}
+                  style={{ border: '1.2px solid #C9A961', padding: '3px', backgroundColor: '#FFFFFF' }}
                 />
                 <div className="text-[9px] md:text-[10px] mt-1 font-bold" style={{ color: '#0A1F44' }}>امسح للتحقق</div>
               </div>
 
-              {/* Barcode (center) */}
-              <div className="text-center flex-1 mx-1">
-                <div className="inline-block rounded-md px-3 py-2" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #C9A961' }}>
+              {/* Cert ID (center column) */}
+              <div className="text-center flex flex-col items-center">
+                <div className="inline-block rounded-md px-3 py-2" style={{ backgroundColor: '#FFFFFF', border: '1.2px solid #C9A961', minWidth: '110px' }}>
                   <div className="text-[8px] md:text-[9px] mb-1 font-bold" style={{ color: '#6B6B6B' }}>رقم الشهادة</div>
                   <div className="text-xs md:text-sm font-bold font-mono tracking-wide" style={{ color: '#0A1F44' }} dir="ltr">{result.certificate_number}</div>
-                  <div className="text-[8px] md:text-[9px] mt-0.5 font-bold" style={{ color: '#6B6B6B' }}>CERTIFICATE ID</div>
+                  <div className="text-[7px] md:text-[8px] mt-0.5 font-bold" style={{ color: '#6B6B6B' }}>CERTIFICATE ID</div>
                 </div>
               </div>
 
-              {/* Signature (right) — EMPTY by default, only shown if signature_image is approved by admin */}
-              <div className="text-center flex-shrink-0">
-                <div className="text-[9px] md:text-[10px] mb-1 font-bold" style={{ color: '#6B6B6B' }}>توقيع الجهة المانوحة</div>
-                {/* Signature area — empty by default */}
-                {/* Signatory name + position ONLY shown if signature is approved (not yet implemented in this static display) */}
-                {/* For now, this remains an empty area where signature can be added later via admin dashboard */}
-                <div className="mx-auto my-1" style={{ minHeight: '30px', minWidth: '100px' }} />
+              {/* Signature (right column) — EMPTY by default */}
+              <div className="text-center flex flex-col items-center">
+                <div className="text-[9px] md:text-[10px] mb-1 font-bold" style={{ color: '#0A1F44' }}>توقيع الجهة المانوحة</div>
+                {/* Empty signature area (signature will be added by admin later) */}
+                <div style={{ minHeight: '32px', minWidth: '90px' }} />
                 {/* Thin gold signature line */}
-                <div className="mx-auto mt-1 h-px w-24" style={{ backgroundColor: '#C9A961' }} />
+                <div className="h-px w-20 md:w-24" style={{ backgroundColor: '#C9A961' }} />
               </div>
             </div>
           </div>

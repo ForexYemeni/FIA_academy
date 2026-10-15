@@ -521,137 +521,126 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(GOLD_BRIGHT)
   ctx.fillText(courseText, cx, plaqueY + plaqueH / 2 + 1 * scale)
 
-  // ===== 3 INFO BOXES (Date / Issuer / Status) =====
-  const boxesY = cardY + 430 * scale
-  const boxesH = 40 * scale
+  // ===== 3 INFO BOXES — UNIFIED PROFESSIONAL DESIGN (all same shape/size) =====
+  const boxesY = cardY + 425 * scale
+  const boxesH = 42 * scale
   const boxW = 200 * scale
-  const boxGap = 18 * scale
+  const boxGap = 14 * scale
   const totalBoxesW = 3 * boxW + 2 * boxGap
   const boxesStartX = cx - totalBoxesW / 2
+  const iconSize = 28 * scale
+  const iconPad = 11 * scale
 
-  // Box 1: Date (left)
-  fillRoundRect(boxesStartX, boxesY, boxW, boxesH, 8 * scale, WHITE)
-  strokeRoundRect(boxesStartX, boxesY, boxW, boxesH, 8 * scale, GOLD, 1.5 * scale)
-  // Calendar icon circle
-  fillRoundRect(boxesStartX + 12 * scale, boxesY + 12 * scale, 32 * scale, 32 * scale, 16 * scale, NAVY)
-  setFont(16, 'bold'); fill(GOLD_BRIGHT); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.fillText('📅', boxesStartX + 28 * scale, boxesY + 28 * scale)
-  // Label + value
-  ctx.direction = 'rtl'; setFont(9, 'regular'); fill(GRAY)
-  ctx.textAlign = 'right'
-  ctx.fillText('تاريخ الإصدار', boxesStartX + boxW - 14 * scale, boxesY + 16 * scale)
-  setFont(13, 'bold'); fill(NAVY)
-  ctx.fillText(issueDate, boxesStartX + boxW - 14 * scale, boxesY + 38 * scale)
+  // Helper: draw one info box (unified design)
+  const drawInfoBox = (x: number, icon: string, label: string, value: string, valueColor: string, boxBgColor: string = WHITE, boxBorderColor: string = GOLD) => {
+    fillRoundRect(x, boxesY, boxW, boxesH, 8 * scale, boxBgColor)
+    strokeRoundRect(x, boxesY, boxW, boxesH, 8 * scale, boxBorderColor, 1.5 * scale)
+    // Icon circle
+    fillRoundRect(x + iconPad, boxesY + (boxesH - iconSize) / 2, iconSize, iconSize, iconSize / 2, boxBorderColor === GOLD ? NAVY : boxBorderColor)
+    setFont(11, 'bold'); fill(GOLD_BRIGHT); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(icon, x + iconPad + iconSize / 2, boxesY + boxesH / 2 + 1 * scale)
+    // Label + value (right side, RTL)
+    ctx.direction = 'rtl'; setFont(8, 'regular'); fill(GRAY); ctx.textAlign = 'right'
+    ctx.fillText(label, x + boxW - 12 * scale, boxesY + 13 * scale)
+    setFont(11, 'bold'); fill(valueColor)
+    ctx.fillText(value, x + boxW - 12 * scale, boxesY + 30 * scale)
+  }
 
-  // Box 2: Issuer (center)
+  // Box 1: Date
+  drawInfoBox(boxesStartX, '📅', 'تاريخ الإصدار', issueDate, NAVY)
+  // Box 2: Issuer
   const box2X = boxesStartX + boxW + boxGap
-  fillRoundRect(box2X, boxesY, boxW, boxesH, 8 * scale, WHITE)
-  strokeRoundRect(box2X, boxesY, boxW, boxesH, 8 * scale, GOLD, 1.5 * scale)
-  fillRoundRect(box2X + 12 * scale, boxesY + 12 * scale, 32 * scale, 32 * scale, 16 * scale, NAVY)
-  setFont(16, 'bold'); fill(GOLD_BRIGHT); ctx.textAlign = 'center'
-  ctx.fillText('🎓', box2X + 28 * scale, boxesY + 28 * scale)
-  ctx.direction = 'rtl'; setFont(9, 'regular'); fill(GRAY); ctx.textAlign = 'right'
-  ctx.fillText('الجهة المصدرة', box2X + boxW - 14 * scale, boxesY + 16 * scale)
-  setFont(13, 'bold'); fill(NAVY)
-  ctx.fillText('أكاديمية المستقبل الدولية', box2X + boxW - 14 * scale, boxesY + 38 * scale)
-
-  // Box 3: Status (right) — distinct colored card
+  drawInfoBox(box2X, '🎓', 'الجهة المصدرة', 'أكاديمية المستقبل الدولية', NAVY)
+  // Box 3: Status
   const box3X = boxesStartX + 2 * (boxW + boxGap)
   const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
   const statusColor = isRevoked ? CRIMSON : EMERALD
   const statusBgColor = isRevoked ? CRIMSON_LIGHT : EMERALD_LIGHT
   const statusText = isRevoked ? 'ملغي' : 'صالح'
-  fillRoundRect(box3X, boxesY, boxW, boxesH, 8 * scale, statusBgColor)
-  strokeRoundRect(box3X, boxesY, boxW, boxesH, 8 * scale, statusColor, 2 * scale)
-  fillRoundRect(box3X + 12 * scale, boxesY + 12 * scale, 32 * scale, 32 * scale, 16 * scale, statusColor)
-  setFont(16, 'bold'); fill(WHITE); ctx.textAlign = 'center'
-  ctx.fillText(isRevoked ? '✕' : '✓', box3X + 28 * scale, boxesY + 28 * scale)
-  ctx.direction = 'rtl'; setFont(9, 'regular'); fill(GRAY); ctx.textAlign = 'right'
-  ctx.fillText('الحالة', box3X + boxW - 14 * scale, boxesY + 16 * scale)
-  setFont(13, 'bold'); fill(statusColor)
-  ctx.fillText(statusText, box3X + boxW - 14 * scale, boxesY + 38 * scale)
+  drawInfoBox(box3X, isRevoked ? '✕' : '✓', 'الحالة', statusText, statusColor, statusBgColor, statusColor)
 
-  // ===== BOTTOM ROW: QR (left) + Barcode (center) + Signature (right) =====
-  const bottomY = cardY + 480 * scale
+  // ===== BOTTOM ROW: 3 EQUAL COLUMNS (QR / Cert ID / Signature) — INSIDE inner gold frame =====
+  // Layout uses 3 equal columns within the inner gold frame area, with consistent spacing
+  const innerLeft = cardX + 32 * scale  // inside inner gold frame
+  const innerRight = cardX + cardW - 32 * scale
+  const innerW = innerRight - innerLeft
+  const colW = innerW / 3
+  const colGap = 8 * scale
+  const bottomY = cardY + 478 * scale
 
-  // --- QR (left) ---
+  // --- QR (left column) ---
   const qrBuffer = await generateQR(verifyUrl)
   const qrImg = await loadImage(qrBuffer)
-  const qrSize = 55 * scale
-  const qrX = cardX + 70 * scale
-  // White background card for QR
-  fillRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, WHITE)
-  strokeRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, GOLD, 1.5 * scale)
-  ctx.drawImage(qrImg, qrX, bottomY, qrSize, qrSize)
+  const qrSize = 38 * scale
+  const qrColCenterX = innerLeft + colW / 2 - colGap / 2
+  const qrY = bottomY + 2 * scale
+  // White card for QR
+  fillRoundRect(qrColCenterX - qrSize / 2 - 4 * scale, qrY - 4 * scale, qrSize + 8 * scale, qrSize + 8 * scale, 4 * scale, WHITE)
+  strokeRoundRect(qrColCenterX - qrSize / 2 - 4 * scale, qrY - 4 * scale, qrSize + 8 * scale, qrSize + 8 * scale, 4 * scale, GOLD, 1.2 * scale)
+  ctx.drawImage(qrImg, qrColCenterX - qrSize / 2, qrY, qrSize, qrSize)
   // QR label
-  ctx.direction = 'rtl'; setFont(10, 'bold'); fill(NAVY); ctx.textAlign = 'center'
-  ctx.fillText('امسح للتحقق', qrX + qrSize / 2, bottomY + qrSize + 14 * scale)
+  ctx.direction = 'rtl'; setFont(9, 'bold'); fill(NAVY); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('امسح للتحقق', qrColCenterX, qrY + qrSize + 14 * scale)
 
-  // --- Barcode (center) ---
+  // --- Cert ID (center column) — barcode + cert number inside white card ---
+  const certColCenterX = innerLeft + colW + colGap / 2 + colW / 2 - colGap / 2
   const barcodeBuffer = await generateBarcode(cert.certificate_number)
   const barcodeImg = await loadImage(barcodeBuffer)
-  const barcodeW = 140 * scale
-  const barcodeH = 25 * scale
-  const barcodeX = cx - barcodeW / 2
-  const barcodeY = bottomY + 5 * scale
-  fillRoundRect(barcodeX - 10 * scale, barcodeY - 6 * scale, barcodeW + 20 * scale, barcodeH + 45 * scale, 4 * scale, WHITE)
-  strokeRoundRect(barcodeX - 10 * scale, barcodeY - 6 * scale, barcodeW + 20 * scale, barcodeH + 45 * scale, 4 * scale, GOLD, 1.2 * scale)
+  const barcodeW = 100 * scale
+  const barcodeH = 20 * scale
+  const barcodeX = certColCenterX - barcodeW / 2
+  const barcodeY = bottomY + 4 * scale
+  const barcodeCardH = barcodeH + 28 * scale
+  // White card containing barcode + cert number
+  fillRoundRect(barcodeX - 6 * scale, barcodeY - 6 * scale, barcodeW + 12 * scale, barcodeCardH, 4 * scale, WHITE)
+  strokeRoundRect(barcodeX - 6 * scale, barcodeY - 6 * scale, barcodeW + 12 * scale, barcodeCardH, 4 * scale, GOLD, 1.2 * scale)
   ctx.drawImage(barcodeImg, barcodeX, barcodeY, barcodeW, barcodeH)
-  ctx.direction = 'ltr'; setFont(12, 'bold'); fill(NAVY)
-  ctx.fillText(cert.certificate_number, cx, bottomY + barcodeH + 12 * scale)
-  setFont(8, 'regular'); fill(GRAY)
-  ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 26 * scale)
+  ctx.direction = 'ltr'; setFont(9, 'bold'); fill(NAVY)
+  ctx.fillText(cert.certificate_number, certColCenterX, barcodeY + barcodeH + 8 * scale)
+  setFont(7, 'regular'); fill(GRAY)
+  ctx.fillText('CERTIFICATE ID', certColCenterX, barcodeY + barcodeH + 16 * scale)
 
-  // --- SIGNATURE (right) — EMPTY by default, only drawn if signature_image is provided by admin ---
-  // Per requirements: signature is added later from admin dashboard, not auto-generated
-  const sigAreaW = 200 * scale
-  const sigAreaX = cardX + cardW - 60 * scale - sigAreaW
+  // --- SIGNATURE (right column) — EMPTY by default, drawn only if signature_image provided ---
+  const sigColCenterX = innerLeft + 2 * colW + colGap + colW / 2 - colGap / 2
+  const sigAreaW = colW - 20 * scale
+  const sigAreaX = sigColCenterX - sigAreaW / 2
 
-  // Top label — always shown (indicates signature area)
-  ctx.direction = 'rtl'; setFont(12, 'bold'); fill(NAVY); ctx.textAlign = 'center'
-  ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 8 * scale)
+  // Top label
+  ctx.direction = 'rtl'; setFont(10, 'bold'); fill(NAVY); ctx.textAlign = 'center'
+  ctx.fillText('توقيع الجهة المانوحة', sigColCenterX, bottomY + 4 * scale)
 
-  // Only draw signature image if provided (from admin dashboard)
+  // Signature image (only if provided from admin dashboard)
   let signatureDrawn = false
   if (founderSignature) {
     try {
       const sigImgBuf = await fetch(founderSignature).then(r => r.arrayBuffer())
       const sigImg = await loadImage(Buffer.from(sigImgBuf))
-      const sigImgW = 140 * scale
-      const sigImgH = 45 * scale
-      ctx.drawImage(sigImg, sigAreaX + (sigAreaW - sigImgW) / 2, bottomY + 15 * scale, sigImgW, sigImgH)
+      const sigImgW = 100 * scale
+      const sigImgH = 28 * scale
+      ctx.drawImage(sigImg, sigColCenterX - sigImgW / 2, bottomY + 10 * scale, sigImgW, sigImgH)
       signatureDrawn = true
     } catch {}
   }
-  // No fallback signature — area remains EMPTY if no signature_image provided
+  // No fallback — area remains EMPTY
 
-  // Thin elegant gold signature line (always shown — indicates where signature goes)
+  // Thin gold signature line
   stroke(GOLD, 1 * scale)
   ctx.beginPath()
-  ctx.moveTo(sigAreaX + 15 * scale, bottomY + 40 * scale)
-  ctx.lineTo(sigAreaX + sigAreaW - 15 * scale, bottomY + 40 * scale)
+  ctx.moveTo(sigAreaX + 5 * scale, bottomY + 42 * scale)
+  ctx.lineTo(sigAreaX + sigAreaW - 5 * scale, bottomY + 42 * scale)
   ctx.stroke()
 
-  // Signatory name + position — ONLY shown if signature is approved (founderSignature provided)
+  // Signatory name + position — ONLY shown if signature is approved
   if (signatureDrawn && signatoryName) {
-    setFont(13, 'bold'); fill(NAVY)
-    ctx.fillText(signatoryName, sigAreaX + sigAreaW / 2, bottomY + 50 * scale)
+    setFont(11, 'bold'); fill(NAVY)
+    ctx.fillText(signatoryName, sigColCenterX, bottomY + 50 * scale)
   }
   if (signatureDrawn && signatoryPosition) {
-    setFont(10, 'regular'); fill(GRAY_DARK)
-    ctx.fillText(signatoryPosition, sigAreaX + sigAreaW / 2, bottomY + 63 * scale)
+    setFont(8, 'regular'); fill(GRAY_DARK)
+    ctx.fillText(signatoryPosition, sigColCenterX, bottomY + 60 * scale)
   }
 
-  // ===== WATERMARK (very faint FIA diagonal) =====
-  ctx.save()
-  ctx.globalAlpha = 0.04
-  ctx.translate(cx, pageH / 2)
-  ctx.rotate(Math.PI / 4)
-  setFont(150, 'black')
-  fill(NAVY)
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.fillText('FIA', 0, 0)
-  ctx.restore()
+  // ===== WATERMARK REMOVED (was interfering with text readability) =====
 
   return await canvas.encode('png')
 }
@@ -834,104 +823,92 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.restore()
       doc.fillColor(GOLD_BRIGHT).text(courseText, plaqueX, plaqueY + 16, { width: plaqueW, align: 'center' })
 
-      // 3 INFO BOXES
-      const boxesY = cardY + 430, boxesH = 40, boxW = 200, boxGap = 18
+      // 3 INFO BOXES — UNIFIED PROFESSIONAL DESIGN (all same shape/size)
+      const boxesY = cardY + 425, boxesH = 42, boxW = 200, boxGap = 14
       const totalBoxesW = 3 * boxW + 2 * boxGap
       const boxesStartX = cx - totalBoxesW / 2
+      const iconSize = 28, iconPad = 11
 
-      // Box 1: Date
-      doc.save()
-      roundRectPath(boxesStartX, boxesY, boxW, boxesH, 8)
-      doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
-      doc.stroke()
-      doc.restore()
-      doc.save()
-      roundRectPath(boxesStartX + 12, boxesY + 12, 32, 32, 16)
-      doc.fill(NAVY)
-      doc.restore()
-      setFont(11, 'regular')
-      doc.fillColor(GRAY).text('تاريخ الإصدار', boxesStartX + 54, boxesY + 14, { width: boxW - 64, align: 'right' })
-      setFont(13, 'bold')
-      doc.fillColor(NAVY).text(issueDate, boxesStartX + 54, boxesY + 34, { width: boxW - 64, align: 'right' })
+      // Helper: draw one info box (unified design)
+      const drawInfoBoxPDF = (x: number, icon: string, label: string, value: string, valueColor: string, boxBgColor: string = WHITE, boxBorderColor: string = GOLD) => {
+        doc.save()
+        roundRectPath(x, boxesY, boxW, boxesH, 8)
+        doc.fill(boxBgColor)
+        doc.lineWidth(1.5).strokeColor(boxBorderColor)
+        doc.stroke()
+        doc.restore()
+        // Icon circle
+        doc.save()
+        roundRectPath(x + iconPad, boxesY + (boxesH - iconSize) / 2, iconSize, iconSize, iconSize / 2)
+        doc.fill(boxBorderColor === GOLD ? NAVY : boxBorderColor)
+        doc.restore()
+        setFont(11, 'bold')
+        doc.fillColor(GOLD_BRIGHT).text(icon, x + iconPad, boxesY + (boxesH - iconSize) / 2 + 5, { width: iconSize, align: 'center' })
+        // Label + value
+        setFont(8, 'regular')
+        doc.fillColor(GRAY).text(label, x + iconPad + iconSize + 5, boxesY + 11, { width: boxW - iconPad - iconSize - 18, align: 'right' })
+        setFont(11, 'bold')
+        doc.fillColor(valueColor).text(value, x + iconPad + iconSize + 5, boxesY + 26, { width: boxW - iconPad - iconSize - 18, align: 'right' })
+      }
 
-      // Box 2: Issuer
+      drawInfoBoxPDF(boxesStartX, '📅', 'تاريخ الإصدار', issueDate, NAVY)
       const box2X = boxesStartX + boxW + boxGap
-      doc.save()
-      roundRectPath(box2X, boxesY, boxW, boxesH, 8)
-      doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
-      doc.stroke()
-      doc.restore()
-      doc.save()
-      roundRectPath(box2X + 12, boxesY + 12, 32, 32, 16)
-      doc.fill(NAVY)
-      doc.restore()
-      setFont(11, 'regular')
-      doc.fillColor(GRAY).text('الجهة المصدرة', box2X + 54, boxesY + 14, { width: boxW - 64, align: 'right' })
-      setFont(13, 'bold')
-      doc.fillColor(NAVY).text('أكاديمية المستقبل الدولية', box2X + 54, boxesY + 34, { width: boxW - 64, align: 'right' })
-
-      // Box 3: Status
+      drawInfoBoxPDF(box2X, '🎓', 'الجهة المصدرة', 'أكاديمية المستقبل الدولية', NAVY)
       const box3X = boxesStartX + 2 * (boxW + boxGap)
       const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
       const statusColor = isRevoked ? CRIMSON : EMERALD
       const statusBgColor = isRevoked ? CRIMSON_LIGHT : EMERALD_LIGHT
       const statusText = isRevoked ? 'ملغي' : 'صالح'
-      doc.save()
-      roundRectPath(box3X, boxesY, boxW, boxesH, 8)
-      doc.fill(statusBgColor)
-      doc.lineWidth(2).strokeColor(statusColor)
-      doc.stroke()
-      doc.restore()
-      doc.save()
-      roundRectPath(box3X + 12, boxesY + 12, 32, 32, 16)
-      doc.fill(statusColor)
-      doc.restore()
-      setFont(11, 'regular')
-      doc.fillColor(GRAY).text('الحالة', box3X + 54, boxesY + 14, { width: boxW - 64, align: 'right' })
-      setFont(13, 'bold')
-      doc.fillColor(statusColor).text(statusText, box3X + 54, boxesY + 34, { width: boxW - 64, align: 'right' })
+      drawInfoBoxPDF(box3X, isRevoked ? '✕' : '✓', 'الحالة', statusText, statusColor, statusBgColor, statusColor)
 
-      // ===== BOTTOM ROW: QR + Barcode + Signature =====
-      const bottomY = cardY + 480
+      // ===== BOTTOM ROW: 3 EQUAL COLUMNS (QR / Cert ID / Signature) — INSIDE inner gold frame =====
+      const innerLeft = cardX + 32, innerRight = cardX + cardW - 32
+      const innerW = innerRight - innerLeft
+      const colW = innerW / 3, colGap = 8
+      const bottomY = cardY + 478
 
-      // QR (left)
+      // QR (left column)
       const qrBuffer = await generateQR(verifyUrl)
-      const qrSize = 55, qrX = cardX + 70
+      const qrSize = 38
+      const qrColCenterX = innerLeft + colW / 2 - colGap / 2
+      const qrY = bottomY + 2
       doc.save()
-      roundRectPath(qrX - 6, bottomY - 6, qrSize + 12, qrSize + 12, 6)
+      roundRectPath(qrColCenterX - qrSize / 2 - 4, qrY - 4, qrSize + 8, qrSize + 8, 4)
       doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
+      doc.lineWidth(1.2).strokeColor(GOLD)
       doc.stroke()
       doc.restore()
-      doc.image(qrBuffer, qrX, bottomY, { width: qrSize, height: qrSize })
-      setFont(10, 'bold')
-      doc.fillColor(NAVY).text('امسح للتحقق', qrX, bottomY + qrSize + 4, { width: qrSize, align: 'center' })
+      doc.image(qrBuffer, qrColCenterX - qrSize / 2, qrY, { width: qrSize, height: qrSize })
+      setFont(9, 'bold')
+      doc.fillColor(NAVY).text('امسح للتحقق', qrColCenterX - 30, qrY + qrSize + 2, { width: 60, align: 'center' })
 
-      // Barcode (center)
+      // Cert ID (center column)
+      const certColCenterX = innerLeft + colW + colGap / 2 + colW / 2 - colGap / 2
       const barcodeBuffer = await generateBarcode(cert.certificate_number)
-      const barcodeW = 140, barcodeH = 25
-      const barcodeX = cx - barcodeW / 2, barcodeY = bottomY + 5
+      const barcodeW = 100, barcodeH = 20
+      const barcodeX = certColCenterX - barcodeW / 2
+      const barcodeY = bottomY + 4
+      const barcodeCardH = barcodeH + 28
       doc.save()
-      roundRectPath(barcodeX - 10, barcodeY - 6, barcodeW + 20, barcodeH + 45, 4)
+      roundRectPath(barcodeX - 6, barcodeY - 6, barcodeW + 12, barcodeCardH, 4)
       doc.fill(WHITE)
       doc.lineWidth(1.2).strokeColor(GOLD)
       doc.stroke()
       doc.restore()
       doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH })
-      setFont(12, 'bold')
-      doc.fillColor(NAVY).text(cert.certificate_number, cx - 100, barcodeY + barcodeH + 2, { width: 200, align: 'center' })
-      setFont(8, 'regular')
-      doc.fillColor(GRAY).text('CERTIFICATE ID', cx - 100, barcodeY + barcodeH + 18, { width: 200, align: 'center' })
+      setFont(9, 'bold')
+      doc.fillColor(NAVY).text(cert.certificate_number, certColCenterX - 60, barcodeY + barcodeH + 2, { width: 120, align: 'center' })
+      setFont(7, 'regular')
+      doc.fillColor(GRAY).text('CERTIFICATE ID', certColCenterX - 60, barcodeY + barcodeH + 12, { width: 120, align: 'center' })
 
-      // Signature (right) — EMPTY by default, only drawn if signature_image provided by admin
-      const sigAreaW = 200
-      const sigAreaX = cardX + cardW - 60 - sigAreaW
-      setFont(12, 'bold')
-      doc.fillColor(NAVY).text('توقيع الجهة المانوحة', sigAreaX, bottomY + 3, { width: sigAreaW, align: 'center' })
+      // Signature (right column) — EMPTY by default
+      const sigColCenterX = innerLeft + 2 * colW + colGap + colW / 2 - colGap / 2
+      const sigAreaW = colW - 20
+      const sigAreaX = sigColCenterX - sigAreaW / 2
+      setFont(10, 'bold')
+      doc.fillColor(NAVY).text('توقيع الجهة المانوحة', sigAreaX, bottomY + 2, { width: sigAreaW, align: 'center' })
 
-      // Only draw signature image if provided (from admin dashboard)
+      // Signature image (only if provided)
       let signatureDrawn = false
       if (founderSignature) {
         try {
@@ -940,36 +917,29 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
           const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
           fs.writeFileSync(sigPath, Buffer.from(sigBuf))
           if (fs.existsSync(sigPath)) {
-            doc.image(sigPath, sigAreaX + 30, bottomY + 15, { width: 140, height: 40 })
+            doc.image(sigPath, sigColCenterX - 50, bottomY + 10, { width: 100, height: 28 })
             fs.unlinkSync(sigPath)
             signatureDrawn = true
           }
         } catch {}
       }
-      // No fallback signature — area remains EMPTY if no signature_image provided
+      // No fallback signature
 
-      // Thin gold signature line (always shown — indicates where signature goes)
+      // Thin gold signature line
       doc.lineWidth(1).strokeColor(GOLD)
-      doc.moveTo(sigAreaX + 15, bottomY + 40).lineTo(sigAreaX + sigAreaW - 15, bottomY + 40).stroke()
+      doc.moveTo(sigAreaX + 5, bottomY + 42).lineTo(sigAreaX + sigAreaW - 5, bottomY + 42).stroke()
 
-      // Signatory name + position — ONLY shown if signature is approved (signatureDrawn)
+      // Signatory name + position — ONLY shown if signature is approved
       if (signatureDrawn && signatoryName) {
-        setFont(13, 'bold')
+        setFont(11, 'bold')
         doc.fillColor(NAVY).text(signatoryName, sigAreaX, bottomY + 48, { width: sigAreaW, align: 'center' })
       }
       if (signatureDrawn && signatoryPosition) {
-        setFont(10, 'regular')
-        doc.fillColor(GRAY_DARK).text(signatoryPosition, sigAreaX, bottomY + 61, { width: sigAreaW, align: 'center' })
+        setFont(8, 'regular')
+        doc.fillColor(GRAY_DARK).text(signatoryPosition, sigAreaX, bottomY + 58, { width: sigAreaW, align: 'center' })
       }
 
-      // Watermark
-      doc.save()
-      doc.fillOpacity(0.04)
-      doc.translate(cx, pageH / 2)
-      doc.rotate(45)
-      setFont(150, 'black')
-      doc.fillColor(NAVY).text('FIA', -150, -75, { width: 300, align: 'center' })
-      doc.restore()
+      // WATERMARK REMOVED (was interfering with text readability)
 
       doc.end()
     } catch (e: any) {
