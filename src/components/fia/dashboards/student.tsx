@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
-  Compass, Lock, Plus, Download,
+  Compass, Lock, Plus, Download, Loader2, FileUp,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
+import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -37,6 +38,8 @@ const NAV: NavItem[] = [
 
 export function StudentDashboard() {
   const [active, setActive] = useState('overview')
+  const [viewingCourse, setViewingCourse] = useState<any | null>(null)
+  const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
   const user = useAuth((s) => s.user)
   const updateUser = useAuth((s) => s.updateUser)
   const [courses, setCourses] = useState<any[]>([])
@@ -65,20 +68,31 @@ export function StudentDashboard() {
     <DashboardShell
       nav={NAV}
       active={active}
-      onNavigate={setActive}
+      onNavigate={(id) => { setActive(id); if (id !== 'course-view') setViewingCourse(null) }}
       roleLabel="متدرب"
       roleColor="bg-blue-500/15 text-blue-600 border-blue-500/30"
     >
-      {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
-      {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} />}
-      {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
-      {active === 'exams' && <Exams />}
-      {active === 'results' && <Results />}
-      {active === 'certificates' && <Certificates certificates={certificates} />}
-      {active === 'payments' && <Payments payments={payments} />}
-      {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
-      {active === 'notifications' && <Notifications />}
-      {active === 'settings' && <SettingsTab />}
+      {active === 'course-view' && viewingCourse ? (
+        <StudentCourseViewer
+          course={viewingCourse}
+          enrollment={viewingEnrollment}
+          onBack={() => { setViewingCourse(null); setActive('courses') }}
+        />
+      ) : null}
+      {active !== 'course-view' && (
+        <>
+          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
+          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
+          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
+          {active === 'exams' && <Exams />}
+          {active === 'results' && <Results />}
+          {active === 'certificates' && <Certificates certificates={certificates} />}
+          {active === 'payments' && <Payments payments={payments} />}
+          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+          {active === 'notifications' && <Notifications />}
+          {active === 'settings' && <SettingsTab />}
+        </>
+      )}
     </DashboardShell>
   )
 }
@@ -138,7 +152,7 @@ function Overview({ user, courses, certificates, enrollments }: any) {
   )
 }
 
-function MyCourses({ courses, enrollments }: any) {
+function MyCourses({ courses, enrollments, onContinue }: any) {
   const enrolled = (enrollments || [])
     .map((e: any) => {
       const course = courses.find((c: any) => c.id === e.course_id)
@@ -152,6 +166,7 @@ function MyCourses({ courses, enrollments }: any) {
         <div className="text-center py-12">
           <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
+          <p className="text-xs text-muted-foreground mb-4">تصفّح الدورات المتاحة في قسم "استكشاف الدورات"</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -176,9 +191,15 @@ function MyCourses({ courses, enrollments }: any) {
                   <span>{c.enrollment.progress || 0}% مكتمل</span>
                   <span>{c.duration_hours} ساعة</span>
                 </div>
-                <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy">
-                  متابعة التعلّم
-                </Button>
+                {c.enrollment.payment_status === 'pending' ? (
+                  <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
+                    بانتظار تأكيد الدفع
+                  </Button>
+                ) : (
+                  <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>
+                    متابعة التعلّم
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -221,9 +242,12 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
     }
   }
 
-  const enrollPaid = async (course: any, method: any, reference: string) => {
+  const enrollPaid = async (course: any, method: any, reference: string, proofUrl?: string | null) => {
     setEnrolling(course.id)
     try {
+      // Combine reference with proof URL
+      const fullReference = proofUrl ? `${reference} | PROOF: ${proofUrl}` : reference
+
       // 1. Create enrollment with pending payment
       const res = await fetch('/api/enrollments', {
         method: 'POST',
@@ -234,14 +258,14 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
           payment_status: 'pending',
           amount_paid: course.price,
           payment_method: method.name,
-          payment_reference: reference,
+          payment_reference: fullReference,
         }),
       })
       const data = await res.json()
       if (data.already_enrolled) {
         toast.info('أنت مسجّل في هذه الدورة')
       } else if (res.ok) {
-        // 2. Create payment record
+        // 2. Create payment record with proof URL
         await fetch('/api/payments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -250,7 +274,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
             currency: course.currency || 'ر.ي',
             method: method.name,
             status: 'قيد الانتظار',
-            reference,
+            reference: fullReference,
             user_id: userId,
             course_id: course.id,
           }),
@@ -328,7 +352,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
           methods={paymentMethods}
           open={payDialog.open}
           onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
-          onPay={(method, reference) => enrollPaid(payDialog.course, method, reference)}
+          onPay={(method: any, reference: string, proofUrl?: string | null) => enrollPaid(payDialog.course, method, reference, proofUrl)}
           loading={enrolling === payDialog.course.id}
         />
       )}
@@ -339,6 +363,49 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
 function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: any) {
   const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
   const [reference, setReference] = useState('')
+  const [proofUrl, setProofUrl] = useState<string | null>(null)
+  const [uploadingProof, setUploadingProof] = useState(false)
+
+  const handleProofUpload = async (file: File) => {
+    setUploadingProof(true)
+    try {
+      // Compress image on client side
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const maxW = 1024, maxH = 1024
+          let { width, height } = img
+          if (width > maxW) { height = (height * maxW) / width; width = maxW }
+          if (height > maxH) { width = (width * maxH) / height; height = maxH }
+          const canvas = document.createElement('canvas')
+          canvas.width = width; canvas.height = height
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, width, height)
+          canvas.toBlob(async (blob) => {
+            if (!blob) { setUploadingProof(false); return }
+            const fd = new FormData()
+            fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
+            fd.append('folder', 'payment-proofs')
+            const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+            const data = await res.json()
+            if (data.url) {
+              setProofUrl(data.url)
+              toast.success('تم رفع إثبات الدفع')
+            } else {
+              toast.error('فشل رفع الصورة')
+            }
+            setUploadingProof(false)
+          }, 'image/jpeg', 0.85)
+        }
+        img.src = e.target?.result as string
+      }
+      reader.readAsDataURL(file)
+    } catch {
+      toast.error('خطأ في الرفع')
+      setUploadingProof(false)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -378,7 +445,7 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
           {selectedMethod && (
             <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
               <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
-              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم أدخل رقم المعاملة.'}</p>
+              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم ارفع صورة الإيصال.'}</p>
             </div>
           )}
 
@@ -393,13 +460,44 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
               className="mt-1"
             />
           </div>
+
+          {/* Payment proof upload */}
+          <div>
+            <Label className="text-navy">رفع صورة إثبات الدفع (إيصال)</Label>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              id="proof-upload"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProofUpload(f) }}
+            />
+            <div className="mt-1 flex items-center gap-3">
+              {proofUrl ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-md border-2 border-green-500/30" />
+                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> تم رفع الإيصال
+                  </div>
+                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs">إزالة</button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" disabled={uploadingProof} className="flex-1" onClick={() => document.getElementById('proof-upload')?.click()}>
+                  {uploadingProof ? (
+                    <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</>
+                  ) : (
+                    <><FileUp className="w-4 h-4 ml-1" /> اختر صورة الإيصال</>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
           <Button
             className="bg-navy hover:bg-navy-light"
-            disabled={loading || !selectedMethod || !reference.trim()}
-            onClick={() => onPay(selectedMethod, reference)}
+            disabled={loading || !selectedMethod || !reference.trim() || !proofUrl}
+            onClick={() => onPay(selectedMethod, reference, proofUrl)}
           >
             {loading ? 'جاري المعالجة...' : 'تأكيد الاشتراك'}
           </Button>
