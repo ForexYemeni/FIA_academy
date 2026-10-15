@@ -67,14 +67,14 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] overflow-y-auto p-4 md:p-6 mx-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <Badge className={type.color + ' flex-shrink-0'}>
                 <Icon className="w-3.5 h-3.5 ml-1" /> {type.label}
               </Badge>
-              <DialogTitle className="text-navy text-lg truncate">{lesson.title}</DialogTitle>
+              <DialogTitle className="text-navy text-base md:text-lg truncate">{lesson.title}</DialogTitle>
             </div>
             {lesson.duration_minutes ? (
               <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -84,7 +84,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
           </div>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-2 md:py-4">
           {/* Render the lesson based on type */}
           {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} />}
           {lesson.lesson_type === 'text' && <TextContent content={lesson.content} />}
@@ -191,43 +191,53 @@ function TextContent({ content }: { content?: string }) {
       const lines = trimmed.split('\n')
       const isNumberedList = lines.length > 1 && lines.every(l => /^\d+[\.\)]\s/.test(l.trim()))
       const isBulletList = lines.length > 1 && lines.every(l => /^[-•▪]\s/.test(l.trim()))
+      // Heading detection: short line ending with colon or all-caps-like pattern
+      const isHeading = trimmed.length < 80 && (trimmed.endsWith(':') || trimmed.endsWith('：')) && !trimmed.includes('\n')
+
+      if (isHeading) {
+        return (
+          <h3 key={pi} dir="rtl" className="text-navy font-bold text-base md:text-lg mt-6 mb-3 pr-3 border-r-[3px] border-gold">
+            {trimmed}
+          </h3>
+        )
+      }
 
       if (isNumberedList) {
         return (
-          <ol key={pi} className="space-y-3 my-5 list-none">
-          {lines.map((line, li) => {
-            const num = line.trim().match(/^(\d+)/)?.[1] || (li + 1)
-            const text = line.trim().replace(/^\d+[\.\)]\s*/, '')
-            return (
-              <li key={li} className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-navy text-gold text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
-                <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1">{text}</span>
-              </li>
-            )
-          })}
+          <ol key={pi} dir="rtl" className="space-y-3 my-5 list-none pr-1">
+            {lines.map((line, li) => {
+              const num = line.trim().match(/^(\d+)/)?.[1] || (li + 1)
+              const text = line.trim().replace(/^\d+[\.\)]\s*/, '')
+              return (
+                <li key={li} className="flex flex-row-reverse items-start gap-3">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-full bg-navy text-gold text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
+                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right">{text}</span>
+                </li>
+              )
+            })}
           </ol>
         )
       }
 
       if (isBulletList) {
         return (
-          <ul key={pi} className="space-y-2.5 my-5 list-none">
-          {lines.map((line, li) => {
-            const text = line.trim().replace(/^[-•▪]\s*/, '')
-            return (
-              <li key={li} className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gold mt-2.5"></span>
-                <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1">{text}</span>
-              </li>
-            )
-          })}
+          <ul key={pi} dir="rtl" className="space-y-2.5 my-5 list-none pr-1">
+            {lines.map((line, li) => {
+              const text = line.trim().replace(/^[-•▪]\s*/, '')
+              return (
+                <li key={li} className="flex flex-row-reverse items-start gap-3">
+                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gold mt-2.5"></span>
+                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right">{text}</span>
+                </li>
+              )
+            })}
           </ul>
         )
       }
 
-      // Regular paragraph
+      // Regular paragraph — RTL with right alignment (no justify — fixes the visual stretching bug)
       return (
-        <p key={pi} className="text-foreground/90 leading-loose text-sm md:text-base mb-4 text-justify">
+        <p key={pi} dir="rtl" className="text-foreground/90 leading-loose text-sm md:text-base mb-4 text-right break-words">
           {trimmed.split('\n').map((line, li) => (
             <span key={li} className="block">
               {line}
@@ -239,15 +249,15 @@ function TextContent({ content }: { content?: string }) {
   }
 
   return (
-    <div className="relative">
-      {/* Decorative top border */}
-      <div className="h-1 bg-gradient-to-l from-gold via-gold-light to-gold rounded-t-xl mb-0" />
+    <div className="relative" dir="rtl">
+      {/* Decorative top border — luxurious gold gradient */}
+      <div className="h-1.5 bg-gradient-to-l from-gold via-gold-light to-gold rounded-t-xl mb-0 shadow-sm" />
 
-      <div className="bg-white rounded-b-xl border border-border shadow-lg overflow-hidden">
-        {/* Reading header */}
+      <div className="bg-white rounded-b-xl border border-border shadow-xl overflow-hidden">
+        {/* Reading header — luxurious navy gradient */}
         <div className="flex items-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-l from-navy to-navy-light text-white">
           <FileText className="w-4 h-4 text-gold flex-shrink-0" />
-          <span className="text-xs font-semibold">محتوى الدرس</span>
+          <span className="text-xs md:text-sm font-semibold">محتوى الدرس</span>
           <div className="flex-1"></div>
           <button
             onClick={() => {
@@ -255,22 +265,28 @@ function TextContent({ content }: { content?: string }) {
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             }}
-            className="text-[10px] text-gold/70 hover:text-gold transition-colors flex items-center gap-1"
+            className="text-[10px] md:text-xs text-gold/80 hover:text-gold transition-colors flex items-center gap-1 px-2 py-1 rounded-md hover:bg-white/5"
             title="نسخ المحتوى"
           >
             {copied ? <><CheckCircle2 className="w-3 h-3" /> تم النسخ</> : <><Copy className="w-3 h-3" /> نسخ</>}
           </button>
         </div>
 
-        {/* Content body */}
-        <div className="px-4 md:px-8 py-5 md:py-7 max-h-[55vh] overflow-y-auto fia-scroll">
-          <div className="max-w-3xl mx-auto">
-            {formatContent(content)}
+        {/* Decorative thin gold strip under header */}
+        <div className="h-0.5 bg-gradient-to-l from-transparent via-gold to-transparent" />
+
+        {/* Content body — fully responsive with proper RTL */}
+        <div className="px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto fia-scroll bg-gradient-to-b from-white to-cream/30">
+          <div className="max-w-3xl mx-auto" dir="rtl">
+            {/* First letter drop cap effect on first paragraph — luxury feel */}
+            <div className="first-letter:text-3xl first-letter:font-bold first-letter:text-navy first-letter:ml-1 first-letter:float-right">
+              {formatContent(content)}
+            </div>
           </div>
         </div>
 
         {/* Bottom gold accent */}
-        <div className="h-0.5 bg-gradient-to-l from-transparent via-gold/30 to-transparent"></div>
+        <div className="h-1 bg-gradient-to-l from-transparent via-gold/40 to-transparent"></div>
       </div>
     </div>
   )
