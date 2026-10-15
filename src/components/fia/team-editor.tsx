@@ -22,13 +22,13 @@ interface TeamMember {
   user_id?: string | null
   name: string
   title?: string | null
-  role: string  // founder | leader | team
+  role: string
   specialization?: string | null
   bio?: string | null
   vision?: string | null
   mission?: string | null
-  qualifications?: string | null  // JSON array string
-  achievements?: string | null     // JSON array string
+  qualifications?: string | null
+  achievements?: string | null
   avatar?: string | null
   signature?: string | null
   email?: string | null
@@ -292,345 +292,305 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
   )
 }
 
-// ============== Full Team Member Dialog ==============
+// ============== Simple Team Member Dialog ==============
 function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: any) {
-  const [form, setForm] = useState<TeamMember>(
-    editing || {
-      name: '',
-      title: '',
-      role: defaultRole,
-      specialization: '',
-      bio: '',
-      vision: '',
-      mission: '',
-      qualifications: '[]',
-      achievements: '[]',
-      avatar: null,
-      signature: null,
-      email: '',
-      phone: '',
-      linkedin: '',
-      twitter: '',
-      years_experience: 0,
-      display_order: 0,
-      is_active: true,
-    }
-  )
+  // Single unified text field for all professional info
+  const [name, setName] = useState(editing?.name || '')
+  const [title, setTitle] = useState(editing?.title || '')
+  const [role, setRole] = useState(editing?.role || defaultRole)
+  const [avatar, setAvatar] = useState(editing?.avatar || null)
+  const [signature, setSignature] = useState(editing?.signature || null)
+  const [email, setEmail] = useState(editing?.email || '')
+  const [phone, setPhone] = useState(editing?.phone || '')
+  const [linkedin, setLinkedin] = useState(editing?.linkedin || '')
+  const [twitter, setTwitter] = useState(editing?.twitter || '')
+  const [yearsExp, setYearsExp] = useState(editing?.years_experience || 0)
+  const [displayOrder, setDisplayOrder] = useState(editing?.display_order || 0)
+
+  // Single unified text field — user writes everything in one textarea
+  // Format: each section starts with a keyword on its own line
+  // Lines starting with keywords are parsed into structured fields
+  const [unifiedText, setUnifiedText] = useState(() => {
+    if (!editing) return ''
+    const parts: string[] = []
+    if (editing.specialization) parts.push(`التخصص: ${editing.specialization}`)
+    if (editing.bio) parts.push(`النبذة المهنية:\n${editing.bio}`)
+    if (editing.vision) parts.push(`الرؤية:\n${editing.vision}`)
+    if (editing.mission) parts.push(`الرسالة:\n${editing.mission}`)
+    const quals = parseArray(editing.qualifications)
+    if (quals.length > 0) parts.push(`المؤهلات:\n${quals.map(q => `• ${q}`).join('\n')}`)
+    const achs = parseArray(editing.achievements)
+    if (achs.length > 0) parts.push(`الإنجازات:\n${achs.map(a => `• ${a}`).join('\n')}`)
+    return parts.join('\n\n')
+  })
+
   const [saving, setSaving] = useState(false)
-  const [qualifications, setQualifications] = useState<string[]>(parseArray(editing?.qualifications))
-  const [achievements, setAchievements] = useState<string[]>(parseArray(editing?.achievements))
-  const [newQual, setNewQual] = useState('')
-  const [newAch, setNewAch] = useState('')
 
   useEffect(() => {
     if (editing) {
-      setForm(editing)
-      setQualifications(parseArray(editing.qualifications))
-      setAchievements(parseArray(editing.achievements))
+      setName(editing.name || '')
+      setTitle(editing.title || '')
+      setRole(editing.role || defaultRole)
+      setAvatar(editing.avatar || null)
+      setSignature(editing.signature || null)
+      setEmail(editing.email || '')
+      setPhone(editing.phone || '')
+      setLinkedin(editing.linkedin || '')
+      setTwitter(editing.twitter || '')
+      setYearsExp(editing.years_experience || 0)
+      setDisplayOrder(editing.display_order || 0)
+      const parts: string[] = []
+      if (editing.specialization) parts.push(`التخصص: ${editing.specialization}`)
+      if (editing.bio) parts.push(`النبذة المهنية:\n${editing.bio}`)
+      if (editing.vision) parts.push(`الرؤية:\n${editing.vision}`)
+      if (editing.mission) parts.push(`الرسالة:\n${editing.mission}`)
+      const quals = parseArray(editing.qualifications)
+      if (quals.length > 0) parts.push(`المؤهلات:\n${quals.map(q => `• ${q}`).join('\n')}`)
+      const achs = parseArray(editing.achievements)
+      if (achs.length > 0) parts.push(`الإنجازات:\n${achs.map(a => `• ${a}`).join('\n')}`)
+      setUnifiedText(parts.join('\n\n'))
     } else {
-      setForm({
-        name: '',
-        title: '',
-        role: defaultRole,
-        specialization: '',
-        bio: '',
-        vision: '',
-        mission: '',
-        qualifications: '[]',
-        achievements: '[]',
-        avatar: null,
-        signature: null,
-        email: '',
-        phone: '',
-        linkedin: '',
-        twitter: '',
-        years_experience: 0,
-        display_order: 0,
-        is_active: true,
-      })
-      setQualifications([])
-      setAchievements([])
+      setName(''); setTitle(''); setRole(defaultRole); setAvatar(null); setSignature(null)
+      setEmail(''); setPhone(''); setLinkedin(''); setTwitter(''); setYearsExp(0); setDisplayOrder(0)
+      setUnifiedText('')
     }
   }, [editing, defaultRole])
 
-  const addQual = () => {
-    if (newQual.trim()) {
-      const arr = [...qualifications, newQual.trim()]
-      setQualifications(arr)
-      setForm({ ...form, qualifications: stringifyArray(arr) })
-      setNewQual('')
+  // Parse unified text into structured fields
+  const parseUnifiedText = (text: string) => {
+    const result: any = { specialization: null, bio: null, vision: null, mission: null, qualifications: [], achievements: [] }
+    if (!text.trim()) return result
+
+    const sections = text.split(/\n\n+/)
+    for (const section of sections) {
+      const lines = section.trim().split('\n')
+      const header = lines[0].trim()
+      const body = lines.slice(1).join('\n').trim()
+
+      if (header.startsWith('التخصص:')) {
+        result.specialization = header.replace('التخصص:', '').trim()
+      } else if (header.startsWith('النبذة') || header.startsWith('نبذة')) {
+        result.bio = body || header.replace(/^[^:]*:\s*/, '').trim()
+      } else if (header.startsWith('الرؤية') || header.startsWith('رؤية')) {
+        result.vision = body || header.replace(/^[^:]*:\s*/, '').trim()
+      } else if (header.startsWith('الرسالة') || header.startsWith('رسالة')) {
+        result.mission = body || header.replace(/^[^:]*:\s*/, '').trim()
+      } else if (header.startsWith('المؤهلات') || header.startsWith('مؤهلات')) {
+        const items = body.split('\n').map(l => l.replace(/^\s*•\s*/, '').trim()).filter(Boolean)
+        result.qualifications = items
+      } else if (header.startsWith('الإنجازات') || header.startsWith('إنجازات') || header.startsWith('التكريمات') || header.startsWith('تكريمات')) {
+        const items = body.split('\n').map(l => l.replace(/^\s*•\s*/, '').trim()).filter(Boolean)
+        result.achievements = items
+      } else {
+        // Unrecognized section — treat as bio if no bio yet
+        if (!result.bio) result.bio = section.trim()
+      }
     }
-  }
-  const removeQual = (i: number) => {
-    const arr = qualifications.filter((_, idx) => idx !== i)
-    setQualifications(arr)
-    setForm({ ...form, qualifications: stringifyArray(arr) })
-  }
-  const addAch = () => {
-    if (newAch.trim()) {
-      const arr = [...achievements, newAch.trim()]
-      setAchievements(arr)
-      setForm({ ...form, achievements: stringifyArray(arr) })
-      setNewAch('')
-    }
-  }
-  const removeAch = (i: number) => {
-    const arr = achievements.filter((_, idx) => idx !== i)
-    setAchievements(arr)
-    setForm({ ...form, achievements: stringifyArray(arr) })
+    return result
   }
 
   const handleSave = async () => {
-    if (!form.name?.trim()) {
+    if (!name.trim()) {
       toast.error('الاسم مطلوب')
       return
     }
     setSaving(true)
-    const finalForm = {
-      ...form,
-      qualifications: stringifyArray(qualifications),
-      achievements: stringifyArray(achievements),
+    const parsed = parseUnifiedText(unifiedText)
+    const finalForm: TeamMember = {
+      id: editing?.id,
+      name: name.trim(),
+      title: title.trim() || null,
+      role,
+      specialization: parsed.specialization,
+      bio: parsed.bio,
+      vision: parsed.vision,
+      mission: parsed.mission,
+      qualifications: stringifyArray(parsed.qualifications),
+      achievements: stringifyArray(parsed.achievements),
+      avatar: avatar || null,
+      signature: signature || null,
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+      linkedin: linkedin.trim() || null,
+      twitter: twitter.trim() || null,
+      years_experience: yearsExp || 0,
+      display_order: displayOrder || 0,
+      is_active: true,
     }
     await onSave(finalForm)
     setSaving(false)
   }
 
+  // Live preview of parsed sections
+  const parsed = parseUnifiedText(unifiedText)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50"
+        >
+          <X className="w-4 h-4 text-muted-foreground" />
+        </button>
         <DialogHeader>
           <DialogTitle className="text-navy text-lg">
-            {editing ? 'تعديل العضو' : 'إضافة عضو جديد'} — {form.role === 'founder' ? 'المؤسس' : form.role === 'leader' ? 'قائد' : 'فريق'}
+            {editing ? 'تعديل العضو' : 'إضافة عضو جديد'} — {role === 'founder' ? 'المؤسس' : role === 'leader' ? 'قائد' : 'فريق'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 py-4">
+        <div className="space-y-4 py-4">
           {/* Avatar */}
-          <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
-            {form.id ? (
+          {editing?.id ? (
+            <div className="flex justify-center p-2">
               <AvatarUploader
-                userId={form.id}
+                userId={editing.id}
                 role="team"
-                initialUrl={form.avatar}
-                name={form.name}
-                size="xl"
-                onUploaded={(url) => setForm({ ...form, avatar: url })}
+                initialUrl={avatar || undefined}
+                name={name}
+                size="lg"
+                onUploaded={(url) => setAvatar(url)}
               />
-            ) : (
-              <div className="text-center">
-                <div className="w-32 h-32 rounded-full bg-navy flex items-center justify-center mb-2">
-                  <User className="w-12 h-12 text-gold" />
-                </div>
-                <p className="text-xs text-muted-foreground">احفظ أولاً ثم ارفع الصورة</p>
-              </div>
-            )}
-            {form.avatar && !form.id && (
-              <Badge variant="outline" className="text-xs">سيتم رفع الصورة بعد الحفظ</Badge>
-            )}
-          </div>
+            </div>
+          ) : null}
 
-          {/* Basic Info */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label>الاسم الكامل *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" />
+          {/* Basic: Name + Title + Role in one row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <Label className="text-xs">الاسم الكامل *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: د. هاني الشافعي" className="mt-1 text-base font-medium" />
             </div>
             <div>
-              <Label>المسمى الوظيفي</Label>
-              <Input value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="مثال: المؤسس والمدير التنفيذي" className="mt-1" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label>الدور</Label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
-              >
+              <Label className="text-xs">الدور</Label>
+              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
                 <option value="founder">المؤسس</option>
                 <option value="leader">قائد</option>
                 <option value="team">فريق</option>
               </select>
             </div>
-            <div>
-              <Label>التخصص</Label>
-              <Input value={form.specialization || ''} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="mt-1" />
-            </div>
           </div>
-
           <div>
-            <Label>النبذة التعريفية</Label>
-            <Textarea value={form.bio || ''} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="mt-1" />
+            <Label className="text-xs">المسمى الوظيفي</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: المؤسس والمدير التنفيذي" className="mt-1" />
           </div>
 
-          {/* Vision & Mission */}
-          <div className="bg-navy/5 p-4 rounded-lg border border-navy/10 space-y-4">
-            <h3 className="font-bold text-navy text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4 text-gold" /> الرؤية والرسالة
-            </h3>
-            <div>
-              <Label className="text-navy">الرؤية</Label>
-              <Textarea value={form.vision || ''} onChange={(e) => setForm({ ...form, vision: e.target.value })} rows={2} placeholder="ما الذي تطمح للوصول إليه..." className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-navy">الرسالة</Label>
-              <Textarea value={form.mission || ''} onChange={(e) => setForm({ ...form, mission: e.target.value })} rows={2} placeholder="كيف تخطط لتحقيق رؤيتك..." className="mt-1" />
-            </div>
-          </div>
-
-          {/* Qualifications (dynamic list) */}
-          <div className="space-y-2">
-            <Label className="text-navy flex items-center gap-2">
-              <Award className="w-4 h-4 text-gold" /> المؤهلات العلمية والاحترافية
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                value={newQual}
-                onChange={(e) => setNewQual(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addQual() } }}
-                placeholder="مثال: استشاري طب باطني — اضغط Enter للإضافة"
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" onClick={addQual}>
-                <PlusIcon className="w-4 h-4" />
-              </Button>
-            </div>
-            {qualifications.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {qualifications.map((q, i) => (
-                  <Badge key={i} variant="outline" className="bg-gold/5 border-gold/30 text-navy">
-                    {q}
-                    <button onClick={() => removeQual(i)} className="mr-1 text-red-500 hover:text-red-700">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Achievements (dynamic list) */}
-          <div className="space-y-2">
-            <Label className="text-navy flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-gold" /> الإنجازات والمساهمات
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                value={newAch}
-                onChange={(e) => setNewAch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAch() } }}
-                placeholder="مثال: تدريب أكثر من 5,000 طالب — اضغط Enter للإضافة"
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" onClick={addAch}>
-                <PlusIcon className="w-4 h-4" />
-              </Button>
-            </div>
-            {achievements.length > 0 && (
-              <div className="space-y-1 mt-2">
-                {achievements.map((a, i) => (
-                  <div key={i} className="flex items-center justify-between bg-muted/30 p-2 rounded-md border border-border">
-                    <span className="text-sm text-navy flex items-start gap-2">
-                      <Trophy className="w-3.5 h-3.5 text-gold flex-shrink-0 mt-0.5" />
-                      {a}
-                    </span>
-                    <button onClick={() => removeAch(i)} className="text-red-500 hover:text-red-700">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Contact */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-navy">البريد الإلكتروني</Label>
-              <Input type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-navy">رقم الهاتف</Label>
-              <Input value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-navy flex items-center gap-1"><Linkedin className="w-3.5 h-3.5" /> LinkedIn</Label>
-              <Input value={form.linkedin || ''} onChange={(e) => setForm({ ...form, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." dir="ltr" className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-navy flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> Twitter</Label>
-              <Input value={form.twitter || ''} onChange={(e) => setForm({ ...form, twitter: e.target.value })} placeholder="@username" dir="ltr" className="mt-1" />
-            </div>
-          </div>
-
-          {/* Signature upload — appears in certificate */}
+          {/* Unified text field — all professional info in one place */}
           <div className="border-t border-border pt-4">
-            <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
-              <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات)
-            </h3>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                {form.signature ? (
-                  <img src={form.signature} alt="توقيع" className="h-16 w-auto object-contain bg-white border-2 border-gold/30 rounded-lg" />
-                ) : (
-                  <div className="h-16 w-32 bg-muted/30 border-2 border-dashed border-gold/30 rounded-lg flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">لا يوجد توقيع</span>
-                  </div>
+            <Label className="text-sm font-bold text-navy flex items-center gap-2 mb-2">
+              <Award className="w-4 h-4 text-gold" /> المعلومات المهنية
+            </Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              اكتب كل المعلومات في الحقل التالي. استخدم العناوين التالية لتقسيم البيانات تلقائياً:
+            </p>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {['التخصص:', 'النبذة المهنية:', 'الرؤية:', 'الرسالة:', 'المؤهلات:', 'الإنجازات:', 'التكريمات:'].map(k => (
+                <Badge key={k} variant="outline" className="text-[10px] bg-gold/5 border-gold/20 text-navy">{k}</Badge>
+              ))}
+            </div>
+            <Textarea
+              value={unifiedText}
+              onChange={(e) => setUnifiedText(e.target.value)}
+              rows={12}
+              placeholder={`التخصص: طبيب عام وخبير تعليم طبي
+
+النبذة المهنية:
+طبيب عام وخبير في التعليم الطبي، يمتلك أكثر من 10 عامًا من الخبرة...
+
+الرؤية:
+أن نوصل التعليم الطبي المستمر لكل ممارس صحي...
+
+الرسالة:
+تمكين الكوادر الصحية بمعارف ومهارات عصرية...
+
+المؤهلات:
+• بكالريوس طب عام وجراحة
+• عضوية البورد الأوروبي
+• ماجستير في التنمية البشرية
+• مدرب معتمد في ACLS و BLS
+
+الإنجازات:
+• أسس أكاديمية المستقبل الدولية
+• درّب أكثر من 3,000 ممارس صحي
+• طبيب سابق لدى اليونيسف
+• نشر أكثر من 20 بحثًا علميًا`}
+              className="mt-1 font-mono text-sm leading-relaxed"
+              dir="rtl"
+            />
+          </div>
+
+          {/* Live preview */}
+          {(parsed.bio || parsed.vision || parsed.qualifications.length > 0 || parsed.achievements.length > 0) && (
+            <div className="bg-muted/30 rounded-lg p-3 border border-border">
+              <div className="text-xs font-bold text-navy mb-2">معاينة البيانات المُقسّمة:</div>
+              <div className="space-y-2">
+                {parsed.specialization && <div className="text-xs"><span className="font-semibold text-navy">التخصص:</span> <span className="text-muted-foreground">{parsed.specialization}</span></div>}
+                {parsed.bio && <div className="text-xs"><span className="font-semibold text-navy">النبذة:</span> <span className="text-muted-foreground line-clamp-2">{parsed.bio}</span></div>}
+                {parsed.vision && <div className="text-xs"><span className="font-semibold text-navy">الرؤية:</span> <span className="text-muted-foreground line-clamp-1">{parsed.vision}</span></div>}
+                {parsed.mission && <div className="text-xs"><span className="font-semibold text-navy">الرسالة:</span> <span className="text-muted-foreground line-clamp-1">{parsed.mission}</span></div>}
+                {parsed.qualifications.length > 0 && (
+                  <div className="text-xs"><span className="font-semibold text-navy">المؤهلات:</span> {parsed.qualifications.length} مؤهل</div>
+                )}
+                {parsed.achievements.length > 0 && (
+                  <div className="text-xs"><span className="font-semibold text-navy">الإنجازات:</span> {parsed.achievements.length} إنجاز</div>
                 )}
               </div>
-              <div className="flex-1">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  id="signature-upload"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0]
-                    if (!f) return
-                    // Upload signature image
-                    const fd = new FormData()
-                    fd.append('file', f)
-                    fd.append('folder', 'signatures')
-                    try {
-                      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
-                      const data = await res.json()
-                      if (data.url) {
-                        setForm({ ...form, signature: data.url })
-                        toast.success('تم رفع التوقيع')
-                      } else {
-                        toast.error('فشل رفع التوقيع')
-                      }
-                    } catch {
-                      toast.error('خطأ في الرفع')
-                    }
-                  }}
-                />
-                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('signature-upload')?.click()}>
-                  <FileUp className="w-4 h-4 ml-1" /> رفع صورة التوقيع
-                </Button>
-                {form.signature && (
-                  <Button type="button" variant="ghost" size="sm" className="mr-2 text-red-500" onClick={() => setForm({ ...form, signature: null })}>
-                    إزالة
-                  </Button>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">PNG شفاف أو JPG بخلفية بيضاء — سيظهر في الشهادات</p>
-              </div>
+            </div>
+          )}
+
+          {/* Contact info — compact */}
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+            <div>
+              <Label className="text-xs">البريد</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="example@fia.edu" />
+            </div>
+            <div>
+              <Label className="text-xs">الهاتف</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="+967 7XX XXX XXX" />
+            </div>
+            <div>
+              <Label className="text-xs">LinkedIn</Label>
+              <Input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="https://..." />
+            </div>
+            <div>
+              <Label className="text-xs">Twitter</Label>
+              <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="@username" />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Signature */}
+          <div className="border-t border-border pt-4">
+            <h3 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
+              <PenTool className="w-4 h-4 text-gold" /> التوقيع (للشهادات)
+            </h3>
+            <div className="flex items-center gap-3">
+              {signature ? (
+                <img src={signature} alt="توقيع" className="h-14 w-auto bg-white border border-gold/30 rounded" />
+              ) : (
+                <div className="h-14 w-28 bg-muted/30 border-2 border-dashed border-gold/30 rounded flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground">لا يوجد</span>
+                </div>
+              )}
+              <input type="file" accept="image/*" className="hidden" id="sig-upload" onChange={async (e) => {
+                const f = e.target.files?.[0]; if (!f) return
+                const fd = new FormData(); fd.append('file', f); fd.append('folder', 'signatures')
+                try { const r = await fetch('/api/upload/image', { method: 'POST', body: fd }); const d = await r.json(); if (d.url) { setSignature(d.url); toast.success('تم رفع التوقيع') } else toast.error('فشل') } catch { toast.error('خطأ') }
+              }} />
+              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('sig-upload')?.click()}>
+                <FileUp className="w-3.5 h-3.5 ml-1" /> رفع
+              </Button>
+              {signature && <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => setSignature(null)}>إزالة</Button>}
+            </div>
+          </div>
+
+          {/* Years + order */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-navy">سنوات الخبرة</Label>
-              <Input type="number" value={form.years_experience || 0} onChange={(e) => setForm({ ...form, years_experience: parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" />
+              <Label className="text-xs">سنوات الخبرة</Label>
+              <Input type="number" value={yearsExp} onChange={(e) => setYearsExp(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" />
             </div>
             <div>
-              <Label className="text-navy">ترتيب العرض</Label>
-              <Input type="number" value={form.display_order || 0} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" />
+              <Label className="text-xs">ترتيب العرض</Label>
+              <Input type="number" value={displayOrder} onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" />
             </div>
           </div>
         </div>
@@ -638,7 +598,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
           <Button onClick={handleSave} disabled={saving} className="bg-navy hover:bg-navy-light">
-            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : <><Save className="w-4 h-4 ml-1" /> حفظ</>}
+            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : <><Save className="w-4 h-4 ml-1" /> حفظ</>}
           </Button>
         </DialogFooter>
       </DialogContent>
