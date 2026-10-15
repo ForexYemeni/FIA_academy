@@ -300,72 +300,46 @@ async function generateCertificatePNG(cert) {
   setFont(13, 'bold'); fill(NAVY_DEEP)
   ctx.fillText('أكاديمية المستقبل الدولية', col2X + colW - 12 * scale, colsY + 34 * scale)
 
-  // Card 3
+  // Card 3: Status — REDESIGNED with status PROMINENTLY in CENTER
   const col3X = colsStartX + 2 * (colW + colGap)
-  fillRoundRect(col3X, colsY, colW, colsH, 10 * scale, WHITE)
-  strokeRoundRect(col3X, colsY, colW, colsH, 10 * scale, GOLD, 1.5 * scale)
-  fillRoundRect(col3X + 10 * scale, colsY + 8 * scale, 34 * scale, 34 * scale, 17 * scale, GOLD)
+  const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
+  const statusColor = isRevoked ? '#DC3545' : EMERALD
+  const statusBgColor = isRevoked ? '#F8D7DA' : '#D4EDDA'
+  const statusText = isRevoked ? 'ملغي' : 'صالح'
+
+  fillRoundRect(col3X, colsY, colW, colsH, 10 * scale, statusBgColor)
+  strokeRoundRect(col3X, colsY, colW, colsH, 10 * scale, statusColor, 2 * scale)
+
+  // Status icon — circle with checkmark (صالح) or X (ملغي)
+  const iconCenterX = col3X + colW / 2
+  const iconCenterY = colsY + 15 * scale
+  const iconR = 9 * scale
+  fillRoundRect(iconCenterX - iconR, iconCenterY - iconR, iconR * 2, iconR * 2, iconR, statusColor)
   ctx.fillStyle = WHITE
-  ctx.fillText('✓', col3X + 27 * scale, colsY + 25 * scale)
-  ctx.direction = 'rtl'; setFont(10, 'regular'); fill(GRAY); ctx.textAlign = 'right'
-  ctx.fillText('الحالة', col3X + colW - 12 * scale, colsY + 15 * scale)
-  const badgeText = '✓ صالح'
-  setFont(13, 'bold')
-  const badgeW = ctx.measureText(badgeText).width + 24 * scale
-  const badgeH = 22 * scale
-  const badgeX = col3X + colW - 12 * scale - badgeW
-  const badgeY = colsY + 28 * scale
-  fillRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, EMERALD)
-  fill(WHITE); ctx.textAlign = 'center'
-  ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2 * scale)
+  ctx.font = `${11 * scale}px Cairo-Bold`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText(isRevoked ? '✕' : '✓', iconCenterX, iconCenterY + 1 * scale)
 
-  // ===== Bottom row: QR + Barcode + Signature (3-column) — positioned BELOW cards =====
-  const bottomY = cardY + 425 * scale
+  // Status label
+  ctx.direction = 'rtl'; setFont(8, 'regular'); fill('#6C757D'); ctx.textAlign = 'center'
+  ctx.fillText('الحالة', col3X + colW / 2, colsY + 32 * scale)
 
-  // QR (left) — moved further right to clear corner ornament
-  const qrBuffer = await generateQR(cert.verifyUrl)
-  const qrImg = await loadImage(qrBuffer)
-  const qrSize = 46 * scale
-  const qrX = cardX + 75 * scale  // moved further from corner ornament
-  fillRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, WHITE)
-  strokeRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, GOLD, 1.5 * scale)
-  ctx.drawImage(qrImg, qrX, bottomY, qrSize, qrSize)
-  ctx.direction = 'rtl'; setFont(11, 'bold'); fill(NAVY_DEEP); ctx.textAlign = 'center'
-  ctx.fillText('امسح للتحقق', qrX + qrSize / 2, bottomY + qrSize + 18 * scale)
+  // Status value — prominent, colored, centered
+  setFont(13, 'bold'); fill(statusColor)
+  ctx.fillText(statusText, col3X + colW / 2, colsY + 44 * scale)
 
-  // Barcode (center)
-  const barcodeBuffer = await generateBarcode(cert.certificate_number)
-  const barcodeImg = await loadImage(barcodeBuffer)
-  const barcodeW = 150 * scale, barcodeH = 28 * scale
-  const barcodeX = cx - barcodeW / 2
-  const barcodeY = bottomY + 5 * scale
-  fillRoundRect(barcodeX - 12 * scale, barcodeY - 8 * scale, barcodeW + 24 * scale, barcodeH + 50 * scale, 4 * scale, WHITE)
-  strokeRoundRect(barcodeX - 12 * scale, barcodeY - 8 * scale, barcodeW + 24 * scale, barcodeH + 50 * scale, 4 * scale, GOLD, 1.5 * scale)
-  ctx.drawImage(barcodeImg, barcodeX, barcodeY, barcodeW, barcodeH)
-  ctx.direction = 'ltr'; setFont(13, 'bold'); fill(NAVY_DEEP)
-  ctx.fillText(cert.certificate_number, cx, bottomY + barcodeH + 15 * scale)
-  setFont(9, 'regular'); fill(GRAY)
-  ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 30 * scale)
+  // ===== Bottom: Centered signature only (NO QR, NO BARCODE, NO NAME/TITLE) =====
+  const bottomY = cardY + 445 * scale
 
-  // Signature block (right)
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl'
-  const sigAreaW = 180 * scale
-  const sigAreaX = cardX + cardW - 35 * scale - sigAreaW
+  // Top label centered above signature
+  setFont(12, 'bold'); fill(GOLD_DARK); ctx.textAlign = 'center'; ctx.direction = 'rtl'
+  ctx.fillText('توقيع الجهة المانوحة', cx, bottomY)
 
-  // Top label
-  setFont(11, 'bold'); fill(GRAY)
-  ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 5 * scale)
-
-  // LARGE gel-pen signature — much narrower width to stay within card
-  const sigImgAreaY = bottomY + 18 * scale
-  drawGelPenSignature(ctx, sigAreaX + 30 * scale, sigImgAreaY + 18 * scale, sigAreaW - 60 * scale, scale)
-
-  // Founder name
-  setFont(14, 'bold'); fill(NAVY_DEEP)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 65 * scale)
-  // Founder title — proper vertical spacing (gap = 30*scale=60px)
-  setFont(10, 'regular'); fill(NAVY_DEEP)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 95 * scale)
+  // Royal blue gel-pen signature — centered
+  const sigWidth = 200 * scale
+  const sigStartX = cx - sigWidth / 2
+  const sigCenterY = bottomY + 35 * scale
+  drawGelPenSignature(ctx, sigStartX, sigCenterY, sigWidth, scale)
 
   // ===== Watermark =====
   ctx.save()
