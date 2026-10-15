@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
 import bwip from 'bwip-js'
@@ -91,7 +92,7 @@ async function generateQR(url: string): Promise<Buffer> {
 }
 
 // ============== Modern PNG Certificate (matching reference image) ==============
-async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
+async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null): Promise<Buffer> {
   registerFontsForCanvas()
 
   const scale = 2
@@ -367,11 +368,23 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(GRAY)
   ctx.textAlign = 'center'
   ctx.fillText('توقيع الجهة المانوحة', sigX + 60 * scale, bottomY + 8 * scale)
-  stroke(NAVY, 0.8 * scale)
-  ctx.beginPath()
-  ctx.moveTo(sigX, bottomY + 20 * scale)
-  ctx.lineTo(sigX + 120 * scale, bottomY + 20 * scale)
-  ctx.stroke()
+  // Draw signature image if available, otherwise draw a line
+  if (founderSignature) {
+    try {
+      const sigBuffer = await fetch(founderSignature).then(r => r.arrayBuffer())
+      const sigImg = await loadImage(Buffer.from(sigBuffer))
+      // Draw signature image above the line
+      const sigImgH = 25 * scale
+      const sigImgW = 100 * scale
+      ctx.drawImage(sigImg, sigX + 10 * scale, bottomY + 2 * scale, sigImgW, sigImgH)
+    } catch {}
+  } else {
+    stroke(NAVY, 0.8 * scale)
+    ctx.beginPath()
+    ctx.moveTo(sigX, bottomY + 20 * scale)
+    ctx.lineTo(sigX + 120 * scale, bottomY + 20 * scale)
+    ctx.stroke()
+  }
   setFont(11, 'bold')
   fill(NAVY)
   ctx.fillText('المدير التنفيذي', sigX + 60 * scale, bottomY + 33 * scale)
@@ -392,7 +405,7 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
 }
 
 // ============== PDF Certificate (matching PNG design) ==============
-async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
+async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const fonts = getFontPaths()
@@ -641,7 +654,23 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       const sigX = innerX + innerW - 30 - 120
       setFont(9, 'regular')
       doc.fillColor(GRAY).text('توقيع الجهة المانوحة', sigX, bottomY, { width: 120, align: 'center' })
-      doc.lineWidth(0.8).strokeColor(NAVY).moveTo(sigX, bottomY + 20).lineTo(sigX + 120, bottomY + 20).stroke()
+      // Draw signature image if available
+      if (founderSignature) {
+        try {
+          // Download signature image
+          const sigRes = await fetch(founderSignature)
+          const sigBuf = await sigRes.arrayBuffer()
+          const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
+          fs.writeFileSync(sigPath, Buffer.from(sigBuf))
+          if (fs.existsSync(sigPath)) {
+            doc.image(sigPath, sigX + 10, bottomY + 2, { width: 100, height: 20 })
+            // Clean up
+            fs.unlinkSync(sigPath)
+          }
+        } catch {}
+      } else {
+        doc.lineWidth(0.8).strokeColor(NAVY).moveTo(sigX, bottomY + 20).lineTo(sigX + 120, bottomY + 20).stroke()
+      }
       setFont(11, 'bold')
       doc.fillColor(NAVY).text('المدير التنفيذي', sigX, bottomY + 25, { width: 120, align: 'center' })
 
@@ -680,20 +709,39 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'الشهادة غير موجودة' }, { status: 404 })
     }
 
+    // Fetch founder's signature
+    let founderSignature: string | null = null
+    try {
+      const { data: trainers } = await supabaseAdmin.from('trainers').select('*')
+      if (trainers) {
+        const founder = trainers.find((t: any) => t.password && t.password.startsWith('__TEAM_MEMBER__:founder'))
+        if (founder) {
+          // Parse bio for signature
+          const bioSeparator = '\n\n===FIA_EXTRA===\n'
+          const idx = founder.bio ? founder.bio.indexOf(bioSeparator) : -1
+          if (idx !== -1) {
+            const extraJson = founder.bio.substring(idx + bioSeparator.length)
+            const extra = JSON.parse(extraJson)
+            founderSignature = extra.signature || null
+          }
+        }
+      }
+    } catch {}
+
     const issueDate = cert.issued_at
       ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
       : new Date().toLocaleDateString('ar-EG')
     const verifyUrl = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
 
     if (format === 'png') {
-      const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl)
+      const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl, founderSignature)
       const headers = new Headers()
       headers.set('Content-Type', 'image/png')
       headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.png"`)
       headers.set('Cache-Control', 'public, max-age=3600')
       return new NextResponse(pngBytes, { status: 200, headers })
     } else {
-      const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl)
+      const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl, founderSignature)
       const headers = new Headers()
       headers.set('Content-Type', 'application/pdf')
       headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.pdf"`)

@@ -915,6 +915,16 @@ function AdminTrainers() {
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
   const del = async (id: string) => {
+    // Check if this trainer is also a team member (founder/leader)
+    try {
+      const teamRes = await fetch('/api/team')
+      const teamData = await teamRes.json()
+      const teamMember = (teamData || []).find((m: any) => m.id === id)
+      if (teamMember) {
+        toast.error(`لا يمكن حذف هذا المدرب لأنه مسجّل كـ "${teamMember.role === 'founder' ? 'المؤسس' : 'عضو فريق'}" في قسم المؤسس والفريق. احذفه من هناك أولاً.`)
+        return
+      }
+    } catch {}
     if (!confirm('حذف المدرب؟')) return
     await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     toast.success('تم الحذف'); load()
@@ -926,29 +936,34 @@ function AdminTrainers() {
       action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
     >
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((t) => (
-          <Card key={t.id} className="p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <Avatar className="w-14 h-14 border-2 border-gold/30">
-                <AvatarImage src={t.avatar || ''} />
-                <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-bold text-navy">{t.name}</div>
-                <div className="text-xs text-gold">{t.title}</div>
+        {items.map((t) => {
+          // Check if this trainer is a team member
+          const isTeamMember = t.password && t.password.startsWith('__TEAM_MEMBER__')
+          return (
+            <Card key={t.id} className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <Avatar className="w-14 h-14 border-2 border-gold/30">
+                  <AvatarImage src={t.avatar || ''} />
+                  <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-bold text-navy">{t.name}</div>
+                  <div className="text-xs text-gold">{t.title}</div>
+                  {isTeamMember && <Badge className="mt-1 bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">👑 عضو فريق</Badge>}
+                </div>
               </div>
-            </div>
-            <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
-            <div className="text-xs space-y-1 mb-3">
-              <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
-              <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(t.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-            </div>
-          </Card>
-        ))}
+              <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
+              <div className="text-xs space-y-1 mb-3">
+                <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
+                <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+                <Button size="sm" variant="outline" disabled={isTeamMember} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => del(t.id)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
+            </Card>
+          )
+        })}
       </div>
       {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
     </SectionCard>

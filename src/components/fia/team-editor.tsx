@@ -13,7 +13,7 @@ import {
 import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Save, Loader2, X, Crown, Star, Award, User,
-  Phone, Mail, Briefcase, Eye, Target, Trophy, Linkedin, Twitter, Plus as PlusIcon,
+  Phone, Mail, Briefcase, Eye, Target, Trophy, Linkedin, Twitter, Plus as PlusIcon, FileUp, PenTool,
 } from 'lucide-react'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 
@@ -30,6 +30,7 @@ interface TeamMember {
   qualifications?: string | null  // JSON array string
   achievements?: string | null     // JSON array string
   avatar?: string | null
+  signature?: string | null
   email?: string | null
   phone?: string | null
   linkedin?: string | null
@@ -305,6 +306,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       qualifications: '[]',
       achievements: '[]',
       avatar: null,
+      signature: null,
       email: '',
       phone: '',
       linkedin: '',
@@ -337,6 +339,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
         qualifications: '[]',
         achievements: '[]',
         avatar: null,
+        signature: null,
         email: '',
         phone: '',
         linkedin: '',
@@ -562,6 +565,61 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             <div>
               <Label className="text-navy flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> Twitter</Label>
               <Input value={form.twitter || ''} onChange={(e) => setForm({ ...form, twitter: e.target.value })} placeholder="@username" dir="ltr" className="mt-1" />
+            </div>
+          </div>
+
+          {/* Signature upload — appears in certificate */}
+          <div className="border-t border-border pt-4">
+            <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+              <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات)
+            </h3>
+            <div className="flex items-center gap-4">
+              <div className="relative flex-shrink-0">
+                {form.signature ? (
+                  <img src={form.signature} alt="توقيع" className="h-16 w-auto object-contain bg-white border-2 border-gold/30 rounded-lg" />
+                ) : (
+                  <div className="h-16 w-32 bg-muted/30 border-2 border-dashed border-gold/30 rounded-lg flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">لا يوجد توقيع</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="signature-upload"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0]
+                    if (!f) return
+                    // Upload signature image
+                    const fd = new FormData()
+                    fd.append('file', f)
+                    fd.append('folder', 'signatures')
+                    try {
+                      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+                      const data = await res.json()
+                      if (data.url) {
+                        setForm({ ...form, signature: data.url })
+                        toast.success('تم رفع التوقيع')
+                      } else {
+                        toast.error('فشل رفع التوقيع')
+                      }
+                    } catch {
+                      toast.error('خطأ في الرفع')
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('signature-upload')?.click()}>
+                  <FileUp className="w-4 h-4 ml-1" /> رفع صورة التوقيع
+                </Button>
+                {form.signature && (
+                  <Button type="button" variant="ghost" size="sm" className="mr-2 text-red-500" onClick={() => setForm({ ...form, signature: null })}>
+                    إزالة
+                  </Button>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">PNG شفاف أو JPG بخلفية بيضاء — سيظهر في الشهادات</p>
+              </div>
             </div>
           </div>
 

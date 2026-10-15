@@ -22,6 +22,7 @@ interface TeamMemberInput {
   qualifications?: string | null
   achievements?: string | null
   avatar?: string | null
+  signature?: string | null
   email?: string | null
   phone?: string | null
   linkedin?: string | null
@@ -90,6 +91,7 @@ function toTeamMember(trainer: StoredTrainer): any {
     qualifications: extra.qualifications || null,
     achievements: extra.achievements || null,
     avatar: trainer.avatar,
+    signature: extra.signature || null,
     email: trainer.email,
     phone: trainer.phone,
     linkedin: extra.linkedin || null,
@@ -147,6 +149,7 @@ export async function POST(req: NextRequest) {
       achievements: body.achievements || null,
       linkedin: body.linkedin || null,
       twitter: body.twitter || null,
+      signature: body.signature || null,
       display_order: body.display_order || 0,
       is_active: body.is_active !== false,
     }
@@ -206,6 +209,7 @@ export async function PUT(req: NextRequest) {
       achievements: updates.achievements || null,
       linkedin: updates.linkedin || null,
       twitter: updates.twitter || null,
+      signature: (updates as any).signature || null,
       display_order: updates.display_order || 0,
       is_active: updates.is_active !== false,
     }
