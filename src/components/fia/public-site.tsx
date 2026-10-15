@@ -45,8 +45,6 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
   const [licenses, setLicenses] = useState<any[]>([])
   const [settings, setSettings] = useState<any>({})
   const [verifyNumber, setVerifyNumber] = useState('')
-  const [verifyResult, setVerifyResult] = useState<any>(null)
-  const [verifyLoading, setVerifyLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
@@ -56,27 +54,13 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
     fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
   }, [])
 
-  const verify = async () => {
+  const verify = () => {
     if (!verifyNumber.trim()) {
       toast.error('أدخل رقم الشهادة')
       return
     }
-    setVerifyLoading(true)
-    try {
-      const res = await fetch(`/api/certificates?number=${encodeURIComponent(verifyNumber.trim())}`)
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        setVerifyResult(data[0])
-        toast.success('تم العثور على الشهادة')
-      } else {
-        setVerifyResult({ not_found: true })
-        toast.error('لم يتم العثور على شهادة بهذا الرقم')
-      }
-    } catch {
-      toast.error('خطأ في الاتصال')
-    } finally {
-      setVerifyLoading(false)
-    }
+    // Redirect to standalone verify page
+    window.location.href = `/?verify=${encodeURIComponent(verifyNumber.trim())}#verify`
   }
 
   return (
@@ -317,80 +301,19 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
                   id="certNum"
                   value={verifyNumber}
                   onChange={(e) => setVerifyNumber(e.target.value)}
-                  placeholder="FIA-2025-XXXXX"
+                  onKeyDown={(e) => { if (e.key === 'Enter') verify() }}
+                  placeholder="FIA-2026-XXXXX"
                   className="mt-1 text-base"
                   dir="ltr"
                 />
               </div>
-              <Button onClick={verify} disabled={verifyLoading} className="w-full bg-navy hover:bg-navy-light text-white h-12">
-                {verifyLoading ? 'جاري التحقق...' : 'تحقق الآن'}
+              <Button onClick={verify} className="w-full bg-navy hover:bg-navy-light text-white h-12">
+                تحقق الآن
               </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                سيتم فتح صفحة تحقق احترافية تعرض الشهادة كاملة
+              </p>
             </div>
-
-            {verifyResult && !verifyResult.not_found && (
-              <div className="mt-6 space-y-4">
-                <div className="p-6 bg-green-50 border-2 border-green-500/30 rounded-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                      <CheckCircle2 className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-green-700 text-lg">شهادة صالحة وموثقة</div>
-                      <div className="text-green-600 text-sm">تم التحقق بنجاح من صحة الشهادة</div>
-                    </div>
-                  </div>
-                  <dl className="grid sm:grid-cols-2 gap-4 text-sm">
-                    <Detail label="اسم المتدرب" value={verifyResult.student_name} />
-                    <Detail label="رقم الشهادة" value={verifyResult.certificate_number} mono />
-                    <Detail label="الدورة" value={verifyResult.course_title || '-'} />
-                    <Detail label="جهة الإصدار" value={verifyResult.issued_by || 'أكاديمية المستقبل الدولية'} />
-                    <Detail label="تاريخ الإصدار" value={verifyResult.issued_at ? new Date(verifyResult.issued_at).toLocaleDateString('ar-EG') : '-'} />
-                    <Detail label="الحالة" value={verifyResult.status} />
-                  </dl>
-                </div>
-
-                {/* Professional certificate preview */}
-                <div className="rounded-lg overflow-hidden border-2 border-gold/30 shadow-lg">
-                  <div className="bg-navy text-white px-4 py-2 flex items-center justify-between">
-                    <div className="font-semibold text-sm flex items-center gap-2">
-                      <Award className="w-4 h-4 text-gold" /> معاينة الشهادة الاحترافية
-                    </div>
-                    <div className="flex gap-2">
-                      <a
-                        href={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="text-gold text-xs hover:underline"
-                      >
-                        تحميل PDF
-                      </a>
-                      <a
-                        href={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=png`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="text-gold text-xs hover:underline"
-                      >
-                        صورة PNG
-                      </a>
-                    </div>
-                  </div>
-                  <img
-                    src={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=png`}
-                    alt="معاينة الشهادة"
-                    className="w-full h-auto"
-                  />
-                </div>
-              </div>
-            )}
-
-            {verifyResult?.not_found && (
-              <div className="mt-6 p-6 bg-red-50 border-2 border-red-500/30 rounded-lg text-center">
-                <div className="text-red-600 font-bold">لم يتم العثور على شهادة بهذا الرقم</div>
-                <div className="text-red-500 text-sm mt-1">تأكد من صحة الرقم المُدخل أو تواصل مع الدعم</div>
-              </div>
-            )}
           </Card>
         </div>
       </section>
