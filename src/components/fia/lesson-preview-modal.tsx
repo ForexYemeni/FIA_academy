@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Video, FileText, HelpCircle, FileUp, X, Play, Download,
-  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft,
+  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -168,23 +168,111 @@ function VideoPlayer({ url }: { url?: string }) {
   )
 }
 
-// ============== Text Content ==============
+// ============== Text Content — Luxurious Reading Experience ==============
 function TextContent({ content }: { content?: string }) {
+  const [copied, setCopied] = useState(false)
   if (!content) {
     return (
-      <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
+      <div className="text-center py-12 bg-gradient-to-b from-muted/20 to-muted/40 rounded-xl border border-border">
         <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
         <p className="text-muted-foreground">لا يوجد محتوى نصي لهذا الدرس</p>
       </div>
     )
   }
 
+  // Format content: split into paragraphs, detect numbered lists, detect headings
+  const formatContent = (text: string) => {
+    const paragraphs = text.split('\n\n')
+    return paragraphs.map((para, pi) => {
+      const trimmed = para.trim()
+      if (!trimmed) return null
+
+      // Check if it's a numbered list (starts with "1." or "1-")
+      const lines = trimmed.split('\n')
+      const isNumberedList = lines.length > 1 && lines.every(l => /^\d+[\.\)]\s/.test(l.trim()))
+      const isBulletList = lines.length > 1 && lines.every(l => /^[-•▪]\s/.test(l.trim()))
+
+      if (isNumberedList) {
+        return (
+          <ol key={pi} className="space-y-3 my-5 list-none">
+          {lines.map((line, li) => {
+            const num = line.trim().match(/^(\d+)/)?.[1] || (li + 1)
+            const text = line.trim().replace(/^\d+[\.\)]\s*/, '')
+            return (
+              <li key={li} className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-navy text-gold text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
+                <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1">{text}</span>
+              </li>
+            )
+          })}
+          </ol>
+        )
+      }
+
+      if (isBulletList) {
+        return (
+          <ul key={pi} className="space-y-2.5 my-5 list-none">
+          {lines.map((line, li) => {
+            const text = line.trim().replace(/^[-•▪]\s*/, '')
+            return (
+              <li key={li} className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gold mt-2.5"></span>
+                <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1">{text}</span>
+              </li>
+            )
+          })}
+          </ul>
+        )
+      }
+
+      // Regular paragraph
+      return (
+        <p key={pi} className="text-foreground/90 leading-loose text-sm md:text-base mb-4 text-justify">
+          {trimmed.split('\n').map((line, li) => (
+            <span key={li} className="block">
+              {line}
+            </span>
+          ))}
+        </p>
+      )
+    })
+  }
+
   return (
-    <Card className="p-6 prose prose-sm max-w-none prose-headings:text-navy prose-headings:font-bold prose-p:text-foreground prose-a:text-gold">
-      <div className="whitespace-pre-wrap leading-relaxed text-foreground">
-        {content}
+    <div className="relative">
+      {/* Decorative top border */}
+      <div className="h-1 bg-gradient-to-l from-gold via-gold-light to-gold rounded-t-xl mb-0" />
+
+      <div className="bg-white rounded-b-xl border border-border shadow-lg overflow-hidden">
+        {/* Reading header */}
+        <div className="flex items-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-l from-navy to-navy-light text-white">
+          <FileText className="w-4 h-4 text-gold flex-shrink-0" />
+          <span className="text-xs font-semibold">محتوى الدرس</span>
+          <div className="flex-1"></div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(content)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="text-[10px] text-gold/70 hover:text-gold transition-colors flex items-center gap-1"
+            title="نسخ المحتوى"
+          >
+            {copied ? <><CheckCircle2 className="w-3 h-3" /> تم النسخ</> : <><Copy className="w-3 h-3" /> نسخ</>}
+          </button>
+        </div>
+
+        {/* Content body */}
+        <div className="px-4 md:px-8 py-5 md:py-7 max-h-[55vh] overflow-y-auto fia-scroll">
+          <div className="max-w-3xl mx-auto">
+            {formatContent(content)}
+          </div>
+        </div>
+
+        {/* Bottom gold accent */}
+        <div className="h-0.5 bg-gradient-to-l from-transparent via-gold/30 to-transparent"></div>
       </div>
-    </Card>
+    </div>
   )
 }
 

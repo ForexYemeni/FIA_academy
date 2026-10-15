@@ -355,25 +355,43 @@ function InfoCards({ result, onCopy }: { result: VerifyResult; onCopy: () => voi
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {cards.map((c, i) => {
         const Icon = c.icon
+        const isCertNumber = c.copyable
         return (
-          <Card key={i} className="p-4 bg-gray-50 border border-border hover:shadow-md transition-shadow">
+          <Card
+            key={i}
+            className={`p-4 border transition-all hover:shadow-lg ${
+              isCertNumber
+                ? 'bg-gradient-to-br from-navy to-navy-light text-white border-gold/40 shadow-md'
+                : 'bg-gray-50 border-border'
+            }`}
+          >
             <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0F172A' }}>
-                <Icon className="w-4 h-4" style={{ color: '#C5A059' }} />
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                isCertNumber ? 'bg-gold' : ''
+              }`} style={!isCertNumber ? { backgroundColor: '#0F172A' } : {}}>
+                <Icon className={`w-4 h-4 ${isCertNumber ? 'text-navy' : ''}`} style={!isCertNumber ? { color: '#C5A059' } : {}} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs text-muted-foreground">{c.label}</div>
+                <div className={`text-xs ${isCertNumber ? 'text-gold/80' : 'text-muted-foreground'}`}>{c.label}</div>
                 <div
-                  className={`text-sm font-semibold truncate ${c.isStatus && result.status === 'صالحة' ? 'text-green-600' : ''}`}
-                  style={{ color: '#0F172A' }}
+                  className={`text-sm font-semibold truncate ${
+                    isCertNumber ? 'text-white font-mono text-base tracking-wide' : ''
+                  } ${
+                    c.isStatus && result.status === 'صالحة' ? 'text-green-600' : ''
+                  }`}
+                  style={!isCertNumber ? { color: '#0F172A' } : {}}
                   dir={(c as any).dir || 'rtl'}
                 >
                   {c.value}
                 </div>
               </div>
               {c.copyable && (
-                <button onClick={onCopy} className="text-muted-foreground hover:text-navy flex-shrink-0" title="نسخ">
-                  <Copy className="w-3.5 h-3.5" />
+                <button
+                  onClick={onCopy}
+                  className="flex-shrink-0 w-7 h-7 rounded-full bg-gold/20 hover:bg-gold/30 flex items-center justify-center transition-colors"
+                  title="نسخ رقم الشهادة"
+                >
+                  <Copy className="w-3.5 h-3.5 text-gold" />
                 </button>
               )}
             </div>
