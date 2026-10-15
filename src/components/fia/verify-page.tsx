@@ -205,155 +205,206 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
     : new Date().toLocaleDateString('ar-EG')
 
   return (
-    <div className="bg-cream rounded-3xl p-3 md:p-4" style={{ backgroundColor: '#FCF9F0' }}>
+    <div className="rounded-3xl p-3 md:p-4" style={{ backgroundColor: '#0B1D3A' }}>
       {/* Outer sage green border — thicker for prominent frame */}
-      <div className="rounded-2xl p-2" style={{ border: '3px solid #D4E8DC' }}>
+      <div className="rounded-2xl p-2" style={{ border: '3px solid #0B1D3A' }}>
         {/* Inner certificate card */}
-        <div className="relative rounded-xl overflow-hidden" style={{ backgroundColor: '#FCF9F0' }}>
+        <div className="relative rounded-xl overflow-hidden" style={{ backgroundColor: '#FDFBF7', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
           {/* Gold frame (outer thick line) — thicker for more prominence */}
-          <div className="absolute inset-0 rounded-xl pointer-events-none" style={{ border: '5px solid #B58A3E' }} />
+          <div className="absolute inset-0 rounded-xl pointer-events-none" style={{ border: '4px solid #C5A059' }} />
           {/* Gold frame (inner thin line) */}
-          <div className="absolute inset-[7px] rounded-lg pointer-events-none" style={{ border: '1.2px solid #B58A3E' }} />
+          <div className="absolute inset-2 rounded-lg pointer-events-none" style={{ border: '1.5px solid #C5A059' }} />
           {/* Triple-frame thin inner accent line */}
-          <div className="absolute inset-[11px] rounded-md pointer-events-none" style={{ border: '0.5px solid #E5C158' }} />
+          <div className="absolute inset-3.5 rounded-md pointer-events-none" style={{ border: '0.5px solid #E5C77E' }} />
 
-          {/* Corner ornaments (L-shaped) — using darker gold */}
+          {/* Corner ornaments (simplified leaf-like flourishes) */}
           {[
-            { top: '14px', right: 'auto', bottom: 'auto', left: '14px', borderTop: '1.8px solid #8B6428', borderLeft: '1.8px solid #8B6428' },
-            { top: '14px', right: '14px', bottom: 'auto', left: 'auto', borderTop: '1.8px solid #8B6428', borderRight: '1.8px solid #8B6428' },
-            { top: 'auto', right: 'auto', bottom: '14px', left: '14px', borderBottom: '1.8px solid #8B6428', borderLeft: '1.8px solid #8B6428' },
-            { top: 'auto', right: '14px', bottom: '14px', left: 'auto', borderBottom: '1.8px solid #8B6428', borderRight: '1.8px solid #8B6428' },
+            { top: '12px', right: 'auto', bottom: 'auto', left: '12px' },
+            { top: '12px', right: '12px', bottom: 'auto', left: 'auto' },
+            { top: 'auto', right: 'auto', bottom: '12px', left: '12px' },
+            { top: 'auto', right: '12px', bottom: '12px', left: 'auto' },
           ].map((style, i) => (
-            <div key={i} className="absolute w-[18px] h-[18px] pointer-events-none" style={style} />
+            <svg key={i} className="absolute w-7 h-7 pointer-events-none" style={style} viewBox="0 0 30 30">
+              <path d="M 0 30 C 0 9, 9 0, 30 0" stroke="#C5A059" strokeWidth="2" fill="none" />
+              <path d="M 6 24 C 9 12, 15 7, 24 6" stroke="#E5C77E" strokeWidth="1" fill="none" />
+              <circle cx="4.5" cy="25.5" r="2" fill="#C5A059" />
+            </svg>
           ))}
 
           <div className="relative p-6 md:p-10">
             {/* Logo top-right — official FIA logo */}
             <div className="absolute top-4 right-4 md:top-6 md:right-6">
-              <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #B58A3E', padding: '4px' }}>
-                <img src="/fia/logo-official.png" alt="FIA Logo" className="h-12 w-12 md:h-14 md:w-14 object-contain" />
+              <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #C5A059', padding: '5px' }}>
+                <img src="/fia/logo-official.png" alt="FIA Logo" className="h-14 w-14 md:h-16 md:w-16 object-contain" />
               </div>
             </div>
 
-            {/* Title */}
+            {/* English subtitle (gold) */}
             <div className="text-center mb-2 mt-2 md:mt-4 pr-16 md:pr-20">
-              <div className="text-[11px] md:text-[13px] font-bold tracking-widest" style={{ color: '#8B6428' }}>
+              <div className="text-[11px] md:text-[13px] font-bold tracking-widest" style={{ color: '#C5A059' }}>
                 CERTIFICATE OF COMPLETION
               </div>
             </div>
 
-            {/* Academy name Arabic */}
+            {/* Academy name Arabic (large navy) */}
             <div className="text-center mb-1 pr-16 md:pr-20">
-              <h1 className="text-2xl md:text-[34px] font-bold" style={{ color: '#050912' }}>
+              <h1 className="text-2xl md:text-[36px] font-bold" style={{ color: '#0F2B5C' }}>
                 {result.issued_by || 'أكاديمية المستقبل الدولية'}
               </h1>
-              <div className="text-[11px] md:text-xs font-bold mt-1" style={{ color: '#8B6428' }}>
+              <div className="text-[11px] md:text-[13px] mt-1 font-bold" style={{ color: '#C5A059' }}>
                 FUTURE INTERNATIONAL ACADEMY
               </div>
             </div>
 
-            {/* Divider */}
+            {/* Divider with center diamond */}
             <div className="flex items-center justify-center my-3 md:my-5 pr-16 md:pr-20">
-              <div className="h-[1.5px] w-16 md:w-24" style={{ backgroundColor: '#B58A3E' }} />
-              <div className="w-2.5 h-2.5 rotate-45 mx-2" style={{ backgroundColor: '#8B6428' }} />
-              <div className="h-[1.5px] w-16 md:w-24" style={{ backgroundColor: '#B58A3E' }} />
+              <div className="h-[1.5px] w-16 md:w-24" style={{ backgroundColor: '#C5A059' }} />
+              <div className="w-2.5 h-2.5 rotate-45 mx-2" style={{ backgroundColor: '#C5A059' }} />
+              <div className="h-[1.5px] w-16 md:w-24" style={{ backgroundColor: '#C5A059' }} />
             </div>
 
-            {/* Award statement */}
-            <div className="text-center text-xs md:text-sm font-bold mb-1 pr-16 md:pr-20" style={{ color: '#1F2937' }}>
+            {/* Award statement (bold) */}
+            <div className="text-center text-xs md:text-[15px] font-bold mb-1 pr-16 md:pr-20" style={{ color: '#1F2937' }}>
               تشهد أكاديمية المستقبل الدولية بأن
             </div>
 
-            {/* Student name (most prominent) */}
+            {/* Student name (LARGEST) */}
             <div className="text-center my-2 md:my-3 pr-16 md:pr-20">
-              <h2 className="text-3xl md:text-[40px] font-extrabold" style={{ color: '#050912' }}>
+              <h2 className="text-3xl md:text-[42px] font-extrabold" style={{ color: '#0F2B5C' }}>
                 {result.student_name}
               </h2>
             </div>
 
             {/* Completion statement */}
-            <div className="text-center text-xs md:text-sm font-bold mb-1 pr-16 md:pr-20" style={{ color: '#1F2937' }}>
-              قد أتم بنجاح متطلبات دورة
+            <div className="text-center text-xs md:text-[15px] font-bold mb-3 pr-16 md:pr-20" style={{ color: '#1F2937' }}>
+              قد أتم بنجاح دراسة متطلبات دورة
             </div>
 
-            {/* Course title */}
-            <div className="text-center my-2 md:my-3 pr-16 md:pr-20">
-              <h3 className="text-lg md:text-[22px] font-bold" style={{ color: '#8B6428' }}>
-                {result.course_title || 'دورة معتمدة'}
-              </h3>
-            </div>
-
-            {/* Accreditation pill banner */}
-            <div className="flex justify-center my-3 md:my-4 pr-16 md:pr-20">
-              <div className="inline-flex items-center gap-1 px-5 py-1.5 rounded-full text-xs md:text-[13px] font-bold"
-                style={{ backgroundColor: '#F5E5B3', border: '1.5px solid #8B6428', color: '#050912' }}>
-                ★  معتمدة من: {result.issued_by || 'أكاديمية المستقبل الدولية'}
+            {/* Course ribbon (navy with gold border, pointed ends) */}
+            <div className="flex justify-center my-4 md:my-5 pr-16 md:pr-20">
+              <div className="relative inline-block">
+                <svg
+                  className="absolute inset-0 w-full h-full"
+                  viewBox="0 0 100 30"
+                  preserveAspectRatio="none"
+                  style={{ position: 'absolute' }}
+                >
+                  <polygon
+                    points="6,2 94,2 100,15 94,28 6,28 0,15"
+                    fill="#0A1929"
+                    stroke="#C5A059"
+                    strokeWidth="2"
+                  />
+                  <polygon
+                    points="8,4 92,4 97,15 92,26 8,26 3,15"
+                    fill="none"
+                    stroke="#E5C77E"
+                    strokeWidth="0.5"
+                  />
+                </svg>
+                <h3 className="relative text-base md:text-[22px] font-bold px-12 py-2.5" style={{ color: '#C5A059' }}>
+                  {result.course_title || 'دورة معتمدة'}
+                </h3>
               </div>
             </div>
 
-            {/* 3 metadata columns */}
+            {/* 3 info cards row */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3 mt-4 md:mt-5 pr-0 md:pr-0">
-              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6', border: '0.8px solid #B58A3E' }}>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F5EBD5', border: '1.2px solid #C5A059' }}>
                 <div className="text-[11px] md:text-xs font-bold mb-1" style={{ color: '#8B6428' }}>تاريخ الإصدار</div>
-                <div className="text-sm md:text-[15px] font-bold" style={{ color: '#050912' }}>{issueDate}</div>
+                <div className="text-sm md:text-[14px] font-bold" style={{ color: '#0F2B5C' }}>{issueDate}</div>
               </div>
-              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6', border: '0.8px solid #B58A3E' }}>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F5EBD5', border: '1.2px solid #C5A059' }}>
                 <div className="text-[11px] md:text-xs font-bold mb-1" style={{ color: '#8B6428' }}>الجهة المصدرة</div>
-                <div className="text-sm md:text-[15px] font-bold" style={{ color: '#050912' }}>أكاديمية المستقبل الدولية</div>
+                <div className="text-sm md:text-[14px] font-bold" style={{ color: '#0F2B5C' }}>أكاديمية المستقبل الدولية</div>
               </div>
-              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6', border: '0.8px solid #B58A3E' }}>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F5EBD5', border: '1.2px solid #C5A059' }}>
                 <div className="text-[11px] md:text-xs font-bold mb-1" style={{ color: '#8B6428' }}>الحالة</div>
-                <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs md:text-[15px] font-bold"
-                  style={{ backgroundColor: '#D1FAE5', color: '#0F9D58', border: '1.2px solid #0F9D58' }}>
+                <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs md:text-[14px] font-bold"
+                  style={{ backgroundColor: '#D1FAE5', color: '#10B981', border: '1.2px solid #10B981' }}>
                   ● {result.status}
                 </div>
               </div>
             </div>
 
-            {/* Bottom: QR + Cert number + signature */}
-            <div className="flex items-end justify-between gap-2 mt-4 md:mt-5 pt-3 border-t" style={{ borderTop: '1.5px solid #B58A3E' }}>
+            {/* Bottom: QR + Cert number + signature (3-column footer) */}
+            <div className="flex items-end justify-between gap-2 mt-4 md:mt-5 pt-3 border-t" style={{ borderTop: '2px solid #C5A059' }}>
+              {/* QR (left) */}
               <div className="text-center">
                 <img
                   src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
                   alt="QR"
                   className="w-14 h-14 md:w-16 md:h-16 rounded"
-                  style={{ border: '1.5px solid #B58A3E', padding: '4px', backgroundColor: '#FFFFFF' }}
+                  style={{ border: '1.5px solid #C5A059', padding: '4px', backgroundColor: '#FFFFFF' }}
                 />
                 <div className="text-[9px] md:text-[11px] mt-1 font-bold" style={{ color: '#8B6428' }}>امسح للتحقق</div>
               </div>
+              {/* Barcode + Cert number (center) */}
               <div className="text-center flex-1 mx-2">
-                <div className="text-[9px] md:text-[11px] mb-1 font-bold" style={{ color: '#8B6428' }}>رقم الشهادة</div>
-                <div className="text-sm md:text-[16px] font-bold font-mono tracking-wide" style={{ color: '#050912' }} dir="ltr">{result.certificate_number}</div>
-                <div className="text-[9px] md:text-[11px] mt-0.5 font-bold" style={{ color: '#8B6428' }}>CERTIFICATE ID</div>
+                <div className="inline-block rounded-md px-4 py-2" style={{ backgroundColor: '#FFFFFF', border: '1px solid #C5A059' }}>
+                  <div className="text-[9px] md:text-[11px] mb-1 font-bold" style={{ color: '#8B6428' }}>رقم الشهادة</div>
+                  <div className="text-sm md:text-[16px] font-bold font-mono tracking-wide" style={{ color: '#0F2B5C' }} dir="ltr">{result.certificate_number}</div>
+                  <div className="text-[9px] md:text-[11px] mt-0.5 font-bold" style={{ color: '#8B6428' }}>CERTIFICATE ID</div>
+                </div>
               </div>
+              {/* Signature block (right) — with large royal blue gel-pen signature */}
               <div className="text-center">
-                <div className="text-[9px] md:text-[11px] mb-2 font-bold" style={{ color: '#8B6428' }}>الجهة المانوحة</div>
-                {/* Larger script-like signature placeholder */}
-                <svg
-                  width="120"
-                  height="40"
-                  viewBox="0 0 120 40"
-                  className="mx-auto mb-1"
-                  style={{ color: '#050912' }}
-                >
-                  <path
-                    d="M 5 22 Q 12 6, 20 22 T 38 22 Q 48 10, 58 26 Q 70 8, 80 24 Q 95 14, 115 22"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="3" cy="14" r="2.5" fill="currentColor" />
-                  <path
-                    d="M 110 14 m 4 0 a 5 5 0 1 1 -10 0 a 5 5 0 1 1 10 0"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    fill="none"
-                  />
-                </svg>
-                <div className="w-24 md:w-28 mx-auto mb-1.5" style={{ borderBottom: '1.2px solid #050912' }} />
-                <div className="text-sm md:text-base font-bold" style={{ color: '#050912' }}>د. هاني الشافعي</div>
-                <div className="text-[10px] md:text-xs mt-1.5 font-bold" style={{ color: '#8B6428' }}>المدير التنفيذي</div>
+                <div className="rounded-lg p-3" style={{ backgroundColor: '#F5EBD5', border: '1.5px solid #C5A059' }}>
+                  <div className="text-[9px] md:text-[11px] mb-2 font-bold" style={{ color: '#8B6428' }}>توقيع الجهة المانوحة</div>
+                  {/* Large gel-pen style signature in royal blue */}
+                  <svg
+                    width="130"
+                    height="45"
+                    viewBox="0 0 130 45"
+                    className="mx-auto mb-1"
+                  >
+                    {/* Main signature flourish — variable width via multiple paths */}
+                    <path
+                      d="M 10 22 Q 20 6, 28 22 T 46 22 Q 56 8, 64 28 Q 78 6, 88 24 Q 100 12, 120 22"
+                      stroke="#1E40AF"
+                      strokeWidth="2.5"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Thicker downstrokes overlay */}
+                    <path
+                      d="M 14 18 Q 18 10, 24 18 M 60 18 Q 64 10, 70 20 M 84 16 Q 90 8, 96 16"
+                      stroke="#1E40AF"
+                      strokeWidth="3.5"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    {/* Left initial flourish */}
+                    <path
+                      d="M 2 10 Q -2 -2, 12 -3 Q 18 0, 14 12"
+                      stroke="#1E40AF"
+                      strokeWidth="2.5"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    {/* Right end flourish */}
+                    <path
+                      d="M 120 22 Q 132 12, 130 30 Q 122 35, 118 25"
+                      stroke="#1E40AF"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    {/* Underscore (long sweep) */}
+                    <path
+                      d="M 5 35 Q 65 33, 128 36"
+                      stroke="#1E40AF"
+                      strokeWidth="1.5"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    {/* Initial dot */}
+                    <circle cx="2" cy="14" r="1.5" fill="#1E40AF" />
+                  </svg>
+                  <div className="text-sm md:text-base font-bold" style={{ color: '#0F2B5C' }}>د. هاني الشافعي</div>
+                  <div className="text-[10px] md:text-xs mt-1 font-bold" style={{ color: '#8B6428' }}>المدير التنفيذي</div>
+                </div>
               </div>
             </div>
           </div>
