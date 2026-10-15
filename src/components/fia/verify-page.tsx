@@ -132,14 +132,19 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
               <CertificateDisplay result={result} />
 
               {/* Action buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
                 <a href={`/api/certificate-pdf?number=${encodeURIComponent(result.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button className="w-full bg-navy hover:bg-navy-light">
-                    <Download className="w-4 h-4 ml-1" /> تنزيل الشهادة PDF
+                    <Download className="w-4 h-4 ml-1" /> تنزيل PDF
+                  </Button>
+                </a>
+                <a href={`/api/certificate-pdf?number=${encodeURIComponent(result.certificate_number)}&format=png`} target="_blank" rel="noopener noreferrer" download className="flex-1">
+                  <Button className="w-full bg-gold hover:bg-gold-light text-navy">
+                    <Download className="w-4 h-4 ml-1" /> تنزيل صورة PNG
                   </Button>
                 </a>
                 <Button onClick={shareLink} variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10">
-                  <Share2 className="w-4 h-4 ml-1" /> مشاركة رابط التحقق
+                  <Share2 className="w-4 h-4 ml-1" /> مشاركة
                 </Button>
               </div>
 
@@ -286,7 +291,7 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-gold/20">
           <div className="text-center">
             <img
-              src={`/api/certificate-pdf?number=${encodeURIComponent(result.certificate_number)}&format=png`}
+              src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
               alt="QR"
               className="w-16 h-16 border border-gold/30"
             />
