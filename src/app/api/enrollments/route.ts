@@ -64,7 +64,27 @@ export async function GET(req: NextRequest) {
     if (courseId) query = query.eq('course_id', courseId)
     const { data, error } = await query.order('date', { ascending: false })
     if (error) throw error
-    return NextResponse.json((data || []).map(toEnrollment))
+
+    // Deduplicate: keep only ONE enrollment per user+course pair
+    // If there are duplicates, prefer: 'مكتمل' > 'completed' > 'active' > anything else
+    const seen = new Map<string, any>()
+    for (const p of (data || [])) {
+      const key = `${p.user_id}_${p.course_id}`
+      if (!seen.has(key)) {
+        seen.set(key, p)
+      } else {
+        const existing = seen.get(key)
+        // Replace if current one is more "advanced" status
+        const priority: any = { 'مكتمل': 3, 'completed': 3, 'active': 2, 'pending': 1 }
+        const curPriority = priority[p.status] || 0
+        const existingPriority = priority[existing.status] || 0
+        if (curPriority > existingPriority) {
+          seen.set(key, p)
+        }
+      }
+    }
+
+    return NextResponse.json(Array.from(seen.values()).map(p => toEnrollment(p as StoredEnrollment)))
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
