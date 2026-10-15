@@ -168,12 +168,12 @@ function VideoPlayer({ url }: { url?: string }) {
   )
 }
 
-// ============== Text Content — Luxurious Reading Experience ==============
+// ============== Text Content — Clean Professional Reading Experience ==============
 function TextContent({ content }: { content?: string }) {
   const [copied, setCopied] = useState(false)
   if (!content) {
     return (
-      <div className="text-center py-12 bg-gradient-to-b from-muted/20 to-muted/40 rounded-xl border border-border">
+      <div className="text-center py-12 bg-muted/30 rounded-xl border border-border">
         <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
         <p className="text-muted-foreground">لا يوجد محتوى نصي لهذا الدرس</p>
       </div>
@@ -191,7 +191,7 @@ function TextContent({ content }: { content?: string }) {
       const lines = trimmed.split('\n')
       const isNumberedList = lines.length > 1 && lines.every(l => /^\d+[\.\)]\s/.test(l.trim()))
       const isBulletList = lines.length > 1 && lines.every(l => /^[-•▪]\s/.test(l.trim()))
-      // Heading detection: short line ending with colon or all-caps-like pattern
+      // Heading detection: short line ending with colon
       const isHeading = trimmed.length < 80 && (trimmed.endsWith(':') || trimmed.endsWith('：')) && !trimmed.includes('\n')
 
       if (isHeading) {
@@ -211,7 +211,7 @@ function TextContent({ content }: { content?: string }) {
               return (
                 <li key={li} className="flex flex-row-reverse items-start gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-navy text-gold text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
-                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right">{text}</span>
+                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right break-words">{text}</span>
                 </li>
               )
             })}
@@ -227,7 +227,7 @@ function TextContent({ content }: { content?: string }) {
               return (
                 <li key={li} className="flex flex-row-reverse items-start gap-3">
                   <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gold mt-2.5"></span>
-                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right">{text}</span>
+                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right break-words">{text}</span>
                 </li>
               )
             })}
@@ -235,7 +235,7 @@ function TextContent({ content }: { content?: string }) {
         )
       }
 
-      // Regular paragraph — RTL with right alignment (no justify — fixes the visual stretching bug)
+      // Regular paragraph — RTL with right alignment (no justify — no stretch)
       return (
         <p key={pi} dir="rtl" className="text-foreground/90 leading-loose text-sm md:text-base mb-4 text-right break-words">
           {trimmed.split('\n').map((line, li) => (
@@ -249,44 +249,33 @@ function TextContent({ content }: { content?: string }) {
   }
 
   return (
-    <div className="relative" dir="rtl">
-      {/* Decorative top border — luxurious gold gradient */}
-      <div className="h-1.5 bg-gradient-to-l from-gold via-gold-light to-gold rounded-t-xl mb-0 shadow-sm" />
+    <div dir="rtl" className="bg-white rounded-xl border border-border shadow-md overflow-hidden">
+      {/* Reading header — clean navy bar */}
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 bg-navy text-white">
+        <FileText className="w-4 h-4 text-gold flex-shrink-0" />
+        <span className="text-xs md:text-sm font-semibold">محتوى الدرس</span>
+        <div className="flex-1"></div>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(content)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+          }}
+          className="text-[10px] md:text-xs text-gold/80 hover:text-gold flex items-center gap-1 px-2 py-1 rounded-md hover:bg-white/5"
+          title="نسخ المحتوى"
+        >
+          {copied ? <><CheckCircle2 className="w-3 h-3" /> تم النسخ</> : <><Copy className="w-3 h-3" /> نسخ</>}
+        </button>
+      </div>
 
-      <div className="bg-white rounded-b-xl border border-border shadow-xl overflow-hidden">
-        {/* Reading header — luxurious navy gradient */}
-        <div className="flex items-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-l from-navy to-navy-light text-white">
-          <FileText className="w-4 h-4 text-gold flex-shrink-0" />
-          <span className="text-xs md:text-sm font-semibold">محتوى الدرس</span>
-          <div className="flex-1"></div>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(content)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
-            className="text-[10px] md:text-xs text-gold/80 hover:text-gold transition-colors flex items-center gap-1 px-2 py-1 rounded-md hover:bg-white/5"
-            title="نسخ المحتوى"
-          >
-            {copied ? <><CheckCircle2 className="w-3 h-3" /> تم النسخ</> : <><Copy className="w-3 h-3" /> نسخ</>}
-          </button>
+      {/* Thin gold separator line */}
+      <div className="h-0.5 bg-gold/60" />
+
+      {/* Content body — clean, RTL-locked, no animations, no drop caps */}
+      <div className="px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto">
+        <div className="max-w-3xl mx-auto" dir="rtl">
+          {formatContent(content)}
         </div>
-
-        {/* Decorative thin gold strip under header */}
-        <div className="h-0.5 bg-gradient-to-l from-transparent via-gold to-transparent" />
-
-        {/* Content body — fully responsive with proper RTL */}
-        <div className="px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto fia-scroll bg-gradient-to-b from-white to-cream/30">
-          <div className="max-w-3xl mx-auto" dir="rtl">
-            {/* First letter drop cap effect on first paragraph — luxury feel */}
-            <div className="first-letter:text-3xl first-letter:font-bold first-letter:text-navy first-letter:ml-1 first-letter:float-right">
-              {formatContent(content)}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom gold accent */}
-        <div className="h-1 bg-gradient-to-l from-transparent via-gold/40 to-transparent"></div>
       </div>
     </div>
   )

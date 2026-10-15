@@ -189,15 +189,15 @@ function drawGelPenSignature(ctx: any, startX: number, centerY: number, width: n
     const t2 = (i + 1) / steps
     const x1 = startX + width * t1
     const x2 = startX + width * t2
-    // Multi-frequency wave for natural handwriting
+    // Multi-frequency wave for natural handwriting — REDUCED amplitudes (compact signature)
     const y1 = centerY
-      + Math.sin(t1 * Math.PI * 5) * 16 * scale
-      + Math.sin(t1 * Math.PI * 11) * 6 * scale
-      + Math.cos(t1 * Math.PI * 3) * 10 * scale
+      + Math.sin(t1 * Math.PI * 5) * 10 * scale
+      + Math.sin(t1 * Math.PI * 11) * 4 * scale
+      + Math.cos(t1 * Math.PI * 3) * 7 * scale
     const y2 = centerY
-      + Math.sin(t2 * Math.PI * 5) * 16 * scale
-      + Math.sin(t2 * Math.PI * 11) * 6 * scale
-      + Math.cos(t2 * Math.PI * 3) * 10 * scale
+      + Math.sin(t2 * Math.PI * 5) * 10 * scale
+      + Math.sin(t2 * Math.PI * 11) * 4 * scale
+      + Math.cos(t2 * Math.PI * 3) * 7 * scale
     // Pressure: thicker on downstrokes (variable gel pen pressure)
     const dy = y2 - y1
     const pressure = Math.abs(dy) > 0.15 ? 4 : 2.5
@@ -209,33 +209,33 @@ function drawGelPenSignature(ctx: any, startX: number, centerY: number, width: n
     ctx.stroke()
   }
 
-  // === Large initial flourish (left side) ===
+  // === Small initial flourish (left side) — REDUCED to stay within bounds ===
   ctx.strokeStyle = ink
-  ctx.lineWidth = 3 * scale
+  ctx.lineWidth = 2.5 * scale
   ctx.beginPath()
-  ctx.moveTo(startX - 12 * scale, centerY - 16 * scale)
+  ctx.moveTo(startX - 8 * scale, centerY - 12 * scale)
   ctx.bezierCurveTo(
-    startX - 25 * scale, centerY - 45 * scale,
-    startX + 8 * scale, centerY - 50 * scale,
-    startX + 10 * scale, centerY - 20 * scale,
+    startX - 16 * scale, centerY - 28 * scale,
+    startX + 4 * scale, centerY - 30 * scale,
+    startX + 6 * scale, centerY - 14 * scale,
   )
   ctx.stroke()
 
-  // === End flourish: large right loop ===
-  ctx.lineWidth = 3.5 * scale
+  // === Small end flourish (right side) — REDUCED to stay within card ===
+  ctx.lineWidth = 3 * scale
   ctx.beginPath()
   ctx.moveTo(startX + width, centerY)
   ctx.bezierCurveTo(
-    startX + width + 30 * scale, centerY - 30 * scale,
-    startX + width + 40 * scale, centerY + 8 * scale,
-    startX + width + 14 * scale, centerY + 12 * scale,
+    startX + width + 16 * scale, centerY - 16 * scale,
+    startX + width + 22 * scale, centerY + 4 * scale,
+    startX + width + 8 * scale, centerY + 6 * scale,
   )
   ctx.stroke()
 
-  // === Long underscore sweep (with pressure variation) ===
-  const usStartX = startX - 8 * scale
-  const usEndX = startX + width + 18 * scale
-  const usY = centerY + 34 * scale
+  // === Underscore sweep (with pressure variation) — REDUCED length ===
+  const usStartX = startX - 4 * scale
+  const usEndX = startX + width + 10 * scale
+  const usY = centerY + 24 * scale
   for (let i = 0; i < 100; i++) {
     const t1 = i / 100
     const t2 = (i + 1) / 100
@@ -244,7 +244,7 @@ function drawGelPenSignature(ctx: any, startX: number, centerY: number, width: n
     const y1 = usY + Math.sin(t1 * Math.PI * 3) * 2 * scale
     const y2 = usY + Math.sin(t2 * Math.PI * 3) * 2 * scale
     // Pressure: thicker in middle, thinner at ends
-    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2.4
+    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2
     ctx.lineWidth = pressure * scale
     ctx.beginPath()
     ctx.moveTo(x1, y1)
@@ -255,7 +255,7 @@ function drawGelPenSignature(ctx: any, startX: number, centerY: number, width: n
   // === Initial pen-flick dot ===
   ctx.fillStyle = ink
   ctx.beginPath()
-  ctx.arc(startX - 18 * scale, centerY - 10 * scale, 2 * scale, 0, Math.PI * 2)
+  ctx.arc(startX - 14 * scale, centerY - 8 * scale, 1.8 * scale, 0, Math.PI * 2)
   ctx.fill()
 }
 
@@ -270,31 +270,31 @@ function drawGelPenSignaturePDF(doc: any, startX: number, centerY: number, width
     const x1 = startX + width * t1
     const x2 = startX + width * t2
     const y1 = centerY
-      + Math.sin(t1 * Math.PI * 5) * 16
-      + Math.sin(t1 * Math.PI * 11) * 6
-      + Math.cos(t1 * Math.PI * 3) * 10
+      + Math.sin(t1 * Math.PI * 5) * 10
+      + Math.sin(t1 * Math.PI * 11) * 4
+      + Math.cos(t1 * Math.PI * 3) * 7
     const y2 = centerY
-      + Math.sin(t2 * Math.PI * 5) * 16
-      + Math.sin(t2 * Math.PI * 11) * 6
-      + Math.cos(t2 * Math.PI * 3) * 10
+      + Math.sin(t2 * Math.PI * 5) * 10
+      + Math.sin(t2 * Math.PI * 11) * 4
+      + Math.cos(t2 * Math.PI * 3) * 7
     const pressure = Math.abs(y2 - y1) > 0.15 ? 4 : 2.5
     doc.lineWidth(pressure).strokeColor(ink)
     doc.moveTo(x1, y1).lineTo(x2, y2).stroke()
   }
-  // Left flourish
-  doc.lineWidth(3).strokeColor(ink)
-  doc.moveTo(startX - 12, centerY - 16)
-  doc.bezierCurveTo(startX - 25, centerY - 45, startX + 8, centerY - 50, startX + 10, centerY - 20)
+  // Small left flourish — REDUCED
+  doc.lineWidth(2.5).strokeColor(ink)
+  doc.moveTo(startX - 8, centerY - 12)
+  doc.bezierCurveTo(startX - 16, centerY - 28, startX + 4, centerY - 30, startX + 6, centerY - 14)
   doc.stroke()
-  // Right end flourish
-  doc.lineWidth(3.5)
+  // Small right end flourish — REDUCED
+  doc.lineWidth(3)
   doc.moveTo(startX + width, centerY)
-  doc.bezierCurveTo(startX + width + 30, centerY - 30, startX + width + 40, centerY + 8, startX + width + 14, centerY + 12)
+  doc.bezierCurveTo(startX + width + 16, centerY - 16, startX + width + 22, centerY + 4, startX + width + 8, centerY + 6)
   doc.stroke()
-  // Underscore
-  const usStartX = startX - 8
-  const usEndX = startX + width + 18
-  const usY = centerY + 34
+  // Underscore — REDUCED length
+  const usStartX = startX - 4
+  const usEndX = startX + width + 10
+  const usY = centerY + 24
   for (let i = 0; i < 100; i++) {
     const t1 = i / 100
     const t2 = (i + 1) / 100
@@ -302,12 +302,12 @@ function drawGelPenSignaturePDF(doc: any, startX: number, centerY: number, width
     const x2 = usStartX + (usEndX - usStartX) * t2
     const y1 = usY + Math.sin(t1 * Math.PI * 3) * 2
     const y2 = usY + Math.sin(t2 * Math.PI * 3) * 2
-    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2.4
+    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2
     doc.lineWidth(pressure).strokeColor(ink)
     doc.moveTo(x1, y1).lineTo(x2, y2).stroke()
   }
   // Initial dot
-  doc.circle(startX - 18, centerY - 10, 2).fill(ink)
+  doc.circle(startX - 14, centerY - 8, 1.8).fill(ink)
 }
 
 // ============== Helper: Draw corner ornament (PDF) ==============
@@ -643,17 +643,16 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.textAlign = 'center'
   ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2 * scale)
 
-  // ===== Footer: QR + Barcode + Signature (3-column) — positioned BELOW cards with proper gap =====
-  // Cards end at cardY+430 (colsY 380 + colsH 50). Footer starts at cardY+440 (10px gap).
-  // Founder title at bottomY+75 = cardY+515 (within cardH=525).
-  // Footer text removed to avoid edge overlap.
-  const bottomY = cardY + 440 * scale
+  // ===== Bottom row: QR + Barcode + Signature (3-column) — positioned BELOW cards with proper gap =====
+  // Cards end at cardY+430. Footer starts at cardY+425 (5px overlap is OK since cards have padding).
+  // Founder title at bottomY+95 = cardY+520 (within cardH=525 with 5px margin).
+  const bottomY = cardY + 425 * scale
 
-  // === QR (left) ===
+  // === QR (left) — moved right to clear corner ornament (75*scale from card edge) ===
   const qrBuffer = await generateQR(verifyUrl)
   const qrImg = await loadImage(qrBuffer)
-  const qrSize = 50 * scale
-  const qrX = cardX + 40 * scale
+  const qrSize = 46 * scale  // slightly smaller
+  const qrX = cardX + 75 * scale  // moved further away from corner ornament
   // White background
   fillRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, WHITE)
   strokeRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, GOLD, 1.5 * scale)
@@ -702,11 +701,12 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
     ctx.fill()
   }
 
-  // === Signature block (right) — LARGE with royal blue gel-pen signature ===
+  // === Signature block (right) — repositioned for proper professional spacing ===
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  const sigAreaW = 200 * scale
-  const sigAreaX = cardX + cardW - 40 * scale - sigAreaW
+  // Narrower signature area (180 instead of 200) + clear margin from card edge to prevent overflow
+  const sigAreaW = 180 * scale
+  const sigAreaX = cardX + cardW - 35 * scale - sigAreaW
 
   // Label
   ctx.direction = 'rtl'
@@ -714,30 +714,31 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(GRAY)
   ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 5 * scale)
 
-  // === Large gel-pen signature in royal blue ===
-  const sigImgAreaY = bottomY + 20 * scale
+  // === Large gel-pen signature in royal blue — width-restricted to stay within card ===
+  // Pass much narrower width (sigAreaW - 80*scale) to prevent right flourish from overflowing card edge
+  const sigImgAreaY = bottomY + 18 * scale
   if (founderSignature) {
     try {
       const sigBuffer = await fetch(founderSignature).then(r => r.arrayBuffer())
       const sigImg = await loadImage(Buffer.from(sigBuffer))
-      const sigImgH = 55 * scale
-      const sigImgW = 180 * scale
+      const sigImgH = 40 * scale  // smaller height
+      const sigImgW = 120 * scale  // narrower to fit
       ctx.drawImage(sigImg, sigAreaX + (sigAreaW - sigImgW) / 2, sigImgAreaY, sigImgW, sigImgH)
     } catch {
-      drawGelPenSignature(ctx, sigAreaX + 15 * scale, sigImgAreaY + 25 * scale, sigAreaW - 30 * scale, scale)
+      drawGelPenSignature(ctx, sigAreaX + 30 * scale, sigImgAreaY + 18 * scale, sigAreaW - 60 * scale, scale)
     }
   } else {
-    drawGelPenSignature(ctx, sigAreaX + 15 * scale, sigImgAreaY + 25 * scale, sigAreaW - 30 * scale, scale)
+    drawGelPenSignature(ctx, sigAreaX + 30 * scale, sigImgAreaY + 18 * scale, sigAreaW - 60 * scale, scale)
   }
 
-  // Founder name (bold navy) — moved up to fit within card
-  setFont(15, 'bold')
+  // Founder name — bold navy, with clear gap from signature
+  setFont(14, 'bold')
   fill(NAVY_DEEP)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 60 * scale)
-  // Founder title (smaller, navy) — within card bounds
-  setFont(11, 'regular')
+  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 65 * scale)
+  // Founder title — PROPER VERTICAL SPACING from name (gap = 30*scale = 60px for clean separation)
+  setFont(10, 'regular')
   fill(NAVY_DEEP)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 75 * scale)
+  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 95 * scale)
 
   // ===== Watermark (very faint FIA diagonal) =====
   ctx.save()
@@ -979,16 +980,15 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.restore()
       doc.fillColor(WHITE).text(badgeText, badgeX, badgeY + 5, { width: badgeW, align: 'center' })
 
-      // ===== Footer: QR + Barcode + Signature — positioned BELOW cards with proper gap =====
-      // Cards end at cardY+430 (colsY 380 + colsH 50). Footer starts at cardY+440 (10px gap).
-      // Founder title at bottomY+75 = cardY+515 (within cardH=525).
-      // Footer text removed to avoid edge overlap.
-      const bottomY = cardY + 440
+      // ===== Footer: QR + Barcode + Signature — positioned BELOW cards =====
+      // Cards end at cardY+430. Footer starts at cardY+425 (slight overlap is OK).
+      // Founder title at bottomY+95 = cardY+520 (within cardH=525).
+      const bottomY = cardY + 425
 
-      // QR (left)
+      // QR (left) — moved right to clear corner ornament
       const qrBuffer = await generateQR(verifyUrl)
-      const qrSize = 50
-      const qrX = cardX + 40
+      const qrSize = 46
+      const qrX = cardX + 75  // moved further from corner ornament
       doc.save()
       roundRectPath(qrX - 6, bottomY - 6, qrSize + 12, qrSize + 12, 6)
       doc.fill(WHITE)
@@ -1017,13 +1017,14 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(9, 'regular')
       doc.fillColor(GRAY).text('CERTIFICATE ID', cx - 100, barcodeY + barcodeH + 18, { width: 200, align: 'center' })
 
-      // ===== Signature block (right) =====
-      const sigAreaW = 200
-      const sigAreaX = cardX + cardW - 40 - sigAreaW
+      // ===== Signature block (right) — repositioned for proper professional spacing =====
+      // Narrower signature area + clear margin from card edge to prevent overflow
+      const sigAreaW = 180
+      const sigAreaX = cardX + cardW - 35 - sigAreaW
       setFont(11, 'bold')
       doc.fillColor(GRAY).text('توقيع الجهة المانوحة', sigAreaX, bottomY, { width: sigAreaW, align: 'center' })
 
-      const sigImgAreaY = bottomY + 20
+      const sigImgAreaY = bottomY + 18
       if (founderSignature) {
         try {
           const sigRes = await fetch(founderSignature)
@@ -1031,22 +1032,22 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
           const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
           fs.writeFileSync(sigPath, Buffer.from(sigBuf))
           if (fs.existsSync(sigPath)) {
-            doc.image(sigPath, sigAreaX + 10, sigImgAreaY, { width: 180, height: 55 })
+            doc.image(sigPath, sigAreaX + 30, sigImgAreaY, { width: 120, height: 40 })
             fs.unlinkSync(sigPath)
           }
         } catch {
-          drawGelPenSignaturePDF(doc, sigAreaX + 15, sigImgAreaY + 25, sigAreaW - 30)
+          drawGelPenSignaturePDF(doc, sigAreaX + 30, sigImgAreaY + 18, sigAreaW - 60)
         }
       } else {
-        drawGelPenSignaturePDF(doc, sigAreaX + 15, sigImgAreaY + 25, sigAreaW - 30)
+        drawGelPenSignaturePDF(doc, sigAreaX + 30, sigImgAreaY + 18, sigAreaW - 60)
       }
 
-      // Founder name (bold navy) — moved up to fit within card
-      setFont(15, 'bold')
+      // Founder name — bold navy, with clear gap from signature
+      setFont(14, 'bold')
       doc.fillColor(NAVY_DEEP).text('د. هاني الشافعي', sigAreaX, bottomY + 60, { width: sigAreaW, align: 'center' })
-      // Founder title — within card bounds
-      setFont(11, 'regular')
-      doc.fillColor(NAVY_DEEP).text('المدير التنفيذي', sigAreaX, bottomY + 75, { width: sigAreaW, align: 'center' })
+      // Founder title — PROPER VERTICAL SPACING (gap = 30px for clean separation)
+      setFont(10, 'regular')
+      doc.fillColor(NAVY_DEEP).text('المدير التنفيذي', sigAreaX, bottomY + 90, { width: sigAreaW, align: 'center' })
 
       // Watermark
       doc.save()

@@ -391,59 +391,59 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
               {/* Signature block (right) — large royal blue gel-pen */}
               <div className="text-center">
                 <div className="text-[9px] md:text-[11px] mb-1 font-bold" style={{ color: '#666666' }}>توقيع الجهة المانوحة</div>
-                {/* Large gel-pen signature SVG */}
+                {/* Compact gel-pen signature SVG — smaller to fit within card */}
                 <svg
-                  width="130"
-                  height="50"
-                  viewBox="0 0 130 50"
+                  width="120"
+                  height="35"
+                  viewBox="0 0 120 35"
                   className="mx-auto"
                 >
                   {/* Main flourish with variable thickness */}
                   <path
-                    d="M 10 25 Q 20 9, 28 25 T 46 25 Q 56 11, 64 31 Q 78 9, 88 27 Q 100 15, 120 25"
+                    d="M 10 18 Q 18 6, 26 18 T 42 18 Q 50 8, 58 22 Q 70 6, 80 20 Q 92 10, 110 18"
                     stroke="#0047AB"
-                    strokeWidth="2.8"
+                    strokeWidth="2.5"
                     fill="none"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   {/* Thicker downstrokes overlay */}
                   <path
-                    d="M 14 21 Q 18 13, 24 21 M 60 21 Q 64 13, 70 23 M 84 19 Q 90 11, 96 19"
-                    stroke="#0047AB"
-                    strokeWidth="4"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Left initial flourish (large) */}
-                  <path
-                    d="M 2 13 Q -2 -1, 12 -3 Q 18 0, 14 15"
-                    stroke="#0047AB"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Right end flourish (large loop) */}
-                  <path
-                    d="M 120 25 Q 132 15, 130 33 Q 122 38, 118 28"
+                    d="M 14 14 Q 18 8, 24 14 M 56 14 Q 60 8, 66 16 M 78 12 Q 84 6, 90 12"
                     stroke="#0047AB"
                     strokeWidth="3.5"
                     fill="none"
                     strokeLinecap="round"
                   />
-                  {/* Underscore (long sweep) */}
+                  {/* Small left initial flourish */}
                   <path
-                    d="M 5 40 Q 65 38, 128 41"
+                    d="M 4 8 Q 0 -2, 12 -3 Q 16 0, 12 10"
                     stroke="#0047AB"
-                    strokeWidth="1.6"
+                    strokeWidth="2.5"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  {/* Small right end flourish */}
+                  <path
+                    d="M 110 18 Q 118 10, 116 26 Q 110 30, 106 22"
+                    stroke="#0047AB"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  {/* Underscore (medium sweep) */}
+                  <path
+                    d="M 5 30 Q 60 28, 116 30"
+                    stroke="#0047AB"
+                    strokeWidth="1.5"
                     fill="none"
                     strokeLinecap="round"
                   />
                   {/* Initial dot */}
-                  <circle cx="2" cy="17" r="1.8" fill="#0047AB" />
+                  <circle cx="2" cy="12" r="1.5" fill="#0047AB" />
                 </svg>
-                <div className="text-sm md:text-[15px] font-bold mt-1" style={{ color: '#001F3F' }}>د. هاني الشافعي</div>
-                <div className="text-[10px] md:text-xs" style={{ color: '#001F3F' }}>المدير التنفيذي</div>
+                <div className="text-sm md:text-[15px] font-bold mt-2" style={{ color: '#001F3F' }}>د. هاني الشافعي</div>
+                <div className="text-[10px] md:text-xs mt-2" style={{ color: '#001F3F' }}>المدير التنفيذي</div>
               </div>
             </div>
 
