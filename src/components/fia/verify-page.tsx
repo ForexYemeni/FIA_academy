@@ -447,8 +447,8 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
               </div>
             </div>
 
-            {/* Footer text with horizontal gold flanking lines */}
-            <div className="flex items-center justify-center gap-2 mt-4 pr-0">
+            {/* Footer text with horizontal gold flanking lines — only show on desktop to avoid crowding on mobile */}
+            <div className="hidden md:flex items-center justify-center gap-2 mt-3 pr-0">
               <span className="h-px w-12 md:w-16" style={{ backgroundColor: '#D4AF37' }} />
               <span className="text-[10px] md:text-xs font-bold px-2" style={{ color: '#8B6428' }}>
                 هذا مستند أصلي مُصدر إلكترونياً

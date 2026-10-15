@@ -500,8 +500,10 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.fillText('قد أتم بنجاح دورة', cx, cardY + 270 * scale)
 
   // ===== Course banner — hexagonal pointed ends + gold border + bright gold text =====
-  const ribbonY = cardY + 300 * scale
-  const ribbonH = 50 * scale
+  // Layout positions carefully computed to avoid ANY overlap:
+  //   ribbon 290-335 | diamond 353 | cards 380-430 | bottom row 440-515 (within cardH=525)
+  const ribbonY = cardY + 290 * scale
+  const ribbonH = 45 * scale
   setFont(22, 'bold')
   const courseText = cert.course_title || 'دورة معتمدة'
   const textW = ctx.measureText(courseText).width
@@ -572,9 +574,10 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.closePath()
   ctx.fill()
 
-  // ===== Info cards row (3 cards with icons in gold circles) =====
-  const colsY = cardY + 388 * scale
-  const colsH = 64 * scale
+  // ===== Info cards row (3 cards with icons in gold circles) — positioned BELOW diamond with proper gap =====
+  // Diamond at cardY+353, cards start at cardY+380 (27px gap, no overlap)
+  const colsY = cardY + 380 * scale
+  const colsH = 50 * scale
   const colW = 200 * scale
   const colGap = 15 * scale
   const totalColsW = 3 * colW + 2 * colGap
@@ -584,64 +587,67 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fillRoundRect(colsStartX, colsY, colW, colsH, 10 * scale, WHITE)
   strokeRoundRect(colsStartX, colsY, colW, colsH, 10 * scale, GOLD, 1.5 * scale)
   // Calendar icon in gold circle
-  fillRoundRect(colsStartX + 10 * scale, colsY + 12 * scale, 40 * scale, 40 * scale, 20 * scale, GOLD)
+  fillRoundRect(colsStartX + 10 * scale, colsY + 8 * scale, 34 * scale, 34 * scale, 17 * scale, GOLD)
   ctx.fillStyle = WHITE
-  ctx.font = `${22 * scale}px Cairo-Bold`
+  ctx.font = `${18 * scale}px Cairo-Bold`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('📅', colsStartX + 30 * scale, colsY + 32 * scale)
+  ctx.fillText('📅', colsStartX + 27 * scale, colsY + 25 * scale)
   // Label
   ctx.direction = 'rtl'
-  setFont(11, 'regular')
+  setFont(10, 'regular')
   fill(GRAY)
   ctx.textAlign = 'right'
-  ctx.fillText('تاريخ الإصدار', colsStartX + colW - 15 * scale, colsY + 20 * scale)
-  setFont(14, 'bold')
+  ctx.fillText('تاريخ الإصدار', colsStartX + colW - 12 * scale, colsY + 15 * scale)
+  setFont(13, 'bold')
   fill(NAVY_DEEP)
-  ctx.fillText(issueDate, colsStartX + colW - 15 * scale, colsY + 42 * scale)
+  ctx.fillText(issueDate, colsStartX + colW - 12 * scale, colsY + 34 * scale)
 
   // Card 2: Issuer (center) — Graduation cap icon
   const col2X = colsStartX + colW + colGap
   fillRoundRect(col2X, colsY, colW, colsH, 10 * scale, WHITE)
   strokeRoundRect(col2X, colsY, colW, colsH, 10 * scale, GOLD, 1.5 * scale)
-  fillRoundRect(col2X + 10 * scale, colsY + 12 * scale, 40 * scale, 40 * scale, 20 * scale, GOLD)
+  fillRoundRect(col2X + 10 * scale, colsY + 8 * scale, 34 * scale, 34 * scale, 17 * scale, GOLD)
   ctx.fillStyle = WHITE
-  ctx.fillText('🎓', col2X + 30 * scale, colsY + 32 * scale)
+  ctx.fillText('🎓', col2X + 27 * scale, colsY + 25 * scale)
   ctx.direction = 'rtl'
-  setFont(11, 'regular')
+  setFont(10, 'regular')
   fill(GRAY)
   ctx.textAlign = 'right'
-  ctx.fillText('الجهة المصدرة', col2X + colW - 15 * scale, colsY + 20 * scale)
-  setFont(14, 'bold')
+  ctx.fillText('الجهة المصدرة', col2X + colW - 12 * scale, colsY + 15 * scale)
+  setFont(13, 'bold')
   fill(NAVY_DEEP)
-  ctx.fillText('أكاديمية المستقبل الدولية', col2X + colW - 15 * scale, colsY + 42 * scale)
+  ctx.fillText('أكاديمية المستقبل الدولية', col2X + colW - 12 * scale, colsY + 34 * scale)
 
   // Card 3: Status (right) — Checkmark icon
   const col3X = colsStartX + 2 * (colW + colGap)
   fillRoundRect(col3X, colsY, colW, colsH, 10 * scale, WHITE)
   strokeRoundRect(col3X, colsY, colW, colsH, 10 * scale, GOLD, 1.5 * scale)
-  fillRoundRect(col3X + 10 * scale, colsY + 12 * scale, 40 * scale, 40 * scale, 20 * scale, GOLD)
+  fillRoundRect(col3X + 10 * scale, colsY + 8 * scale, 34 * scale, 34 * scale, 17 * scale, GOLD)
   ctx.fillStyle = WHITE
-  ctx.fillText('✓', col3X + 30 * scale, colsY + 32 * scale)
+  ctx.fillText('✓', col3X + 27 * scale, colsY + 25 * scale)
   ctx.direction = 'rtl'
-  setFont(11, 'regular')
+  setFont(10, 'regular')
   fill(GRAY)
   ctx.textAlign = 'right'
-  ctx.fillText('الحالة', col3X + colW - 15 * scale, colsY + 20 * scale)
+  ctx.fillText('الحالة', col3X + colW - 12 * scale, colsY + 15 * scale)
   // Green pill badge for status
   const badgeText = cert.status === 'صالحة' ? '✓ صالح' : cert.status || 'صالح'
-  setFont(14, 'bold')
-  const badgeW = ctx.measureText(badgeText).width + 28 * scale
-  const badgeH = 26 * scale
-  const badgeX = col3X + colW - 15 * scale - badgeW
-  const badgeY = colsY + 30 * scale
+  setFont(13, 'bold')
+  const badgeW = ctx.measureText(badgeText).width + 24 * scale
+  const badgeH = 22 * scale
+  const badgeX = col3X + colW - 12 * scale - badgeW
+  const badgeY = colsY + 28 * scale
   fillRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, EMERALD)
   fill(WHITE)
   ctx.textAlign = 'center'
   ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2 * scale)
 
-  // ===== Footer: QR + Barcode + Signature (3-column) =====
-  const bottomY = cardY + cardH - 110 * scale
+  // ===== Footer: QR + Barcode + Signature (3-column) — positioned BELOW cards with proper gap =====
+  // Cards end at cardY+430 (colsY 380 + colsH 50). Footer starts at cardY+440 (10px gap).
+  // Founder title at bottomY+75 = cardY+515 (within cardH=525).
+  // Footer text removed to avoid edge overlap.
+  const bottomY = cardY + 440 * scale
 
   // === QR (left) ===
   const qrBuffer = await generateQR(verifyUrl)
@@ -724,29 +730,14 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
     drawGelPenSignature(ctx, sigAreaX + 15 * scale, sigImgAreaY + 25 * scale, sigAreaW - 30 * scale, scale)
   }
 
-  // Founder name (bold navy)
+  // Founder name (bold navy) — moved up to fit within card
   setFont(15, 'bold')
   fill(NAVY_DEEP)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 78 * scale)
-  // Founder title (smaller, navy)
+  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 60 * scale)
+  // Founder title (smaller, navy) — within card bounds
   setFont(11, 'regular')
   fill(NAVY_DEEP)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 95 * scale)
-
-  // ===== Footer text with horizontal gold flanking lines =====
-  const footerTextY = cardY + cardH - 35 * scale
-  stroke(GOLD, 1 * scale)
-  ctx.beginPath()
-  ctx.moveTo(cx - 120 * scale, footerTextY)
-  ctx.lineTo(cx - 75 * scale, footerTextY)
-  ctx.moveTo(cx + 75 * scale, footerTextY)
-  ctx.lineTo(cx + 120 * scale, footerTextY)
-  ctx.stroke()
-  ctx.direction = 'rtl'
-  setFont(10, 'bold')
-  fill(GOLD_DARK)
-  ctx.textAlign = 'center'
-  ctx.fillText('هذا مستند أصلي مُصدر إلكترونياً', cx, footerTextY)
+  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 75 * scale)
 
   // ===== Watermark (very faint FIA diagonal) =====
   ctx.save()
@@ -895,8 +886,8 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.fillColor(GRAY_DARK).text('قد أتم بنجاح دورة', cx - 350, cardY + 263, { width: 700, align: 'center' })
 
       // ===== Course banner (navy with gold border, pointed hexagon) =====
-      const ribbonY = cardY + 300
-      const ribbonH = 50
+      const ribbonY = cardY + 290
+      const ribbonH = 45
       setFont(22, 'bold')
       const courseText = cert.course_title || 'دورة معتمدة'
       const textW = doc.widthOfString(courseText)
@@ -923,8 +914,9 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.polygon([cx, ribbonY + ribbonH + 12], [cx + 4, ribbonY + ribbonH + 18], [cx, ribbonY + ribbonH + 24], [cx - 4, ribbonY + ribbonH + 18]).fill(GOLD)
 
       // ===== Info cards row (3 cards with icons) =====
-      const colsY = cardY + 388
-      const colsH = 64
+      // ===== Info cards row (3 cards with icons) — positioned BELOW diamond with proper gap =====
+      const colsY = cardY + 380
+      const colsH = 50
       const colW = 200
       const colGap = 15
       const totalColsW = 3 * colW + 2 * colGap
@@ -987,8 +979,11 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.restore()
       doc.fillColor(WHITE).text(badgeText, badgeX, badgeY + 5, { width: badgeW, align: 'center' })
 
-      // ===== Footer: QR + Barcode + Signature =====
-      const bottomY = cardY + cardH - 110
+      // ===== Footer: QR + Barcode + Signature — positioned BELOW cards with proper gap =====
+      // Cards end at cardY+430 (colsY 380 + colsH 50). Footer starts at cardY+440 (10px gap).
+      // Founder title at bottomY+75 = cardY+515 (within cardH=525).
+      // Footer text removed to avoid edge overlap.
+      const bottomY = cardY + 440
 
       // QR (left)
       const qrBuffer = await generateQR(verifyUrl)
@@ -1046,20 +1041,12 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
         drawGelPenSignaturePDF(doc, sigAreaX + 15, sigImgAreaY + 25, sigAreaW - 30)
       }
 
-      // Founder name (bold navy)
+      // Founder name (bold navy) — moved up to fit within card
       setFont(15, 'bold')
-      doc.fillColor(NAVY_DEEP).text('د. هاني الشافعي', sigAreaX, bottomY + 75, { width: sigAreaW, align: 'center' })
-      // Founder title
+      doc.fillColor(NAVY_DEEP).text('د. هاني الشافعي', sigAreaX, bottomY + 60, { width: sigAreaW, align: 'center' })
+      // Founder title — within card bounds
       setFont(11, 'regular')
-      doc.fillColor(NAVY_DEEP).text('المدير التنفيذي', sigAreaX, bottomY + 92, { width: sigAreaW, align: 'center' })
-
-      // ===== Footer text with gold flanking lines =====
-      const footerTextY = cardY + cardH - 35
-      doc.lineWidth(1).strokeColor(GOLD)
-      doc.moveTo(cx - 120, footerTextY).lineTo(cx - 75, footerTextY).stroke()
-      doc.moveTo(cx + 75, footerTextY).lineTo(cx + 120, footerTextY).stroke()
-      setFont(10, 'bold')
-      doc.fillColor(GOLD_DARK).text('هذا مستند أصلي مُصدر إلكترونياً', cx - 200, footerTextY - 6, { width: 400, align: 'center' })
+      doc.fillColor(NAVY_DEEP).text('المدير التنفيذي', sigAreaX, bottomY + 75, { width: sigAreaW, align: 'center' })
 
       // Watermark
       doc.save()
