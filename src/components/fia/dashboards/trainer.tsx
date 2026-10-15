@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
-  Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight,
+  Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -34,6 +34,7 @@ export function TrainerDashboard() {
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)
   const updateUser = useAuth((s) => s.updateUser)
+  const logout = useAuth((s) => s.logout)
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [editing, setEditing] = useState<any | null>(null)
@@ -79,7 +80,7 @@ export function TrainerDashboard() {
       {active === 'exams' && <TrainerExams />}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
       {active === 'notifications' && <TrainerNotifs />}
-      {active === 'settings' && <TrainerSettings />}
+      {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
 
       {isDialogOpen && (
         <CourseDialog
@@ -526,6 +527,187 @@ function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
         </div>
         <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
           {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+        </Button>
+      </div>
+    </SectionCard>
+  )
+}
+
+function TrainerAccountSettings({ user, updateUser, logout }: any) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const save = async () => {
+    if (!currentPassword) {
+      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+      return
+    }
+    if (newPassword && newPassword !== confirmPassword) {
+      toast.error('كلمتا المرور الجديدتان غير متطابقتين')
+      return
+    }
+    if (newPassword && newPassword.length < 6) {
+      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+      return
+    }
+    if (!newEmail && !newPassword) {
+      toast.error('لا توجد تغييرات للحفظ')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          currentEmail: user.email,
+          currentPassword,
+          newEmail: newEmail || undefined,
+          newPassword: newPassword || undefined,
+          role: 'trainer',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل التحديث')
+        return
+      }
+      toast.success('تم تحديث بيانات الدخول بنجاح')
+      updateUser({
+        email: newEmail || user.email,
+        password: newPassword || user.password,
+      })
+      setCurrentPassword('')
+      setNewEmail('')
+      setNewPassword('')
+      setConfirmPassword('')
+      if (newEmail) {
+        setTimeout(() => {
+          logout()
+          toast.info('تم تحديث البريد. يرجى تسجيل الدخول بالبيانات الجديدة')
+        }, 2000)
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <SectionCard title="الحساب والأمان" description="تغيير البريد الإلكتروني وكلمة المرور">
+      <div className="space-y-5 max-w-2xl">
+        {/* Current account info */}
+        <div className="bg-muted/30 p-4 rounded-lg border border-border">
+          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+              {user?.name?.charAt(0)}
+            </div>
+            <div>
+              <div className="font-bold text-navy">{user?.name}</div>
+              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Security verification */}
+        <div>
+          <Label className="text-navy font-semibold">كلمة المرور الحالية *</Label>
+          <div className="relative mt-1">
+            <Input
+              type={showCurrent ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              dir="ltr"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent(!showCurrent)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+            >
+              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
+        </div>
+
+        {/* New email */}
+        <div className="border-t border-border pt-4">
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+            <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
+          </h3>
+          <div>
+            <Label>البريد الجديد</Label>
+            <Input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder={user?.email || 'example@fia.edu'}
+              dir="ltr"
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+          </div>
+        </div>
+
+        {/* New password */}
+        <div className="border-t border-border pt-4">
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+            <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <Label>كلمة المرور الجديدة</Label>
+              <div className="relative mt-1">
+                <Input
+                  type={showNew ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+                >
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <Label>تأكيد كلمة المرور</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                dir="ltr"
+                className="mt-1"
+              />
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-xs text-red-500 mt-1">كلمتا المرور غير متطابقتين</p>
+              )}
+              {newPassword && confirmPassword && newPassword === confirmPassword && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> كلمتا المرور متطابقتان
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">اتركها فارغاً إذا لم ترد تغيير كلمة المرور</p>
+          </div>
+        </div>
+
+        <Button onClick={save} disabled={loading || !currentPassword} className="bg-navy hover:bg-navy-light">
+          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
         </Button>
       </div>
     </SectionCard>
