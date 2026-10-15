@@ -76,7 +76,7 @@ export function StudentDashboard() {
         <StudentCourseViewer
           course={viewingCourse}
           enrollment={viewingEnrollment}
-          onBack={() => { setViewingCourse(null); setActive('courses') }}
+          onBack={() => { setViewingCourse(null); setActive('courses'); loadEnrollments() }}
         />
       ) : null}
       {active !== 'course-view' && (

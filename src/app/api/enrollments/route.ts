@@ -31,12 +31,19 @@ function toEnrollment(p: StoredEnrollment): any {
   if (!isFree) {
     payment_status = p.status === 'paid' ? 'paid' : 'pending'
   }
+  // Parse progress from reference field (stored as __PROGRESS__:XX)
+  let progress = 0
+  if (p.reference) {
+    const match = p.reference.match(/__PROGRESS__:(\d+)/)
+    if (match) progress = parseInt(match[1]) || 0
+    // If reference contains PROGRESS marker, the actual reference is the part before it
+  }
   return {
     id: p.id,
     user_id: p.user_id,
     course_id: p.course_id,
     status: p.status || 'active',
-    progress: 0, // we'll calculate from a separate field if needed
+    progress,
     payment_status,
     amount_paid: p.amount || 0,
     currency: p.currency || 'ر.ي',
@@ -117,6 +124,21 @@ export async function PUT(req: NextRequest) {
     if (updates.payment_method !== undefined) paymentUpdates.method = updates.payment_method
     if (updates.payment_reference !== undefined) paymentUpdates.reference = updates.payment_reference
     if (updates.enrolled_at !== undefined) paymentUpdates.date = updates.enrolled_at
+
+    // Store progress in reference field (append to existing reference)
+    if (updates.progress !== undefined) {
+      // Fetch current reference to preserve payment proof info
+      const { data: existing } = await supabaseAdmin
+        .from('payments')
+        .select('reference')
+        .eq('id', id)
+        .maybeSingle()
+      const existingRef = existing?.reference || ''
+      // Remove old progress marker if exists
+      const cleanRef = existingRef.replace(/\s*\|?\s*__PROGRESS__:\d+/g, '').trim()
+      // Add new progress marker
+      paymentUpdates.reference = cleanRef ? `${cleanRef} | __PROGRESS__:${updates.progress}` : `__PROGRESS__:${updates.progress}`
+    }
 
     if (Object.keys(paymentUpdates).length === 0) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 })
