@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
+  Compass, Lock, Plus, Download,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -15,11 +16,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { AvatarUploader } from '@/components/fia/avatar-uploader'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { id: 'courses', label: 'دوراتي', icon: BookOpen },
+  { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
   { id: 'exams', label: 'اختباراتي', icon: FileText },
   { id: 'results', label: 'نتائجي', icon: TrendingUp },
   { id: 'certificates', label: 'شهاداتي', icon: Award },
@@ -36,13 +42,24 @@ export function StudentDashboard() {
   const [courses, setCourses] = useState<any[]>([])
   const [certificates, setCertificates] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<any[]>([])
   const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '' })
+
+  const loadEnrollments = () => {
+    if (!user?.id) return
+    fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
+  }
 
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [])
+    loadEnrollments()
+  }, [user?.id])
+
+  const onEnrolled = () => {
+    loadEnrollments()
+  }
 
   return (
     <DashboardShell
@@ -52,8 +69,9 @@ export function StudentDashboard() {
       roleLabel="متدرب"
       roleColor="bg-blue-500/15 text-blue-600 border-blue-500/30"
     >
-      {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} />}
-      {active === 'courses' && <MyCourses courses={courses} />}
+      {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
+      {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} />}
+      {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
       {active === 'exams' && <Exams />}
       {active === 'results' && <Results />}
       {active === 'certificates' && <Certificates certificates={certificates} />}
@@ -65,7 +83,7 @@ export function StudentDashboard() {
   )
 }
 
-function Overview({ user, courses, certificates }: any) {
+function Overview({ user, courses, certificates, enrollments }: any) {
   return (
     <div className="space-y-6">
       <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
@@ -74,29 +92,37 @@ function Overview({ user, courses, certificates }: any) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={BookOpen} label="الدورات المسجّلة" value={3} color="navy" />
-        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={1} color="green" />
+        <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
+        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
         <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
         <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
       </div>
 
       <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
         <div className="space-y-4">
-          {courses.slice(0, 3).map((c: any) => (
-            <div key={c.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-navy text-sm">{c.title}</div>
-                <span className="text-xs text-muted-foreground">{Math.floor(Math.random() * 80) + 10}%</span>
-              </div>
-              <Progress value={Math.floor(Math.random() * 80) + 10} className="h-2" />
-            </div>
-          ))}
+          {enrollments && enrollments.length > 0 ? (
+            enrollments.slice(0, 3).map((e: any) => {
+              const c = courses.find((x:any) => x.id === e.course_id)
+              if (!c) return null
+              return (
+                <div key={e.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-navy text-sm">{c.title}</div>
+                    <span className="text-xs text-muted-foreground">{e.progress || 0}%</span>
+                  </div>
+                  <Progress value={e.progress || 0} className="h-2" />
+                </div>
+              )
+            })
+          ) : (
+            <div className="text-center py-6 text-muted-foreground text-sm">لا توجد دورات مسجّلة بعد — تصفّح الدورات المتاحة</div>
+          )}
         </div>
       </SectionCard>
 
       <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.slice(3, 6).map((c: any) => (
+          {courses.slice(0, 3).map((c: any) => (
             <Card key={c.id} className="p-4 card-hover">
               <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden">
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
@@ -112,33 +138,274 @@ function Overview({ user, courses, certificates }: any) {
   )
 }
 
-function MyCourses({ courses }: any) {
+function MyCourses({ courses, enrollments }: any) {
+  const enrolled = (enrollments || [])
+    .map((e: any) => {
+      const course = courses.find((c: any) => c.id === e.course_id)
+      return course ? { ...course, enrollment: e } : null
+    })
+    .filter(Boolean)
+
   return (
-    <SectionCard title="دوراتي المسجّلة" description="جميع الدورات التي اشتركت بها">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {courses.map((c: any) => (
-          <Card key={c.id} className="overflow-hidden card-hover">
-            <div className="h-32 bg-navy relative">
-              {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-              <div className="absolute top-2 right-2">
-                <Badge className="bg-green-500 text-white">قيد التعلّم</Badge>
+    <SectionCard title="دوراتي المسجّلة" description={`${enrolled.length} دورة`}>
+      {enrolled.length === 0 ? (
+        <div className="text-center py-12">
+          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {enrolled.map((c: any) => (
+            <Card key={c.id} className="overflow-hidden card-hover">
+              <div className="h-32 bg-navy relative">
+                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+                <div className="absolute top-2 right-2">
+                  <Badge className={
+                    c.enrollment.status === 'completed' ? 'bg-green-500 text-white'
+                    : c.enrollment.payment_status === 'pending' ? 'bg-yellow-500 text-white'
+                    : 'bg-blue-500 text-white'
+                  }>
+                    {c.enrollment.status === 'completed' ? 'مكتملة' : c.enrollment.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                  </Badge>
+                </div>
               </div>
-            </div>
-            <div className="p-4">
-              <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
-              <Progress value={Math.floor(Math.random() * 90) + 5} className="h-2 mb-2" />
-              <div className="flex justify-between text-xs text-muted-foreground mb-3">
-                <span>{Math.floor(Math.random() * 90) + 5}% مكتمل</span>
-                <span>{c.duration_hours} ساعة</span>
+              <div className="p-4">
+                <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+                <Progress value={c.enrollment.progress || 0} className="h-2 mb-2" />
+                <div className="flex justify-between text-xs text-muted-foreground mb-3">
+                  <span>{c.enrollment.progress || 0}% مكتمل</span>
+                  <span>{c.duration_hours} ساعة</span>
+                </div>
+                <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy">
+                  متابعة التعلّم
+                </Button>
               </div>
-              <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy">
-                متابعة التعلّم
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </SectionCard>
+  )
+}
+
+function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+  const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
+  const [enrolling, setEnrolling] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
+  }, [])
+
+  const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
+
+  const enrollFree = async (course: any) => {
+    setEnrolling(course.id)
+    try {
+      const res = await fetch('/api/enrollments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, course_id: course.id, payment_status: 'free' }),
+      })
+      const data = await res.json()
+      if (data.already_enrolled) {
+        toast.info('أنت مسجّل في هذه الدورة')
+      } else if (res.ok) {
+        toast.success(`تم التسجيل في دورة: ${course.title}`)
+        onEnrolled()
+      } else toast.error('فشل التسجيل')
+    } catch {
+      toast.error('خطأ')
+    } finally {
+      setEnrolling(null)
+    }
+  }
+
+  const enrollPaid = async (course: any, method: any, reference: string) => {
+    setEnrolling(course.id)
+    try {
+      // 1. Create enrollment with pending payment
+      const res = await fetch('/api/enrollments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          course_id: course.id,
+          payment_status: 'pending',
+          amount_paid: course.price,
+          payment_method: method.name,
+          payment_reference: reference,
+        }),
+      })
+      const data = await res.json()
+      if (data.already_enrolled) {
+        toast.info('أنت مسجّل في هذه الدورة')
+      } else if (res.ok) {
+        // 2. Create payment record
+        await fetch('/api/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: course.price,
+            currency: course.currency || 'ر.ي',
+            method: method.name,
+            status: 'قيد الانتظار',
+            reference,
+            user_id: userId,
+            course_id: course.id,
+          }),
+        })
+        toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
+        onEnrolled()
+        setPayDialog(null)
+      } else toast.error('فشل التسجيل')
+    } catch {
+      toast.error('خطأ')
+    } finally {
+      setEnrolling(null)
+    }
+  }
+
+  return (
+    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {courses.map((c: any) => {
+          const enrolled = isEnrolled(c.id)
+          const isFree = c.price_type === 'مجانية' || c.price === 0
+          return (
+            <Card key={c.id} className="overflow-hidden card-hover">
+              <div className="h-32 bg-navy relative">
+                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+                {isFree ? (
+                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية</Badge>
+                ) : (
+                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة</Badge>
+                )}
+              </div>
+              <div className="p-4">
+                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
+                  </span>
+                  <span className="font-bold text-navy">
+                    {isFree ? <span className="text-green-600">مجانية</span> : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                  </span>
+                </div>
+                {enrolled ? (
+                  <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 bg-green-500/5">
+                    <CheckCircle2 className="w-4 h-4 ml-1" /> مسجّل
+                  </Button>
+                ) : isFree ? (
+                  <Button
+                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={() => enrollFree(c)}
+                    disabled={enrolling === c.id}
+                  >
+                    {enrolling === c.id ? 'جاري التسجيل...' : 'سجّل الآن'}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="w-full bg-gold hover:bg-gold-light text-navy"
+                    onClick={() => setPayDialog({ course: c, open: true })}
+                  >
+                    <Lock className="w-3.5 h-3.5 ml-1" /> اشترك الآن
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+
+      {payDialog?.open && (
+        <PaymentDialog
+          course={payDialog.course}
+          methods={paymentMethods}
+          open={payDialog.open}
+          onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
+          onPay={(method, reference) => enrollPaid(payDialog.course, method, reference)}
+          loading={enrolling === payDialog.course.id}
+        />
+      )}
+    </SectionCard>
+  )
+}
+
+function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: any) {
+  const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
+  const [reference, setReference] = useState('')
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
+            <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
+            <span className="text-xl font-extrabold text-gold">
+              {course.price?.toLocaleString()} {course.currency || 'ر.ي'}
+            </span>
+          </div>
+
+          <div>
+            <Label className="text-navy">اختر طريقة الدفع</Label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {methods.map((m: any) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMethod(m)}
+                  className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                    selectedMethod?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:border-muted'
+                  }`}
+                >
+                  <span className="text-2xl">{m.icon}</span>
+                  <div className="text-right">
+                    <div className="font-bold text-navy text-sm">{m.name}</div>
+                    {m.wallet_id && <div className="text-xs text-muted-foreground font-mono" dir="ltr">{m.wallet_id}</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {selectedMethod && (
+            <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
+              <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
+              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم أدخل رقم المعاملة.'}</p>
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="ref">رقم المعاملة / المرجع</Label>
+            <Input
+              id="ref"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="مثال: JB-123456789"
+              dir="ltr"
+              className="mt-1"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+          <Button
+            className="bg-navy hover:bg-navy-light"
+            disabled={loading || !selectedMethod || !reference.trim()}
+            onClick={() => onPay(selectedMethod, reference)}
+          >
+            {loading ? 'جاري المعالجة...' : 'تأكيد الاشتراك'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -223,26 +490,60 @@ function Results() {
 }
 
 function Certificates({ certificates }: any) {
-  const myCerts = certificates.length > 0 ? certificates : [
-    { id: '1', certificate_number: 'FIA-2025-00142', student_name: 'محمد أحمد', course_title: 'BLS & ACLS', issued_at: '2025-09-15', status: 'صالحة' }
-  ]
+  const myCerts = certificates.length > 0 ? certificates : []
+  const [downloading, setDownloading] = useState<string | null>(null)
+
+  const handleDownload = (cert: any) => {
+    setDownloading(cert.id)
+    // Open PDF in new tab (browser will download or preview)
+    window.open(`/api/certificate-pdf?number=${encodeURIComponent(cert.certificate_number)}&format=pdf`, '_blank')
+    setTimeout(() => setDownloading(null), 2000)
+  }
+
   return (
     <SectionCard title="شهاداتي" description="الشهادات التي حصلت عليها">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {myCerts.map((c: any) => (
-          <Card key={c.id} className="p-5 text-center card-hover border-2 border-gold/20">
-            <div className="w-16 h-16 mx-auto rounded-full bg-gold/15 flex items-center justify-center mb-3">
-              <Award className="w-8 h-8 text-gold" />
-            </div>
-            <div className="font-bold text-navy text-sm mb-1">{c.course_title}</div>
-            <div className="text-xs text-muted-foreground mb-3" dir="ltr">{c.certificate_number}</div>
-            <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
-            <Button size="sm" variant="outline" className="w-full border-gold/30 text-navy hover:bg-gold/10">
-              تحميل PDF
-            </Button>
-          </Card>
-        ))}
-      </div>
+      {myCerts.length === 0 ? (
+        <div className="text-center py-12">
+          <Award className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground mb-2">لا توجد شهادات بعد</p>
+          <p className="text-xs text-muted-foreground">أنهِ دورة بنجاح للحصول على شهادة معتمدة</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {myCerts.map((c: any) => (
+            <Card key={c.id} className="overflow-hidden card-hover border-2 border-gold/20">
+              <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden cursor-pointer" onClick={() => handleDownload(c)}>
+                <img
+                  src={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`}
+                  alt={c.course_title || 'certificate'}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center">
+                    <Award className="w-5 h-5 text-gold" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-navy text-sm line-clamp-1">{c.course_title || 'دورة'}</div>
+                    <div className="text-xs text-muted-foreground font-mono" dir="ltr">{c.certificate_number}</div>
+                  </div>
+                </div>
+                <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 bg-navy hover:bg-navy-light" onClick={() => handleDownload(c)} disabled={downloading === c.id}>
+                    <Download className="w-3.5 h-3.5 ml-1" /> PDF
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`, '_blank')}>
+                    صورة
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </SectionCard>
   )
 }
@@ -289,7 +590,7 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
   const save = async () => {
     setLoading(true)
     try {
-      // Update locally (in real app, would call /api/students PUT)
+      // Update locally — in real app, would call /api/students PUT
       updateUser({
         name: profile.name,
         phone: profile.phone,
@@ -306,16 +607,16 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
 
   return (
     <SectionCard title="الملف الشخصي" description="إدارة معلوماتك الشخصية">
-      <div className="space-y-5 max-w-2xl">
-        <div className="flex items-center gap-4">
-          <Avatar className="w-24 h-24 border-4 border-gold/20">
-            <AvatarImage src={user?.avatar || ''} />
-            <AvatarFallback className="bg-navy text-gold text-3xl">{user?.name?.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <Button variant="outline" size="sm">تغيير الصورة</Button>
-            <p className="text-xs text-muted-foreground mt-2">JPG أو PNG. حد أقصى 2MB.</p>
-          </div>
+      <div className="space-y-6 max-w-2xl">
+        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+          <AvatarUploader
+            userId={user.id}
+            role="student"
+            initialUrl={user?.avatar}
+            name={user?.name}
+            size="xl"
+            onUploaded={(url) => updateUser({ avatar: url })}
+          />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">

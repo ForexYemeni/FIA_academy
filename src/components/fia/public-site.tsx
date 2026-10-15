@@ -328,24 +328,60 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
             </div>
 
             {verifyResult && !verifyResult.not_found && (
-              <div className="mt-6 p-6 bg-green-50 border-2 border-green-500/30 rounded-lg">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                    <CheckCircle2 className="w-7 h-7 text-white" />
+              <div className="mt-6 space-y-4">
+                <div className="p-6 bg-green-50 border-2 border-green-500/30 rounded-lg">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                      <CheckCircle2 className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-green-700 text-lg">شهادة صالحة وموثقة</div>
+                      <div className="text-green-600 text-sm">تم التحقق بنجاح من صحة الشهادة</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-bold text-green-700 text-lg">شهادة صالحة وموثقة</div>
-                    <div className="text-green-600 text-sm">تم التحقق بنجاح من صحة الشهادة</div>
-                  </div>
+                  <dl className="grid sm:grid-cols-2 gap-4 text-sm">
+                    <Detail label="اسم المتدرب" value={verifyResult.student_name} />
+                    <Detail label="رقم الشهادة" value={verifyResult.certificate_number} mono />
+                    <Detail label="الدورة" value={verifyResult.course_title || '-'} />
+                    <Detail label="جهة الإصدار" value={verifyResult.issued_by || 'أكاديمية المستقبل الدولية'} />
+                    <Detail label="تاريخ الإصدار" value={verifyResult.issued_at ? new Date(verifyResult.issued_at).toLocaleDateString('ar-EG') : '-'} />
+                    <Detail label="الحالة" value={verifyResult.status} />
+                  </dl>
                 </div>
-                <dl className="grid sm:grid-cols-2 gap-4 text-sm">
-                  <Detail label="اسم المتدرب" value={verifyResult.student_name} />
-                  <Detail label="رقم الشهادة" value={verifyResult.certificate_number} mono />
-                  <Detail label="الدورة" value={verifyResult.course_title || '-'} />
-                  <Detail label="جهة الإصدار" value={verifyResult.issued_by || 'أكاديمية المستقبل الدولية'} />
-                  <Detail label="تاريخ الإصدار" value={verifyResult.issued_at ? new Date(verifyResult.issued_at).toLocaleDateString('ar-EG') : '-'} />
-                  <Detail label="الحالة" value={verifyResult.status} />
-                </dl>
+
+                {/* Professional certificate preview */}
+                <div className="rounded-lg overflow-hidden border-2 border-gold/30 shadow-lg">
+                  <div className="bg-navy text-white px-4 py-2 flex items-center justify-between">
+                    <div className="font-semibold text-sm flex items-center gap-2">
+                      <Award className="w-4 h-4 text-gold" /> معاينة الشهادة الاحترافية
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="text-gold text-xs hover:underline"
+                      >
+                        تحميل PDF
+                      </a>
+                      <a
+                        href={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=png`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="text-gold text-xs hover:underline"
+                      >
+                        صورة PNG
+                      </a>
+                    </div>
+                  </div>
+                  <img
+                    src={`/api/certificate-pdf?number=${encodeURIComponent(verifyResult.certificate_number)}&format=png`}
+                    alt="معاينة الشهادة"
+                    className="w-full h-auto"
+                  />
+                </div>
               </div>
             )}
 

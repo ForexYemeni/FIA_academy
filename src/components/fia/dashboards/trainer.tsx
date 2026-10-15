@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
-  Plus, Edit, Trash2, Video, FileUp, Star,
+  Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
+import { CourseContentManager } from '@/components/fia/course-content-manager'
+import { AvatarUploader } from '@/components/fia/avatar-uploader'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -29,12 +31,14 @@ const NAV: NavItem[] = [
 
 export function TrainerDashboard() {
   const [active, setActive] = useState('overview')
+  const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)
+  const updateUser = useAuth((s) => s.updateUser)
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [editing, setEditing] = useState<any | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '', specialization: '' })
+  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '', specialization: user?.title || '' })
 
   const loadCourses = () => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
@@ -48,19 +52,32 @@ export function TrainerDashboard() {
     loadStudents()
   }, [])
 
+  const navigateToContent = (courseId: string) => {
+    setContentCourseId(courseId)
+    setActive('content')
+  }
+
   return (
     <DashboardShell
       nav={NAV}
       active={active}
-      onNavigate={setActive}
+      onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
       roleLabel="مدرب"
       roleColor="bg-purple-500/15 text-purple-600 border-purple-500/30"
     >
       {active === 'overview' && <TrainerOverview user={user} courses={courses} students={students} />}
-      {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} />}
+      {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
+      {active === 'content' && contentCourseId && (
+        <div className="space-y-4">
+          <Button variant="ghost" onClick={() => setActive('courses')} className="text-navy hover:bg-navy/5">
+            <ArrowRight className="w-4 h-4 ml-1" /> العودة للدورات
+          </Button>
+          <CourseContentManager courseId={contentCourseId} />
+        </div>
+      )}
       {active === 'students' && <TrainerStudents students={students} />}
       {active === 'exams' && <TrainerExams />}
-      {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} />}
+      {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
       {active === 'notifications' && <TrainerNotifs />}
       {active === 'settings' && <TrainerSettings />}
 
@@ -114,7 +131,7 @@ function TrainerOverview({ user, courses, students }: any) {
   )
 }
 
-function TrainerCourses({ courses, onAdd, onEdit, onRefresh }: any) {
+function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: any) {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const handleDelete = async (id: string) => {
@@ -162,13 +179,18 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh }: any) {
                 <span>{c.enrolled || 0} متدرب</span>
                 <span>{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}</span>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(c)}>
-                  <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+              <div className="space-y-2">
+                <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onManageContent(c.id)}>
+                  <FileText className="w-3.5 h-3.5 ml-1" /> إدارة المحتوى
                 </Button>
-                <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(c.id)} disabled={deleting === c.id}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(c)}>
+                    <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(c.id)} disabled={deleting === c.id}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
@@ -386,20 +408,41 @@ function TrainerExams() {
   )
 }
 
-function TrainerProfile({ profile, setProfile, user }: any) {
+function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
+  const [loading, setLoading] = useState(false)
+
+  const save = async () => {
+    setLoading(true)
+    try {
+      // Update locally — in real app this would also call /api/trainers PUT
+      updateUser({
+        name: profile.name,
+        phone: profile.phone,
+        title: profile.title,
+        bio: profile.bio,
+      })
+      toast.success('تم تحديث الملف الشخصي')
+    } catch {
+      toast.error('فشل التحديث')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <SectionCard title="الملف الشخصي" description="إدارة معلوماتك">
-      <div className="space-y-5 max-w-2xl">
-        <div className="flex items-center gap-4">
-          <Avatar className="w-24 h-24 border-4 border-gold/20">
-            <AvatarImage src={user?.avatar || ''} />
-            <AvatarFallback className="bg-navy text-gold text-3xl">{user?.name?.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <Button variant="outline" size="sm">تغيير الصورة</Button>
-            <p className="text-xs text-muted-foreground mt-2">JPG أو PNG. حد أقصى 2MB.</p>
-          </div>
+      <div className="space-y-6 max-w-2xl">
+        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+          <AvatarUploader
+            userId={user.id}
+            role="trainer"
+            initialUrl={user?.avatar}
+            name={user?.name}
+            size="xl"
+            onUploaded={(url) => updateUser({ avatar: url })}
+          />
         </div>
+
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <Label>الاسم الكامل</Label>
@@ -410,7 +453,7 @@ function TrainerProfile({ profile, setProfile, user }: any) {
             <Input value={profile.specialization} onChange={(e) => setProfile({ ...profile, specialization: e.target.value })} className="mt-1" />
           </div>
           <div>
-            <Label>البريد</Label>
+            <Label>البريد الإلكتروني</Label>
             <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
           </div>
           <div>
@@ -419,10 +462,16 @@ function TrainerProfile({ profile, setProfile, user }: any) {
           </div>
         </div>
         <div>
+          <Label>المسمى الوظيفي</Label>
+          <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+        </div>
+        <div>
           <Label>النبذة التعريفية</Label>
           <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
         </div>
-        <Button className="bg-navy hover:bg-navy-light">حفظ التغييرات</Button>
+        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
+          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+        </Button>
       </div>
     </SectionCard>
   )
