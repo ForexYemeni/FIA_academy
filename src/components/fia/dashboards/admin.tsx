@@ -7,7 +7,7 @@ import {
   BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
   DollarSign, TrendingUp, Activity, Star, ArrowRight,
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
-  Loader2, FileUp, Clock,
+  Loader2, FileUp, Clock, RefreshCw,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -733,6 +733,36 @@ function AdminCertificates() {
   const revoke = async () => { if (!revokeTarget || !revokeReason.trim()) { toast.error('أدخل سبب الإلغاء'); return }; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: revokeTarget.id, status: 'ملغاة' }) }); toast.success('تم إلغاء الشهادة'); setRevokeTarget(null); setRevokeReason(''); load() }
   const restore = async (cert: any) => { if (!confirm('استعادة؟')) return; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cert.id, status: 'صالحة' }) }); toast.success('تمت الاستعادة'); load() }
 
+  // === Reissue: regenerate the same certificate with a new number & new issued_at ===
+  // Use case: certificate has wrong data / student wants fresh copy / status issue — no need to delete user
+  const [reissuing, setReissuing] = useState<string | null>(null)
+  const reissue = async (cert: any) => {
+    if (!confirm(`إعادة إصدار شهادة جديدة لنفس المتدرب؟\n\nالاسم: ${cert.student_name}\nالدورة: ${cert.course_title || '-'}\nالرقم القديم: ${cert.certificate_number}\n\nسيتم:\n- تمييز الشهادة الحالية كـ "مستبدلة"\n- إصدار شهادة جديدة برقم جديد وتاريخ جديد\n- بقاء بيانات المتدرب والتسجيل كما هي`)) return
+    setReissuing(cert.id)
+    try {
+      const res = await fetch('/api/certificates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reissue', id: cert.id }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast.success('تم إعادة الإصدار بنجاح!', {
+          description: `الرقم الجديد: ${data.new_certificate.certificate_number}`,
+        })
+        load()
+        // Open the new certificate PDF in a new tab automatically
+        window.open(`/api/certificate-pdf?number=${encodeURIComponent(data.new_certificate.certificate_number)}&format=pdf`, '_blank')
+      } else {
+        toast.error(data.error || 'فشل في إعادة الإصدار')
+      }
+    } catch (e: any) {
+      toast.error('خطأ في الشبكة')
+    } finally {
+      setReissuing(null)
+    }
+  }
+
   // Certificate request actions
   const handleRequestAction = async (reqId: string, action: string, note?: string) => {
     try {
@@ -785,6 +815,7 @@ function AdminCertificates() {
               <option value="all">كل الحالات</option>
               <option value="صالحة">صالحة</option>
               <option value="ملغاة">ملغاة</option>
+              <option value="مستبدلة">مستبدلة (تم إعادة إصدارها)</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -793,14 +824,18 @@ function AdminCertificates() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
-                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
+                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : c.status === 'مستبدلة' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
                   </div>
                   <div className="font-medium text-navy text-sm">{c.student_name}</div>
                   <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
+                <div className="flex gap-1 flex-shrink-0 flex-wrap">
                   <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة"><Eye className="w-4 h-4 text-navy" /></Button>
                   <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PDF"><Download className="w-4 h-4 text-gold" /></Button></a>
+                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PNG"><FileUp className="w-4 h-4 text-green-600" /></Button></a>
+                  <Button size="sm" variant="ghost" onClick={() => reissue(c)} disabled={reissuing === c.id} title="إعادة إصدار الشهادة (برقم جديد)" className="text-blue-600">
+                    {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
                   {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
                   <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>

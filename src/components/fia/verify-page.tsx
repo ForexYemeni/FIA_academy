@@ -327,26 +327,33 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
                 <div className="text-[9px] md:text-[11px] mt-0.5 font-bold" style={{ color: '#8B6428' }}>CERTIFICATE ID</div>
               </div>
               <div className="text-center">
-                <div className="text-[9px] md:text-[11px] mb-2 font-bold" style={{ color: '#8B6428' }}>توقيع الجهة المانوحة</div>
-                {/* Script-like signature placeholder */}
+                <div className="text-[9px] md:text-[11px] mb-2 font-bold" style={{ color: '#8B6428' }}>الجهة المانوحة</div>
+                {/* Larger script-like signature placeholder */}
                 <svg
-                  width="80"
-                  height="28"
-                  viewBox="0 0 80 28"
+                  width="120"
+                  height="40"
+                  viewBox="0 0 120 40"
                   className="mx-auto mb-1"
                   style={{ color: '#050912' }}
                 >
                   <path
-                    d="M 5 14 Q 10 4, 18 14 T 35 14 Q 45 6, 55 18 T 75 14"
+                    d="M 5 22 Q 12 6, 20 22 T 38 22 Q 48 10, 58 26 Q 70 8, 80 24 Q 95 14, 115 22"
                     stroke="currentColor"
-                    strokeWidth="1.6"
+                    strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
                   />
+                  <circle cx="3" cy="14" r="2.5" fill="currentColor" />
+                  <path
+                    d="M 110 14 m 4 0 a 5 5 0 1 1 -10 0 a 5 5 0 1 1 10 0"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    fill="none"
+                  />
                 </svg>
-                <div className="w-20 md:w-24 mx-auto mb-1" style={{ borderBottom: '1.2px solid #050912' }} />
-                <div className="text-sm md:text-[15px] font-bold" style={{ color: '#050912' }}>د. هاني الشافعي</div>
-                <div className="text-[9px] md:text-[11px] mt-0.5 font-bold" style={{ color: '#8B6428' }}>المدير التنفيذي</div>
+                <div className="w-24 md:w-28 mx-auto mb-1.5" style={{ borderBottom: '1.2px solid #050912' }} />
+                <div className="text-sm md:text-base font-bold" style={{ color: '#050912' }}>د. هاني الشافعي</div>
+                <div className="text-[10px] md:text-xs mt-1.5 font-bold" style={{ color: '#8B6428' }}>المدير التنفيذي</div>
               </div>
             </div>
           </div>

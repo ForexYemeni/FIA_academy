@@ -356,7 +356,7 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.fillText(badgeText, col3X + colW / 2, badgeY + badgeH / 2 + 2 * scale)
 
   // ===== Bottom: QR + Cert number + signature =====
-  const bottomY = innerY + innerH - 90 * scale
+  const bottomY = innerY + innerH - 140 * scale
 
   // QR (left)
   const qrBuffer = await generateQR(verifyUrl)
@@ -391,71 +391,64 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(GRAY_DARK)
   ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 26 * scale)
 
-  // Signature (right) — enhanced signature block with founder name + title
+  // Signature (right) — redesigned larger signature block with proper spacing
   ctx.direction = 'rtl'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
-  // Signature block: larger area + better placement
-  const sigBoxW = 160 * scale
-  const sigBoxH = 70 * scale
+  // Signature block: SIGNIFICANTLY larger with proper spacing between elements
+  const sigBoxW = 220 * scale
+  const sigBoxH = 120 * scale
   const sigBoxX = innerX + innerW - 30 * scale - sigBoxW
-  const sigBoxY = bottomY - 5 * scale
+  const sigBoxY = bottomY - 10 * scale
 
-  // Subtle gold background pill for signature area (luxury feel)
-  fillRoundRect(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 6 * scale, GOLD_PALE)
-  strokeRoundRect(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 6 * scale, GOLD, 0.6 * scale)
+  // Gold background pill with stronger border for signature area
+  fillRoundRect(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 8 * scale, GOLD_PALE)
+  strokeRoundRect(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 8 * scale, GOLD_DARK, 1.5 * scale)
+  // Inner accent
+  strokeRoundRect(sigBoxX + 4 * scale, sigBoxY + 4 * scale, sigBoxW - 8 * scale, sigBoxH - 8 * scale, 5 * scale, GOLD_LIGHT, 0.5 * scale)
 
-  // Label: "توقيع الجهة المانوحة" — small gold-brown label
-  setFont(9, 'bold')
-  fill(GOLD)
-  ctx.fillText('توقيع الجهة المانوحة', sigBoxX + sigBoxW / 2, sigBoxY + 12 * scale)
+  // Top label inside signature box — "الجهة المانوحة" (no overlap with name below)
+  setFont(11, 'bold')
+  fill(GOLD_DARK)
+  ctx.fillText('الجهة المانوحة', sigBoxX + sigBoxW / 2, sigBoxY + 14 * scale)
 
-  // Draw signature image if available, otherwise draw a cursive-style signature placeholder
+  // ===== Signature image area (large) =====
+  // Draw signature image if available, otherwise draw a large script-like signature placeholder
+  const sigImgAreaY = sigBoxY + 26 * scale
+  const sigImgAreaH = 50 * scale
   if (founderSignature) {
     try {
       const sigBuffer = await fetch(founderSignature).then(r => r.arrayBuffer())
       const sigImg = await loadImage(Buffer.from(sigBuffer))
-      const sigImgH = 28 * scale
-      const sigImgW = 110 * scale
-      ctx.drawImage(sigImg, sigBoxX + (sigBoxW - sigImgW) / 2, sigBoxY + 20 * scale, sigImgW, sigImgH)
+      const sigImgH = sigImgAreaH
+      const sigImgW = 170 * scale
+      ctx.drawImage(sigImg, sigBoxX + (sigBoxW - sigImgW) / 2, sigImgAreaY, sigImgW, sigImgH)
     } catch {
-      // Fallback line
-      stroke(NAVY, 1 * scale)
-      ctx.beginPath()
-      ctx.moveTo(sigBoxX + 20 * scale, sigBoxY + 36 * scale)
-      ctx.lineTo(sigBoxX + sigBoxW - 20 * scale, sigBoxY + 36 * scale)
-      ctx.stroke()
+      // Fallback: large script-like signature
+      drawScriptSignature(sigBoxX + 25 * scale, sigImgAreaY + 25 * scale, sigBoxW - 50 * scale, ctx, stroke, NAVY_DARK, scale)
     }
   } else {
-    // Cursive-style signature placeholder — script-like strokes
-    stroke(NAVY, 1.4 * scale)
-    ctx.beginPath()
-    ctx.moveTo(sigBoxX + 20 * scale, sigBoxY + 38 * scale)
-    // Wavy script line to suggest a signature
-    const sw = sigBoxW - 40 * scale
-    for (let i = 0; i <= sw; i += 2) {
-      const y = sigBoxY + 38 * scale + Math.sin(i / 12) * 3 * scale
-      ctx.lineTo(sigBoxX + 20 * scale + i, y)
-    }
-    ctx.stroke()
-    // Underscore baseline
-    stroke(NAVY, 0.8 * scale)
-    ctx.beginPath()
-    ctx.moveTo(sigBoxX + 20 * scale, sigBoxY + 44 * scale)
-    ctx.lineTo(sigBoxX + sigBoxW - 20 * scale, sigBoxY + 44 * scale)
-    ctx.stroke()
+    // Large script-style signature placeholder
+    drawScriptSignature(sigBoxX + 25 * scale, sigImgAreaY + 25 * scale, sigBoxW - 50 * scale, ctx, stroke, NAVY_DARK, scale)
   }
 
-  // Founder name (bold navy) — "د. هاني الشافعي"
-  setFont(13, 'bold')
-  fill(NAVY)
-  ctx.fillText('د. هاني الشافعي', sigBoxX + sigBoxW / 2, sigBoxY + 52 * scale)
+  // Signature underscore line (clearly visible)
+  stroke(NAVY_DARK, 1 * scale)
+  ctx.beginPath()
+  ctx.moveTo(sigBoxX + 25 * scale, sigBoxY + 80 * scale)
+  ctx.lineTo(sigBoxX + sigBoxW - 25 * scale, sigBoxY + 80 * scale)
+  ctx.stroke()
 
-  // Founder title (small gold) — "المدير التنفيذي"
-  setFont(9, 'regular')
-  fill(GOLD)
-  ctx.fillText('المدير التنفيذي', sigBoxX + sigBoxW / 2, sigBoxY + 62 * scale)
+  // Founder name — "د. هاني الشافعي" — bigger and clearly separated
+  setFont(16, 'bold')
+  fill(NAVY_DARK)
+  ctx.fillText('د. هاني الشافعي', sigBoxX + sigBoxW / 2, sigBoxY + 95 * scale)
+
+  // Founder title — "المدير التنفيذي" — with proper vertical spacing (no overlap)
+  setFont(11, 'regular')
+  fill(GOLD_DARK)
+  ctx.fillText('المدير التنفيذي', sigBoxX + sigBoxW / 2, sigBoxY + 110 * scale)
 
   // ===== Watermark (very subtle — barely visible to not interfere with text) =====
   ctx.save()
@@ -470,6 +463,60 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.restore()
 
   return await canvas.encode('png')
+}
+
+// Helper: Draw a large script-like signature (PNG canvas)
+function drawScriptSignature(startX: number, centerY: number, width: number, ctx: any, stroke: any, color: string, scale: number) {
+  stroke(color, 2 * scale)
+  ctx.beginPath()
+  ctx.moveTo(startX, centerY)
+  // Multi-curve script strokes to suggest handwriting
+  const steps = 80
+  const sw = width
+  for (let i = 0; i <= steps; i++) {
+    const x = startX + (sw * i) / steps
+    // Multi-frequency wave for natural handwriting look
+    const y = centerY
+      + Math.sin((i / steps) * Math.PI * 4) * 8 * scale
+      + Math.sin((i / steps) * Math.PI * 8) * 3 * scale
+      + Math.cos((i / steps) * Math.PI * 2) * 5 * scale
+    ctx.lineTo(x, y)
+  }
+  ctx.stroke()
+  // Add a flourish at the end (small loop)
+  stroke(color, 1.6 * scale)
+  ctx.beginPath()
+  ctx.arc(startX + sw + 4 * scale, centerY - 4 * scale, 5 * scale, 0, Math.PI * 1.5, false)
+  ctx.stroke()
+  // Initial dot (start flourish)
+  ctx.beginPath()
+  ctx.arc(startX - 6 * scale, centerY - 8 * scale, 2.5 * scale, 0, Math.PI * 2)
+  ctx.fillStyle = color
+  ctx.fill()
+}
+
+// Helper: Draw a large script-like signature (PDFKit document)
+function drawScriptSignaturePDF(doc: any, startX: number, centerY: number, width: number, color: string) {
+  doc.lineWidth(2).strokeColor(color)
+  doc.moveTo(startX, centerY)
+  // Multi-curve script strokes for handwriting look
+  const steps = 80
+  for (let i = 0; i <= steps; i++) {
+    const x = startX + (width * i) / steps
+    const y = centerY
+      + Math.sin((i / steps) * Math.PI * 4) * 8
+      + Math.sin((i / steps) * Math.PI * 8) * 3
+      + Math.cos((i / steps) * Math.PI * 2) * 5
+    doc.lineTo(x, y)
+  }
+  doc.stroke()
+  // Flourish loop at the end
+  doc.lineWidth(1.6).strokeColor(color)
+  doc.circle(startX + width + 4, centerY - 4, 5)
+  doc.stroke()
+  // Initial dot
+  doc.circle(startX - 6, centerY - 8, 2.5)
+  doc.fill(color)
 }
 
 // ============== PDF Certificate (matching PNG design) ==============
@@ -704,7 +751,7 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       doc.fillColor(EMERALD_GREEN).text(badgeText, col3X, badgeY + 5, { width: colW, align: 'center' })
 
       // ===== Bottom: QR + Cert number + signature =====
-      const bottomY = innerY + innerH - 90
+      const bottomY = innerY + innerH - 140
 
       // QR (left)
       const qrBuffer = await generateQR(verifyUrl)
@@ -739,25 +786,33 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(9, 'regular')
       doc.fillColor(GRAY_DARK).text('CERTIFICATE ID', cx - 100, barcodeY + barcodeH + 16, { width: 200, align: 'center' })
 
-      // ===== Signature block (right) — enhanced with founder name =====
-      const sigBoxW = 160
-      const sigBoxH = 70
+      // ===== Signature block (right) — redesigned larger with proper spacing =====
+      const sigBoxW = 220
+      const sigBoxH = 120
       const sigBoxX = innerX + innerW - 30 - sigBoxW
-      const sigBoxY = bottomY - 5
+      const sigBoxY = bottomY - 10
 
-      // Subtle gold background pill
+      // Gold background pill with stronger border
       doc.save()
-      roundRectPath(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 6)
+      roundRectPath(sigBoxX, sigBoxY, sigBoxW, sigBoxH, 8)
       doc.fill(GOLD_PALE)
-      doc.lineWidth(0.6).strokeColor(GOLD)
+      doc.lineWidth(1.5).strokeColor(GOLD_DARK)
+      doc.stroke()
+      doc.restore()
+      // Inner accent border
+      doc.save()
+      roundRectPath(sigBoxX + 4, sigBoxY + 4, sigBoxW - 8, sigBoxH - 8, 5)
+      doc.lineWidth(0.5).strokeColor(GOLD_LIGHT)
       doc.stroke()
       doc.restore()
 
-      // Label
-      setFont(9, 'bold')
-      doc.fillColor(GOLD_DARK).text('توقيع الجهة المانوحة', sigBoxX, sigBoxY + 6, { width: sigBoxW, align: 'center' })
+      // Top label inside signature box — "الجهة المانوحة" (no overlap with name below)
+      setFont(11, 'bold')
+      doc.fillColor(GOLD_DARK).text('الجهة المانوحة', sigBoxX, sigBoxY + 8, { width: sigBoxW, align: 'center' })
 
-      // Draw signature image if available, otherwise draw script-like signature placeholder
+      // Signature area (large)
+      const sigImgAreaY = sigBoxY + 26
+      const sigImgAreaH = 50
       if (founderSignature) {
         try {
           const sigRes = await fetch(founderSignature)
@@ -765,32 +820,27 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
           const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
           fs.writeFileSync(sigPath, Buffer.from(sigBuf))
           if (fs.existsSync(sigPath)) {
-            doc.image(sigPath, sigBoxX + 25, sigBoxY + 18, { width: 110, height: 28 })
+            doc.image(sigPath, sigBoxX + 25, sigImgAreaY, { width: 170, height: sigImgAreaH })
             fs.unlinkSync(sigPath)
           }
         } catch {
-          doc.lineWidth(1).strokeColor(NAVY).moveTo(sigBoxX + 20, sigBoxY + 36).lineTo(sigBoxX + sigBoxW - 20, sigBoxY + 36).stroke()
+          // Fallback: large script-like signature
+          drawScriptSignaturePDF(doc, sigBoxX + 25, sigImgAreaY + 25, sigBoxW - 50, NAVY_DARK)
         }
       } else {
-        // Script-like wavy signature
-        doc.lineWidth(1.4).strokeColor(NAVY_DARK)
-        doc.moveTo(sigBoxX + 20, sigBoxY + 38)
-        const sw = sigBoxW - 40
-        for (let i = 0; i <= sw; i += 2) {
-          const y = sigBoxY + 38 + Math.sin(i / 12) * 3
-          doc.lineTo(sigBoxX + 20 + i, y)
-        }
-        doc.stroke()
-        // Underscore
-        doc.lineWidth(0.8).strokeColor(NAVY_DARK).moveTo(sigBoxX + 20, sigBoxY + 44).lineTo(sigBoxX + sigBoxW - 20, sigBoxY + 44).stroke()
+        // Large script-style signature placeholder
+        drawScriptSignaturePDF(doc, sigBoxX + 25, sigImgAreaY + 25, sigBoxW - 50, NAVY_DARK)
       }
 
-      // Founder name — "د. هاني الشافعي"
-      setFont(13, 'bold')
-      doc.fillColor(NAVY_DARK).text('د. هاني الشافعي', sigBoxX, sigBoxY + 47, { width: sigBoxW, align: 'center' })
-      // Founder title
-      setFont(9, 'regular')
-      doc.fillColor(GOLD_DARK).text('المدير التنفيذي', sigBoxX, sigBoxY + 61, { width: sigBoxW, align: 'center' })
+      // Signature underscore line (clearly visible)
+      doc.lineWidth(1).strokeColor(NAVY_DARK).moveTo(sigBoxX + 25, sigBoxY + 80).lineTo(sigBoxX + sigBoxW - 25, sigBoxY + 80).stroke()
+
+      // Founder name — "د. هاني الشافعي" — bigger and clearly separated
+      setFont(16, 'bold')
+      doc.fillColor(NAVY_DARK).text('د. هاني الشافعي', sigBoxX, sigBoxY + 88, { width: sigBoxW, align: 'center' })
+      // Founder title — "المدير التنفيذي" — with proper vertical spacing (no overlap)
+      setFont(11, 'regular')
+      doc.fillColor(GOLD_DARK).text('المدير التنفيذي', sigBoxX, sigBoxY + 105, { width: sigBoxW, align: 'center' })
 
       // Watermark (very subtle — barely visible to not interfere with text)
       doc.save()
