@@ -250,8 +250,17 @@ async function generateCertificatePNG(cert) {
   ctx.direction = 'rtl'; setFont(14, 'regular'); fill(GRAY_DARK)
   ctx.fillText('تشهد أكاديمية المستقبل الدولية بأن', cx, cardY + 245 * scale)
 
-  // Recipient name — LARGEST
-  setFont(38, 'black'); fill(NAVY)
+  // Recipient name — LARGEST with AUTO-FIT
+  let nameFontSize = 38
+  setFont(nameFontSize, 'black')
+  let nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+  const maxNameWidth = (cardW - 200 * scale)
+  while (nameWidth > maxNameWidth && nameFontSize > 20) {
+    nameFontSize -= 2
+    setFont(nameFontSize, 'black')
+    nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+  }
+  fill(NAVY)
   ctx.fillText(cert.student_name || 'طالب', cx, cardY + 290 * scale)
 
   // Gold underline + center diamond
@@ -268,12 +277,19 @@ async function generateCertificatePNG(cert) {
   ctx.direction = 'rtl'; setFont(14, 'regular'); fill(GRAY_DARK)
   ctx.fillText('قد أتم بنجاح متطلبات دورة', cx, cardY + 345 * scale)
 
-  // Course plaque
+  // Course plaque — with AUTO-FIT
   const plaqueY = cardY + 380 * scale, plaqueH = 40 * scale
-  setFont(20, 'bold')
+  let courseFontSize = 20
+  setFont(courseFontSize, 'bold')
   const courseText = cert.course_title || 'دورة معتمدة'
-  const textWidth = ctx.measureText(courseText).width
+  let textWidth = ctx.measureText(courseText).width
   const plaquePadX = 50 * scale
+  const maxPlaqueWidth = cardW - 100 * scale
+  while (textWidth + 100 * scale + plaquePadX * 2 > maxPlaqueWidth && courseFontSize > 11) {
+    courseFontSize -= 1
+    setFont(courseFontSize, 'bold')
+    textWidth = ctx.measureText(courseText).width
+  }
   const plaqueW = Math.max(textWidth + 100 * scale + plaquePadX * 2, 320 * scale)
   const plaqueX = cx - plaqueW / 2
 
@@ -383,37 +399,21 @@ async function generateCertificatePNG(cert) {
   setFont(8, 'regular'); fill(GRAY)
   ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 26 * scale)
 
-  // Signature (right) with image
+  // Signature (right) — EMPTY by default, only signature image if provided
   const sigAreaW = 200 * scale, sigAreaX = cardX + cardW - 60 * scale - sigAreaW
   ctx.direction = 'rtl'; setFont(11, 'bold'); fill(GRAY_DARK); ctx.textAlign = 'center'
   ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 5 * scale)
 
-  const sigImgPath = '/home/z/my-project/public/fia/signature-hani.png'
-  let sigDrawn = false
-  if (fs.existsSync(sigImgPath)) {
-    try {
-      const sigImg = await loadImage(fs.readFileSync(sigImgPath))
-      const sigImgW = 140 * scale, sigImgH = 45 * scale
-      ctx.drawImage(sigImg, sigAreaX + (sigAreaW - sigImgW) / 2, bottomY + 15 * scale, sigImgW, sigImgH)
-      sigDrawn = true
-    } catch {}
-  }
-  if (!sigDrawn) {
-    drawGelPenSignature(ctx, sigAreaX + 30 * scale, bottomY + 38 * scale, sigAreaW - 60 * scale, scale)
-  }
+  // No default signature — area remains EMPTY
 
-  // Thin gold signature line
+  // Thin gold signature line (always shown — indicates where signature goes)
   stroke(GOLD, 1 * scale)
   ctx.beginPath()
   ctx.moveTo(sigAreaX + 15 * scale, bottomY + 40 * scale)
   ctx.lineTo(sigAreaX + sigAreaW - 15 * scale, bottomY + 40 * scale)
   ctx.stroke()
 
-  // Founder name + title — positioned to fit WITHIN the card (cardH ends at cardY + 539*scale)
-  setFont(13, 'bold'); fill(NAVY)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 50 * scale)
-  setFont(10, 'regular'); fill(GRAY_DARK)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 63 * scale)
+  // Signatory name + position — NOT shown (no signature approved yet)
 
   // Watermark
   ctx.save()

@@ -238,7 +238,7 @@ function drawGelPenSignaturePDF(doc: any, startX: number, centerY: number, width
 }
 
 // ============== ULTRA-PREMIUM PNG CERTIFICATE ==============
-async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
+async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null, signatoryName?: string | null, signatoryPosition?: string | null): Promise<Buffer> {
   registerFontsForCanvas()
 
   const scale = 2
@@ -424,8 +424,17 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(GRAY_DARK)
   ctx.fillText('تشهد أكاديمية المستقبل الدولية بأن', cx, cardY + 245 * scale)
 
-  // ===== RECIPIENT NAME — LARGEST element, focal point =====
-  setFont(38, 'black')
+  // ===== RECIPIENT NAME — LARGEST element, focal point — AUTO-FIT for long names =====
+  // Start at 38pt; if too long, shrink to fit within 80% of card width
+  let nameFontSize = 38
+  setFont(nameFontSize, 'black')
+  let nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+  const maxNameWidth = (cardW - 200 * scale)
+  while (nameWidth > maxNameWidth && nameFontSize > 20) {
+    nameFontSize -= 2
+    setFont(nameFontSize, 'black')
+    nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+  }
   fill(NAVY)
   ctx.fillText(cert.student_name || 'طالب', cx, cardY + 290 * scale)
 
@@ -452,12 +461,22 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   ctx.fillText('قد أتم بنجاح متطلبات دورة', cx, cardY + 345 * scale)
 
   // ===== LUXURIOUS COURSE PLAQUE (dark navy with metallic-gold borders) =====
+  // AUTO-FIT: shrink course title font if too long to fit in plaque
   const plaqueY = cardY + 380 * scale
   const plaqueH = 40 * scale
-  setFont(20, 'bold')
+  let courseFontSize = 20
+  setFont(courseFontSize, 'bold')
   const courseText = cert.course_title || 'دورة معتمدة'
-  const textWidth = ctx.measureText(courseText).width
+  // Determine plaque width based on initial measurement
+  let textWidth = ctx.measureText(courseText).width
   const plaquePadX = 50 * scale
+  const maxPlaqueWidth = cardW - 100 * scale  // maximum plaque width
+  // Shrink font if text + padding exceeds max plaque width
+  while (textWidth + 100 * scale + plaquePadX * 2 > maxPlaqueWidth && courseFontSize > 11) {
+    courseFontSize -= 1
+    setFont(courseFontSize, 'bold')
+    textWidth = ctx.measureText(courseText).width
+  }
   const plaqueW = Math.max(textWidth + 100 * scale + plaquePadX * 2, 320 * scale)
   const plaqueX = cx - plaqueW / 2
 
@@ -583,44 +602,45 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   setFont(8, 'regular'); fill(GRAY)
   ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 26 * scale)
 
-  // --- SIGNATURE (right) — with image + name + title + gold line ---
+  // --- SIGNATURE (right) — EMPTY by default, only drawn if signature_image is provided by admin ---
+  // Per requirements: signature is added later from admin dashboard, not auto-generated
   const sigAreaW = 200 * scale
   const sigAreaX = cardX + cardW - 60 * scale - sigAreaW
 
-  // Top label
-  ctx.direction = 'rtl'; setFont(11, 'bold'); fill(GRAY_DARK); ctx.textAlign = 'center'
-  ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 5 * scale)
+  // Top label — always shown (indicates signature area)
+  ctx.direction = 'rtl'; setFont(12, 'bold'); fill(NAVY); ctx.textAlign = 'center'
+  ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 8 * scale)
 
-  // Signature image (transparent PNG)
-  const sigImgPath = path.join(process.cwd(), 'public', 'fia', 'signature-hani.png')
-  let sigDrawn = false
-  if (fs.existsSync(sigImgPath)) {
+  // Only draw signature image if provided (from admin dashboard)
+  let signatureDrawn = false
+  if (founderSignature) {
     try {
-      const sigImgBuf = fs.readFileSync(sigImgPath)
-      const sigImg = await loadImage(sigImgBuf)
+      const sigImgBuf = await fetch(founderSignature).then(r => r.arrayBuffer())
+      const sigImg = await loadImage(Buffer.from(sigImgBuf))
       const sigImgW = 140 * scale
       const sigImgH = 45 * scale
       ctx.drawImage(sigImg, sigAreaX + (sigAreaW - sigImgW) / 2, bottomY + 15 * scale, sigImgW, sigImgH)
-      sigDrawn = true
+      signatureDrawn = true
     } catch {}
   }
-  if (!sigDrawn) {
-    drawGelPenSignature(ctx, sigAreaX + 30 * scale, bottomY + 38 * scale, sigAreaW - 60 * scale, scale)
-  }
+  // No fallback signature — area remains EMPTY if no signature_image provided
 
-  // Thin elegant gold signature line
+  // Thin elegant gold signature line (always shown — indicates where signature goes)
   stroke(GOLD, 1 * scale)
   ctx.beginPath()
   ctx.moveTo(sigAreaX + 15 * scale, bottomY + 40 * scale)
   ctx.lineTo(sigAreaX + sigAreaW - 15 * scale, bottomY + 40 * scale)
   ctx.stroke()
 
-  // Founder name (bold navy)
-  setFont(13, 'bold'); fill(NAVY)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 50 * scale)
-  // Founder title (smaller, gray)
-  setFont(10, 'regular'); fill(GRAY_DARK)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 63 * scale)
+  // Signatory name + position — ONLY shown if signature is approved (founderSignature provided)
+  if (signatureDrawn && signatoryName) {
+    setFont(13, 'bold'); fill(NAVY)
+    ctx.fillText(signatoryName, sigAreaX + sigAreaW / 2, bottomY + 50 * scale)
+  }
+  if (signatureDrawn && signatoryPosition) {
+    setFont(10, 'regular'); fill(GRAY_DARK)
+    ctx.fillText(signatoryPosition, sigAreaX + sigAreaW / 2, bottomY + 63 * scale)
+  }
 
   // ===== WATERMARK (very faint FIA diagonal) =====
   ctx.save()
@@ -637,7 +657,7 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
 }
 
 // ============== PDF CERTIFICATE (matching PNG design) ==============
-async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
+async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null, signatoryName?: string | null, signatoryPosition?: string | null): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const fonts = getFontPaths()
@@ -765,8 +785,16 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(14, 'regular')
       doc.fillColor(GRAY_DARK).text('تشهد أكاديمية المستقبل الدولية بأن', cx - 350, cardY + 238, { width: 700, align: 'center' })
 
-      // RECIPIENT NAME — largest
-      setFont(38, 'black')
+      // RECIPIENT NAME — largest with AUTO-FIT for long names
+      let nameFontSize = 38
+      setFont(nameFontSize, 'black')
+      let nameWidth = doc.widthOfString(cert.student_name || 'طالب')
+      const maxNameWidth = 600
+      while (nameWidth > maxNameWidth && nameFontSize > 20) {
+        nameFontSize -= 2
+        setFont(nameFontSize, 'black')
+        nameWidth = doc.widthOfString(cert.student_name || 'طالب')
+      }
       doc.fillColor(NAVY).text(cert.student_name || 'طالب', cx - 350, cardY + 273, { width: 700, align: 'center' })
 
       // Gold underline under recipient name
@@ -778,12 +806,19 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(14, 'regular')
       doc.fillColor(GRAY_DARK).text('قد أتم بنجاح متطلبات دورة', cx - 350, cardY + 340, { width: 700, align: 'center' })
 
-      // COURSE PLAQUE
+      // COURSE PLAQUE — with AUTO-FIT for long course names
       const plaqueY = cardY + 380, plaqueH = 40
-      setFont(20, 'bold')
+      let courseFontSize = 20
+      setFont(courseFontSize, 'bold')
       const courseText = cert.course_title || 'دورة معتمدة'
-      const textWidth = doc.widthOfString(courseText)
+      let textWidth = doc.widthOfString(courseText)
       const plaquePadX = 50
+      const maxPlaqueWidth = cardW - 100
+      while (textWidth + 100 + plaquePadX * 2 > maxPlaqueWidth && courseFontSize > 11) {
+        courseFontSize -= 1
+        setFont(courseFontSize, 'bold')
+        textWidth = doc.widthOfString(courseText)
+      }
       const plaqueW = Math.max(textWidth + 100 + plaquePadX * 2, 320)
       const plaqueX = cx - plaqueW / 2
 
@@ -890,34 +925,42 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(8, 'regular')
       doc.fillColor(GRAY).text('CERTIFICATE ID', cx - 100, barcodeY + barcodeH + 18, { width: 200, align: 'center' })
 
-      // Signature (right)
+      // Signature (right) — EMPTY by default, only drawn if signature_image provided by admin
       const sigAreaW = 200
       const sigAreaX = cardX + cardW - 60 - sigAreaW
-      setFont(11, 'bold')
-      doc.fillColor(GRAY_DARK).text('توقيع الجهة المانوحة', sigAreaX, bottomY, { width: sigAreaW, align: 'center' })
+      setFont(12, 'bold')
+      doc.fillColor(NAVY).text('توقيع الجهة المانوحة', sigAreaX, bottomY + 3, { width: sigAreaW, align: 'center' })
 
-      // Try signature image first
-      const sigImgPath = path.join(process.cwd(), 'public', 'fia', 'signature-hani.png')
-      let sigDrawn = false
-      if (fs.existsSync(sigImgPath)) {
+      // Only draw signature image if provided (from admin dashboard)
+      let signatureDrawn = false
+      if (founderSignature) {
         try {
-          doc.image(sigImgPath, sigAreaX + 30, bottomY + 15, { width: 140, height: 45 })
-          sigDrawn = true
+          const sigRes = await fetch(founderSignature)
+          const sigBuf = await sigRes.arrayBuffer()
+          const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
+          fs.writeFileSync(sigPath, Buffer.from(sigBuf))
+          if (fs.existsSync(sigPath)) {
+            doc.image(sigPath, sigAreaX + 30, bottomY + 15, { width: 140, height: 40 })
+            fs.unlinkSync(sigPath)
+            signatureDrawn = true
+          }
         } catch {}
       }
-      if (!sigDrawn) {
-        drawGelPenSignaturePDF(doc, sigAreaX + 30, bottomY + 38, sigAreaW - 60)
-      }
+      // No fallback signature — area remains EMPTY if no signature_image provided
 
-      // Thin gold signature line
+      // Thin gold signature line (always shown — indicates where signature goes)
       doc.lineWidth(1).strokeColor(GOLD)
       doc.moveTo(sigAreaX + 15, bottomY + 40).lineTo(sigAreaX + sigAreaW - 15, bottomY + 40).stroke()
 
-      // Founder name + title
-      setFont(13, 'bold')
-      doc.fillColor(NAVY).text('د. هاني الشافعي', sigAreaX, bottomY + 48, { width: sigAreaW, align: 'center' })
-      setFont(10, 'regular')
-      doc.fillColor(GRAY_DARK).text('المدير التنفيذي', sigAreaX, bottomY + 61, { width: sigAreaW, align: 'center' })
+      // Signatory name + position — ONLY shown if signature is approved (signatureDrawn)
+      if (signatureDrawn && signatoryName) {
+        setFont(13, 'bold')
+        doc.fillColor(NAVY).text(signatoryName, sigAreaX, bottomY + 48, { width: sigAreaW, align: 'center' })
+      }
+      if (signatureDrawn && signatoryPosition) {
+        setFont(10, 'regular')
+        doc.fillColor(GRAY_DARK).text(signatoryPosition, sigAreaX, bottomY + 61, { width: sigAreaW, align: 'center' })
+      }
 
       // Watermark
       doc.save()
@@ -959,15 +1002,38 @@ export async function GET(req: NextRequest) {
       : new Date().toLocaleDateString('ar-EG')
     const verifyUrl = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
 
+    // Fetch founder's signature, signatory name & position from founder bio (added via admin dashboard)
+    // The signature is OPTIONAL — area remains EMPTY if no signature has been added/approved by admin
+    let founderSignature: string | null = null
+    let signatoryName: string | null = null
+    let signatoryPosition: string | null = null
+    try {
+      const { data: trainers } = await supabaseAdmin.from('trainers').select('*')
+      if (trainers) {
+        const founder = trainers.find((t: any) => t.password && t.password.startsWith('__TEAM_MEMBER__:founder'))
+        if (founder) {
+          const bioSeparator = '\n\n===FIA_EXTRA===\n'
+          const idx = founder.bio ? founder.bio.indexOf(bioSeparator) : -1
+          if (idx !== -1) {
+            const extraJson = founder.bio.substring(idx + bioSeparator.length)
+            const extra = JSON.parse(extraJson)
+            founderSignature = extra.signature || null
+            signatoryName = extra.signatory_name || founder.name || null
+            signatoryPosition = extra.signatory_position || 'المدير التنفيذي'
+          }
+        }
+      }
+    } catch {}
+
     if (format === 'png') {
-      const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl)
+      const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
       const headers = new Headers()
       headers.set('Content-Type', 'image/png')
       headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.png"`)
       headers.set('Cache-Control', 'public, max-age=3600')
       return new NextResponse(pngBytes, { status: 200, headers })
     } else {
-      const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl)
+      const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
       const headers = new Headers()
       headers.set('Content-Type', 'application/pdf')
       headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.pdf"`)
