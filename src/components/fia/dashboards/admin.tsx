@@ -673,6 +673,9 @@ function AdminPaymentMethods() {
 
 function AdminCertificates() {
   const [items, setItems] = useState<any[]>([])
+  const [requests, setRequests] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
   const [search, setSearch] = useState('')
@@ -680,171 +683,179 @@ function AdminCertificates() {
   const [revokeTarget, setRevokeTarget] = useState<any | null>(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [previewCert, setPreviewCert] = useState<any | null>(null)
-  const load = () => fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  const [tab, setTab] = useState<'issued' | 'requests'>('issued')
+  const [approveNote, setApproveNote] = useState('')
+
+  const load = () => {
+    fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+    fetch('/api/certificate-requests').then((r) => r.json()).then((d) => setRequests(Array.isArray(d) ? d : []))
+    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+  }
   useEffect(() => { load() }, [])
 
-  // Filter items
   const filtered = items.filter((c) => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false
     if (search.trim()) {
       const q = search.trim().toLowerCase()
-      return (
-        (c.certificate_number || '').toLowerCase().includes(q) ||
-        (c.student_name || '').toLowerCase().includes(q) ||
-        (c.course_title || '').toLowerCase().includes(q)
-      )
+      return (c.certificate_number || '').toLowerCase().includes(q) || (c.student_name || '').toLowerCase().includes(q) || (c.course_title || '').toLowerCase().includes(q)
     }
     return true
   })
 
-  const del = async (id: string) => {
-    if (!confirm('حذف الشهادة نهائياً؟')) return
-    await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف'); load()
-  }
+  const del = async (id: string) => { if (!confirm('حذف نهائي؟')) return; await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const revoke = async () => { if (!revokeTarget || !revokeReason.trim()) { toast.error('أدخل سبب الإلغاء'); return }; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: revokeTarget.id, status: 'ملغاة' }) }); toast.success('تم إلغاء الشهادة'); setRevokeTarget(null); setRevokeReason(''); load() }
+  const restore = async (cert: any) => { if (!confirm('استعادة؟')) return; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cert.id, status: 'صالحة' }) }); toast.success('تمت الاستعادة'); load() }
 
-  const revoke = async () => {
-    if (!revokeTarget) return
-    if (!revokeReason.trim()) {
-      toast.error('أدخل سبب الإلغاء')
-      return
-    }
+  // Certificate request actions
+  const handleRequestAction = async (reqId: string, action: string, note?: string) => {
     try {
-      await fetch('/api/certificates', {
+      const res = await fetch('/api/certificate-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: revokeTarget.id,
-          status: 'ملغاة',
-        }),
+        body: JSON.stringify({ id: reqId, action, note }),
       })
-      // Also store the revoke reason in a comment (using external_accreditation_body field as audit log)
-      toast.success(`تم إلغاء الشهادة. السبب: ${revokeReason}`)
-      setRevokeTarget(null)
-      setRevokeReason('')
-      load()
-    } catch {
-      toast.error('فشل الإلغاء')
-    }
+      if (res.ok) {
+        toast.success(action === 'issue' ? 'تم إصدار الشهادة بنجاح!' : action === 'reject' ? 'تم رفض الطلب' : 'تم التحديث')
+        load()
+      } else {
+        const d = await res.json(); toast.error(d.error || 'فشل')
+      }
+    } catch { toast.error('خطأ') }
   }
 
-  const restore = async (cert: any) => {
-    if (!confirm('استعادة الشهادة إلى "صالحة"؟')) return
-    await fetch('/api/certificates', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: cert.id, status: 'صالحة' }),
-    })
-    toast.success('تم استعادة الشهادة')
-    load()
+  // Check if student completed the course
+  const isCourseCompleted = (userId: string, courseId: string) => {
+    return enrollments.some(e => e.user_id === userId && e.course_id === courseId && e.status === 'completed')
+  }
+
+  const requestStatusBadge = (status: string) => {
+    const map: any = {
+      pending: { label: 'بانتظار موافقة المدرب', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
+      trainer_approved: { label: 'بانتظار موافقة المدير', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+      admin_approved: { label: 'بانتظار دفع الرسوم', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
+      issued: { label: 'تم الإصدار', color: 'bg-green-500/15 text-green-600 border-green-500/30' },
+      rejected: { label: 'مرفوض', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+    }
+    return map[status] || map.pending
   }
 
   return (
     <SectionCard
       title="الشهادات"
-      description={`${filtered.length} من ${items.length} شهادة`}
-      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+      description={tab === 'issued' ? `${filtered.length} شهادة صادرة` : `${requests.length} طلب شهادة`}
     >
-      {/* Search + filter bar */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <Input
-          placeholder="بحث برقم الشهادة أو اسم المتدرب أو اسم الدورة..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-input rounded-md bg-background text-sm"
-        >
-          <option value="all">كل الحالات</option>
-          <option value="صالحة">صالحة</option>
-          <option value="ملغاة">ملغاة</option>
-        </select>
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-border pb-3 mb-4">
+        <button onClick={() => setTab('issued')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'issued' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📄 الشهادات الصادرة</button>
+        <button onClick={() => setTab('requests')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'requests' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📋 طلبات الشهادات {requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length > 0 && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 mr-1">{requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length}</span>}</button>
       </div>
 
-      {/* Mobile-friendly card layout */}
-      <div className="space-y-2">
-        {filtered.map((c) => (
-          <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
-                <Badge className={
-                  c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30'
-                  : c.status === 'ملغاة' ? 'bg-red-500/15 text-red-600 border-red-500/30'
-                  : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                }>
-                  {c.status}
-                </Badge>
-              </div>
-              <div className="font-medium text-navy text-sm">{c.student_name}</div>
-              <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
-              <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">
-                {c.issued_at ? new Date(c.issued_at).toLocaleDateString('ar-EG') : '-'}
-              </div>
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة">
-                <Eye className="w-4 h-4 text-navy" />
-              </Button>
-              <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="ghost" title="PDF">
-                  <Download className="w-4 h-4 text-gold" />
-                </Button>
-              </a>
-              <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل">
-                <Edit className="w-4 h-4 text-navy" />
-              </Button>
-              {c.status === 'صالحة' ? (
-                <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء">
-                  <XCircle className="w-4 h-4 text-red-500" />
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف نهائي">
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </Button>
-            </div>
+      {tab === 'issued' ? (
+        <>
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+              <option value="all">كل الحالات</option>
+              <option value="صالحة">صالحة</option>
+              <option value="ملغاة">ملغاة</option>
+            </select>
           </div>
-        ))}
-        {!filtered.length && (
-          <div className="text-center py-8 text-muted-foreground">
-            {search ? 'لا توجد نتائج للبحث' : 'لا توجد شهادات'}
+          <div className="space-y-2">
+            {filtered.map((c) => (
+              <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
+                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
+                  </div>
+                  <div className="font-medium text-navy text-sm">{c.student_name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة"><Eye className="w-4 h-4 text-navy" /></Button>
+                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PDF"><Download className="w-4 h-4 text-gold" /></Button></a>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
+                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
+                  <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                </div>
+              </div>
+            ))}
+            {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        /* Certificate requests tab */
+        <div className="space-y-2">
+          {requests.map((r) => {
+            const badge = requestStatusBadge(r.status)
+            const completed = isCourseCompleted(r.user_id, r.course_id)
+            return (
+              <div key={r.id} className="p-3 bg-white border border-border rounded-lg">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <Badge className={badge.color}>{badge.label}</Badge>
+                  {completed && <Badge className="bg-green-500/15 text-green-600 border-green-500/30">✅ الدورة مكتملة</Badge>}
+                  {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
+                </div>
+                <div className="font-medium text-navy text-sm">{r.student_name}</div>
+                <div className="text-xs text-muted-foreground">{r.course_title || '-'}</div>
+                {r.amount > 0 && <div className="text-xs text-muted-foreground mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
+                {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
+                {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
+                {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
+                {r.cert_number && <div className="text-xs font-mono text-green-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
+                {r.verify_code && <div className="text-xs font-mono text-green-600" dir="ltr">رمز التحقق: {r.verify_code}</div>}
+
+                {/* Action buttons based on status */}
+                <div className="flex gap-2 mt-3 pt-2 border-t border-border">
+                  {r.status === 'pending' && (
+                    <>
+                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
+                        <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>
+                        <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+                      </Button>
+                    </>
+                  )}
+                  {r.status === 'trainer_approved' && (
+                    <Button size="sm" className="bg-navy hover:bg-navy-light text-gold text-xs" onClick={() => handleRequestAction(r.id, 'admin_approve', 'تمت الموافقة على الطلب')}>
+                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدير
+                    </Button>
+                  )}
+                  {r.status === 'admin_approved' && (
+                    <Button size="sm" className="bg-gold hover:bg-gold-light text-navy text-xs" onClick={() => handleRequestAction(r.id, 'issue')}>
+                      <Award className="w-3.5 h-3.5 ml-1" /> إصدار الشهادة
+                    </Button>
+                  )}
+                  {r.status === 'issued' && r.cert_number && (
+                    <a href={`/api/certificate-pdf?number=${encodeURIComponent(r.cert_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="border-gold/30 text-navy hover:bg-gold/10 text-xs">
+                        <Download className="w-3.5 h-3.5 ml-1" /> تحميل الشهادة
+                      </Button>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {requests.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد طلبات شهادات</div>}
+        </div>
+      )}
 
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['student_name', 'course_title', 'status', 'issued_by', 'external_accreditation_body']} apiPath="/api/certificates" />}
 
-      {/* Revoke dialog */}
       {revokeTarget && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeReason('') } }}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>إلغاء الشهادة</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>إلغاء الشهادة</DialogTitle></DialogHeader>
             <div className="space-y-3 py-4">
               <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
                 <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
                 <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
                 <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
               </div>
-              <div>
-                <Label>سبب الإلغاء *</Label>
-                <Textarea
-                  value={revokeReason}
-                  onChange={(e) => setRevokeReason(e.target.value)}
-                  rows={3}
-                  placeholder="مثال: تم اكتشاف خطأ في بيانات المتدرب / طلب إداري..."
-                  className="mt-1"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">سيتم تسجيل سبب الإلغاء ولن تُحذف الشهادة. ستظهر كملغاة في صفحة التحقق فوراً.</p>
+              <div><Label>سبب الإلغاء *</Label><Textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={3} placeholder="مثال: خطأ في بيانات المتدرب..." className="mt-1" /></div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }}>إلغاء</Button>
@@ -854,24 +865,15 @@ function AdminCertificates() {
         </Dialog>
       )}
 
-      {/* Preview dialog */}
       {previewCert && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>معاينة الشهادة — {previewCert.certificate_number}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>معاينة — {previewCert.certificate_number}</DialogTitle></DialogHeader>
             <div className="py-2">
               <a href={`/?verify=${encodeURIComponent(previewCert.certificate_number)}#verify`} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
-                <Button variant="outline" size="sm" className="border-gold/30 text-navy hover:bg-gold/10">
-                  <ExternalLink className="w-3.5 h-3.5 ml-1" /> فتح صفحة التحقق الكاملة
-                </Button>
+                <Button variant="outline" size="sm" className="border-gold/30 text-navy hover:bg-gold/10"><ExternalLink className="w-3.5 h-3.5 ml-1" /> فتح صفحة التحقق</Button>
               </a>
-              <iframe
-                src={`/api/certificate-pdf?number=${encodeURIComponent(previewCert.certificate_number)}&format=pdf`}
-                className="w-full h-[500px] border-2 border-gold/30 rounded-lg"
-                title="Certificate Preview"
-              />
+              <iframe src={`/api/certificate-pdf?number=${encodeURIComponent(previewCert.certificate_number)}&format=pdf`} className="w-full h-[500px] border-2 border-gold/30 rounded-lg" title="Certificate Preview" />
             </div>
           </DialogContent>
         </Dialog>
@@ -1088,17 +1090,15 @@ function AdminPartners() {
   const [editing, setEditing] = useState<any | null>(null)
   const load = () => fetch('/api/partners').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
-  const del = async (id: string) => {
-    if (!confirm('حذف؟')) return
-    await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف'); load()
+  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const toggleStatus = async (p: any) => {
+    const newStatus = p.status === 'نشط' ? 'متوقف' : 'نشط'
+    await fetch('/api/partners', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, status: newStatus }) })
+    toast.success(newStatus === 'نشط' ? 'تم تنشيط الشراكة' : 'تم إيقاف الشراكة')
+    load()
   }
   return (
-    <SectionCard
-      title="الشركاء"
-      description={`${items.length} شريك`}
-      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
-    >
+    <SectionCard title="الشركاء" description={`${items.length} شريك`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((p) => (
           <Card key={p.id} className="p-5">
@@ -1110,8 +1110,16 @@ function AdminPartners() {
                 {p.since && <Badge variant="outline" className="mt-1 text-xs">منذ {p.since}</Badge>}
               </div>
             </div>
+            <div className="mb-3">
+              <Badge className={p.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
+                {p.status === 'نشط' ? '● نشط' : '● متوقف'}
+              </Badge>
+            </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+              <Button size="sm" variant="outline" className={p.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(p)}>
+                {p.status === 'نشط' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+              </Button>
               <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           </Card>
@@ -1128,17 +1136,15 @@ function AdminLicenses() {
   const [editing, setEditing] = useState<any | null>(null)
   const load = () => fetch('/api/licenses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
-  const del = async (id: string) => {
-    if (!confirm('حذف؟')) return
-    await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف'); load()
+  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const toggleStatus = async (l: any) => {
+    const newStatus = l.status === 'ساري' ? 'متوقف' : 'ساري'
+    await fetch('/api/licenses', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, status: newStatus }) })
+    toast.success(newStatus === 'ساري' ? 'تم تنشيط الترخيص' : 'تم إيقاف الترخيص')
+    load()
   }
   return (
-    <SectionCard
-      title="التراخيص"
-      description={`${items.length} ترخيص`}
-      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
-    >
+    <SectionCard title="التراخيص" description={`${items.length} ترخيص`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
       <div className="grid md:grid-cols-2 gap-4">
         {items.map((l) => (
           <Card key={l.id} className="p-5">
@@ -1147,7 +1153,7 @@ function AdminLicenses() {
                 <div className="font-bold text-navy">{l.issuing_body}</div>
                 <div className="text-xs text-gold">{l.type}</div>
               </div>
-              <Badge className="bg-green-500/15 text-green-600 border-green-500/30">{l.status}</Badge>
+              <Badge className={l.status === 'ساري' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{l.status === 'ساري' ? '● ساري' : '● متوقف'}</Badge>
             </div>
             <div className="text-xs text-muted-foreground mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
             <div className="flex justify-between text-xs text-muted-foreground mb-3">
@@ -1156,6 +1162,9 @@ function AdminLicenses() {
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(l); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+              <Button size="sm" variant="outline" className={l.status === 'ساري' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(l)}>
+                {l.status === 'ساري' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+              </Button>
               <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(l.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           </Card>
