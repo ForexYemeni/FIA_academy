@@ -34,8 +34,8 @@ def shape_ar(text):
         return text[::-1] if text else text
 
 # Load Cairo font
-CAIRO_PATH = '/home/z/my-project/.fonts/Cairo-Regular.ttf'
-CAIRO_BOLD_PATH = '/home/z/my-project/.fonts/Cairo-Bold.ttf'
+CAIRO_PATH = os.path.join(os.environ.get('FIA_FONTS_DIR', '/home/z/my-project/.fonts'), 'Cairo-Regular.ttf')
+CAIRO_BOLD_PATH = os.path.join(os.environ.get('FIA_FONTS_DIR', '/home/z/my-project/.fonts'), 'Cairo-Bold.ttf')
 font_regular = FontProperties(fname=CAIRO_PATH) if os.path.exists(CAIRO_PATH) else FontProperties()
 font_bold = FontProperties(fname=CAIRO_BOLD_PATH) if os.path.exists(CAIRO_BOLD_PATH) else FontProperties(weight='bold')
 

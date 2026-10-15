@@ -3,25 +3,47 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
+
+// Force Node.js runtime (not Edge) — required for child_process.spawn
+export const runtime = 'nodejs'
+export const maxDuration = 60 // 60 seconds max for PDF generation
 
 async function generateArtifacts(cert: any, issueDate: string) {
-  const outDir = '/home/z/my-project/download/certificates'
+  // Use /tmp for serverless environment (Vercel) — falls back to project dir for local dev
+  const isServerless = !!process.env.VERCEL || !fs.existsSync('/home/z/my-project/download')
+  const outDir = isServerless
+    ? path.join(os.tmpdir(), 'fia-certificates')
+    : '/home/z/my-project/download/certificates'
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
-  const verifyUrl = `https://fia.edu/verify?number=${cert.certificate_number}`
+  const verifyUrl = `https://fia-academy-nu.vercel.app/#verify?number=${cert.certificate_number}`
 
   const pdfPath = path.join(outDir, `${cert.certificate_number}.pdf`)
   const pngPath = path.join(outDir, `${cert.certificate_number}.png`)
 
+  // Python scripts location
+  const scriptDir = isServerless
+    ? path.join(process.cwd(), 'scripts')
+    : '/home/z/my-project/scripts'
+  const pdfScript = path.join(scriptDir, 'generate_certificate.py')
+  const pngScript = path.join(scriptDir, 'generate_certificate_png.py')
+  // Fonts path
+  const fontsDir = isServerless
+    ? path.join(process.cwd(), '.fonts')
+    : '/home/z/my-project/.fonts'
+
   const runPy = (script: string, args: string[]) =>
     new Promise<void>((resolve, reject) => {
-      const py = spawn('python3', [script, ...args])
+      // Set env vars so scripts can find fonts
+      const env = { ...process.env, FIA_FONTS_DIR: fontsDir }
+      const py = spawn('python3', [script, ...args], { env })
       let stderr = ''
       py.stderr.on('data', (d) => (stderr += d.toString()))
       py.on('close', (code) => (code === 0 ? resolve() : reject(new Error(stderr))))
     })
 
   await Promise.all([
-    runPy('/home/z/my-project/scripts/generate_certificate.py', [
+    runPy(pdfScript, [
       cert.student_name || 'طالب',
       cert.course_title || 'دورة معتمدة',
       cert.certificate_number,
@@ -29,7 +51,7 @@ async function generateArtifacts(cert: any, issueDate: string) {
       pdfPath,
       verifyUrl,
     ]),
-    runPy('/home/z/my-project/scripts/generate_certificate_png.py', [
+    runPy(pngScript, [
       cert.student_name || 'طالب',
       cert.course_title || 'دورة معتمدة',
       cert.certificate_number,

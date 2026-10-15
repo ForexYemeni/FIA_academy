@@ -36,10 +36,11 @@ GRAY = HexColor('#666666')
 
 # Fonts — use Cairo if available, fall back to DejaVu
 def register_fonts():
+    fonts_dir = os.environ.get('FIA_FONTS_DIR', '/home/z/my-project/.fonts')
     fonts = {
-        'Cairo':           '/home/z/my-project/.fonts/Cairo-Regular.ttf',
-        'Cairo-Bold':      '/home/z/my-project/.fonts/Cairo-Bold.ttf',
-        'Cairo-Black':     '/home/z/my-project/.fonts/Cairo-Black.ttf',
+        'Cairo':           os.path.join(fonts_dir, 'Cairo-Regular.ttf'),
+        'Cairo-Bold':      os.path.join(fonts_dir, 'Cairo-Bold.ttf'),
+        'Cairo-Black':     os.path.join(fonts_dir, 'Cairo-Black.ttf'),
         'DejaVu':           '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         'DejaVu-Bold':      '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
         'FreeSerif':        '/usr/share/fonts/truetype/freefont/FreeSerif.ttf',
