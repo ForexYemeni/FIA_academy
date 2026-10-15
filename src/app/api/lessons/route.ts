@@ -1,25 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Lessons are stored inside modules (which are stored as JSON in the course's description field).
+// The /api/modules endpoint handles the full course content. This endpoint provides
+// a friendly interface for individual lesson operations.
+
+const MODULES_SEPARATOR = '\n\n===FIA_MODULES===\n'
+
+function genLessonId(): string {
+  return `l_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function parseCourseContent(description: string | null): { description: string; modules: any[] } {
+  if (!description) return { description: '', modules: [] }
+  const idx = description.indexOf(MODULES_SEPARATOR)
+  if (idx === -1) return { description, modules: [] }
+  const desc = description.substring(0, idx)
+  const jsonStr = description.substring(idx + MODULES_SEPARATOR.length)
+  try {
+    const modules = JSON.parse(jsonStr)
+    if (Array.isArray(modules)) return { description: desc, modules }
+  } catch {}
+  return { description, modules: [] }
+}
+
+async function fetchCourse(courseId: string): Promise<any> {
+  const { data } = await supabaseAdmin
+    .from('courses')
+    .select('description')
+    .eq('id', courseId)
+    .maybeSingle()
+  return data
+}
+
+async function saveCourseModules(courseId: string, description: string, modules: any[]): Promise<void> {
+  const newDescription = modules.length === 0
+    ? description
+    : `${description || ''}${MODULES_SEPARATOR}${JSON.stringify(modules)}`
+  const modulesCount = modules.length
+  const lessonsCount = modules.reduce((acc, m) => acc + ((m.lessons as any[]) || []).length, 0)
+  const { error } = await supabaseAdmin
+    .from('courses')
+    .update({
+      description: newDescription,
+      modules_count: modulesCount,
+      lessons_count: lessonsCount,
+    })
+    .eq('id', courseId)
+  if (error) throw error
+}
+
+async function findCourseIdByModule(moduleId: string): Promise<string | null> {
+  // We can't easily query JSON in PostgREST, so we have to scan all courses.
+  // For small datasets this is fine.
+  const { data: courses } = await supabaseAdmin
+    .from('courses')
+    .select('id, description')
+  if (!courses) return null
+  for (const c of courses) {
+    const { modules } = parseCourseContent(c.description)
+    if (modules.some((m) => m.id === moduleId)) return c.id
+  }
+  return null
+}
+
 export async function GET(req: NextRequest) {
   try {
     const moduleId = req.nextUrl.searchParams.get('module_id')
     const courseId = req.nextUrl.searchParams.get('course_id')
-    let query = supabaseAdmin.from('course_lessons').select('*')
-    if (moduleId) query = query.eq('module_id', moduleId)
-    if (courseId) {
-      // Get all lessons for a course by joining modules
-      const { data: modules } = await supabaseAdmin
-        .from('course_modules')
-        .select('id')
-        .eq('course_id', courseId)
-      const moduleIds = (modules || []).map((m: any) => m.id)
-      if (moduleIds.length === 0) return NextResponse.json([])
-      query = supabaseAdmin.from('course_lessons').select('*').in('module_id', moduleIds)
+
+    if (!courseId) return NextResponse.json([])
+
+    const course = await fetchCourse(courseId)
+    if (!course) return NextResponse.json([])
+
+    const { modules } = parseCourseContent(course.description)
+    let lessons: any[] = []
+    if (moduleId) {
+      const mod = modules.find((m) => m.id === moduleId)
+      lessons = mod?.lessons || []
+    } else {
+      // All lessons for the course
+      modules.forEach((m) => {
+        if (Array.isArray(m.lessons)) {
+          lessons.push(...m.lessons.map((l: any) => ({ ...l, module_id: m.id })))
+        }
+      })
     }
-    const { data, error } = await query.order('position', { ascending: true })
-    if (error) throw error
-    return NextResponse.json(data || [])
+    return NextResponse.json(lessons)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -28,23 +96,43 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { data, error } = await supabaseAdmin
-      .from('course_lessons')
-      .insert({
-        module_id: body.module_id,
-        title: body.title,
-        lesson_type: body.lesson_type || 'text',
-        content: body.content || null,
-        video_url: body.video_url || null,
-        pdf_url: body.pdf_url || null,
-        duration_minutes: body.duration_minutes || 0,
-        position: body.position || 0,
-        is_preview: body.is_preview || false,
-      })
-      .select()
-      .single()
-    if (error) throw error
-    return NextResponse.json(data)
+    if (!body.module_id || !body.title) {
+      return NextResponse.json({ error: 'module_id و title مطلوبان' }, { status: 400 })
+    }
+
+    // Find course_id from module_id by scanning
+    let courseId = body.course_id
+    if (!courseId) {
+      courseId = await findCourseIdByModule(body.module_id)
+      if (!courseId) return NextResponse.json({ error: 'Course not found for module' }, { status: 404 })
+    }
+
+    const course = await fetchCourse(courseId)
+    if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+
+    const { description, modules } = parseCourseContent(course.description)
+    const modIdx = modules.findIndex((m) => m.id === body.module_id)
+    if (modIdx === -1) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+
+    if (!Array.isArray(modules[modIdx].lessons)) modules[modIdx].lessons = []
+
+    const newLesson = {
+      id: genLessonId(),
+      module_id: body.module_id,
+      title: body.title,
+      lesson_type: body.lesson_type || 'text',
+      content: body.content || null,
+      video_url: body.video_url || null,
+      pdf_url: body.pdf_url || null,
+      duration_minutes: body.duration_minutes || 0,
+      position: body.position ?? modules[modIdx].lessons.length,
+      is_preview: body.is_preview || false,
+    }
+
+    modules[modIdx].lessons.push(newLesson)
+    await saveCourseModules(courseId, description, modules)
+
+    return NextResponse.json(newLesson)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -52,15 +140,33 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { id, ...updates } = await req.json()
-    const { data, error } = await supabaseAdmin
-      .from('course_lessons')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return NextResponse.json(data)
+    const { id, module_id, course_id, ...updates } = await req.json()
+    if (!id || !module_id) {
+      return NextResponse.json({ error: 'id و module_id مطلوبان' }, { status: 400 })
+    }
+
+    let courseId = course_id
+    if (!courseId) {
+      courseId = await findCourseIdByModule(module_id)
+      if (!courseId) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+    }
+
+    const course = await fetchCourse(courseId)
+    if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+
+    const { description, modules } = parseCourseContent(course.description)
+    const modIdx = modules.findIndex((m) => m.id === module_id)
+    if (modIdx === -1) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+
+    const lessons = modules[modIdx].lessons || []
+    const lessonIdx = lessons.findIndex((l: any) => l.id === id)
+    if (lessonIdx === -1) return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
+
+    lessons[lessonIdx] = { ...lessons[lessonIdx], ...updates, id, module_id }
+    modules[modIdx].lessons = lessons
+
+    await saveCourseModules(courseId, description, modules)
+    return NextResponse.json(lessons[lessonIdx])
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -68,9 +174,27 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json()
-    const { error } = await supabaseAdmin.from('course_lessons').delete().eq('id', id)
-    if (error) throw error
+    const { id, module_id, course_id } = await req.json()
+    if (!id || !module_id) {
+      return NextResponse.json({ error: 'id و module_id مطلوبان' }, { status: 400 })
+    }
+
+    let courseId = course_id
+    if (!courseId) {
+      courseId = await findCourseIdByModule(module_id)
+      if (!courseId) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+    }
+
+    const course = await fetchCourse(courseId)
+    if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+
+    const { description, modules } = parseCourseContent(course.description)
+    const modIdx = modules.findIndex((m) => m.id === module_id)
+    if (modIdx === -1) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+
+    modules[modIdx].lessons = (modules[modIdx].lessons || []).filter((l: any) => l.id !== id)
+    await saveCourseModules(courseId, description, modules)
+
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

@@ -39,14 +39,12 @@ export async function POST(req: NextRequest) {
     const { data: pub } = supabaseAdmin.storage.from('fia-media').getPublicUrl(fileName)
 
     // Update the user's avatar in the right table
-    if (role === 'trainer') {
+    if (role === 'trainer' || role === 'team') {
+      // Team members are stored in the trainers table too (with a special password marker)
       await supabaseAdmin.from('trainers').update({ avatar: pub.publicUrl }).eq('id', userId)
     } else if (role === 'student') {
       await supabaseAdmin.from('users').update({ avatar: pub.publicUrl }).eq('id', userId)
-    } else if (role === 'team') {
-      await supabaseAdmin.from('team_members').update({ avatar: pub.publicUrl }).eq('id', userId)
     }
-    // For team role, userId is the team_members row id
 
     return NextResponse.json({ url: pub.publicUrl, path: fileName })
   } catch (e: any) {
