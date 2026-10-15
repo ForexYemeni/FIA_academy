@@ -102,11 +102,6 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
             <Button onClick={submit} disabled={loading} className="w-full bg-navy hover:bg-navy-light text-white">
               {loading ? 'جاري المعالجة...' : 'دخول'}
             </Button>
-            <div className="text-xs text-muted-foreground bg-muted/40 p-3 rounded-md space-y-1">
-              <div className="font-semibold text-navy">حسابات تجريبية:</div>
-              <div>المدير: admin@fia.edu / admin123</div>
-              <div>المدرب: trainer@fia.edu / trainer123</div>
-            </div>
           </TabsContent>
 
           <TabsContent value="register" className="space-y-4 pt-4">
