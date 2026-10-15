@@ -7,7 +7,7 @@ import {
   BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
   DollarSign, TrendingUp, Activity, Star, ArrowRight,
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
-  Loader2, FileUp,
+  Loader2, FileUp, Clock,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -157,20 +157,38 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
 }
 
 function AdminOverview() {
-  const [stats, setStats] = useState({ courses: 0, trainers: 0, students: 0, payments: 0 })
+  const [stats, setStats] = useState({ courses: 0, trainers: 0, students: 0, payments: 0, totalRevenue: 0, pendingPayments: 0, completedEnrollments: 0, activeEnrollments: 0 })
 
   useEffect(() => {
     Promise.all([
       fetch('/api/courses').then((r) => r.json()),
       fetch('/api/trainers').then((r) => r.json()),
-      fetch('/api/students').then((r) => r.json()),
+      fetch('/api/students?role=student').then((r) => r.json()),
       fetch('/api/payments').then((r) => r.json()),
-    ]).then(([c, t, s, p]) => {
+      fetch('/api/enrollments').then((r) => r.json()),
+    ]).then(([c, t, s, p, e]) => {
+      const courses = Array.isArray(c) ? c : []
+      const trainers = Array.isArray(t) ? t : []
+      const students = Array.isArray(s) ? s : []
+      const payments = Array.isArray(p) ? p : []
+      const enrollments = Array.isArray(e) ? e : []
+
+      // Calculate REAL revenue from completed payments only
+      const completedPayments = payments.filter(p => p.status === 'مكتمل')
+      const totalRevenue = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
+      const pendingPayments = payments.filter(p => p.status === 'قيد الانتظار').length
+      const completedEnrollments = enrollments.filter(e => e.status === 'completed').length
+      const activeEnrollments = enrollments.filter(e => e.status === 'active').length
+
       setStats({
-        courses: Array.isArray(c) ? c.length : 0,
-        trainers: Array.isArray(t) ? t.length : 0,
-        students: Array.isArray(s) ? s.length : 0,
-        payments: Array.isArray(p) ? p.length : 0,
+        courses: courses.length,
+        trainers: trainers.length,
+        students: students.length,
+        payments: payments.length,
+        totalRevenue,
+        pendingPayments,
+        completedEnrollments,
+        activeEnrollments,
       })
     }).catch(() => {})
   }, [])
@@ -189,22 +207,27 @@ function AdminOverview() {
         <StatCard icon={CreditCard} label="المعاملات" value={stats.payments} color="green" />
       </div>
 
-      <SectionCard title="نظرة عامة مالية" description="ملخّص الإيرادات والأداء">
-        <div className="grid sm:grid-cols-3 gap-4">
+      <SectionCard title="نظرة عامة مالية" description="إحصائيات حقيقية من قاعدة البيانات">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-navy to-navy-light text-white p-5 rounded-xl">
             <DollarSign className="w-6 h-6 text-gold mb-2" />
-            <div className="text-2xl font-bold">2,450,000 ر.ي</div>
-            <div className="text-white/70 text-sm">إجمالي الإيرادات</div>
+            <div className="text-2xl font-bold">{stats.totalRevenue.toLocaleString()}</div>
+            <div className="text-white/70 text-sm">ر.ي إجمالي الإيرادات (مكتمل)</div>
           </div>
-          <div className="bg-gradient-to-br from-gold to-gold-light text-navy p-5 rounded-xl">
-            <TrendingUp className="w-6 h-6 mb-2" />
-            <div className="text-2xl font-bold">+18%</div>
-            <div className="text-navy/70 text-sm">نمو شهري</div>
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
+            <Clock className="w-6 h-6 mb-2" />
+            <div className="text-2xl font-bold">{stats.pendingPayments}</div>
+            <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
           </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+            <CheckCircle2 className="w-6 h-6 mb-2" />
+            <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
+            <div className="text-white/80 text-sm">دورات مكتملة</div>
+          </div>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
             <Activity className="w-6 h-6 mb-2" />
-            <div className="text-2xl font-bold">542</div>
-            <div className="text-white/80 text-sm">متدرب نشط</div>
+            <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
+            <div className="text-white/80 text-sm">تسجيلات نشطة</div>
           </div>
         </div>
       </SectionCard>
@@ -287,90 +310,320 @@ function AdminExams() {
 
 function AdminStudents() {
   const [items, setItems] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [search, setSearch] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
+
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }, [])
+
   const del = async (id: string) => {
-    if (!confirm('حذف المتدرب؟')) return
+    if (!confirm('حذف المتدرب نهائياً؟')) return
     await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     toast.success('تم الحذف')
     setItems(items.filter((s) => s.id !== id))
+    setSelectedStudent(null)
   }
+
+  const filtered = items.filter(s => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q) || (s.phone || '').includes(q)
+  })
+
+  // Get student's enrollments
+  const getStudentEnrollments = (studentId: string) => enrollments.filter(e => e.user_id === studentId)
+
   return (
-    <SectionCard title="المتدربون" description={`${items.length} متدرب`}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">الاسم</th>
-              <th className="py-3 px-2">البريد</th>
-              <th className="py-3 px-2">الهاتف</th>
-              <th className="py-3 px-2">التسجيل</th>
-              <th className="py-3 px-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((s) => (
-              <tr key={s.id} className="border-b border-border">
-                <td className="py-3 px-2 font-medium text-navy">{s.name}</td>
-                <td className="py-3 px-2" dir="ltr">{s.email}</td>
-                <td className="py-3 px-2" dir="ltr">{s.phone || '-'}</td>
-                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</td>
-                <td className="py-3 px-2"><Button size="icon" variant="ghost" onClick={() => del(s.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <SectionCard title="المتدربون" description={`${filtered.length} متدرب`}>
+      <div className="flex gap-2 mb-4">
+        <Input placeholder="بحث بالاسم أو البريد أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
       </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((s) => {
+          const sEnrs = getStudentEnrollments(s.id)
+          return (
+            <Card key={s.id} className="overflow-hidden card-hover">
+              <div className="p-4 bg-fia-gradient text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold/30 flex-shrink-0 bg-navy-light">
+                    {s.avatar ? (
+                      <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl">{s.name?.charAt(0)}</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm truncate">{s.name}</div>
+                    <div className="text-xs text-white/70 truncate" dir="ltr">{s.email}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 space-y-2">
+                {s.phone && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>📞</span><span dir="ltr">{s.phone}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>📅</span><span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span>📚</span>
+                  <span className="font-semibold text-navy">{sEnrs.length} دورة مسجّلة</span>
+                </div>
+                {sEnrs.slice(0, 2).map((e) => {
+                  const c = courses.find(co => co.id === e.course_id)
+                  return c ? (
+                    <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
+                      <span className="truncate">{c.title}</span>
+                      <Badge className={
+                        e.status === 'completed' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
+                        : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-[10px]'
+                        : 'bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]'
+                      }>
+                        {e.status === 'completed' ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                      </Badge>
+                    </div>
+                  ) : null
+                })}
+                {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground">+{sEnrs.length - 2} دورة أخرى</div>}
+              </div>
+              <div className="flex gap-1 p-3 pt-0">
+                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
+                <Button size="sm" variant="ghost" onClick={() => del(s.id)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+
+      {filtered.length === 0 && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
+
+      {/* Student detail modal */}
+      {selectedStudent && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedStudent(null) }}>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>تفاصيل المتدرب</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-4 p-4 bg-fia-gradient rounded-lg text-white">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/30 bg-navy-light">
+                  {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gold font-bold text-2xl">{selectedStudent.name?.charAt(0)}</div>}
+                </div>
+                <div>
+                  <div className="font-bold text-lg">{selectedStudent.name}</div>
+                  <div className="text-xs text-white/70" dir="ltr">{selectedStudent.email}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
+              </div>
+              <div>
+                <h4 className="font-bold text-navy text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
+                <div className="space-y-2">
+                  {getStudentEnrollments(selectedStudent.id).map((e) => {
+                    const c = courses.find(co => co.id === e.course_id)
+                    if (!c) return null
+                    const isFree = c.price_type === 'مجانية' || c.price === 0
+                    return (
+                      <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+                          <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
+                        </div>
+                        <Badge className={
+                          e.status === 'completed' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                          : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                          : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                        }>
+                          {e.status === 'completed' ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة</p>}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedStudent(null)}>إغلاق</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </SectionCard>
   )
 }
 
 function AdminPayments() {
   const [items, setItems] = useState<any[]>([])
-  useEffect(() => { fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])) }, [])
+  const [courses, setCourses] = useState<any[]>([])
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
+
+  const load = () => {
+    fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+  }
+  useEffect(() => { load() }, [])
+
   const updateStatus = async (id: string, status: string) => {
     await fetch('/api/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
-    toast.success('تم التحديث')
-    setItems(items.map((p) => (p.id === id ? { ...p, status } : p)))
+    toast.success(status === 'مكتمل' ? 'تم قبول الدفع' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
+    load()
+    setSelectedPayment(null)
   }
+
+  const filtered = items.filter(p => {
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return (p.reference || '').toLowerCase().includes(q) || (p.method || '').toLowerCase().includes(q)
+    }
+    return true
+  })
+
+  // Extract proof URL from reference field (format: "JB-123 | PROOF: https://...")
+  const extractProofUrl = (ref: string) => {
+    if (!ref) return null
+    const match = ref.match(/PROOF:\s*(https?:\/\/[^\s|]+)/i)
+    return match ? match[1] : null
+  }
+
+  // Get course for payment
+  const getCourse = (courseId: string) => courses.find(c => c.id === courseId)
+
   return (
-    <SectionCard title="المدفوعات" description={`${items.length} معاملة`}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">المبلغ</th>
-              <th className="py-3 px-2">الطريقة</th>
-              <th className="py-3 px-2">المرجع</th>
-              <th className="py-3 px-2">التاريخ</th>
-              <th className="py-3 px-2">الحالة</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((p) => (
-              <tr key={p.id} className="border-b border-border">
-                <td className="py-3 px-2 font-bold text-navy">{p.amount.toLocaleString()} {p.currency || 'ر.ي'}</td>
-                <td className="py-3 px-2">{p.method || '-'}</td>
-                <td className="py-3 px-2 font-mono" dir="ltr">{p.reference || '-'}</td>
-                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</td>
-                <td className="py-3 px-2">
-                  <select
-                    value={p.status}
-                    onChange={(e) => updateStatus(p.id, e.target.value)}
-                    className="px-2 py-1 border border-input rounded text-xs bg-background"
-                  >
-                    <option value="قيد الانتظار">قيد الانتظار</option>
-                    <option value="مكتمل">مكتمل</option>
-                    <option value="ملغي">ملغي</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
-            {!items.length && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد مدفوعات</td></tr>}
-          </tbody>
-        </table>
+    <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <Input placeholder="بحث برقم المعاملة أو الطريقة..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+          <option value="all">كل الحالات</option>
+          <option value="قيد الانتظار">قيد الانتظار</option>
+          <option value="مكتمل">مكتمل</option>
+          <option value="ملغي">ملغي</option>
+        </select>
       </div>
+
+      <div className="space-y-2">
+        {filtered.map((p) => {
+          const course = getCourse(p.course_id)
+          const proofUrl = extractProofUrl(p.reference)
+          const isPending = p.status === 'قيد الانتظار'
+          return (
+            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="font-bold text-navy text-sm">{p.amount?.toLocaleString()} {p.currency || 'ر.ي'}</span>
+                  <Badge className={
+                    p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                    : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                  }>{p.status}</Badge>
+                  {proofUrl && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">📎 إثبات دفع</Badge>}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
+                  {' • '}
+                  <span>{p.method || '-'}</span>
+                  {' • '}
+                  <span dir="ltr">{p.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <Button size="sm" variant="ghost" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
+                  <Eye className="w-4 h-4 text-navy" />
+                </Button>
+                {isPending && (
+                  <>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
+                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
+                    </Button>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => updateStatus(p.id, 'ملغي')}>
+                      <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
+      </div>
+
+      {/* Payment detail modal with proof image */}
+      {selectedPayment && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedPayment(null) }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>تفاصيل المعاملة</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
+                <span className="text-sm font-semibold text-navy">المبلغ:</span>
+                <span className="text-xl font-extrabold text-gold">{selectedPayment.amount?.toLocaleString()} {selectedPayment.currency || 'ر.ي'}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{selectedPayment.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
+                  <Badge className={
+                    selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                    : selectedPayment.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                  }>{selectedPayment.status}</Badge>
+                </div>
+              </div>
+              {(() => {
+                const course = getCourse(selectedPayment.course_id)
+                return course ? (
+                  <div className="bg-muted/30 p-3 rounded-lg">
+                    <div className="text-xs text-muted-foreground">الدورة</div>
+                    <div className="text-sm font-medium text-navy">{course.title}</div>
+                    <div className="text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
+                  </div>
+                ) : null
+              })()}
+
+              {/* Proof image */}
+              {(() => {
+                const proofUrl = extractProofUrl(selectedPayment.reference)
+                return proofUrl ? (
+                  <div>
+                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
+                    <div className="rounded-lg overflow-hidden border-2 border-gold/30">
+                      <img src={proofUrl} alt="إثبات الدفع" className="w-full h-auto max-h-96 object-contain" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground text-sm">لا يوجد إثبات دفع مرفق</div>
+                )
+              })()}
+
+              {selectedPayment.status === 'قيد الانتظار' && (
+                <div className="flex gap-2 pt-2">
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
+                    <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
+                  </Button>
+                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => updateStatus(selectedPayment.id, 'ملغي')}>
+                    <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
+                  </Button>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedPayment(null)}>إغلاق</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </SectionCard>
   )
 }
@@ -1162,52 +1415,162 @@ function AdminAccount({ user, updateUser, logout }: any) {
 }
 
 function AdminReports() {
+  const [data, setData] = useState<any>({ courses: [], payments: [], students: [], enrollments: [], trainers: [] })
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/courses').then(r => r.json()),
+      fetch('/api/payments').then(r => r.json()),
+      fetch('/api/students?role=student').then(r => r.json()),
+      fetch('/api/enrollments').then(r => r.json()),
+      fetch('/api/trainers').then(r => r.json()),
+    ]).then(([c, p, s, e, t]) => {
+      setData({
+        courses: Array.isArray(c) ? c : [],
+        payments: Array.isArray(p) ? p : [],
+        students: Array.isArray(s) ? s : [],
+        enrollments: Array.isArray(e) ? e : [],
+        trainers: Array.isArray(t) ? t : [],
+      })
+    })
+  }, [])
+
+  const completedRevenue = data.payments.filter(p => p.status === 'مكتمل').reduce((sum, p) => sum + (p.amount || 0), 0)
+  const pendingRevenue = data.payments.filter(p => p.status === 'قيد الانتظار').reduce((sum, p) => sum + (p.amount || 0), 0)
+  const freeCourses = data.courses.filter(c => c.price_type === 'مجانية' || c.price === 0).length
+  const paidCourses = data.courses.filter(c => c.price_type !== 'مجانية' && c.price > 0).length
+  const completedEnrs = data.enrollments.filter(e => e.status === 'completed').length
+  const totalLessons = data.courses.reduce((sum, c) => sum + (c.lessons_count || 0), 0)
+  const avgRating = data.courses.length > 0
+    ? (data.courses.reduce((sum, c) => sum + (c.rating || 0), 0) / data.courses.length).toFixed(1)
+    : '0.0'
+  const totalEnrolled = data.courses.reduce((sum, c) => sum + (c.enrolled || 0), 0)
+
+  const reportCards = [
+    { icon: DollarSign, label: 'إجمالي الإيرادات المكتملة', value: `${completedRevenue.toLocaleString()} ر.ي`, color: 'from-navy to-navy-light', textCol: 'text-gold' },
+    { icon: Clock, label: 'إيرادات قيد الانتظار', value: `${pendingRevenue.toLocaleString()} ر.ي`, color: 'from-yellow-500 to-yellow-600', textCol: 'text-white' },
+    { icon: BookOpen, label: 'الدورات المدفوعة', value: paidCourses, color: 'from-gold to-gold-light', textCol: 'text-navy' },
+    { icon: BookOpen, label: 'الدورات المجانية', value: freeCourses, color: 'from-green-500 to-green-600', textCol: 'text-white' },
+    { icon: FileText, label: 'إجمالي الدروس', value: totalLessons, color: 'from-blue-500 to-blue-600', textCol: 'text-white' },
+    { icon: CheckCircle2, label: 'تسجيلات مكتملة', value: completedEnrs, color: 'from-purple-500 to-purple-600', textCol: 'text-white' },
+    { icon: Users, label: 'إجمالي التسجيلات', value: totalEnrolled, color: 'from-cyan-500 to-cyan-600', textCol: 'text-white' },
+    { icon: Star, label: 'متوسط التقييم', value: `${avgRating} / 5`, color: 'from-amber-500 to-orange-500', textCol: 'text-white' },
+  ]
+
   return (
-    <SectionCard title="التقارير" description="تقارير الأداء والإحصائيات">
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-navy flex items-center justify-center"><TrendingUp className="w-5 h-5 text-gold" /></div>
-            <div><div className="font-bold text-navy">نمو الإيرادات</div><div className="text-xs text-muted-foreground">آخر 6 أشهر</div></div>
-          </div>
-          <div className="text-2xl font-extrabold text-navy mb-1">+18%</div>
-          <div className="text-xs text-green-600">↑ 2,450,000 ر.ي</div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gold flex items-center justify-center"><Star className="w-5 h-5 text-navy" /></div>
-            <div><div className="font-bold text-navy">رضا المتدربين</div><div className="text-xs text-muted-foreground">متوسط التقييم</div></div>
-          </div>
-          <div className="text-2xl font-extrabold text-navy mb-1">4.8 / 5</div>
-          <div className="text-xs text-muted-foreground">من 542 تقييم</div>
-        </Card>
+    <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {reportCards.map((r, i) => {
+          const Icon = r.icon
+          return (
+            <div key={i} className={`bg-gradient-to-br ${r.color} text-white p-5 rounded-xl`}>
+              <Icon className={`w-6 h-6 ${r.textCol} mb-2`} />
+              <div className="text-xl font-bold">{r.value}</div>
+              <div className="text-white/80 text-xs mt-1">{r.label}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Top courses by enrollment */}
+      <div className="mt-6">
+        <h4 className="font-bold text-navy text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
+        <div className="space-y-2">
+          {[...data.courses].sort((a, b) => (b.enrolled || 0) - (a.enrolled || 0)).slice(0, 5).map((c, i) => (
+            <div key={c.id} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">{i + 1}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+                <div className="text-xs text-muted-foreground">{c.specialization || '-'}</div>
+              </div>
+              <div className="text-sm font-bold text-navy">{c.enrolled || 0} متدرب</div>
+              <Badge className={c.price_type === 'مجانية' || c.price === 0 ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
+                {c.price_type === 'مجانية' || c.price === 0 ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || ''}`}
+              </Badge>
+            </div>
+          ))}
+          {data.courses.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد دورات</div>}
+        </div>
       </div>
     </SectionCard>
   )
 }
 
 function AdminLogs() {
-  const logs = [
-    { action: 'تسجيل دخول المدير', time: '2025-10-15 10:30', user: 'admin@fia.edu' },
-    { action: 'إضافة دورة جديدة', time: '2025-10-15 09:15', user: 'admin@fia.edu' },
-    { action: 'تعديل بيانات مدرب', time: '2025-10-14 14:20', user: 'admin@fia.edu' },
-    { action: 'حذف طريقة دفع', time: '2025-10-14 11:00', user: 'admin@fia.edu' },
-  ]
+  const [logs, setLogs] = useState<any[]>([])
+
+  useEffect(() => {
+    // Generate REAL logs from actual data (payments + enrollments + courses)
+    Promise.all([
+      fetch('/api/payments').then(r => r.json()),
+      fetch('/api/enrollments').then(r => r.json()),
+      fetch('/api/courses').then(r => r.json()),
+    ]).then(([p, e, c]) => {
+      const payments = Array.isArray(p) ? p : []
+      const enrollments = Array.isArray(e) ? e : []
+      const courses = Array.isArray(c) ? c : []
+
+      const realLogs: any[] = []
+
+      // Payment logs
+      payments.forEach(pay => {
+        const course = courses.find(co => co.id === pay.course_id)
+        if (pay.status === 'مكتمل') {
+          realLogs.push({ action: `قبول دفع ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'payment' })
+        } else if (pay.status === 'ملغي') {
+          realLogs.push({ action: `رفض دفع ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'cancel' })
+        } else if (pay.status === 'قيد الانتظار') {
+          realLogs.push({ action: `طلب دفع جديد ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'pending' })
+        }
+      })
+
+      // Enrollment logs
+      enrollments.forEach(enr => {
+        const course = courses.find(co => co.id === enr.course_id)
+        if (enr.status === 'completed') {
+          realLogs.push({ action: `إكمال دورة: ${course?.title || 'دورة'}`, time: enr.completed_at || enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'complete' })
+        } else if (enr.status === 'active') {
+          realLogs.push({ action: `تسجيل في دورة: ${course?.title || 'دورة'}`, time: enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'enroll' })
+        }
+      })
+
+      // Sort by date descending
+      realLogs.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
+
+      setLogs(realLogs.slice(0, 50))
+    })
+  }, [])
+
+  const iconMap: any = {
+    payment: { icon: CheckCircle2, color: 'bg-green-500', text: 'text-green-600' },
+    cancel: { icon: XCircle, color: 'bg-red-500', text: 'text-red-600' },
+    pending: { icon: Clock, color: 'bg-yellow-500', text: 'text-yellow-600' },
+    complete: { icon: Award, color: 'bg-navy', text: 'text-navy' },
+    enroll: { icon: Users, color: 'bg-blue-500', text: 'text-blue-600' },
+  }
+
   return (
-    <SectionCard title="سجل العمليات" description="آخر النشاطات في النظام">
-      <div className="space-y-2">
-        {logs.map((l, i) => (
-          <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center"><ScrollText className="w-4 h-4 text-gold" /></div>
-              <div>
-                <div className="text-sm font-medium text-navy">{l.action}</div>
-                <div className="text-xs text-muted-foreground" dir="ltr">{l.user}</div>
+    <SectionCard title="سجل العمليات" description={`${logs.length} عملية حقيقية`}>
+      <div className="space-y-2 max-h-[600px] overflow-y-auto fia-scroll">
+        {logs.map((l, i) => {
+          const cfg = iconMap[l.type] || iconMap.enroll
+          const Icon = cfg.icon
+          return (
+            <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-8 h-8 rounded-lg ${cfg.color} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-navy truncate">{l.action}</div>
+                  <div className="text-xs text-muted-foreground" dir="ltr">{l.user}</div>
+                </div>
               </div>
+              <div className="text-xs text-muted-foreground flex-shrink-0" dir="ltr">{l.time ? new Date(l.time).toLocaleString('ar-EG') : '-'}</div>
             </div>
-            <div className="text-xs text-muted-foreground" dir="ltr">{l.time}</div>
-          </div>
-        ))}
+          )
+        })}
+        {logs.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد عمليات مسجّلة</div>}
       </div>
     </SectionCard>
   )
