@@ -300,6 +300,8 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
   const [role, setRole] = useState(editing?.role || defaultRole)
   const [avatar, setAvatar] = useState(editing?.avatar || null)
   const [signature, setSignature] = useState(editing?.signature || null)
+  const [signatoryName, setSignatoryName] = useState(editing?.signatory_name || '')
+  const [signatoryPosition, setSignatoryPosition] = useState(editing?.signatory_position || 'المدير التنفيذي')
   const [email, setEmail] = useState(editing?.email || '')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState(editing?.phone || '')
@@ -334,6 +336,8 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       setRole(editing.role || defaultRole)
       setAvatar(editing.avatar || null)
       setSignature(editing.signature || null)
+      setSignatoryName(editing.signatory_name || '')
+      setSignatoryPosition(editing.signatory_position || 'المدير التنفيذي')
       setEmail(editing.email || '')
       setPassword('')
       setPhone(editing.phone || '')
@@ -353,6 +357,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       setUnifiedText(parts.join('\n\n'))
     } else {
       setName(''); setTitle(''); setRole(defaultRole); setAvatar(null); setSignature(null)
+      setSignatoryName(''); setSignatoryPosition('المدير التنفيذي')
       setEmail(''); setPassword(''); setPhone(''); setLinkedin(''); setTwitter(''); setYearsExp(0); setDisplayOrder(0)
       setUnifiedText('')
     }
@@ -411,6 +416,8 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       achievements: stringifyArray(parsed.achievements),
       avatar: avatar || null,
       signature: role === 'founder' ? (signature || null) : null,
+      signatory_name: role === 'founder' ? (signatoryName.trim() || null) : null,
+      signatory_position: role === 'founder' ? (signatoryPosition.trim() || null) : null,
       email: email.trim() || null,
       phone: phone.trim() || null,
       linkedin: linkedin.trim() || null,
@@ -575,26 +582,56 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           {role === 'founder' && (
           <div className="border-t border-border pt-4">
             <h3 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
-              <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات)
+              <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات بعد الاعتماد)
             </h3>
-            <div className="flex items-center gap-3">
-              {signature ? (
-                <img src={signature} alt="توقيع" className="h-14 w-auto bg-white border border-gold/30 rounded" />
-              ) : (
-                <div className="h-14 w-28 bg-muted/30 border-2 border-dashed border-gold/30 rounded flex items-center justify-center">
-                  <span className="text-[10px] text-muted-foreground">لا يوجد</span>
-                </div>
-              )}
-              <input type="file" accept="image/*" className="hidden" id="sig-upload" onChange={async (e) => {
-                const f = e.target.files?.[0]; if (!f) return
-                const fd = new FormData(); fd.append('file', f); fd.append('folder', 'signatures')
-                try { const r = await fetch('/api/upload/image', { method: 'POST', body: fd }); const d = await r.json(); if (d.url) { setSignature(d.url); toast.success('تم رفع التوقيع') } else toast.error('فشل') } catch { toast.error('خطأ') }
-              }} />
-              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('sig-upload')?.click()}>
-                <FileUp className="w-3.5 h-3.5 ml-1" /> رفع
-              </Button>
-              {signature && <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => setSignature(null)}>إزالة</Button>}
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 mb-3">
+              <p className="text-[10px] text-muted-foreground mb-3">
+                💡 التوقيع لا يظهر في الشهادة افتراضياً. بمجرد رفع التوقيع هنا وحفظه، سيتم إظهاره في شهادات المتدربين مع اسم الموقّع ومنصبه.
+              </p>
+              <div className="flex items-center gap-3">
+                {signature ? (
+                  <img src={signature} alt="توقيع" className="h-14 w-auto bg-white border border-gold/30 rounded" />
+                ) : (
+                  <div className="h-14 w-28 bg-muted/30 border-2 border-dashed border-gold/30 rounded flex items-center justify-center">
+                    <span className="text-[10px] text-muted-foreground">لا يوجد توقيع</span>
+                  </div>
+                )}
+                <input type="file" accept="image/*" className="hidden" id="sig-upload" onChange={async (e) => {
+                  const f = e.target.files?.[0]; if (!f) return
+                  const fd = new FormData(); fd.append('file', f); fd.append('folder', 'signatures')
+                  try { const r = await fetch('/api/upload/image', { method: 'POST', body: fd }); const d = await r.json(); if (d.url) { setSignature(d.url); toast.success('تم رفع التوقيع') } else toast.error('فشل') } catch { toast.error('خطأ') }
+                }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('sig-upload')?.click()}>
+                  <FileUp className="w-3.5 h-3.5 ml-1" /> رفع التوقيع
+                </Button>
+                {signature && <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => setSignature(null)}>إزالة</Button>}
+              </div>
             </div>
+
+            {/* Signatory name + position — shown ONLY when signature is approved */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">اسم الموقّع (يظهر أسفل التوقيع)</Label>
+                <Input
+                  value={signatoryName}
+                  onChange={(e) => setSignatoryName(e.target.value)}
+                  placeholder="د. هاني الشافعي"
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">منصب الموقّع</Label>
+                <Input
+                  value={signatoryPosition}
+                  onChange={(e) => setSignatoryPosition(e.target.value)}
+                  placeholder="المدير التنفيذي"
+                  className="text-sm"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              ⚠️ اسم الموقّع ومنصبه لا يظهران في الشهادة إلا بعد رفع التوقيع واعتماده.
+            </p>
           </div>
           )}
 

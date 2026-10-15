@@ -397,20 +397,15 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
                 </div>
               </div>
 
-              {/* Signature (right) */}
+              {/* Signature (right) — EMPTY by default, only shown if signature_image is approved by admin */}
               <div className="text-center flex-shrink-0">
                 <div className="text-[9px] md:text-[10px] mb-1 font-bold" style={{ color: '#6B6B6B' }}>توقيع الجهة المانوحة</div>
-                {/* Signature image */}
-                <img
-                  src="/fia/signature-hani.png"
-                  alt="Signature"
-                  className="mx-auto"
-                  style={{ width: '100px', height: '30px' }}
-                />
+                {/* Signature area — empty by default */}
+                {/* Signatory name + position ONLY shown if signature is approved (not yet implemented in this static display) */}
+                {/* For now, this remains an empty area where signature can be added later via admin dashboard */}
+                <div className="mx-auto my-1" style={{ minHeight: '30px', minWidth: '100px' }} />
                 {/* Thin gold signature line */}
                 <div className="mx-auto mt-1 h-px w-24" style={{ backgroundColor: '#C9A961' }} />
-                <div className="text-xs md:text-sm font-bold mt-1" style={{ color: '#0A1F44' }}>د. هاني الشافعي</div>
-                <div className="text-[9px] md:text-[10px]" style={{ color: '#6B6B6B' }}>المدير التنفيذي</div>
               </div>
             </div>
           </div>
