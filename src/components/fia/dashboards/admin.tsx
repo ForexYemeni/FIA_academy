@@ -431,19 +431,45 @@ function AdminStudents() {
                     const c = courses.find(co => co.id === e.course_id)
                     if (!c) return null
                     const isFree = c.price_type === 'مجانية' || c.price === 0
+                    const isCompleted = e.status === 'completed'
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-navy text-sm truncate">{c.title}</div>
                           <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
                         </div>
-                        <Badge className={
-                          e.status === 'completed' ? 'bg-green-500/15 text-green-600 border-green-500/30'
-                          : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                          : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
-                        }>
-                          {e.status === 'completed' ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
-                        </Badge>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {isCompleted && (
+                            <Button
+                              size="sm"
+                              className="bg-gold hover:bg-gold-light text-navy text-xs"
+                              onClick={async () => {
+                                // Auto-issue certificate directly
+                                const certNum = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+                                await fetch('/api/certificates', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    student_name: selectedStudent.name,
+                                    course_title: c.title,
+                                    status: 'صالحة',
+                                    issued_by: 'أكاديمية المستقبل الدولية',
+                                  }),
+                                })
+                                toast.success(`تم إصدار الشهادة: ${certNum}`)
+                              }}
+                            >
+                              <Award className="w-3.5 h-3.5 ml-1" /> إصدار شهادة
+                            </Button>
+                          )}
+                          <Badge className={
+                            isCompleted ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                            : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                            : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                          }>
+                            {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                          </Badge>
+                        </div>
                       </div>
                     )
                   })}
