@@ -75,7 +75,7 @@ export function TrainerDashboard() {
           <CourseContentManager courseId={contentCourseId} />
         </div>
       )}
-      {active === 'students' && <TrainerStudents students={students} />}
+      {active === 'students' && <TrainerStudents students={students} courses={courses} />}
       {active === 'exams' && <TrainerExams />}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
       {active === 'notifications' && <TrainerNotifs />}
@@ -355,41 +355,96 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
   )
 }
 
-function TrainerStudents({ students }: any) {
+function TrainerStudents({ students, courses }: any) {
+  const [enrollments, setEnrollments] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [])
+
+  // Helper: get all enrollments for a student
+  const studentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
+
   return (
-    <SectionCard title="متدربوّ" description="قائمة بالمتدربين في دوراتك">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">المتدرب</th>
-              <th className="py-3 px-2">البريد</th>
-              <th className="py-3 px-2">الهاتف</th>
-              <th className="py-3 px-2">تاريخ التسجيل</th>
-            </tr>
-          </thead>
-          <tbody>
-            {students.length > 0 ? students.map((s: any) => (
-              <tr key={s.id} className="border-b border-border">
-                <td className="py-3 px-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={s.avatar || ''} />
-                      <AvatarFallback className="bg-navy text-gold text-xs">{s.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-navy">{s.name}</span>
+    <SectionCard title="متدربوّ" description={`${students.length} متدرب${students.length === 1 ? '' : 'ين'}`}>
+      {students.length === 0 ? (
+        <div className="text-center py-12">
+          <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">لا يوجد متدربون بعد</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {students.map((s: any) => {
+            const studentEnrs = studentEnrollments(s.id)
+            return (
+              <Card key={s.id} className="overflow-hidden">
+                <div className="p-4 bg-muted/30 border-b border-border">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gold/30 bg-navy flex items-center justify-center text-gold font-bold text-lg flex-shrink-0">
+                      {s.avatar ? (
+                        <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+                      ) : (
+                        s.name?.charAt(0)
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-navy">{s.name}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+                        <span dir="ltr">{s.email}</span>
+                        {s.phone && <span dir="ltr">{s.phone}</span>}
+                        <span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+                      </div>
+                    </div>
+                    <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">
+                      {studentEnrs.length} دورة
+                    </Badge>
                   </div>
-                </td>
-                <td className="py-3 px-2" dir="ltr">{s.email}</td>
-                <td className="py-3 px-2" dir="ltr">{s.phone || '-'}</td>
-                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</td>
-              </tr>
-            )) : (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">لا يوجد متدربون بعد</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+                <div className="p-4">
+                  {studentEnrs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة بعد</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {studentEnrs.map((e) => {
+                        const course = courses?.find((c: any) => c.id === e.course_id)
+                        if (!course) return null
+                        const isFree = course.price_type === 'مجانية' || course.price === 0
+                        return (
+                          <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+                                <BookOpen className="w-5 h-5 text-gold" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-navy text-sm truncate">{course.title}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {course.lessons_count || 0} درس
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Badge className={isFree ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
+                                {isFree ? 'مجانية' : 'مدفوعة'}
+                              </Badge>
+                              <Badge variant="outline" className={
+                                e.status === 'completed' ? 'border-green-500/30 text-green-600'
+                                : e.payment_status === 'pending' ? 'border-yellow-500/30 text-yellow-600'
+                                : 'border-blue-500/30 text-blue-600'
+                              }>
+                                {e.status === 'completed' ? 'مكتملة' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                              </Badge>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </SectionCard>
   )
 }

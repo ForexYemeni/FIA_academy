@@ -4,14 +4,38 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   try {
     const role = req.nextUrl.searchParams.get('role') || 'student'
-    const { data, error } = await supabaseAdmin
+
+    // Fetch all users with role='student'
+    const { data: users, error } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('role', role)
       .order('created_at', { ascending: false })
+
     if (error) throw error
-    const safe = (data || []).map(({ password, ...rest }: any) => rest)
-    return NextResponse.json(safe)
+
+    // Strip passwords before returning
+    const safe = (users || []).map(({ password, ...rest }: any) => rest)
+
+    // Optionally enrich with enrollment counts (count of payment records per student)
+    const { data: allPayments } = await supabaseAdmin
+      .from('payments')
+      .select('user_id, id')
+      .not('user_id', 'is', null)
+
+    const enrollmentCounts: Record<string, number> = {}
+    ;(allPayments || []).forEach((p: any) => {
+      if (p.user_id) {
+        enrollmentCounts[p.user_id] = (enrollmentCounts[p.user_id] || 0) + 1
+      }
+    })
+
+    const enriched = safe.map((u: any) => ({
+      ...u,
+      enrollment_count: enrollmentCounts[u.id] || 0,
+    }))
+
+    return NextResponse.json(enriched)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

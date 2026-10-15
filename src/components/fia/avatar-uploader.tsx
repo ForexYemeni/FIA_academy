@@ -97,17 +97,29 @@ export function AvatarUploader({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className={`relative ${SIZE_MAP[size]}`}>
-        <Avatar className={`${SIZE_MAP[size]} border-4 border-gold/30`}>
-          <AvatarImage src={url || ''} />
-          <AvatarFallback className="bg-navy text-gold" style={{ fontSize: size === 'xl' ? '3rem' : size === 'lg' ? '2.5rem' : size === 'md' ? '2rem' : '1.5rem' }}>
-            {name?.charAt(0) || 'U'}
-          </AvatarFallback>
-        </Avatar>
+      <div className={`relative ${SIZE_MAP[size]} group`}>
+        <div className={`${SIZE_MAP[size]} rounded-full overflow-hidden border-4 border-gold/40 shadow-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center`}>
+          {url ? (
+            <img
+              src={url}
+              alt={name || 'avatar'}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="text-gold font-bold" style={{ fontSize: size === 'xl' ? '3rem' : size === 'lg' ? '2.5rem' : size === 'md' ? '2rem' : '1.5rem' }}>
+              {name?.charAt(0) || 'U'}
+            </div>
+          )}
+        </div>
+        {/* Hover overlay */}
+        <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+          <Camera className="w-6 h-6 text-white" />
+        </div>
+        {/* Upload button */}
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="absolute -bottom-1 -left-1 w-9 h-9 rounded-full bg-gold hover:bg-gold-light text-navy flex items-center justify-center shadow-md transition-colors disabled:opacity-50"
+          className="absolute -bottom-1 -left-1 w-10 h-10 rounded-full bg-gold hover:bg-gold-light text-navy flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-navy-light transition-all hover:scale-110 disabled:opacity-50"
           title="تغيير الصورة"
         >
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
