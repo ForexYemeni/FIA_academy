@@ -18,7 +18,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <img src="/fia/favicon.svg" alt="FIA" className="w-12 h-12" />
+              <img src="/fia/logo-official.png" alt="FIA" className="h-12 w-auto object-contain" />
               <div>
                 <div className="font-bold text-lg">أكاديمية المستقبل الدولية</div>
                 <div className="text-gold text-xs font-semibold tracking-wider">FIA</div>

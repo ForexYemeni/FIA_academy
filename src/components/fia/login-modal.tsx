@@ -57,7 +57,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex justify-center mb-2">
-            <img src="/fia/favicon.svg" alt="FIA" className="w-16 h-16" />
+            <img src="/fia/logo-official.png" alt="FIA" className="h-16 w-auto object-contain" />
           </div>
           <DialogTitle className="text-center text-navy text-2xl font-bold">
             {mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
