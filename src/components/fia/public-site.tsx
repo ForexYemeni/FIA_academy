@@ -41,6 +41,7 @@ type Trainer = {
 export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
   const [courses, setCourses] = useState<Course[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
+  const [founder, setFounder] = useState<any>(null)
   const [partners, setPartners] = useState<any[]>([])
   const [licenses, setLicenses] = useState<any[]>([])
   const [settings, setSettings] = useState<any>({})
@@ -49,6 +50,7 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/team?role=founder').then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length > 0) setFounder(d[0]) }).catch(() => {})
     fetch('/api/partners').then((r) => r.json()).then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/licenses').then((r) => r.json()).then((d) => setLicenses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
@@ -191,11 +193,87 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
         </div>
       </section>
 
-      {/* TRAINERS */}
+      {/* FOUNDER SECTION — Professional, separate from trainers */}
+      {founder && (
+        <section className="py-20 bg-gradient-to-b from-navy to-navy-light text-white">
+          <div className="container mx-auto px-4 lg:px-6">
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <Badge className="bg-gold/15 text-gold border-gold/30 mb-3">المؤسس التنفيذي</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{founder.name}</h2>
+              <p className="text-gold text-lg font-semibold">{founder.title}</p>
+            </div>
+            <div className="max-w-5xl mx-auto">
+              <div className="grid md:grid-cols-3 gap-8 items-start">
+                {/* Founder photo */}
+                <div className="text-center md:text-right">
+                  <div className="relative inline-block">
+                    {founder.avatar ? (
+                      <img src={founder.avatar} alt={founder.name} className="w-48 h-48 rounded-2xl object-cover border-4 border-gold/30 mx-auto" />
+                    ) : (
+                      <div className="w-48 h-48 rounded-2xl bg-white/10 border-4 border-gold/30 flex items-center justify-center mx-auto">
+                        <span className="text-6xl text-gold font-bold">{founder.name?.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gold text-navy text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
+                      ★ المؤسس
+                    </div>
+                  </div>
+                </div>
+
+                {/* Founder info */}
+                <div className="md:col-span-2 space-y-4">
+                  {founder.bio && (
+                    <div>
+                      <h3 className="text-gold text-sm font-bold mb-1">النبذة المهنية</h3>
+                      <p className="text-white/80 text-sm leading-relaxed">{founder.bio}</p>
+                    </div>
+                  )}
+                  {founder.vision && (
+                    <div className="bg-white/5 border border-gold/20 rounded-lg p-4">
+                      <h3 className="text-gold text-sm font-bold mb-1">🎯 الرؤية</h3>
+                      <p className="text-white/80 text-sm leading-relaxed">{founder.vision}</p>
+                    </div>
+                  )}
+                  {founder.mission && (
+                    <div className="bg-white/5 border border-gold/20 rounded-lg p-4">
+                      <h3 className="text-gold text-sm font-bold mb-1">🚀 الرسالة</h3>
+                      <p className="text-white/80 text-sm leading-relaxed">{founder.mission}</p>
+                    </div>
+                  )}
+                  {founder.qualifications && founder.qualifications !== 'null' && founder.qualifications !== '[]' && (
+                    <div>
+                      <h3 className="text-gold text-sm font-bold mb-2">🎓 المؤهلات العلمية</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => { try { return JSON.parse(founder.qualifications) } catch { return [] } })().map((q: string, i: number) => (
+                          <Badge key={i} className="bg-white/10 text-white border-gold/20">{q}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {founder.achievements && founder.achievements !== 'null' && founder.achievements !== '[]' && (
+                    <div>
+                      <h3 className="text-gold text-sm font-bold mb-2">🏆 الإنجازات</h3>
+                      <ul className="space-y-1">
+                        {(() => { try { return JSON.parse(founder.achievements) } catch { return [] } })().map((a: string, i: number) => (
+                          <li key={i} className="text-white/80 text-sm flex items-start gap-2">
+                            <span className="text-gold flex-shrink-0">•</span> {a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* TRAINERS — separate from founder */}
       <section id="trainers" className="py-20 bg-white">
         <div className="container mx-auto px-4 lg:px-6">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">المدربون</Badge>
+            <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">الفريق التدريبي</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-navy mb-4">نخبة من الخبراء</h2>
             <p className="text-muted-foreground text-lg">تعلّم على يد أمهر الاستشاريين في مختلف التخصصات</p>
           </div>

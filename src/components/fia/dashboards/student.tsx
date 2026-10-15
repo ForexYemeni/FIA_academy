@@ -276,6 +276,11 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
   const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
 
   const enrollFree = async (course: any) => {
+    // Double-check client-side before calling API
+    if (isEnrolled(course.id)) {
+      toast.info('أنت مسجّل في هذه الدورة')
+      return
+    }
     setEnrolling(course.id)
     try {
       const res = await fetch('/api/enrollments', {
@@ -298,6 +303,11 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
   }
 
   const enrollPaid = async (course: any, method: any, reference: string, proofUrl?: string | null) => {
+    // Double-check client-side before calling API
+    if (isEnrolled(course.id)) {
+      toast.info('أنت مسجّل في هذه الدورة')
+      return
+    }
     setEnrolling(course.id)
     try {
       // Combine reference with proof URL
