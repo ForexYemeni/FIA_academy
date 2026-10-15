@@ -5,23 +5,27 @@ import path from 'path'
 import PDFDocument from 'pdfkit'
 import QRCode from 'qrcode'
 import bwip from 'bwip-js'
-import { createCanvas, GlobalFonts } from '@napi-rs/canvas'
+import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
 import { Buffer } from 'buffer'
 
 // Force Node.js runtime
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// Brand colors — luxurious white/gold/navy palette
-const NAVY = '#0B1635'
-const NAVY_LIGHT = '#1A2547'
-const GOLD = '#D4AF37'
+// Brand colors — modern luxurious palette matching reference image
+const NAVY = '#0F172A'
+const NAVY_LIGHT = '#1A1F36'
+const GOLD = '#C5A059'
 const GOLD_LIGHT = '#E5C158'
 const GOLD_PALE = '#F5E5B3'
+const CREAM = '#FDFBF7'
+const SAGE_GREEN = '#E6F4EA'
+const EMERALD_GREEN = '#10B981'
+const LIGHT_GREEN = '#D1FAE5'
+const GRAY = '#6B7280'
+const GRAY_LIGHT = '#9CA3AF'
+const GRAY_BG = '#F3F4F6'
 const WHITE = '#FFFFFF'
-const GRAY = '#666666'
-const GRAY_LIGHT = '#999999'
-const GREEN = '#16A34A'
 
 function getFontPaths() {
   const candidates = [
@@ -36,7 +40,6 @@ function getFontPaths() {
   }
 }
 
-// Register fonts for canvas (once)
 let fontsRegistered = false
 function registerFontsForCanvas() {
   if (fontsRegistered) return
@@ -46,43 +49,38 @@ function registerFontsForCanvas() {
     if (fs.existsSync(fonts.bold)) GlobalFonts.registerFromPath(fonts.bold, 'Cairo-Bold')
     if (fs.existsSync(fonts.black)) GlobalFonts.registerFromPath(fonts.black, 'Cairo-Black')
     fontsRegistered = true
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) {}
 }
 
-// Generate a real Code-128 barcode as PNG buffer (different for each cert number)
 async function generateBarcode(certNumber: string): Promise<Buffer> {
   try {
     return await bwip.toBuffer({
       bcid: 'code128',
       text: certNumber,
       scale: 2,
-      height: 25,
+      height: 20,
       includetext: false,
-      paddingwidth: 5,
-      paddingheight: 5,
+      paddingwidth: 3,
+      paddingheight: 3,
       backgroundcolor: 'FFFFFF',
-      foregroundcolor: '0B1635',
+      foregroundcolor: '0F172A',
     })
   } catch (e: any) {
-    // Fallback: simple barcode stripes
-    const canvas = createCanvas(200, 60)
+    const canvas = createCanvas(200, 50)
     const ctx = canvas.getContext('2d')
     ctx.fillStyle = 'white'
-    ctx.fillRect(0, 0, 200, 60)
+    ctx.fillRect(0, 0, 200, 50)
     ctx.fillStyle = NAVY
     let x = 5
     for (let i = 0; i < 40; i++) {
       const w = 1 + ((certNumber.charCodeAt(i % certNumber.length) * (i + 1)) % 4)
-      if (i % 2 === 0) ctx.fillRect(x, 5, w, 50)
+      if (i % 2 === 0) ctx.fillRect(x, 5, w, 40)
       x += w
     }
     return await canvas.encode('png')
   }
 }
 
-// Generate QR code as PNG buffer
 async function generateQR(url: string): Promise<Buffer> {
   return await QRCode.toBuffer(url, {
     type: 'png',
@@ -92,13 +90,302 @@ async function generateQR(url: string): Promise<Buffer> {
   })
 }
 
-// ============== PDF Certificate ==============
+// ============== Modern PNG Certificate (matching reference image) ==============
+async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
+  registerFontsForCanvas()
+
+  const scale = 2
+  // A4 landscape: 842 x 595
+  const pageW = 842 * scale
+  const pageH = 595 * scale
+  const canvas = createCanvas(pageW, pageH)
+  const ctx = canvas.getContext('2d')
+
+  // Helpers
+  const fill = (c: string) => { ctx.fillStyle = c }
+  const stroke = (c: string, w: number) => { ctx.strokeStyle = c; ctx.lineWidth = w }
+  const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+    ctx.lineTo(x + w, y + h - r)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+    ctx.lineTo(x + r, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+    ctx.lineTo(x, y + r)
+    ctx.quadraticCurveTo(x, y, x + r, y)
+    ctx.closePath()
+  }
+  const fillRoundRect = (x: number, y: number, w: number, h: number, r: number, c: string) => {
+    fill(c)
+    roundRect(x, y, w, h, r)
+    ctx.fill()
+  }
+  const strokeRoundRect = (x: number, y: number, w: number, h: number, r: number, c: string, lw: number) => {
+    stroke(c, lw)
+    roundRect(x, y, w, h, r)
+    ctx.stroke()
+  }
+  const setFont = (size: number, weight: 'regular' | 'bold' | 'black' = 'regular') => {
+    const family = weight === 'black' ? 'Cairo-Black' : weight === 'bold' ? 'Cairo-Bold' : 'Cairo'
+    ctx.font = `${size * scale}px ${family}`
+  }
+
+  const cx = pageW / 2
+
+  // ===== Background: cream =====
+  fill(CREAM)
+  ctx.fillRect(0, 0, pageW, pageH)
+
+  // Outer soft green border (container)
+  strokeRoundRect(15 * scale, 15 * scale, pageW - 30 * scale, pageH - 30 * scale, 14 * scale, SAGE_GREEN, 2 * scale)
+
+  // ===== Inner certificate frame: cream with thick gold border =====
+  const innerPad = 30 * scale
+  const innerX = innerPad
+  const innerY = innerPad
+  const innerW = pageW - 2 * innerPad
+  const innerH = pageH - 2 * innerPad
+
+  // Fill cream for inner card
+  fillRoundRect(innerX, innerY, innerW, innerH, 12 * scale, CREAM)
+
+  // Gold border (thick outer line)
+  strokeRoundRect(innerX, innerY, innerW, innerH, 12 * scale, GOLD, 3 * scale)
+  // Gold border (thin inner line)
+  strokeRoundRect(innerX + 5 * scale, innerY + 5 * scale, innerW - 10 * scale, innerH - 10 * scale, 10 * scale, GOLD, 0.7 * scale)
+
+  // ===== Corner ornaments (L-shaped) =====
+  const cornerLen = 18 * scale
+  const cornerInset = 14 * scale
+  // Top-left
+  stroke(GOLD, 1.5 * scale)
+  ctx.beginPath()
+  ctx.moveTo(innerX + cornerInset, innerY + cornerInset + cornerLen)
+  ctx.lineTo(innerX + cornerInset, innerY + cornerInset)
+  ctx.lineTo(innerX + cornerInset + cornerLen, innerY + cornerInset)
+  ctx.stroke()
+  // Top-right
+  ctx.beginPath()
+  ctx.moveTo(innerX + innerW - cornerInset - cornerLen, innerY + cornerInset)
+  ctx.lineTo(innerX + innerW - cornerInset, innerY + cornerInset)
+  ctx.lineTo(innerX + innerW - cornerInset, innerY + cornerInset + cornerLen)
+  ctx.stroke()
+  // Bottom-left
+  ctx.beginPath()
+  ctx.moveTo(innerX + cornerInset, innerY + innerH - cornerInset - cornerLen)
+  ctx.lineTo(innerX + cornerInset, innerY + innerH - cornerInset)
+  ctx.lineTo(innerX + cornerInset + cornerLen, innerY + innerH - cornerInset)
+  ctx.stroke()
+  // Bottom-right
+  ctx.beginPath()
+  ctx.moveTo(innerX + innerW - cornerInset - cornerLen, innerY + innerH - cornerInset)
+  ctx.lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset)
+  ctx.lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset - cornerLen)
+  ctx.stroke()
+
+  // ===== Logo (top-right interior) — square with rounded corners, navy bg + gold "FIA" =====
+  const logoSize = 50 * scale
+  const logoX = innerX + innerW - logoSize - 22 * scale
+  const logoY = innerY + 22 * scale
+  fillRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, NAVY)
+  strokeRoundRect(logoX, logoY, logoSize, logoSize, 10 * scale, GOLD, 1.5 * scale)
+  setFont(16, 'bold')
+  fill(GOLD)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('FIA', logoX + logoSize / 2, logoY + logoSize / 2)
+
+  // ===== Title: CERTIFICATE OF COMPLETION (gold, small, all caps) =====
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  setFont(11, 'bold')
+  fill(GOLD)
+  // Letter-spacing approximation
+  const titleText = 'CERTIFICATE OF COMPLETION'
+  const titleY = innerY + 50 * scale
+  ctx.fillText(titleText, cx, titleY)
+
+  // ===== Academy name Arabic (large, navy) =====
+  ctx.direction = 'rtl'
+  setFont(28, 'bold')
+  fill(NAVY)
+  ctx.fillText(cert.issued_by || 'أكاديمية المستقبل الدولية', cx, innerY + 88 * scale)
+
+  // English subtitle (small, gray)
+  ctx.direction = 'ltr'
+  setFont(11, 'regular')
+  fill(GRAY)
+  ctx.fillText('FUTURE INTERNATIONAL ACADEMY', cx, innerY + 118 * scale)
+
+  // ===== Divider with center diamond =====
+  const dividerY = innerY + 140 * scale
+  stroke(GOLD, 1 * scale)
+  ctx.beginPath()
+  ctx.moveTo(cx - 100 * scale, dividerY)
+  ctx.lineTo(cx - 10 * scale, dividerY)
+  ctx.moveTo(cx + 10 * scale, dividerY)
+  ctx.lineTo(cx + 100 * scale, dividerY)
+  ctx.stroke()
+  fill(GOLD)
+  ctx.beginPath()
+  ctx.moveTo(cx, dividerY - 5 * scale)
+  ctx.lineTo(cx + 5 * scale, dividerY)
+  ctx.lineTo(cx, dividerY + 5 * scale)
+  ctx.lineTo(cx - 5 * scale, dividerY)
+  ctx.closePath()
+  ctx.fill()
+
+  // ===== Award statement (gray) =====
+  ctx.direction = 'rtl'
+  setFont(13, 'regular')
+  fill(GRAY)
+  ctx.fillText('تشهد أكاديمية المستقبل الدولية بأن', cx, innerY + 165 * scale)
+
+  // ===== Student name (LARGE, navy, most prominent) =====
+  setFont(36, 'black')
+  fill(NAVY)
+  ctx.fillText(cert.student_name || 'طالب', cx, innerY + 210 * scale)
+
+  // Course completion statement (small gray)
+  setFont(13, 'regular')
+  fill(GRAY)
+  ctx.fillText('قد أتم بنجاح متطلبات دورة', cx, innerY + 250 * scale)
+
+  // Course title (gold, bold, prominent)
+  setFont(20, 'bold')
+  fill(GOLD)
+  ctx.fillText(cert.course_title || 'دورة معتمدة', cx, innerY + 282 * scale)
+
+  // ===== Accreditation pill banner (gold pale) =====
+  const pillY = innerY + 312 * scale
+  const pillH = 28 * scale
+  const pillText = 'معتمدة من: أكاديمية المستقبل الدولية'
+  setFont(11, 'bold')
+  const pillW = ctx.measureText(pillText).width + 60 * scale
+  const pillX = cx - pillW / 2
+  fillRoundRect(pillX, pillY, pillW, pillH, pillH / 2, GOLD_PALE)
+  strokeRoundRect(pillX, pillY, pillW, pillH, pillH / 2, GOLD_LIGHT, 1 * scale)
+  fill(NAVY)
+  ctx.fillText('★ ' + pillText, cx, pillY + pillH / 2)
+
+  // ===== 3 metadata columns at bottom =====
+  const colsY = innerY + 360 * scale
+  const colsH = 60 * scale
+  const colW = 200 * scale
+  const colGap = 20 * scale
+  const totalColsW = 3 * colW + 2 * colGap
+  const colsStartX = cx - totalColsW / 2
+
+  // Column 1: Issue Date (left)
+  fillRoundRect(colsStartX, colsY, colW, colsH, 8 * scale, GRAY_BG)
+  ctx.direction = 'rtl'
+  setFont(9, 'regular')
+  fill(GRAY)
+  ctx.textAlign = 'center'
+  ctx.fillText('تاريخ الإصدار', colsStartX + colW / 2, colsY + 18 * scale)
+  setFont(13, 'bold')
+  fill(NAVY)
+  ctx.fillText(issueDate, colsStartX + colW / 2, colsY + 40 * scale)
+
+  // Column 2: Issuer (center)
+  fillRoundRect(colsStartX + colW + colGap, colsY, colW, colsH, 8 * scale, GRAY_BG)
+  setFont(9, 'regular')
+  fill(GRAY)
+  ctx.fillText('الجهة المصدرة', cx, colsY + 18 * scale)
+  setFont(13, 'bold')
+  fill(NAVY)
+  ctx.fillText('أكاديمية المستقبل الدولية', cx, colsY + 40 * scale)
+
+  // Column 3: Status (right, with green badge)
+  const col3X = colsStartX + 2 * (colW + colGap)
+  fillRoundRect(col3X, colsY, colW, colsH, 8 * scale, GRAY_BG)
+  setFont(9, 'regular')
+  fill(GRAY)
+  ctx.fillText('الحالة', col3X + colW / 2, colsY + 18 * scale)
+  // Green pill badge for status
+  const badgeText = cert.status === 'صالحة' ? '● صالحة' : cert.status || 'صالحة'
+  setFont(13, 'bold')
+  const badgeW = ctx.measureText(badgeText).width + 24 * scale
+  const badgeH = 22 * scale
+  const badgeX = col3X + colW / 2 - badgeW / 2
+  const badgeY = colsY + 30 * scale
+  fillRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, LIGHT_GREEN)
+  fill(EMERALD_GREEN)
+  ctx.fillText(badgeText, col3X + colW / 2, badgeY + badgeH / 2 + 2 * scale)
+
+  // ===== Bottom: QR + Cert number + signature =====
+  const bottomY = innerY + innerH - 60 * scale
+
+  // QR (left)
+  const qrBuffer = await generateQR(verifyUrl)
+  const qrImg = await loadImage(qrBuffer)
+  const qrSize = 35 * scale
+  const qrX = innerX + 30 * scale
+  fillRoundRect(qrX - 3 * scale, bottomY - 3 * scale, qrSize + 6 * scale, qrSize + 6 * scale, 4 * scale, WHITE)
+  strokeRoundRect(qrX - 3 * scale, bottomY - 3 * scale, qrSize + 6 * scale, qrSize + 6 * scale, 4 * scale, GOLD, 1 * scale)
+  ctx.drawImage(qrImg, qrX, bottomY, qrSize, qrSize)
+  ctx.direction = 'rtl'
+  setFont(8, 'regular')
+  fill(GRAY)
+  ctx.textAlign = 'center'
+  ctx.fillText('امسح للتحقق', qrX + qrSize / 2, bottomY + qrSize + 12 * scale)
+
+  // Cert number (center) with real Code-128 barcode
+  const barcodeBuffer = await generateBarcode(cert.certificate_number)
+  const barcodeImg = await loadImage(barcodeBuffer)
+  const barcodeW = 140 * scale
+  const barcodeH = 25 * scale
+  const barcodeX = cx - barcodeW / 2
+  const barcodeY = bottomY + 2 * scale
+  ctx.drawImage(barcodeImg, barcodeX, barcodeY, barcodeW, barcodeH)
+  ctx.direction = 'ltr'
+  setFont(10, 'bold')
+  fill(NAVY)
+  ctx.fillText(cert.certificate_number, cx, bottomY + barcodeH + 12 * scale)
+  setFont(7, 'regular')
+  fill(GRAY)
+  ctx.fillText('Certificate ID', cx, bottomY + barcodeH + 22 * scale)
+
+  // Signature (right)
+  ctx.direction = 'rtl'
+  const sigX = innerX + innerW - 30 * scale - 120 * scale
+  setFont(9, 'regular')
+  fill(GRAY)
+  ctx.textAlign = 'center'
+  ctx.fillText('توقيع الجهة المانوحة', sigX + 60 * scale, bottomY + 8 * scale)
+  stroke(NAVY, 0.8 * scale)
+  ctx.beginPath()
+  ctx.moveTo(sigX, bottomY + 20 * scale)
+  ctx.lineTo(sigX + 120 * scale, bottomY + 20 * scale)
+  ctx.stroke()
+  setFont(11, 'bold')
+  fill(NAVY)
+  ctx.fillText('المدير التنفيذي', sigX + 60 * scale, bottomY + 33 * scale)
+
+  // ===== Watermark (very subtle) =====
+  ctx.save()
+  ctx.globalAlpha = 0.03
+  ctx.translate(cx, pageH / 2)
+  ctx.rotate(Math.PI / 4)
+  setFont(140, 'black')
+  fill(NAVY)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('FIA', 0, 0)
+  ctx.restore()
+
+  return await canvas.encode('png')
+}
+
+// ============== PDF Certificate (matching PNG design) ==============
 async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const fonts = getFontPaths()
       const doc = new PDFDocument({
-        size: [842, 595], // A4 landscape
+        size: [842, 595],
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
         info: {
           Title: `FIA Certificate — ${cert.certificate_number}`,
@@ -127,154 +414,219 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       const pageH = 595
       const cx = pageW / 2
 
-      // Background: pure white
-      doc.rect(0, 0, pageW, pageH).fill(WHITE)
-
-      // Three-layer gold frame
-      doc.lineWidth(1).strokeColor(GOLD).rect(20, 20, pageW - 40, pageH - 40).stroke()
-      doc.lineWidth(2.5).strokeColor(GOLD).rect(28, 28, pageW - 56, pageH - 56).stroke()
-      doc.lineWidth(0.5).strokeColor(GOLD_LIGHT).rect(36, 36, pageW - 72, pageH - 72).stroke()
-
-      // Corner ornaments
-      const drawCornerOrnament = (x: number, y: number, flipX = false, flipY = false) => {
-        const s = flipX ? -1 : 1
-        const v = flipY ? -1 : 1
-        doc.polygon([x, y - 6 * v], [x + 4 * s, y], [x, y + 6 * v], [x - 4 * s, y]).fill(GOLD)
-        doc.lineWidth(0.8).strokeColor(GOLD)
-        doc.moveTo(x + (8 * s), y).lineTo(x + (28 * s), y).stroke()
-        doc.moveTo(x, y + (8 * v)).lineTo(x, y + (28 * v)).stroke()
-        doc.polygon([x + (28 * s), y - 3], [x + (31 * s), y], [x + (28 * s), y + 3], [x + (25 * s), y]).fill(GOLD)
-        doc.polygon([x, y + (28 * v) - 3], [x + 3, y + (28 * v)], [x, y + (28 * v) + 3], [x - 3, y + (28 * v)]).fill(GOLD)
+      const roundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
+        // pdfkit rounded path
+        doc.path(`M ${x + r},${y} L ${x + w - r},${y} Q ${x + w},${y} ${x + w},${y + r} L ${x + w},${y + h - r} Q ${x + w},${y + h} ${x + w - r},${y + h} L ${x + r},${y + h} Q ${x},${y + h} ${x},${y + h - r} L ${x},${y + r} Q ${x},${y} ${x + r},${y} Z`)
       }
-      drawCornerOrnament(50, 50, false, false)
-      drawCornerOrnament(pageW - 50, 50, true, false)
-      drawCornerOrnament(50, pageH - 50, false, true)
-      drawCornerOrnament(pageW - 50, pageH - 50, true, true)
 
-      // Logo: navy circle with gold ring + FIA text
-      const logoY = pageH - 95
-      const logoR = 26
-      doc.circle(cx, logoY + logoR, logoR).fill(NAVY)
-      doc.circle(cx, logoY + logoR, logoR).lineWidth(2).strokeColor(GOLD)
-      doc.circle(cx, logoY + logoR, logoR - 4).lineWidth(0.5).strokeColor(GOLD_LIGHT)
-      setFont(15, 'bold')
-      doc.fillColor(GOLD).text('FIA', cx - 20, logoY + logoR - 8, { width: 40, align: 'center' })
+      // ===== Background: cream =====
+      doc.rect(0, 0, pageW, pageH).fill(CREAM)
 
-      // English main title
-      setFont(13, 'bold')
-      doc.fillColor(GOLD).text('CERTIFICATE OF COMPLETION', cx - 350, logoY - 75, { width: 700, align: 'center' })
+      // Outer soft green border (container)
+      doc.save()
+      doc.lineWidth(2).strokeColor(SAGE_GREEN)
+      roundRectPath(15, 15, pageW - 30, pageH - 30, 14)
+      doc.stroke()
+      doc.restore()
 
-      // Academy name Arabic (large navy)
-      setFont(26, 'bold')
-      doc.fillColor(NAVY).text(cert.issued_by || 'أكاديمية المستقبل الدولية', cx - 350, logoY - 50, { width: 700, align: 'center' })
+      // ===== Inner certificate frame =====
+      const innerPad = 30
+      const innerX = innerPad
+      const innerY = innerPad
+      const innerW = pageW - 2 * innerPad
+      const innerH = pageH - 2 * innerPad
 
-      // English academy name
+      // Fill cream for inner card
+      doc.save()
+      roundRectPath(innerX, innerY, innerW, innerH, 12)
+      doc.fill(CREAM)
+      doc.restore()
+
+      // Gold border (thick outer line)
+      doc.save()
+      doc.lineWidth(3).strokeColor(GOLD)
+      roundRectPath(innerX, innerY, innerW, innerH, 12)
+      doc.stroke()
+      doc.restore()
+      // Gold border (thin inner line)
+      doc.save()
+      doc.lineWidth(0.7).strokeColor(GOLD)
+      roundRectPath(innerX + 5, innerY + 5, innerW - 10, innerH - 10, 10)
+      doc.stroke()
+      doc.restore()
+
+      // Corner ornaments (L-shaped)
+      const cornerLen = 18
+      const cornerInset = 14
+      doc.lineWidth(1.5).strokeColor(GOLD)
+      // Top-left
+      doc.moveTo(innerX + cornerInset, innerY + cornerInset + cornerLen).lineTo(innerX + cornerInset, innerY + cornerInset).lineTo(innerX + cornerInset + cornerLen, innerY + cornerInset).stroke()
+      // Top-right
+      doc.moveTo(innerX + innerW - cornerInset - cornerLen, innerY + cornerInset).lineTo(innerX + innerW - cornerInset, innerY + cornerInset).lineTo(innerX + innerW - cornerInset, innerY + cornerInset + cornerLen).stroke()
+      // Bottom-left
+      doc.moveTo(innerX + cornerInset, innerY + innerH - cornerInset - cornerLen).lineTo(innerX + cornerInset, innerY + innerH - cornerInset).lineTo(innerX + cornerInset + cornerLen, innerY + innerH - cornerInset).stroke()
+      // Bottom-right
+      doc.moveTo(innerX + innerW - cornerInset - cornerLen, innerY + innerH - cornerInset).lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset).lineTo(innerX + innerW - cornerInset, innerY + innerH - cornerInset - cornerLen).stroke()
+
+      // ===== Logo (top-right interior) =====
+      const logoSize = 50
+      const logoX = innerX + innerW - logoSize - 22
+      const logoY = innerY + 22
+      doc.save()
+      roundRectPath(logoX, logoY, logoSize, logoSize, 10)
+      doc.fill(NAVY)
+      doc.restore()
+      doc.save()
+      doc.lineWidth(1.5).strokeColor(GOLD)
+      roundRectPath(logoX, logoY, logoSize, logoSize, 10)
+      doc.stroke()
+      doc.restore()
+      setFont(16, 'bold')
+      doc.fillColor(GOLD).text('FIA', logoX, logoY + logoSize / 2 - 8, { width: logoSize, align: 'center' })
+
+      // ===== Title: CERTIFICATE OF COMPLETION (gold) =====
+      setFont(11, 'bold')
+      doc.fillColor(GOLD).text('CERTIFICATE OF COMPLETION', cx - 350, innerY + 42, { width: 700, align: 'center' })
+
+      // Academy name Arabic (large, navy)
+      setFont(28, 'bold')
+      doc.fillColor(NAVY).text(cert.issued_by || 'أكاديمية المستقبل الدولية', cx - 350, innerY + 75, { width: 700, align: 'center' })
+
+      // English subtitle
       setFont(11, 'regular')
-      doc.fillColor(GRAY).text('FUTURE INTERNATIONAL ACADEMY', cx - 350, logoY - 30, { width: 700, align: 'center' })
+      doc.fillColor(GRAY).text('FUTURE INTERNATIONAL ACADEMY', cx - 350, innerY + 110, { width: 700, align: 'center' })
 
-      // Gold divider with diamond
-      const dividerY = logoY - 15
-      doc.lineWidth(1).strokeColor(GOLD).moveTo(cx - 130, dividerY).lineTo(cx - 10, dividerY).stroke()
-      doc.lineWidth(1).strokeColor(GOLD).moveTo(cx + 10, dividerY).lineTo(cx + 130, dividerY).stroke()
-      doc.polygon([cx, dividerY - 4], [cx + 4, dividerY], [cx, dividerY + 4], [cx - 4, dividerY]).fill(GOLD)
+      // Divider with center diamond
+      const dividerY = innerY + 140
+      doc.lineWidth(1).strokeColor(GOLD).moveTo(cx - 100, dividerY).lineTo(cx - 10, dividerY).stroke()
+      doc.lineWidth(1).strokeColor(GOLD).moveTo(cx + 10, dividerY).lineTo(cx + 100, dividerY).stroke()
+      doc.polygon([cx, dividerY - 5], [cx + 5, dividerY], [cx, dividerY + 5], [cx - 5, dividerY]).fill(GOLD)
 
       // Award statement
-      setFont(12, 'regular')
-      doc.fillColor(GRAY).text('تُمنح هذه الشهادة إلى', cx - 350, logoY - 60, { width: 700, align: 'center' })
+      setFont(13, 'regular')
+      doc.fillColor(GRAY).text('تشهد أكاديمية المستقبل الدولية بأن', cx - 350, innerY + 160, { width: 700, align: 'center' })
 
-      // Student name (large, navy)
-      setFont(34, 'black')
-      doc.fillColor(NAVY).text(cert.student_name || 'طالب', cx - 350, logoY - 95, { width: 700, align: 'center' })
+      // Student name (LARGE, navy)
+      setFont(36, 'black')
+      doc.fillColor(NAVY).text(cert.student_name || 'طالب', cx - 350, innerY + 195, { width: 700, align: 'center' })
 
       // Course completion statement
-      setFont(12, 'regular')
-      doc.fillColor(GRAY).text('لإكماله دورة', cx - 350, logoY - 140, { width: 700, align: 'center' })
+      setFont(13, 'regular')
+      doc.fillColor(GRAY).text('قد أتم بنجاح متطلبات دورة', cx - 350, innerY + 245, { width: 700, align: 'center' })
 
-      // Course title (gold)
+      // Course title (gold, bold)
       setFont(20, 'bold')
-      doc.fillColor(GOLD).text(cert.course_title || 'دورة معتمدة', cx - 350, logoY - 165, { width: 700, align: 'center' })
+      doc.fillColor(GOLD).text(cert.course_title || 'دورة معتمدة', cx - 350, innerY + 275, { width: 700, align: 'center' })
 
-      // Three columns
-      const colY = pageH - 130
-      const colH = 50
+      // Accreditation pill banner
+      const pillY = innerY + 312
+      const pillH = 28
+      setFont(11, 'bold')
+      const pillText = '★ معتمدة من: أكاديمية المستقبل الدولية'
+      const pillW = doc.widthOfString(pillText) + 60
+      const pillX = cx - pillW / 2
       doc.save()
-      doc.fillOpacity(0.4)
-      doc.rect(80, colY, 220, colH).fill(GOLD_PALE)
-      doc.rect(cx - 110, colY, 220, colH).fill(GOLD_PALE)
-      doc.rect(pageW - 300, colY, 220, colH).fill(GOLD_PALE)
+      roundRectPath(pillX, pillY, pillW, pillH, pillH / 2)
+      doc.fill(GOLD_PALE)
+      doc.lineWidth(1).strokeColor(GOLD_LIGHT)
+      doc.stroke()
       doc.restore()
-      doc.lineWidth(0.5).strokeColor(GOLD_LIGHT).rect(80, colY, 220, colH).stroke()
-      doc.lineWidth(0.5).strokeColor(GOLD_LIGHT).rect(cx - 110, colY, 220, colH).stroke()
-      doc.lineWidth(0.5).strokeColor(GOLD_LIGHT).rect(pageW - 300, colY, 220, colH).stroke()
+      doc.fillColor(NAVY).text(pillText, pillX, pillY + 8, { width: pillW, align: 'center' })
 
-      // Column 1: Date
-      setFont(8, 'regular')
-      doc.fillColor(GRAY).text('تاريخ الإصدار', 80, colY + 8, { width: 220, align: 'center' })
-      setFont(11, 'bold')
-      doc.fillColor(NAVY).text(issueDate, 80, colY + 25, { width: 220, align: 'center' })
+      // ===== 3 metadata columns at bottom =====
+      const colsY = innerY + 360
+      const colsH = 60
+      const colW = 200
+      const colGap = 20
+      const totalColsW = 3 * colW + 2 * colGap
+      const colsStartX = cx - totalColsW / 2
 
-      // Column 2: Issuer
-      setFont(8, 'regular')
-      doc.fillColor(GRAY).text('الجهة المصدرة', cx - 110, colY + 8, { width: 220, align: 'center' })
-      setFont(11, 'bold')
-      doc.fillColor(NAVY).text(cert.issued_by || 'أكاديمية المستقبل الدولية', cx - 110, colY + 25, { width: 220, align: 'center' })
+      // Col 1: Issue Date (left)
+      doc.save()
+      roundRectPath(colsStartX, colsY, colW, colsH, 8)
+      doc.fill(GRAY_BG)
+      doc.restore()
+      setFont(9, 'regular')
+      doc.fillColor(GRAY).text('تاريخ الإصدار', colsStartX, colsY + 10, { width: colW, align: 'center' })
+      setFont(13, 'bold')
+      doc.fillColor(NAVY).text(issueDate, colsStartX, colsY + 32, { width: colW, align: 'center' })
 
-      // Column 3: Status
-      setFont(8, 'regular')
-      doc.fillColor(GRAY).text('الحالة', pageW - 300, colY + 8, { width: 220, align: 'center' })
-      setFont(11, 'bold')
-      doc.fillColor(GREEN).text(cert.status === 'صالحة' ? 'صالحة' : cert.status || 'صالحة', pageW - 300, colY + 25, { width: 220, align: 'center' })
+      // Col 2: Issuer (center)
+      const col2X = colsStartX + colW + colGap
+      doc.save()
+      roundRectPath(col2X, colsY, colW, colsH, 8)
+      doc.fill(GRAY_BG)
+      doc.restore()
+      setFont(9, 'regular')
+      doc.fillColor(GRAY).text('الجهة المصدرة', col2X, colsY + 10, { width: colW, align: 'center' })
+      setFont(13, 'bold')
+      doc.fillColor(NAVY).text('أكاديمية المستقبل الدولية', col2X, colsY + 32, { width: colW, align: 'center' })
 
-      // ===== QR code (left) =====
+      // Col 3: Status (right)
+      const col3X = colsStartX + 2 * (colW + colGap)
+      doc.save()
+      roundRectPath(col3X, colsY, colW, colsH, 8)
+      doc.fill(GRAY_BG)
+      doc.restore()
+      setFont(9, 'regular')
+      doc.fillColor(GRAY).text('الحالة', col3X, colsY + 10, { width: colW, align: 'center' })
+      // Green pill badge for status
+      const badgeText = cert.status === 'صالحة' ? '● صالحة' : cert.status || 'صالحة'
+      setFont(13, 'bold')
+      const badgeW = doc.widthOfString(badgeText) + 24
+      const badgeH = 22
+      const badgeX = col3X + colW / 2 - badgeW / 2
+      const badgeY = colsY + 30
+      doc.save()
+      roundRectPath(badgeX, badgeY, badgeW, badgeH, badgeH / 2)
+      doc.fill(LIGHT_GREEN)
+      doc.restore()
+      doc.fillColor(EMERALD_GREEN).text(badgeText, col3X, badgeY + 3, { width: colW, align: 'center' })
+
+      // ===== Bottom: QR + Cert number + signature =====
+      const bottomY = innerY + innerH - 60
+
+      // QR (left)
       const qrBuffer = await generateQR(verifyUrl)
-      const qrX = 80
-      const qrY = 75
-      const qrSize = 45
-      doc.lineWidth(1).strokeColor(GOLD).rect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4).stroke()
-      doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize })
-      setFont(6, 'regular')
-      doc.fillColor(GRAY).text('امسح للتحقق', qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' })
-
-      // ===== Real Code-128 barcode (center) =====
-      const barcodeBuffer = await generateBarcode(cert.certificate_number)
-      // Barcode is at most ~200px wide × 60px tall
-      const barcodeW = 180
-      const barcodeH = 50
-      const barcodeX = cx - barcodeW / 2
-      const barcodeY2 = 85
-      // White background with light gray border
-      doc.rect(barcodeX - 3, barcodeY2 - 3, barcodeW + 6, barcodeH + 6).fill(WHITE)
-      doc.lineWidth(0.5).strokeColor(GRAY_LIGHT).rect(barcodeX - 3, barcodeY2 - 3, barcodeW + 6, barcodeH + 6).stroke()
-      // Embed barcode image
-      doc.image(barcodeBuffer, barcodeX, barcodeY2, { width: barcodeW, height: barcodeH })
-      // Cert number caption
-      setFont(10, 'bold')
-      doc.fillColor(NAVY).text(cert.certificate_number, cx - 100, barcodeY2 + barcodeH + 2, { width: 200, align: 'center' })
-      setFont(7, 'regular')
-      doc.fillColor(GRAY).text('Certificate ID', cx - 100, barcodeY2 + barcodeH + 15, { width: 200, align: 'center' })
-
-      // ===== Signature (right) =====
+      const qrSize = 35
+      const qrX = innerX + 30
+      doc.save()
+      roundRectPath(qrX - 3, bottomY - 3, qrSize + 6, qrSize + 6, 4)
+      doc.fill(WHITE)
+      doc.lineWidth(1).strokeColor(GOLD)
+      doc.stroke()
+      doc.restore()
+      doc.image(qrBuffer, qrX, bottomY, { width: qrSize, height: qrSize })
       setFont(8, 'regular')
-      doc.fillColor(GRAY).text('توقيع الجهة المانوحة', pageW - 200, 90 + 25, { width: 120, align: 'center' })
-      doc.lineWidth(0.8).strokeColor(NAVY).moveTo(pageW - 200, 90 + 22).lineTo(pageW - 80, 90 + 22).stroke()
+      doc.fillColor(GRAY).text('امسح للتحقق', qrX, bottomY + qrSize + 2, { width: qrSize, align: 'center' })
+
+      // Cert number (center) with real Code-128 barcode
+      const barcodeBuffer = await generateBarcode(cert.certificate_number)
+      const barcodeW = 140
+      const barcodeH = 25
+      const barcodeX = cx - barcodeW / 2
+      const barcodeY = bottomY + 2
+      doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH })
       setFont(10, 'bold')
-      doc.fillColor(NAVY).text('المدير التنفيذي', pageW - 200, 90 + 10, { width: 120, align: 'center' })
-
-      // Bottom gold ribbon
-      doc.rect(60, 50, pageW - 120, 4).fill(GOLD)
-      doc.rect(60, 56, pageW - 120, 1).fill(GOLD_LIGHT)
-
-      // Verify URL
+      doc.fillColor(NAVY).text(cert.certificate_number, cx - 100, barcodeY + barcodeH + 2, { width: 200, align: 'center' })
       setFont(7, 'regular')
-      doc.fillColor(GRAY_LIGHT).text(`للتحقق: ${verifyUrl}`, cx - 200, 35, { width: 400, align: 'center' })
+      doc.fillColor(GRAY).text('Certificate ID', cx - 100, barcodeY + barcodeH + 14, { width: 200, align: 'center' })
+
+      // Signature (right)
+      const sigX = innerX + innerW - 30 - 120
+      setFont(9, 'regular')
+      doc.fillColor(GRAY).text('توقيع الجهة المانوحة', sigX, bottomY, { width: 120, align: 'center' })
+      doc.lineWidth(0.8).strokeColor(NAVY).moveTo(sigX, bottomY + 20).lineTo(sigX + 120, bottomY + 20).stroke()
+      setFont(11, 'bold')
+      doc.fillColor(NAVY).text('المدير التنفيذي', sigX, bottomY + 25, { width: 120, align: 'center' })
 
       // Watermark
       doc.save()
-      doc.fillOpacity(0.04)
+      doc.fillOpacity(0.03)
       doc.translate(cx, pageH / 2)
       doc.rotate(45)
-      setFont(120, 'black')
-      doc.fillColor(NAVY).text('FIA', -150, -60, { width: 300, align: 'center' })
+      setFont(140, 'black')
+      doc.fillColor(NAVY).text('FIA', -100, -50, { width: 200, align: 'center' })
       doc.restore()
 
       doc.end()
@@ -282,278 +634,6 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       reject(e)
     }
   })
-}
-
-// ============== PNG Certificate (full certificate, mirrors PDF design) ==============
-async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string): Promise<Buffer> {
-  registerFontsForCanvas()
-
-  // Use 2x resolution for crisp output
-  const scale = 2
-  const pageW = 842 * scale
-  const pageH = 595 * scale
-  const canvas = createCanvas(pageW, pageH)
-  const ctx = canvas.getContext('2d')
-
-  // Helper functions
-  const fill = (color: string) => { ctx.fillStyle = color }
-  const stroke = (color: string, width: number) => { ctx.strokeStyle = color; ctx.lineWidth = width }
-  const rect = (x: number, y: number, w: number, h: number) => ctx.rect(x, y, w, h)
-  const fillRect = (x: number, y: number, w: number, h: number) => ctx.fillRect(x, y, w, h)
-  const strokeRect = (x: number, y: number, w: number, h: number) => ctx.strokeRect(x, y, w, h)
-
-  const setFont = (size: number, weight: 'regular' | 'bold' | 'black' = 'regular') => {
-    const family = weight === 'black' ? 'Cairo-Black' : weight === 'bold' ? 'Cairo-Bold' : 'Cairo'
-    ctx.font = `${size * scale}px ${family}`
-  }
-
-  const cx = pageW / 2
-
-  // ===== Background =====
-  fill(WHITE)
-  fillRect(0, 0, pageW, pageH)
-
-  // ===== Three-layer gold frame =====
-  stroke(GOLD, 1 * scale)
-  strokeRect(20 * scale, 20 * scale, pageW - 40 * scale, pageH - 40 * scale)
-  ctx.stroke()
-  stroke(GOLD, 2.5 * scale)
-  strokeRect(28 * scale, 28 * scale, pageW - 56 * scale, pageH - 56 * scale)
-  ctx.stroke()
-  stroke(GOLD_LIGHT, 0.5 * scale)
-  strokeRect(36 * scale, 36 * scale, pageW - 72 * scale, pageH - 72 * scale)
-  ctx.stroke()
-
-  // ===== Corner ornaments =====
-  const drawDiamond = (x: number, y: number, w: number, h: number) => {
-    ctx.beginPath()
-    ctx.moveTo(x, y - h)
-    ctx.lineTo(x + w, y)
-    ctx.lineTo(x, y + h)
-    ctx.lineTo(x - w, y)
-    ctx.closePath()
-    ctx.fill()
-  }
-  const drawCorner = (x: number, y: number, fx: number, fy: number) => {
-    fill(GOLD)
-    drawDiamond(x, y, 4 * scale, 6 * scale)
-    stroke(GOLD, 0.8 * scale)
-    ctx.beginPath()
-    ctx.moveTo(x + 8 * scale * fx, y)
-    ctx.lineTo(x + 28 * scale * fx, y)
-    ctx.moveTo(x, y + 8 * scale * fy)
-    ctx.lineTo(x, y + 28 * scale * fy)
-    ctx.stroke()
-    fill(GOLD)
-    drawDiamond(x + 28 * scale * fx, y, 3 * scale, 3 * scale)
-    drawDiamond(x, y + 28 * scale * fy, 3 * scale, 3 * scale)
-  }
-  drawCorner(50 * scale, 50 * scale, 1, 1)
-  drawCorner(pageW - 50 * scale, 50 * scale, -1, 1)
-  drawCorner(50 * scale, pageH - 50 * scale, 1, -1)
-  drawCorner(pageW - 50 * scale, pageH - 50 * scale, -1, -1)
-
-  // ===== Logo: navy circle with gold rings =====
-  const logoY = pageH - 95 * scale
-  const logoR = 26 * scale
-  fill(NAVY)
-  ctx.beginPath()
-  ctx.arc(cx, logoY + logoR, logoR, 0, 2 * Math.PI)
-  ctx.fill()
-  stroke(GOLD, 2 * scale)
-  ctx.beginPath()
-  ctx.arc(cx, logoY + logoR, logoR, 0, 2 * Math.PI)
-  ctx.stroke()
-  stroke(GOLD_LIGHT, 0.5 * scale)
-  ctx.beginPath()
-  ctx.arc(cx, logoY + logoR, logoR - 4 * scale, 0, 2 * Math.PI)
-  ctx.stroke()
-  setFont(15, 'bold')
-  fill(GOLD)
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('FIA', cx, logoY + logoR)
-
-  // ===== English main title =====
-  setFont(13, 'bold')
-  fill(GOLD)
-  ctx.fillText('CERTIFICATE OF COMPLETION', cx, logoY - 75 * scale)
-
-  // ===== Academy name Arabic (large navy) =====
-  ctx.direction = 'rtl'
-  setFont(26, 'bold')
-  fill(NAVY)
-  ctx.fillText(cert.issued_by || 'أكاديمية المستقبل الدولية', cx, logoY - 50 * scale)
-
-  // English academy name
-  ctx.direction = 'ltr'
-  setFont(11, 'regular')
-  fill(GRAY)
-  ctx.fillText('FUTURE INTERNATIONAL ACADEMY', cx, logoY - 30 * scale)
-
-  // ===== Gold divider with diamond =====
-  const dividerY = logoY - 15 * scale
-  stroke(GOLD, 1 * scale)
-  ctx.beginPath()
-  ctx.moveTo(cx - 130 * scale, dividerY)
-  ctx.lineTo(cx - 10 * scale, dividerY)
-  ctx.moveTo(cx + 10 * scale, dividerY)
-  ctx.lineTo(cx + 130 * scale, dividerY)
-  ctx.stroke()
-  fill(GOLD)
-  drawDiamond(cx, dividerY, 4 * scale, 4 * scale)
-
-  // ===== Award statement =====
-  ctx.direction = 'rtl'
-  setFont(12, 'regular')
-  fill(GRAY)
-  ctx.fillText('تُمنح هذه الشهادة إلى', cx, logoY - 60 * scale)
-
-  // ===== Student name (large, navy) =====
-  setFont(34, 'black')
-  fill(NAVY)
-  ctx.fillText(cert.student_name || 'طالب', cx, logoY - 95 * scale)
-
-  // Course completion statement
-  setFont(12, 'regular')
-  fill(GRAY)
-  ctx.fillText('لإكماله دورة', cx, logoY - 140 * scale)
-
-  // Course title (gold)
-  setFont(20, 'bold')
-  fill(GOLD)
-  ctx.fillText(cert.course_title || 'دورة معتمدة', cx, logoY - 165 * scale)
-
-  // ===== Three columns =====
-  const colY = pageH - 130 * scale
-  const colH = 50 * scale
-  const colW = 220 * scale
-  // Background fill (semi-transparent gold pale)
-  ctx.globalAlpha = 0.4
-  fill(GOLD_PALE)
-  fillRect(80 * scale, colY, colW, colH)
-  fillRect(cx - 110 * scale, colY, colW, colH)
-  fillRect(pageW - 300 * scale, colY, colW, colH)
-  ctx.globalAlpha = 1
-  // Borders
-  stroke(GOLD_LIGHT, 0.5 * scale)
-  strokeRect(80 * scale, colY, colW, colH)
-  ctx.stroke()
-  strokeRect(cx - 110 * scale, colY, colW, colH)
-  ctx.stroke()
-  strokeRect(pageW - 300 * scale, colY, colW, colH)
-  ctx.stroke()
-
-  // Column 1: Date
-  setFont(8, 'regular')
-  fill(GRAY)
-  ctx.fillText('تاريخ الإصدار', 80 * scale + colW / 2, colY + 8 * scale)
-  setFont(11, 'bold')
-  fill(NAVY)
-  ctx.fillText(issueDate, 80 * scale + colW / 2, colY + 25 * scale)
-
-  // Column 2: Issuer
-  setFont(8, 'regular')
-  fill(GRAY)
-  ctx.fillText('الجهة المصدرة', cx, colY + 8 * scale)
-  setFont(11, 'bold')
-  fill(NAVY)
-  ctx.fillText(cert.issued_by || 'أكاديمية المستقبل الدولية', cx, colY + 25 * scale)
-
-  // Column 3: Status
-  setFont(8, 'regular')
-  fill(GRAY)
-  ctx.fillText('الحالة', pageW - 300 * scale + colW / 2, colY + 8 * scale)
-  setFont(11, 'bold')
-  fill(GREEN)
-  ctx.fillText(cert.status === 'صالحة' ? 'صالحة' : cert.status || 'صالحة', pageW - 300 * scale + colW / 2, colY + 25 * scale)
-
-  // ===== QR code (left) =====
-  const qrBuffer = await generateQR(verifyUrl)
-  const qrImg = await loadImage(qrBuffer)
-  const qrSize = 45 * scale
-  const qrX = 80 * scale
-  const qrY = 75 * scale
-  // White background + gold border
-  fill(WHITE)
-  fillRect(qrX - 2 * scale, qrY - 2 * scale, qrSize + 4 * scale, qrSize + 4 * scale)
-  stroke(GOLD, 1 * scale)
-  strokeRect(qrX - 2 * scale, qrY - 2 * scale, qrSize + 4 * scale, qrSize + 4 * scale)
-  ctx.stroke()
-  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize)
-  ctx.direction = 'rtl'
-  setFont(6, 'regular')
-  fill(GRAY)
-  ctx.textAlign = 'center'
-  ctx.fillText('امسح للتحقق', qrX + qrSize / 2, qrY + qrSize + 5 * scale)
-
-  // ===== Real Code-128 barcode (center) =====
-  const barcodeBuffer = await generateBarcode(cert.certificate_number)
-  const barcodeImg = await loadImage(barcodeBuffer)
-  const barcodeW = 180 * scale
-  const barcodeH = 40 * scale
-  const barcodeX = cx - barcodeW / 2
-  const barcodeY2 = 85 * scale
-  // White bg + light gray border
-  fill(WHITE)
-  fillRect(barcodeX - 3 * scale, barcodeY2 - 3 * scale, barcodeW + 6 * scale, barcodeH + 6 * scale)
-  stroke(GRAY_LIGHT, 0.5 * scale)
-  strokeRect(barcodeX - 3 * scale, barcodeY2 - 3 * scale, barcodeW + 6 * scale, barcodeH + 6 * scale)
-  ctx.stroke()
-  // Draw barcode image (maintain aspect ratio, fit inside)
-  ctx.drawImage(barcodeImg, barcodeX, barcodeY2, barcodeW, barcodeH)
-  // Cert number caption
-  ctx.direction = 'ltr'
-  setFont(10, 'bold')
-  fill(NAVY)
-  ctx.fillText(cert.certificate_number, cx, barcodeY2 + barcodeH + 7 * scale)
-  setFont(7, 'regular')
-  fill(GRAY)
-  ctx.fillText('Certificate ID', cx, barcodeY2 + barcodeH + 18 * scale)
-
-  // ===== Signature (right) =====
-  ctx.direction = 'rtl'
-  setFont(8, 'regular')
-  fill(GRAY)
-  ctx.fillText('توقيع الجهة المانوحة', pageW - 140 * scale, 115 * scale)
-  stroke(NAVY, 0.8 * scale)
-  ctx.beginPath()
-  ctx.moveTo(pageW - 200 * scale, 112 * scale)
-  ctx.lineTo(pageW - 80 * scale, 112 * scale)
-  ctx.stroke()
-  setFont(10, 'bold')
-  fill(NAVY)
-  ctx.fillText('المدير التنفيذي', pageW - 140 * scale, 100 * scale)
-
-  // ===== Bottom gold ribbon =====
-  fill(GOLD)
-  fillRect(60 * scale, 50 * scale, pageW - 120 * scale, 4 * scale)
-  fill(GOLD_LIGHT)
-  fillRect(60 * scale, 56 * scale, pageW - 120 * scale, 1 * scale)
-
-  // ===== Verify URL =====
-  ctx.direction = 'ltr'
-  setFont(7, 'regular')
-  fill(GRAY_LIGHT)
-  ctx.fillText(`للتحقق: ${verifyUrl}`, cx, 35 * scale)
-
-  // ===== Watermark =====
-  ctx.save()
-  ctx.globalAlpha = 0.04
-  ctx.translate(cx, pageH / 2)
-  ctx.rotate(Math.PI / 4)
-  setFont(120, 'black')
-  fill(NAVY)
-  ctx.fillText('FIA', 0, 0)
-  ctx.restore()
-
-  return await canvas.encode('png')
-}
-
-// Helper to load an image buffer into a canvas image
-async function loadImage(buffer: Buffer): Promise<any> {
-  const { loadImage } = await import('@napi-rs/canvas')
-  return await loadImage(buffer)
 }
 
 export async function GET(req: NextRequest) {

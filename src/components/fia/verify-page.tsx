@@ -29,7 +29,6 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
   const [certNum, setCertNum] = useState(initialNumber || '')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<VerifyResult | null>(null)
-  const [searched, setSearched] = useState(false)
 
   useEffect(() => {
     if (initialNumber) {
@@ -44,7 +43,6 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
       return
     }
     setLoading(true)
-    setSearched(true)
     try {
       const res = await fetch(`/api/certificates?number=${encodeURIComponent(num)}`)
       const data = await res.json()
@@ -111,7 +109,6 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
         </Card>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="text-center py-12">
           <Loader2 className="w-10 h-10 animate-spin mx-auto text-navy mb-3" />
@@ -119,16 +116,12 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
         </div>
       )}
 
-      {/* Result */}
       {!loading && result && (
         <div className="space-y-6">
-          {/* Status card */}
-          <StatusCard result={result} onReset={() => { setResult(null); setCertNum(''); setSearched(false) }} />
+          <StatusCard result={result} onReset={() => { setResult(null); setCertNum('') }} />
 
-          {/* Certificate display (only if valid) */}
           {result.status === 'صالحة' && !result.not_found && (
             <>
-              {/* Certificate preview */}
               <CertificateDisplay result={result} />
 
               {/* Action buttons */}
@@ -148,7 +141,6 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
                 </Button>
               </div>
 
-              {/* Info cards */}
               <InfoCards result={result} onCopy={copyCertNumber} />
             </>
           )}
@@ -158,7 +150,6 @@ export function VerifyPage({ initialNumber }: { initialNumber?: string }) {
   )
 }
 
-// ============== Status Card ==============
 function StatusCard({ result, onReset }: { result: VerifyResult; onReset: () => void }) {
   let icon = CheckCircle2
   let bgColor = 'bg-green-50'
@@ -208,103 +199,137 @@ function StatusCard({ result, onReset }: { result: VerifyResult; onReset: () => 
   )
 }
 
-// ============== Certificate Display ==============
 function CertificateDisplay({ result }: { result: VerifyResult }) {
   const issueDate = result.issued_at
     ? new Date(result.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
     : new Date().toLocaleDateString('ar-EG')
 
   return (
-    <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-gold/30">
-      {/* Outer gold frame */}
-      <div className="absolute inset-3 border-2 border-gold rounded-lg pointer-events-none" />
-      <div className="absolute inset-5 border border-gold/50 rounded-md pointer-events-none" />
+    <div className="bg-cream rounded-3xl p-3 md:p-4" style={{ backgroundColor: '#FDFBF7' }}>
+      {/* Outer sage green border */}
+      <div className="rounded-2xl p-2" style={{ border: '2px solid #E6F4EA' }}>
+        {/* Inner certificate card */}
+        <div className="relative rounded-xl overflow-hidden" style={{ backgroundColor: '#FDFBF7' }}>
+          {/* Gold frame (outer thick line) */}
+          <div className="absolute inset-0 rounded-xl pointer-events-none" style={{ border: '3px solid #C5A059' }} />
+          {/* Gold frame (inner thin line) */}
+          <div className="absolute inset-[5px] rounded-lg pointer-events-none" style={{ border: '1px solid #C5A059' }} />
 
-      {/* Corner ornaments */}
-      {[
-        { top: '12px', right: '12px' },
-        { top: '12px', left: '12px' },
-        { bottom: '12px', right: '12px' },
-        { bottom: '12px', left: '12px' },
-      ].map((pos, i) => (
-        <div key={i} className="absolute w-4 h-4 pointer-events-none" style={pos}>
-          <div className="absolute inset-0 rotate-45 bg-gold rounded-sm" />
-        </div>
-      ))}
+          {/* Corner ornaments (L-shaped) */}
+          {[
+            { top: '14px', right: 'auto', bottom: 'auto', left: '14px', borderTop: '1.5px solid #C5A059', borderLeft: '1.5px solid #C5A059' },
+            { top: '14px', right: '14px', bottom: 'auto', left: 'auto', borderTop: '1.5px solid #C5A059', borderRight: '1.5px solid #C5A059' },
+            { top: 'auto', right: 'auto', bottom: '14px', left: '14px', borderBottom: '1.5px solid #C5A059', borderLeft: '1.5px solid #C5A059' },
+            { top: 'auto', right: '14px', bottom: '14px', left: 'auto', borderBottom: '1.5px solid #C5A059', borderRight: '1.5px solid #C5A059' },
+          ].map((style, i) => (
+            <div key={i} className="absolute w-[18px] h-[18px] pointer-events-none" style={style} />
+          ))}
 
-      <div className="relative p-8 md:p-12">
-        {/* Top: Logo */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 rounded-full bg-navy border-2 border-gold flex items-center justify-center mb-2">
-            <span className="text-gold font-bold text-lg">FIA</span>
-          </div>
-          <div className="text-gold text-xs font-bold tracking-widest">CERTIFICATE OF COMPLETION</div>
-        </div>
+          <div className="relative p-6 md:p-10">
+            {/* Logo top-right */}
+            <div className="absolute top-4 right-4 md:top-6 md:right-6">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0F172A', border: '1.5px solid #C5A059' }}>
+                <span className="font-bold text-sm md:text-base" style={{ color: '#C5A059' }}>FIA</span>
+              </div>
+            </div>
 
-        {/* Academy name */}
-        <div className="text-center mb-1">
-          <h1 className="text-2xl md:text-3xl font-bold text-navy">أكاديمية المستقبل الدولية</h1>
-          <div className="text-xs text-muted-foreground tracking-wider mt-1">FUTURE INTERNATIONAL ACADEMY</div>
-        </div>
+            {/* Title */}
+            <div className="text-center mb-2 mt-2 md:mt-4 pr-16 md:pr-20">
+              <div className="text-[10px] md:text-xs font-bold tracking-widest" style={{ color: '#C5A059' }}>
+                CERTIFICATE OF COMPLETION
+              </div>
+            </div>
 
-        {/* Gold divider */}
-        <div className="flex items-center justify-center my-5">
-          <div className="h-px bg-gold w-24 md:w-32" />
-          <div className="w-2 h-2 rotate-45 bg-gold mx-2" />
-          <div className="h-px bg-gold w-24 md:w-32" />
-        </div>
+            {/* Academy name Arabic */}
+            <div className="text-center mb-1 pr-16 md:pr-20">
+              <h1 className="text-xl md:text-3xl font-bold" style={{ color: '#0F172A' }}>
+                {result.issued_by || 'أكاديمية المستقبل الدولية'}
+              </h1>
+              <div className="text-[10px] md:text-xs mt-1" style={{ color: '#6B7280' }}>
+                FUTURE INTERNATIONAL ACADEMY
+              </div>
+            </div>
 
-        {/* Award statement */}
-        <div className="text-center text-sm text-muted-foreground mb-2">تُمنح هذه الشهادة إلى</div>
+            {/* Divider */}
+            <div className="flex items-center justify-center my-3 md:my-5 pr-16 md:pr-20">
+              <div className="h-px w-16 md:w-24" style={{ backgroundColor: '#C5A059' }} />
+              <div className="w-2 h-2 rotate-45 mx-2" style={{ backgroundColor: '#C5A059' }} />
+              <div className="h-px w-16 md:w-24" style={{ backgroundColor: '#C5A059' }} />
+            </div>
 
-        {/* Student name */}
-        <div className="text-center my-4">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-navy">{result.student_name}</h2>
-          <div className="h-0.5 bg-gold w-48 md:w-64 mx-auto mt-2" />
-        </div>
+            {/* Award statement */}
+            <div className="text-center text-xs md:text-sm mb-1 pr-16 md:pr-20" style={{ color: '#6B7280' }}>
+              تشهد أكاديمية المستقبل الدولية بأن
+            </div>
 
-        {/* Course completion statement */}
-        <div className="text-center text-sm text-muted-foreground mb-2">لإكماله دورة</div>
+            {/* Student name (most prominent) */}
+            <div className="text-center my-2 md:my-3 pr-16 md:pr-20">
+              <h2 className="text-2xl md:text-4xl font-extrabold" style={{ color: '#0F172A' }}>
+                {result.student_name}
+              </h2>
+            </div>
 
-        {/* Course title */}
-        <div className="text-center my-3">
-          <h3 className="text-lg md:text-xl font-bold text-gold">{result.course_title || 'دورة معتمدة'}</h3>
-        </div>
+            {/* Completion statement */}
+            <div className="text-center text-xs md:text-sm mb-1 pr-16 md:pr-20" style={{ color: '#6B7280' }}>
+              قد أتم بنجاح متطلبات دورة
+            </div>
 
-        {/* Three columns */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8">
-          <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">تاريخ الإصدار</div>
-            <div className="text-sm font-bold text-navy">{issueDate}</div>
-          </div>
-          <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">الجهة المصدرة</div>
-            <div className="text-sm font-bold text-navy">{result.issued_by || 'أكاديمية المستقبل الدولية'}</div>
-          </div>
-          <div className="bg-green-50 border border-green-500/30 rounded-lg p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">الحالة</div>
-            <div className="text-sm font-bold text-green-600">{result.status}</div>
-          </div>
-        </div>
+            {/* Course title */}
+            <div className="text-center my-2 md:my-3 pr-16 md:pr-20">
+              <h3 className="text-base md:text-xl font-bold" style={{ color: '#C5A059' }}>
+                {result.course_title || 'دورة معتمدة'}
+              </h3>
+            </div>
 
-        {/* Bottom: QR + Cert number + signature */}
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gold/20">
-          <div className="text-center">
-            <img
-              src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
-              alt="QR"
-              className="w-16 h-16 border border-gold/30"
-            />
-            <div className="text-[10px] text-muted-foreground mt-1">امسح للتحقق</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[10px] text-muted-foreground mb-1">رقم الشهادة</div>
-            <div className="text-sm font-bold text-navy font-mono" dir="ltr">{result.certificate_number}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[10px] text-muted-foreground mb-2">توقيع الجهة المانوحة</div>
-            <div className="border-b border-navy w-24 mb-1" />
-            <div className="text-xs font-bold text-navy">المدير التنفيذي</div>
+            {/* Accreditation pill banner */}
+            <div className="flex justify-center my-3 md:my-4 pr-16 md:pr-20">
+              <div className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold"
+                style={{ backgroundColor: '#F5E5B3', border: '1px solid #E5C158', color: '#0F172A' }}>
+                ★ معتمدة من: {result.issued_by || 'أكاديمية المستقبل الدولية'}
+              </div>
+            </div>
+
+            {/* 3 metadata columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3 mt-4 md:mt-5 pr-0 md:pr-0">
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6' }}>
+                <div className="text-[10px] md:text-xs mb-1" style={{ color: '#6B7280' }}>تاريخ الإصدار</div>
+                <div className="text-xs md:text-sm font-bold" style={{ color: '#0F172A' }}>{issueDate}</div>
+              </div>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6' }}>
+                <div className="text-[10px] md:text-xs mb-1" style={{ color: '#6B7280' }}>الجهة المصدرة</div>
+                <div className="text-xs md:text-sm font-bold" style={{ color: '#0F172A' }}>أكاديمية المستقبل الدولية</div>
+              </div>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: '#F3F4F6' }}>
+                <div className="text-[10px] md:text-xs mb-1" style={{ color: '#6B7280' }}>الحالة</div>
+                <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs md:text-sm font-bold"
+                  style={{ backgroundColor: '#D1FAE5', color: '#10B981' }}>
+                  ● {result.status}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom: QR + Cert number + signature */}
+            <div className="flex items-center justify-between mt-4 md:mt-5 pt-3 border-t" style={{ borderTop: '1px solid #C5A05920' }}>
+              <div className="text-center">
+                <img
+                  src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
+                  alt="QR"
+                  className="w-12 h-12 md:w-14 md:h-14 rounded"
+                  style={{ border: '1px solid #C5A059' }}
+                />
+                <div className="text-[8px] md:text-[10px] mt-1" style={{ color: '#6B7280' }}>امسح للتحقق</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[8px] md:text-[10px] mb-1" style={{ color: '#6B7280' }}>رقم الشهادة</div>
+                <div className="text-xs md:text-sm font-bold font-mono" style={{ color: '#0F172A' }} dir="ltr">{result.certificate_number}</div>
+                <div className="text-[8px] md:text-[10px] mt-0.5" style={{ color: '#6B7280' }}>Certificate ID</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[8px] md:text-[10px] mb-2" style={{ color: '#6B7280' }}>توقيع الجهة المانوحة</div>
+                <div className="w-20 md:w-24 mx-auto mb-1" style={{ borderBottom: '1px solid #0F172A' }} />
+                <div className="text-xs md:text-sm font-bold" style={{ color: '#0F172A' }}>المدير التنفيذي</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -312,7 +337,6 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
   )
 }
 
-// ============== Info Cards ==============
 function InfoCards({ result, onCopy }: { result: VerifyResult; onCopy: () => void }) {
   const issueDate = result.issued_at
     ? new Date(result.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -332,15 +356,16 @@ function InfoCards({ result, onCopy }: { result: VerifyResult; onCopy: () => voi
       {cards.map((c, i) => {
         const Icon = c.icon
         return (
-          <Card key={i} className="p-4 bg-gray-50/50 border border-border hover:shadow-md transition-shadow">
+          <Card key={i} className="p-4 bg-gray-50 border border-border hover:shadow-md transition-shadow">
             <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                <Icon className="w-4 h-4 text-gold" />
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#0F172A' }}>
+                <Icon className="w-4 h-4" style={{ color: '#C5A059' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-muted-foreground">{c.label}</div>
                 <div
-                  className={`text-sm font-semibold text-navy truncate ${c.isStatus && result.status === 'صالحة' ? 'text-green-600' : ''}`}
+                  className={`text-sm font-semibold truncate ${c.isStatus && result.status === 'صالحة' ? 'text-green-600' : ''}`}
+                  style={{ color: '#0F172A' }}
                   dir={(c as any).dir || 'rtl'}
                 >
                   {c.value}
