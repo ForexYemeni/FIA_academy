@@ -105,43 +105,31 @@ export function StudentCourseViewer({
     const key = `fia_completed_lessons_${course.id}`
     localStorage.setItem(key, JSON.stringify(Array.from(next)))
 
-    // Auto-complete course if all lessons done — update enrollment via API
+    // Calculate completion from ALL lessons (not just loaded ones)
     const allL = modules.flatMap((m) => m.lessons || [])
-    const completed = allL.filter((l) => next.has(l.id)).length
-    if (allL.length > 0 && completed === allL.length) {
-      // All lessons complete — mark enrollment as completed
-      try {
-        const enr = enrollment
-        if (enr && enr.id) {
-          await fetch('/api/enrollments', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: enr.id,
-              status: 'مكتمل',
-              progress: 100,
-            }),
-          })
-          toast.success('🎉 أكملت الدورة بنجاح! يمكنك الآن طلب الشهادة')
+    const completedCount = allL.filter((l) => next.has(l.id)).length
+    const totalLessons = allL.length
+    const isAllDone = totalLessons > 0 && completedCount === totalLessons
+    const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+
+    // Update enrollment via API
+    try {
+      const enr = enrollment
+      if (enr && enr.id) {
+        const updateBody: any = { progress: pct }
+        if (isAllDone) {
+          updateBody.status = 'مكتمل'
         }
-      } catch {}
-    } else {
-      // Update progress
-      const pct = allL.length > 0 ? Math.round((completed / allL.length) * 100) : 0
-      try {
-        const enr = enrollment
-        if (enr && enr.id && pct > (enr.progress || 0)) {
-          await fetch('/api/enrollments', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: enr.id,
-              progress: pct,
-            }),
-          })
+        await fetch('/api/enrollments', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: enr.id, ...updateBody }),
+        })
+        if (isAllDone) {
+          toast.success('🎉 أكملت الدورة بنجاح! اضغط "رجوع" ثم اطلب الشهادة')
         }
-      } catch {}
-    }
+      }
+    } catch {}
   }
 
   const allLessons = modules.flatMap((m) => m.lessons || [])
