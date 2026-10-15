@@ -50,12 +50,17 @@ export function DashboardShell({
 
       <div className="p-4 border-b border-gold/20">
         <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10 border-2 border-gold/30">
-            <AvatarImage src={user?.avatar || ''} />
-            <AvatarFallback className="bg-navy-light text-gold">
-              {user?.name?.charAt(0) || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gold/40 shadow-md flex-shrink-0 bg-navy-light">
+            {user?.avatar ? (
+              <img src={user.avatar} alt={user.name || 'avatar'} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gold font-bold text-lg">
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+            )}
+            {/* Online indicator */}
+            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-navy-light"></span>
+          </div>
           <div className="flex-1 min-w-0">
             <div className="text-white text-sm font-semibold truncate">{user?.name}</div>
             <div className="text-white/60 text-xs truncate" dir="ltr">{user?.email}</div>

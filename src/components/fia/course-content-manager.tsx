@@ -14,8 +14,9 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, ChevronDown, ChevronUp, Video, FileText,
   HelpCircle, FileUp, GripVertical, Save, X, Loader2,
-  Database, Copy, ExternalLink, RefreshCw, CheckCircle2,
+  Database, Copy, ExternalLink, RefreshCw, CheckCircle2, Eye,
 } from 'lucide-react'
+import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
 
 interface Module {
   id: string
@@ -144,6 +145,7 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
   // Dialogs
   const [moduleDialog, setModuleDialog] = useState<{ open: boolean; editing: Module | null }>({ open: false, editing: null })
   const [lessonDialog, setLessonDialog] = useState<{ open: boolean; editing: Lesson | null; moduleId: string } | null>(null)
+  const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null)
 
   const loadModules = async () => {
     setLoading(true)
@@ -371,6 +373,9 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
                             </div>
                           </div>
                           <div className="flex gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => setPreviewLesson(l)} title="معاينة الدرس">
+                              <Eye className="w-4 h-4 text-gold" />
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => setLessonDialog({ open: true, editing: l, moduleId: m.id })}>
                               <Edit className="w-4 h-4 text-navy" />
                             </Button>
@@ -417,6 +422,15 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
           onSave={(data: any) => saveLesson(data, lessonDialog.moduleId, lessonDialog.editing)}
         />
       )}
+
+      {/* Lesson preview modal */}
+      <LessonPreviewModal
+        open={!!previewLesson}
+        onOpenChange={(o) => { if (!o) setPreviewLesson(null) }}
+        lesson={previewLesson}
+        modules={modules}
+        onNavigate={(l) => setPreviewLesson(l)}
+      />
     </div>
   )
 }
@@ -658,18 +672,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
           )}
 
           {lessonType === 'exam' && (
-            <div>
-              <Label>أسئلة الاختبار (JSON)</Label>
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={6}
-                placeholder='[{"q":"ما هو BLS؟","options":["A","B","C","D"],"answer":0}]'
-                dir="ltr"
-                className="mt-1 font-mono text-xs"
-              />
-              <p className="text-xs text-muted-foreground mt-1">صيغة JSON: قائمة من الأسئلة مع الخيارات والإجابة الصحيحة (index)</p>
-            </div>
+            <ExamBuilder value={content} onChange={setContent} />
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -719,5 +722,108 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ============== Visual Exam Builder (no JSON editing) ==============
+function ExamBuilder({ value, onChange }: { value?: string | null; onChange: (v: string) => void }) {
+  const [questions, setQuestions] = useState<any[]>(() => {
+    if (!value) return []
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })
+
+  const updateJson = (qs: any[]) => {
+    setQuestions(qs)
+    onChange(JSON.stringify(qs))
+  }
+
+  const addQuestion = () => {
+    updateJson([...questions, { q: '', options: ['', '', '', ''], answer: 0 }])
+  }
+
+  const updateQuestion = (i: number, field: string, val: any) => {
+    const qs = [...questions]
+    qs[i] = { ...qs[i], [field]: val }
+    updateJson(qs)
+  }
+
+  const removeQuestion = (i: number) => {
+    updateJson(questions.filter((_, idx) => idx !== i))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-1">
+          <HelpCircle className="w-4 h-4 text-purple-600" /> أسئلة الاختبار
+        </Label>
+        <Button type="button" size="sm" variant="outline" onClick={addQuestion}>
+          <Plus className="w-3.5 h-3.5 ml-1" /> سؤال جديد
+        </Button>
+      </div>
+
+      {questions.length === 0 ? (
+        <div className="text-center py-8 bg-purple-500/5 border border-purple-500/30 rounded-lg">
+          <HelpCircle className="w-10 h-10 text-purple-600/30 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">لا توجد أسئلة بعد</p>
+          <p className="text-xs text-muted-foreground mt-1">اضغط "سؤال جديد" لإضافة أول سؤال</p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-96 overflow-y-auto fia-scroll pr-1">
+          {questions.map((q, qi) => (
+            <Card key={qi} className="p-3 border-purple-500/20">
+              <div className="flex items-start gap-2 mb-2">
+                <Badge variant="outline" className="text-xs bg-purple-500/5 border-purple-500/30 text-purple-600 flex-shrink-0">
+                  سؤال {qi + 1}
+                </Badge>
+                <Input
+                  value={q.q || ''}
+                  onChange={(e) => updateQuestion(qi, 'q', e.target.value)}
+                  placeholder="اكتب السؤال هنا..."
+                  className="flex-1 text-sm"
+                />
+                <Button type="button" size="icon" variant="ghost" onClick={() => removeQuestion(qi)} className="flex-shrink-0">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="text-xs text-muted-foreground">الإجابات (اضغط الدائرة لتحديد الإجابة الصحيحة):</div>
+                {(q.options || []).map((opt: string, oi: number) => (
+                  <div key={oi} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateQuestion(qi, 'answer', oi)}
+                      className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                        q.answer === oi ? 'bg-green-500 border-green-500' : 'border-muted-foreground/40 hover:border-purple-400'
+                      }`}
+                      title="تحديد كإجابة صحيحة"
+                    >
+                      {q.answer === oi && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    </button>
+                    <Input
+                      value={opt}
+                      onChange={(e) => {
+                        const newOptions = [...(q.options || [])]
+                        newOptions[oi] = e.target.value
+                        updateQuestion(qi, 'options', newOptions)
+                      }}
+                      placeholder={`الخيار ${oi + 1}`}
+                      className={`text-sm flex-1 ${q.answer === oi ? 'border-green-500/40 bg-green-500/5' : ''}`}
+                      dir="rtl"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

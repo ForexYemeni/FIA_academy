@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Users, CreditCard,
   Award, GraduationCap, Building2, Shield, UserCog, Settings,
   BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
-  DollarSign, TrendingUp, Activity, Star,
+  DollarSign, TrendingUp, Activity, Star, ArrowRight,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -20,10 +20,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { TeamEditor } from '@/components/fia/team-editor'
+import { CourseContentManager } from '@/components/fia/course-content-manager'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
   { id: 'courses', label: 'الدورات', icon: BookOpen },
+  { id: 'content', label: 'محتوى الدورات', icon: FileText },
   { id: 'exams', label: 'الاختبارات', icon: FileText },
   { id: 'students', label: 'المتدربون', icon: Users },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
@@ -40,18 +42,25 @@ const NAV: NavItem[] = [
 
 export function AdminDashboard() {
   const [active, setActive] = useState('overview')
+  const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)
 
   return (
     <DashboardShell
       nav={NAV}
       active={active}
-      onNavigate={setActive}
+      onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
       roleLabel="مدير"
       roleColor="bg-red-500/15 text-red-600 border-red-500/30"
     >
       {active === 'overview' && <AdminOverview />}
       {active === 'courses' && <AdminCourses />}
+      {active === 'content' && (
+        <AdminContent
+          contentCourseId={contentCourseId}
+          setContentCourseId={setContentCourseId}
+        />
+      )}
       {active === 'exams' && <AdminExams />}
       {active === 'students' && <AdminStudents />}
       {active === 'payments' && <AdminPayments />}
@@ -65,6 +74,79 @@ export function AdminDashboard() {
       {active === 'reports' && <AdminReports />}
       {active === 'logs' && <AdminLogs />}
     </DashboardShell>
+  )
+}
+
+// ============== Admin Content Viewer (all courses + lessons) ==============
+function AdminContent({ contentCourseId, setContentCourseId }: any) {
+  const [courses, setCourses] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [])
+
+  if (contentCourseId) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={() => setContentCourseId(null)} className="text-navy hover:bg-navy/5">
+          <ArrowRight className="w-4 h-4 ml-1" /> العودة لقائمة الدورات
+        </Button>
+        <CourseContentManager courseId={contentCourseId} />
+      </div>
+    )
+  }
+
+  return (
+    <SectionCard
+      title="محتوى الدورات"
+      description="تصفّح كل الدورات والدروس"
+    >
+      {courses.length === 0 ? (
+        <div className="text-center py-12">
+          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">لا توجد دورات بعد</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {courses.map((c: any) => {
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            return (
+              <Card key={c.id} className="overflow-hidden card-hover">
+                <div className="h-32 bg-navy relative">
+                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    <Badge className="bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+                  </div>
+                  <div className="absolute top-2 left-2">
+                    <Badge className={isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}>
+                      {isFree ? 'مجانية' : 'مدفوعة'}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-navy text-sm mb-2 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+                  <div className="flex justify-between text-xs text-muted-foreground mb-3">
+                    <span>{c.modules_count || 0} وحدة</span>
+                    <span>{c.lessons_count || 0} درس</span>
+                    <span>{c.duration_hours || 0} ساعة</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    {c.enrolled || 0} متدرب مسجّل
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full bg-navy hover:bg-navy-light"
+                    onClick={() => setContentCourseId(c.id)}
+                  >
+                    <FileText className="w-3.5 h-3.5 ml-1" /> عرض المحتوى
+                  </Button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </SectionCard>
   )
 }
 
