@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
-  Compass, Lock, Plus, Download, Loader2, FileUp,
+  Compass, Lock, Plus, Download, Loader2, FileUp, X,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -213,11 +213,11 @@ function MyCourses({ courses, enrollments, onContinue }: any) {
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
                 <div className="absolute top-2 right-2">
                   <Badge className={
-                    c.enrollment.status === 'completed' ? 'bg-green-500 text-white'
+                    (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'bg-green-500 text-white'
                     : c.enrollment.payment_status === 'pending' ? 'bg-yellow-500 text-white'
                     : 'bg-blue-500 text-white'
                   }>
-                    {c.enrollment.status === 'completed' ? 'مكتملة' : c.enrollment.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                    {(c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'مكتملة' : c.enrollment.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
                   </Badge>
                 </div>
               </div>
@@ -232,7 +232,7 @@ function MyCourses({ courses, enrollments, onContinue }: any) {
                   <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
                     بانتظار تأكيد الدفع
                   </Button>
-                ) : c.enrollment.status === 'completed' ? (
+                ) : e.status === 'completed' || e.status === 'مكتمل' ? (
                   <div className="space-y-2">
                     <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5" disabled>
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
@@ -464,7 +464,14 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50"
+          title="إغلاق"
+        >
+          <X className="w-4 h-4 text-muted-foreground" />
+        </button>
         <DialogHeader>
           <DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle>
         </DialogHeader>
