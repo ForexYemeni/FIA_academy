@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
+import { TeamEditor } from '@/components/fia/team-editor'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -583,44 +584,31 @@ function AdminLicenses() {
 }
 
 function AdminFounder({ user }: any) {
+  const [tab, setTab] = useState<'founder' | 'team'>('founder')
+
   return (
-    <SectionCard title="المؤسس والفريق" description="إدارة معلومات المؤسس">
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Avatar className="w-20 h-20 border-4 border-gold/30">
-              <AvatarImage src={user?.avatar || ''} />
-              <AvatarFallback className="bg-navy text-gold text-2xl">{user?.name?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="font-bold text-navy text-lg">{user?.name}</div>
-              <div className="text-gold text-sm">{user?.title || 'المؤسس والمدير التنفيذي'}</div>
-            </div>
-          </div>
-          <div className="space-y-2 text-sm">
-            <div className="text-muted-foreground" dir="ltr">📧 {user?.email}</div>
-            <div className="text-muted-foreground" dir="ltr">📞 {user?.phone || '-'}</div>
-            <p className="text-muted-foreground">{user?.bio || ''}</p>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <h3 className="font-bold text-navy mb-3">الفريق القيادي</h3>
-          <div className="space-y-3">
-            {[
-              { name: 'د. سارة الأهدل', role: 'مدير المحتوى العلمي' },
-              { name: 'م. خالد العمري', role: 'مدير التكنولوجيا' },
-              { name: 'أ. منى الشامي', role: 'مدير العلاقات' },
-            ].map((m, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <Avatar className="w-10 h-10"><AvatarFallback className="bg-navy text-gold text-xs">{m.name.charAt(0)}</AvatarFallback></Avatar>
-                <div>
-                  <div className="text-sm font-medium text-navy">{m.name}</div>
-                  <div className="text-xs text-muted-foreground">{m.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+    <SectionCard title="المؤسس والفريق" description="إدارة معلومات المؤسس وأعضاء الفريق بشكل احترافي">
+      <div className="space-y-5">
+        <div className="flex gap-2 border-b border-border pb-3">
+          <button
+            onClick={() => setTab('founder')}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'founder' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+          >
+            👑 المؤسس
+          </button>
+          <button
+            onClick={() => setTab('team')}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'team' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+          >
+            👥 الفريق القيادي
+          </button>
+        </div>
+
+        {tab === 'founder' ? (
+          <TeamEditor filterRole="founder" />
+        ) : (
+          <TeamEditor filterRole="leader" />
+        )}
       </div>
     </SectionCard>
   )
