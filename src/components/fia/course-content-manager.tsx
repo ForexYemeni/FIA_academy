@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, ChevronDown, ChevronUp, Video, FileText,
   HelpCircle, FileUp, GripVertical, Save, X, Loader2,
+  Database, Copy, ExternalLink, RefreshCw, CheckCircle2,
 } from 'lucide-react'
 
 interface Module {
@@ -48,7 +49,97 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
   const [modules, setModules] = useState<Module[]>([])
   const [lessonsByModule, setLessonsByModule] = useState<Record<string, Lesson[]>>({})
   const [loading, setLoading] = useState(true)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [setupSqlCopied, setSetupSqlCopied] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const SETUP_SQL = `-- FIA Academy — Database Setup
+CREATE TABLE IF NOT EXISTS course_modules (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  course_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  position INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS course_lessons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  module_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  lesson_type TEXT DEFAULT 'text',
+  content TEXT,
+  video_url TEXT,
+  pdf_url TEXT,
+  duration_minutes INT DEFAULT 0,
+  position INT DEFAULT 0,
+  is_preview BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS enrollments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  course_id UUID NOT NULL,
+  status TEXT DEFAULT 'active',
+  progress INT DEFAULT 0,
+  payment_status TEXT DEFAULT 'free',
+  amount_paid INT DEFAULT 0,
+  payment_method TEXT,
+  payment_reference TEXT,
+  enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, course_id)
+);
+
+CREATE TABLE IF NOT EXISTS team_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT,
+  name TEXT NOT NULL,
+  title TEXT,
+  role TEXT DEFAULT 'team',
+  specialization TEXT,
+  bio TEXT,
+  vision TEXT,
+  mission TEXT,
+  qualifications TEXT,
+  achievements TEXT,
+  avatar TEXT,
+  email TEXT,
+  phone TEXT,
+  linkedin TEXT,
+  twitter TEXT,
+  years_experience INT DEFAULT 0,
+  display_order INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE course_modules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE course_lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_all_modules" ON course_modules FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_lessons" ON course_lessons FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_enrollments" ON enrollments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_team" ON team_members FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO team_members (name, title, role, specialization, bio, vision, mission, email, phone, years_experience, display_order, is_active)
+SELECT 'د. عبدالرحمن المحمدي', 'المؤسس والمدير التنفيذي', 'founder', 'الطب الباطني والتعليم الطبي',
+       'طبيب استشاري وخبير تعليم طبي مع 15 عامًا من الخبرة.',
+       'أن نكون المرجع الأول للتعليم الطبي المستمر في المنطقة.',
+       'تمكين الكوادر الصحية بمعارف ومهارات تخدم المرضى.',
+       'admin@fia.edu', '+967 700 000 001', 15, 0, true
+WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
+
+  const copySql = () => {
+    navigator.clipboard.writeText(SETUP_SQL).then(() => {
+      setSetupSqlCopied(true)
+      toast.success('تم نسخ SQL! الصقه في Supabase SQL Editor واضغط Run')
+      setTimeout(() => setSetupSqlCopied(false), 4000)
+    })
+  }
 
   // Dialogs
   const [moduleDialog, setModuleDialog] = useState<{ open: boolean; editing: Module | null }>({ open: false, editing: null })
@@ -56,16 +147,21 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
 
   const loadModules = async () => {
     setLoading(true)
+    setNeedsSetup(false)
     try {
       const res = await fetch(`/api/modules?course_id=${courseId}`)
       const data = await res.json()
+      if (data.needs_setup) {
+        setNeedsSetup(true)
+        setModules([])
+        setLoading(false)
+        return
+      }
       const mods = Array.isArray(data) ? data : []
       setModules(mods)
-      // Auto-expand first module
       if (mods.length > 0 && expanded.size === 0) {
         setExpanded(new Set([mods[0].id]))
       }
-      // Load lessons for each module
       const lessonRes = await fetch(`/api/lessons?course_id=${courseId}`)
       const allLessons = await lessonRes.json()
       const byModule: Record<string, Lesson[]> = {}
@@ -101,13 +197,20 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(moduleDialog.editing ? { id: moduleDialog.editing.id, ...data } : { course_id: courseId, ...data }),
       })
+      const result = await res.json()
       if (res.ok) {
         toast.success(moduleDialog.editing ? 'تم تحديث الوحدة' : 'تمت إضافة الوحدة')
         setModuleDialog({ open: false, editing: null })
         loadModules()
-      } else toast.error('فشل الحفظ')
+      } else if (result.needs_setup) {
+        setNeedsSetup(true)
+        setModuleDialog({ open: false, editing: null })
+        toast.error('يجب تنفيذ SQL أولاً')
+      } else {
+        toast.error(result.error || 'فشل الحفظ')
+      }
     } catch {
-      toast.error('خطأ')
+      toast.error('خطأ في الاتصال بالخادم')
     }
   }
 
@@ -129,9 +232,12 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
         toast.success(editing ? 'تم تحديث الدرس' : 'تمت إضافة الدرس')
         setLessonDialog(null)
         loadModules()
-      } else toast.error('فشل الحفظ')
+      } else {
+        const result = await res.json()
+        toast.error(result.error || 'فشل الحفظ')
+      }
     } catch {
-      toast.error('خطأ')
+      toast.error('خطأ في الاتصال')
     }
   }
 
@@ -147,6 +253,41 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
       <div className="text-center py-12">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-navy mb-3" />
         <p className="text-sm text-muted-foreground">جاري تحميل محتوى الدورة...</p>
+      </div>
+    )
+  }
+
+  // ===== Database setup needed =====
+  if (needsSetup) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-8 text-center bg-amber-50 border-2 border-amber-300">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500 flex items-center justify-center mb-4">
+            <Database className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="font-bold text-navy text-lg mb-2">تهيئة قاعدة البيانات مطلوبة</h3>
+          <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
+            لتفعيل نظام الوحدات والدروس، يجب إنشاء جداول في Supabase. اضغط زر النسخ ثم الصق في Supabase SQL Editor واضغط Run.
+          </p>
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Button onClick={copySql} className="bg-navy hover:bg-navy-light">
+              {setupSqlCopied ? <CheckCircle2 className="w-4 h-4 ml-1" /> : <Copy className="w-4 h-4 ml-1" />}
+              {setupSqlCopied ? 'تم النسخ!' : 'نسخ SQL'}
+            </Button>
+            <a href="https://supabase.com/dashboard/project/tzquudmfazysjogorrxz/sql/new" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="border-navy/30 text-navy hover:bg-navy/5">
+                <ExternalLink className="w-4 h-4 ml-1" /> فتح SQL Editor
+              </Button>
+            </a>
+            <Button variant="outline" onClick={loadModules} className="border-navy/30 text-navy hover:bg-navy/5">
+              <RefreshCw className="w-4 h-4 ml-1" /> إعادة المحاولة
+            </Button>
+          </div>
+          <details className="mt-5 text-right">
+            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-navy">عرض SQL الكامل</summary>
+            <pre className="mt-3 text-xs bg-navy text-white p-4 rounded-lg overflow-x-auto max-h-72 overflow-y-auto font-mono" dir="ltr">{SETUP_SQL}</pre>
+          </details>
+        </Card>
       </div>
     )
   }

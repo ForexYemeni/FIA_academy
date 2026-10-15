@@ -8,7 +8,7 @@ import { Camera, Loader2 } from 'lucide-react'
 
 interface AvatarUploaderProps {
   userId: string
-  role: 'student' | 'trainer'
+  role: 'student' | 'trainer' | 'team'
   initialUrl?: string | null
   name: string
   size?: 'sm' | 'md' | 'lg' | 'xl'

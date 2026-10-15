@@ -41,9 +41,12 @@ export async function POST(req: NextRequest) {
     // Update the user's avatar in the right table
     if (role === 'trainer') {
       await supabaseAdmin.from('trainers').update({ avatar: pub.publicUrl }).eq('id', userId)
-    } else {
+    } else if (role === 'student') {
       await supabaseAdmin.from('users').update({ avatar: pub.publicUrl }).eq('id', userId)
+    } else if (role === 'team') {
+      await supabaseAdmin.from('team_members').update({ avatar: pub.publicUrl }).eq('id', userId)
     }
+    // For team role, userId is the team_members row id
 
     return NextResponse.json({ url: pub.publicUrl, path: fileName })
   } catch (e: any) {

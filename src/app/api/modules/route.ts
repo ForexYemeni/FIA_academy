@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const TABLE_NOT_FOUND = 'Could not find the table'
+
+function isTableMissing(error: any): boolean {
+  return error?.message?.includes(TABLE_NOT_FOUND) || false
+}
+
 export async function GET(req: NextRequest) {
   try {
     const courseId = req.nextUrl.searchParams.get('course_id')
@@ -10,6 +16,14 @@ export async function GET(req: NextRequest) {
     if (error) throw error
     return NextResponse.json(data || [])
   } catch (e: any) {
+    if (isTableMissing(e)) {
+      return NextResponse.json({
+        error: 'جدول الوحدات (course_modules) غير موجود. نفّذ SQL أولاً.',
+        needs_setup: true,
+        sql_file: '/supabase/migrations/002_modules_lessons_enrollments.sql',
+        supabase_sql_editor: 'https://supabase.com/dashboard/project/tzquudmfazysjogorrxz/sql/new',
+      }, { status: 404 })
+    }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
@@ -17,6 +31,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    if (!body.course_id || !body.title) {
+      return NextResponse.json({ error: 'course_id و title مطلوبان' }, { status: 400 })
+    }
     const { data, error } = await supabaseAdmin
       .from('course_modules')
       .insert({
@@ -27,7 +44,17 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      if (isTableMissing(error)) {
+        return NextResponse.json({
+          error: 'جدول الوحدات غير موجود. الرجاء تنفيذ ملف SQL أولاً في Supabase SQL Editor.',
+          needs_setup: true,
+          sql_file: '/supabase/migrations/002_modules_lessons_enrollments.sql',
+          supabase_sql_editor: 'https://supabase.com/dashboard/project/tzquudmfazysjogorrxz/sql/new',
+        }, { status: 404 })
+      }
+      throw error
+    }
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
