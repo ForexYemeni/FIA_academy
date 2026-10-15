@@ -162,7 +162,10 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
 
       // ===== Footer: Date + Signature + Barcode + QR =====
       // Footer section background bar (cream/light gold tint)
-      doc.rect(50, 95, pageW - 100, 70).fill(GOLD + '20') // light gold tint
+      doc.saveState()
+      doc.fillOpacity(0.15)
+      doc.rect(50, 95, pageW - 100, 70).fill(GOLD)
+      doc.restoreState()
 
       // Left side: Date box
       setFont(9, 'regular')
@@ -261,10 +264,11 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
 
       // Watermark (very faint) — diagonal FIA across the page
       doc.saveState()
+      doc.fillOpacity(0.06)
       doc.translate(cx, pageH / 2)
       doc.rotate(45)
       setFont(80, 'black')
-      doc.fillColor(NAVY + '10').text('FIA', -100, -40, { width: 200, align: 'center' })
+      doc.fillColor(NAVY).text('FIA', -100, -40, { width: 200, align: 'center' })
       doc.restoreState()
 
       // Add small text on top "OFFICIAL CERTIFICATE"
