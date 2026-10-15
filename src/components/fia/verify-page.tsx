@@ -345,106 +345,84 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
                   <div className="text-xs md:text-sm font-bold" style={{ color: '#001F3F' }}>أكاديمية المستقبل الدولية</div>
                 </div>
               </div>
-              {/* Card 3: Status */}
-              <div className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #D4AF37' }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#D4AF37' }}>
-                  <span className="text-white text-lg">✓</span>
-                </div>
-                <div className="flex-1 min-w-0 text-right">
-                  <div className="text-[11px] md:text-xs" style={{ color: '#666666' }}>الحالة</div>
-                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs md:text-sm font-bold"
-                    style={{ backgroundColor: '#28A745', color: '#FFFFFF' }}>
-                    ✓ {result.status}
+              {/* Card 3: Status — REDESIGNED with status PROMINENTLY in CENTER */}
+              {(() => {
+                const isRevoked = result.status === 'ملغاة' || result.status === 'ملغي'
+                const statusColor = isRevoked ? '#DC3545' : '#28A745'
+                const statusBgColor = isRevoked ? '#F8D7DA' : '#D4EDDA'
+                const statusText = isRevoked ? 'ملغي' : 'صالح'
+                return (
+                  <div className="rounded-lg p-3 flex flex-col items-center justify-center gap-1"
+                    style={{ backgroundColor: statusBgColor, border: `2px solid ${statusColor}` }}>
+                    {/* Status icon circle */}
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: statusColor }}>
+                      <span className="text-white text-base font-bold">{isRevoked ? '✕' : '✓'}</span>
+                    </div>
+                    {/* Label */}
+                    <div className="text-[10px] md:text-xs font-semibold" style={{ color: '#6C757D' }}>الحالة</div>
+                    {/* Status value — prominent, colored */}
+                    <div className="text-sm md:text-base font-bold" style={{ color: statusColor }}>{statusText}</div>
                   </div>
-                </div>
-              </div>
+                )
+              })()}
             </div>
 
-            {/* Footer: QR + Barcode + Signature (3-column) */}
-            <div className="flex items-end justify-between gap-2 mt-4 md:mt-6 pt-3" style={{ borderTop: '1.5px solid #D4AF37' }}>
-              {/* QR (left) */}
-              <div className="text-center">
-                <img
-                  src={`/api/qr-code?text=${encodeURIComponent(`https://fiaacademy.vercel.app/?verify=${result.certificate_number}#verify`)}&size=200`}
-                  alt="QR"
-                  className="w-14 h-14 md:w-16 md:h-16 rounded"
-                  style={{ border: '1.5px solid #D4AF37', padding: '4px', backgroundColor: '#FFFFFF' }}
+            {/* Footer: Centered Signature only — NO QR, NO BARCODE, NO NAME/TITLE */}
+            <div className="flex flex-col items-center justify-center gap-2 mt-5 md:mt-7 pt-3" style={{ borderTop: '2px solid #D4AF37' }}>
+              {/* Top label */}
+              <div className="text-[10px] md:text-xs font-bold mb-1" style={{ color: '#8B6428' }}>توقيع الجهة المانوحة</div>
+              {/* Compact gel-pen signature SVG — centered */}
+              <svg
+                width="150"
+                height="45"
+                viewBox="0 0 150 45"
+                className="mx-auto"
+              >
+                {/* Main flourish with variable thickness */}
+                <path
+                  d="M 15 22 Q 25 6, 35 22 T 55 22 Q 65 8, 75 26 Q 90 6, 100 22 Q 115 10, 140 22"
+                  stroke="#0047AB"
+                  strokeWidth="2.5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-                <div className="text-[9px] md:text-[11px] mt-1 font-bold" style={{ color: '#001F3F' }}>امسح للتحقق</div>
-              </div>
-
-              {/* Barcode (center) with diamond flankers */}
-              <div className="text-center flex-1 mx-2">
-                <div className="inline-block rounded-md px-4 py-2" style={{ backgroundColor: '#FFFFFF', border: '1.5px solid #D4AF37' }}>
-                  <div className="text-[9px] md:text-[11px] mb-1 font-bold" style={{ color: '#666666' }}>رقم الشهادة</div>
-                  <div className="text-sm md:text-[16px] font-bold font-mono tracking-wide" style={{ color: '#001F3F' }} dir="ltr">{result.certificate_number}</div>
-                  <div className="text-[9px] md:text-[11px] mt-0.5 font-bold" style={{ color: '#666666' }}>CERTIFICATE ID</div>
-                </div>
-                {/* Diamond flankers */}
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <span className="h-px w-6" style={{ backgroundColor: '#D4AF37' }} />
-                  <span className="w-1.5 h-1.5 rotate-45" style={{ backgroundColor: '#D4AF37' }} />
-                  <span className="h-px w-6" style={{ backgroundColor: '#D4AF37' }} />
-                </div>
-              </div>
-
-              {/* Signature block (right) — large royal blue gel-pen */}
-              <div className="text-center">
-                <div className="text-[9px] md:text-[11px] mb-1 font-bold" style={{ color: '#666666' }}>توقيع الجهة المانوحة</div>
-                {/* Compact gel-pen signature SVG — smaller to fit within card */}
-                <svg
-                  width="120"
-                  height="35"
-                  viewBox="0 0 120 35"
-                  className="mx-auto"
-                >
-                  {/* Main flourish with variable thickness */}
-                  <path
-                    d="M 10 18 Q 18 6, 26 18 T 42 18 Q 50 8, 58 22 Q 70 6, 80 20 Q 92 10, 110 18"
-                    stroke="#0047AB"
-                    strokeWidth="2.5"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {/* Thicker downstrokes overlay */}
-                  <path
-                    d="M 14 14 Q 18 8, 24 14 M 56 14 Q 60 8, 66 16 M 78 12 Q 84 6, 90 12"
-                    stroke="#0047AB"
-                    strokeWidth="3.5"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Small left initial flourish */}
-                  <path
-                    d="M 4 8 Q 0 -2, 12 -3 Q 16 0, 12 10"
-                    stroke="#0047AB"
-                    strokeWidth="2.5"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Small right end flourish */}
-                  <path
-                    d="M 110 18 Q 118 10, 116 26 Q 110 30, 106 22"
-                    stroke="#0047AB"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Underscore (medium sweep) */}
-                  <path
-                    d="M 5 30 Q 60 28, 116 30"
-                    stroke="#0047AB"
-                    strokeWidth="1.5"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Initial dot */}
-                  <circle cx="2" cy="12" r="1.5" fill="#0047AB" />
-                </svg>
-                <div className="text-sm md:text-[15px] font-bold mt-2" style={{ color: '#001F3F' }}>د. هاني الشافعي</div>
-                <div className="text-[10px] md:text-xs mt-2" style={{ color: '#001F3F' }}>المدير التنفيذي</div>
-              </div>
+                {/* Thicker downstrokes overlay */}
+                <path
+                  d="M 19 18 Q 25 10, 31 18 M 71 18 Q 75 10, 81 20 M 95 16 Q 102 8, 108 16"
+                  stroke="#0047AB"
+                  strokeWidth="3.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+                {/* Small left initial flourish */}
+                <path
+                  d="M 8 10 Q 4 -2, 18 -3 Q 22 0, 18 14"
+                  stroke="#0047AB"
+                  strokeWidth="2.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+                {/* Small right end flourish */}
+                <path
+                  d="M 140 22 Q 152 12, 150 30 Q 142 35, 138 26"
+                  stroke="#0047AB"
+                  strokeWidth="3"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+                {/* Underscore (medium sweep) */}
+                <path
+                  d="M 8 38 Q 75 36, 146 38"
+                  stroke="#0047AB"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+                {/* Initial dot */}
+                <circle cx="6" cy="14" r="1.8" fill="#0047AB" />
+              </svg>
             </div>
 
             {/* Footer text with horizontal gold flanking lines — only show on desktop to avoid crowding on mobile */}

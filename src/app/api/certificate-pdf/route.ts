@@ -619,126 +619,74 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   fill(NAVY_DEEP)
   ctx.fillText('أكاديمية المستقبل الدولية', col2X + colW - 12 * scale, colsY + 34 * scale)
 
-  // Card 3: Status (right) — Checkmark icon
+  // Card 3: Status (right) — REDESIGNED with status PROMINENTLY displayed in CENTER of the card
+  // Per user request: status (صالح / ملغي) appears prominently in the middle of the card professionally
   const col3X = colsStartX + 2 * (colW + colGap)
-  fillRoundRect(col3X, colsY, colW, colsH, 10 * scale, WHITE)
-  strokeRoundRect(col3X, colsY, colW, colsH, 10 * scale, GOLD, 1.5 * scale)
-  fillRoundRect(col3X + 10 * scale, colsY + 8 * scale, 34 * scale, 34 * scale, 17 * scale, GOLD)
+  // Determine status: valid (صالحة) = green; revoked (ملغاة) = red; default = green
+  const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
+  const statusColor = isRevoked ? '#DC3545' : EMERALD  // red or green
+  const statusBgColor = isRevoked ? '#F8D7DA' : '#D4EDDA'  // light red or light green
+  const statusText = isRevoked ? 'ملغي' : 'صالح'
+
+  // Card background — soft tinted color matching status (subtle professional look)
+  fillRoundRect(col3X, colsY, colW, colsH, 10 * scale, statusBgColor)
+  strokeRoundRect(col3X, colsY, colW, colsH, 10 * scale, statusColor, 2 * scale)  // thicker colored border
+
+  // Status icon — circle with checkmark (صالح) or X (ملغي) — centered top
+  const iconCenterX = col3X + colW / 2
+  const iconCenterY = colsY + 15 * scale
+  const iconR = 9 * scale
+  fillRoundRect(iconCenterX - iconR, iconCenterY - iconR, iconR * 2, iconR * 2, iconR, statusColor)
   ctx.fillStyle = WHITE
-  ctx.fillText('✓', col3X + 27 * scale, colsY + 25 * scale)
-  ctx.direction = 'rtl'
-  setFont(10, 'regular')
-  fill(GRAY)
-  ctx.textAlign = 'right'
-  ctx.fillText('الحالة', col3X + colW - 12 * scale, colsY + 15 * scale)
-  // Green pill badge for status
-  const badgeText = cert.status === 'صالحة' ? '✓ صالح' : cert.status || 'صالح'
-  setFont(13, 'bold')
-  const badgeW = ctx.measureText(badgeText).width + 24 * scale
-  const badgeH = 22 * scale
-  const badgeX = col3X + colW - 12 * scale - badgeW
-  const badgeY = colsY + 28 * scale
-  fillRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, EMERALD)
-  fill(WHITE)
-  ctx.textAlign = 'center'
-  ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2 * scale)
-
-  // ===== Bottom row: QR + Barcode + Signature (3-column) — positioned BELOW cards with proper gap =====
-  // Cards end at cardY+430. Footer starts at cardY+425 (5px overlap is OK since cards have padding).
-  // Founder title at bottomY+95 = cardY+520 (within cardH=525 with 5px margin).
-  const bottomY = cardY + 425 * scale
-
-  // === QR (left) — moved right to clear corner ornament (75*scale from card edge) ===
-  const qrBuffer = await generateQR(verifyUrl)
-  const qrImg = await loadImage(qrBuffer)
-  const qrSize = 46 * scale  // slightly smaller
-  const qrX = cardX + 75 * scale  // moved further away from corner ornament
-  // White background
-  fillRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, WHITE)
-  strokeRoundRect(qrX - 6 * scale, bottomY - 6 * scale, qrSize + 12 * scale, qrSize + 12 * scale, 6 * scale, GOLD, 1.5 * scale)
-  ctx.drawImage(qrImg, qrX, bottomY, qrSize, qrSize)
-  ctx.direction = 'rtl'
-  setFont(11, 'bold')
-  fill(NAVY_DEEP)
-  ctx.textAlign = 'center'
-  ctx.fillText('امسح للتحقق', qrX + qrSize / 2, bottomY + qrSize + 18 * scale)
-
-  // === Barcode (center) with diamond flankers ===
-  const barcodeBuffer = await generateBarcode(cert.certificate_number)
-  const barcodeImg = await loadImage(barcodeBuffer)
-  const barcodeW = 150 * scale
-  const barcodeH = 28 * scale
-  const barcodeX = cx - barcodeW / 2
-  const barcodeY = bottomY + 5 * scale
-  // White card background
-  fillRoundRect(barcodeX - 12 * scale, barcodeY - 8 * scale, barcodeW + 24 * scale, barcodeH + 50 * scale, 4 * scale, WHITE)
-  strokeRoundRect(barcodeX - 12 * scale, barcodeY - 8 * scale, barcodeW + 24 * scale, barcodeH + 50 * scale, 4 * scale, GOLD, 1.5 * scale)
-  ctx.drawImage(barcodeImg, barcodeX, barcodeY, barcodeW, barcodeH)
-  ctx.direction = 'ltr'
-  setFont(13, 'bold')
-  fill(NAVY_DEEP)
-  ctx.fillText(cert.certificate_number, cx, bottomY + barcodeH + 15 * scale)
-  setFont(9, 'regular')
-  fill(GRAY)
-  ctx.fillText('CERTIFICATE ID', cx, bottomY + barcodeH + 30 * scale)
-
-  // Diamond flankers on either side of barcode
-  for (const flankX of [barcodeX - 30 * scale, barcodeX + barcodeW + 30 * scale]) {
-    const flankY = bottomY + barcodeH / 2 + 5 * scale
-    // Small horizontal gold line ending in diamond
-    stroke(GOLD, 1.2 * scale)
-    ctx.beginPath()
-    ctx.moveTo(flankX - 6 * scale, flankY)
-    ctx.lineTo(flankX + 4 * scale, flankY)
-    ctx.stroke()
-    fill(GOLD)
-    ctx.beginPath()
-    ctx.moveTo(flankX + 8 * scale, flankY - 4 * scale)
-    ctx.lineTo(flankX + 12 * scale, flankY)
-    ctx.lineTo(flankX + 8 * scale, flankY + 4 * scale)
-    ctx.lineTo(flankX + 4 * scale, flankY)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  // === Signature block (right) — repositioned for proper professional spacing ===
+  ctx.font = `${11 * scale}px Cairo-Bold`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  // Narrower signature area (180 instead of 200) + clear margin from card edge to prevent overflow
-  const sigAreaW = 180 * scale
-  const sigAreaX = cardX + cardW - 35 * scale - sigAreaW
+  ctx.fillText(isRevoked ? '✕' : '✓', iconCenterX, iconCenterY + 1 * scale)
 
-  // Label
+  // Status label "الحالة" — small gray text above the status value
   ctx.direction = 'rtl'
-  setFont(11, 'bold')
-  fill(GRAY)
-  ctx.fillText('توقيع الجهة المانوحة', sigAreaX + sigAreaW / 2, bottomY + 5 * scale)
+  setFont(8, 'regular')
+  fill('#6C757D')
+  ctx.textAlign = 'center'
+  ctx.fillText('الحالة', col3X + colW / 2, colsY + 32 * scale)
 
-  // === Large gel-pen signature in royal blue — width-restricted to stay within card ===
-  // Pass much narrower width (sigAreaW - 80*scale) to prevent right flourish from overflowing card edge
-  const sigImgAreaY = bottomY + 18 * scale
+  // STATUS VALUE — prominent, centered, large font, colored
+  setFont(13, 'bold')
+  fill(statusColor)
+  ctx.fillText(statusText, col3X + colW / 2, colsY + 44 * scale)
+
+  // ===== Bottom signature row — CENTERED signature only (no QR, no barcode, no name/title) =====
+  // Per user request: removed QR code, removed barcode box, removed executive director name/title.
+  // Only the royal blue gel-pen signature remains, centered horizontally at the bottom of the certificate.
+  const bottomY = cardY + 445 * scale
+
+  // === CENTERED SIGNATURE ===
+  // Top label — "توقيع الجهة المانوحة" centered above signature
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.direction = 'rtl'
+  setFont(12, 'bold')
+  fill(GOLD_DARK)
+  ctx.fillText('توقيع الجهة المانوحة', cx, bottomY)
+
+  // === Royal blue gel-pen signature — centered horizontally ===
+  // Signature width is moderate, centered via startX = cx - width/2
+  const sigWidth = 200 * scale
+  const sigStartX = cx - sigWidth / 2
+  const sigCenterY = bottomY + 35 * scale
   if (founderSignature) {
     try {
       const sigBuffer = await fetch(founderSignature).then(r => r.arrayBuffer())
       const sigImg = await loadImage(Buffer.from(sigBuffer))
-      const sigImgH = 40 * scale  // smaller height
-      const sigImgW = 120 * scale  // narrower to fit
-      ctx.drawImage(sigImg, sigAreaX + (sigAreaW - sigImgW) / 2, sigImgAreaY, sigImgW, sigImgH)
+      const sigImgH = 45 * scale
+      const sigImgW = 180 * scale
+      ctx.drawImage(sigImg, cx - sigImgW / 2, sigCenterY - sigImgH / 2, sigImgW, sigImgH)
     } catch {
-      drawGelPenSignature(ctx, sigAreaX + 30 * scale, sigImgAreaY + 18 * scale, sigAreaW - 60 * scale, scale)
+      drawGelPenSignature(ctx, sigStartX, sigCenterY, sigWidth, scale)
     }
   } else {
-    drawGelPenSignature(ctx, sigAreaX + 30 * scale, sigImgAreaY + 18 * scale, sigAreaW - 60 * scale, scale)
+    drawGelPenSignature(ctx, sigStartX, sigCenterY, sigWidth, scale)
   }
-
-  // Founder name — bold navy, with clear gap from signature
-  setFont(14, 'bold')
-  fill(NAVY_DEEP)
-  ctx.fillText('د. هاني الشافعي', sigAreaX + sigAreaW / 2, bottomY + 65 * scale)
-  // Founder title — PROPER VERTICAL SPACING from name (gap = 30*scale = 60px for clean separation)
-  setFont(10, 'regular')
-  fill(NAVY_DEEP)
-  ctx.fillText('المدير التنفيذي', sigAreaX + sigAreaW / 2, bottomY + 95 * scale)
 
   // ===== Watermark (very faint FIA diagonal) =====
   ctx.save()
@@ -955,76 +903,45 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       setFont(14, 'bold')
       doc.fillColor(NAVY_DEEP).text('أكاديمية المستقبل الدولية', col2X + 70, colsY + 38, { width: colW - 80, align: 'right' })
 
-      // Card 3: Status
+      // Card 3: Status — REDESIGNED with status PROMINENTLY displayed in CENTER of the card
       const col3X = colsStartX + 2 * (colW + colGap)
+      const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
+      const statusColor = isRevoked ? '#DC3545' : EMERALD
+      const statusBgColor = isRevoked ? '#F8D7DA' : '#D4EDDA'
+      const statusText = isRevoked ? 'ملغي' : 'صالح'
+      // Card background — soft tinted color matching status
       doc.save()
       roundRectPath(col3X, colsY, colW, colsH, 10)
-      doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
+      doc.fill(statusBgColor)
+      doc.lineWidth(2).strokeColor(statusColor)
       doc.stroke()
       doc.restore()
+      // Status icon — circle with checkmark (صالح) or X (ملغي) — centered top
       doc.save()
-      doc.circle(col3X + 30, colsY + 32, 20).fill(GOLD)
+      doc.circle(col3X + colW / 2, colsY + 15, 9).fill(statusColor)
       doc.restore()
-      setFont(11, 'regular')
-      doc.fillColor(GRAY).text('الحالة', col3X + 70, colsY + 16, { width: colW - 80, align: 'right' })
-      const badgeText = cert.status === 'صالحة' ? '✓ صالح' : cert.status || 'صالح'
-      setFont(14, 'bold')
-      const badgeW = doc.widthOfString(badgeText) + 28
-      const badgeH = 26
-      const badgeX = col3X + colW - 15 - badgeW
-      const badgeY = colsY + 30
-      doc.save()
-      roundRectPath(badgeX, badgeY, badgeW, badgeH, badgeH / 2)
-      doc.fill(EMERALD)
-      doc.restore()
-      doc.fillColor(WHITE).text(badgeText, badgeX, badgeY + 5, { width: badgeW, align: 'center' })
-
-      // ===== Footer: QR + Barcode + Signature — positioned BELOW cards =====
-      // Cards end at cardY+430. Footer starts at cardY+425 (slight overlap is OK).
-      // Founder title at bottomY+95 = cardY+520 (within cardH=525).
-      const bottomY = cardY + 425
-
-      // QR (left) — moved right to clear corner ornament
-      const qrBuffer = await generateQR(verifyUrl)
-      const qrSize = 46
-      const qrX = cardX + 75  // moved further from corner ornament
-      doc.save()
-      roundRectPath(qrX - 6, bottomY - 6, qrSize + 12, qrSize + 12, 6)
-      doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
-      doc.stroke()
-      doc.restore()
-      doc.image(qrBuffer, qrX, bottomY, { width: qrSize, height: qrSize })
       setFont(11, 'bold')
-      doc.fillColor(NAVY_DEEP).text('امسح للتحقق', qrX, bottomY + qrSize + 4, { width: qrSize, align: 'center' })
-
-      // Barcode (center)
-      const barcodeBuffer = await generateBarcode(cert.certificate_number)
-      const barcodeW = 150
-      const barcodeH = 28
-      const barcodeX = cx - barcodeW / 2
-      const barcodeY = bottomY + 5
-      doc.save()
-      roundRectPath(barcodeX - 12, barcodeY - 8, barcodeW + 24, barcodeH + 50, 4)
-      doc.fill(WHITE)
-      doc.lineWidth(1.5).strokeColor(GOLD)
-      doc.stroke()
-      doc.restore()
-      doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH })
+      doc.fillColor(WHITE).text(isRevoked ? '✕' : '✓', col3X + colW / 2 - 20, colsY + 9, { width: 40, align: 'center' })
+      // Status label "الحالة"
+      setFont(8, 'regular')
+      doc.fillColor('#6C757D').text('الحالة', col3X, colsY + 26, { width: colW, align: 'center' })
+      // STATUS VALUE — prominent, centered, large font, colored
       setFont(13, 'bold')
-      doc.fillColor(NAVY_DEEP).text(cert.certificate_number, cx - 100, barcodeY + barcodeH + 2, { width: 200, align: 'center' })
-      setFont(9, 'regular')
-      doc.fillColor(GRAY).text('CERTIFICATE ID', cx - 100, barcodeY + barcodeH + 18, { width: 200, align: 'center' })
+      doc.fillColor(statusColor).text(statusText, col3X, colsY + 36, { width: colW, align: 'center' })
 
-      // ===== Signature block (right) — repositioned for proper professional spacing =====
-      // Narrower signature area + clear margin from card edge to prevent overflow
-      const sigAreaW = 180
-      const sigAreaX = cardX + cardW - 35 - sigAreaW
-      setFont(11, 'bold')
-      doc.fillColor(GRAY).text('توقيع الجهة المانوحة', sigAreaX, bottomY, { width: sigAreaW, align: 'center' })
+      // ===== Bottom signature row — CENTERED signature only (no QR, no barcode, no name/title) =====
+      // Per user request: removed QR code, removed barcode box, removed executive director name/title.
+      // Only the royal blue gel-pen signature remains, centered horizontally at the bottom.
+      const bottomY = cardY + 445
 
-      const sigImgAreaY = bottomY + 18
+      // Top label — "توقيع الجهة المانوحة" centered above signature
+      setFont(12, 'bold')
+      doc.fillColor(GOLD_DARK).text('توقيع الجهة المانوحة', cx - 200, bottomY - 6, { width: 400, align: 'center' })
+
+      // === Royal blue gel-pen signature — centered horizontally ===
+      const sigWidth = 200
+      const sigStartX = cx - sigWidth / 2
+      const sigCenterY = bottomY + 35
       if (founderSignature) {
         try {
           const sigRes = await fetch(founderSignature)
@@ -1032,22 +949,15 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
           const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
           fs.writeFileSync(sigPath, Buffer.from(sigBuf))
           if (fs.existsSync(sigPath)) {
-            doc.image(sigPath, sigAreaX + 30, sigImgAreaY, { width: 120, height: 40 })
+            doc.image(sigPath, cx - 90, sigCenterY - 22, { width: 180, height: 45 })
             fs.unlinkSync(sigPath)
           }
         } catch {
-          drawGelPenSignaturePDF(doc, sigAreaX + 30, sigImgAreaY + 18, sigAreaW - 60)
+          drawGelPenSignaturePDF(doc, sigStartX, sigCenterY, sigWidth)
         }
       } else {
-        drawGelPenSignaturePDF(doc, sigAreaX + 30, sigImgAreaY + 18, sigAreaW - 60)
+        drawGelPenSignaturePDF(doc, sigStartX, sigCenterY, sigWidth)
       }
-
-      // Founder name — bold navy, with clear gap from signature
-      setFont(14, 'bold')
-      doc.fillColor(NAVY_DEEP).text('د. هاني الشافعي', sigAreaX, bottomY + 60, { width: sigAreaW, align: 'center' })
-      // Founder title — PROPER VERTICAL SPACING (gap = 30px for clean separation)
-      setFont(10, 'regular')
-      doc.fillColor(NAVY_DEEP).text('المدير التنفيذي', sigAreaX, bottomY + 90, { width: sigAreaW, align: 'center' })
 
       // Watermark
       doc.save()
