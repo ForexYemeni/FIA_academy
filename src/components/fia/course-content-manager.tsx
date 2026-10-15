@@ -549,14 +549,32 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       const tgData = await tgRes.json()
       if (tgData.ok && tgData.result?.video) {
         const fileId = tgData.result.video.file_id
-        // Get direct URL (note: file links expire, but for demo we use file_id)
-        setVideoUrl(`tg://${fileId}`)
-        toast.success('تم رفع الفيديو إلى تيليجرام')
+        // 3. Get the actual downloadable file URL from Telegram
+        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
+        const fileData = await fileRes.json()
+        if (fileData.ok && fileData.result?.file_path) {
+          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
+          setVideoUrl(directUrl)
+          toast.success('تم رفع الفيديو بنجاح')
+        } else {
+          // Fallback: use file_id directly as URL (won't play but stored for reference)
+          setVideoUrl(`tg://${fileId}`)
+          toast.success('تم رفع الفيديو إلى تيليجرام (الرابط المباشر غير متاح)')
+        }
       } else if (tgData.ok && tgData.result?.document) {
-        setVideoUrl(`tg://${tgData.result.document.file_id}`)
-        toast.success('تم رفع الملف إلى تيليجرام')
+        const fileId = tgData.result.document.file_id
+        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
+        const fileData = await fileRes.json()
+        if (fileData.ok && fileData.result?.file_path) {
+          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
+          setVideoUrl(directUrl)
+          toast.success('تم رفع الفيديو بنجاح')
+        } else {
+          setVideoUrl(`tg://${fileId}`)
+          toast.success('تم رفع الملف إلى تيليجرام')
+        }
       } else {
-        toast.error('فشل رفع الفيديو')
+        toast.error('فشل رفع الفيديو: ' + (tgData.description || ''))
       }
     } catch (e: any) {
       toast.error('خطأ في الرفع')

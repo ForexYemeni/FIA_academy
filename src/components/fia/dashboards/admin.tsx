@@ -676,22 +676,19 @@ function AdminTrainers() {
 
 function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', courses_count: 0, years_experience: 0 }
+    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
-  // Reset form when initial changes
   useEffect(() => {
-    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', courses_count: 0, years_experience: 0 })
+    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
   }, [initial])
 
-  // Upload avatar image to Supabase Storage (with client-side compression)
   const handleAvatarUpload = async (file: File) => {
     setUploadingAvatar(true)
     try {
-      // Compress image on client side (Canvas API)
       const compressedFile = await new Promise<File>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = (e) => {
@@ -707,7 +704,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             ctx.drawImage(img, 0, 0, width, height)
             canvas.toBlob((blob) => {
               if (!blob) { reject(new Error('Compression failed')); return }
-              resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+              resolve(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
             }, 'image/jpeg', 0.85)
           }
           img.onerror = () => reject(new Error('Image load failed'))
@@ -726,9 +723,9 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
         setForm({ ...form, avatar: data.url })
         toast.success('تم رفع صورة المدرب')
       } else {
-        toast.error('فشل رفع الصورة')
+        toast.error(data.error || 'فشل رفع الصورة')
       }
-    } catch (e) {
+    } catch {
       toast.error('خطأ في رفع الصورة')
     } finally {
       setUploadingAvatar(false)
@@ -754,80 +751,77 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
     } catch { toast.error('خطأ') } finally { setSaving(false) }
   }
 
+  const TITLES = ['استشاري', 'أخصائي', 'محاضر', 'مدرب معتمد', 'مدرس']
+  const SPECIALIZATIONS = ['الطب الباطني', 'طب الطوارئ', 'التمريض', 'الإنعاش القلبي الرئوي', 'مكافحة العدوى', 'صحة الأم والطفل', 'الصيدلة السريرية', 'إدارة المنشآت الصحية', 'التعليم الطبي']
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{initial ? 'تعديل مدرب' : 'إضافة مدرب جديد'}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-4">
-          {/* Avatar upload (replaces URL field) */}
-          <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
-            <div className="relative">
-              <Avatar className="w-24 h-24 border-4 border-gold/30">
+          {/* Avatar upload */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-shrink-0">
+              <Avatar className="w-16 h-16 border-2 border-gold/30">
                 <AvatarImage src={form.avatar || ''} />
-                <AvatarFallback className="bg-navy text-gold text-3xl">
-                  {form.name?.charAt(0) || '؟'}
-                </AvatarFallback>
+                <AvatarFallback className="bg-navy text-gold text-xl">{form.name?.charAt(0) || '؟'}</AvatarFallback>
               </Avatar>
-              {form.avatar && (
-                <button
-                  onClick={() => setForm({ ...form, avatar: '' })}
-                  className="absolute -top-1 -left-1 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center text-xs"
-                  title="إزالة الصورة"
-                >
-                  ×
-                </button>
-              )}
+              <input type="file" accept="image/*" className="hidden" id="trainer-avatar" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f) }} />
+              <button
+                onClick={() => document.getElementById('trainer-avatar')?.click()}
+                disabled={uploadingAvatar}
+                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gold text-navy flex items-center justify-center text-xs disabled:opacity-50"
+                title="رفع صورة"
+              >
+                {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
+              </button>
             </div>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              id="trainer-avatar-upload"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f) }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={uploadingAvatar}
-              onClick={() => document.getElementById('trainer-avatar-upload')?.click()}
-              className="border-gold/30 text-navy hover:bg-gold/10"
-            >
-              {uploadingAvatar ? (
-                <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</>
-              ) : form.avatar ? (
-                <><Edit className="w-4 h-4 ml-1" /> تغيير الصورة</>
-              ) : (
-                <><FileUp className="w-4 h-4 ml-1" /> رفع صورة المدرب</>
-              )}
-            </Button>
-            <p className="text-xs text-muted-foreground text-center">JPG أو PNG (حد أقصى 5MB) — سيتم ضغط الصورة تلقائياً</p>
+            <div className="flex-1">
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم المدرب *" className="text-base font-medium" />
+            </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div><Label>الاسم *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" /></div>
-            <div><Label>التخصص</Label><Input value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="mt-1" /></div>
+          {/* Quick selects */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">المسمى</Label>
+              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+                <option value="">— اختر —</option>
+                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">التخصص</Label>
+              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+                <option value="">— اختر —</option>
+                {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-          <div><Label>المسمى الوظيفي</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" /></div>
-          <div><Label>البريد الإلكتروني *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" /></div>
+
+          {/* Email + Password */}
+          <div><Label className="text-xs">البريد الإلكتروني *</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" placeholder="example@fia.edu" />
+          </div>
           <div>
-            <Label>كلمة المرور {initial && '(اتركها فارغة للإبقاء على الحالية)'}</Label>
+            <Label className="text-xs">كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}</Label>
             <div className="relative mt-1">
-              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" />
+              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" placeholder="••••••••" />
               <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div><Label>الهاتف</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
-            <div><Label>سنوات الخبرة</Label><Input type="number" value={form.years_experience || 0} onChange={(e) => setForm({ ...form, years_experience: parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" /></div>
+
+          {/* Phone */}
+          <div><Label className="text-xs">الهاتف</Label>
+            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
           </div>
-          <div><Label>النبذة التعريفية</Label><Textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="mt-1" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
           <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
-            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ'}
+            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ'}
           </Button>
         </DialogFooter>
       </DialogContent>
