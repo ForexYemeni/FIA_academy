@@ -232,7 +232,7 @@ function MyCourses({ courses, enrollments, onContinue }: any) {
                   <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
                     بانتظار تأكيد الدفع
                   </Button>
-                ) : e.status === 'completed' || e.status === 'مكتمل' ? (
+                ) : (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? (
                   <div className="space-y-2">
                     <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5" disabled>
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
