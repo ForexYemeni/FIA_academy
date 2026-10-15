@@ -59,7 +59,6 @@ server.log
 /.zscripts/
 /.z-ai-config
 /.claude
-/.fonts/
 
 # Build artifacts
 /test
