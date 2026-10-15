@@ -250,9 +250,9 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       // QR with gold border
       doc.rect(50, 105, 50, 50).lineWidth(2).strokeColor(GOLD).fill('white')
       doc.image(qrBuffer, 52, 107, { width: 46, height: 46 })
-      setFont(7, 'bold')
+      setFont(7, 'regular')
       doc.fillColor(GRAY).text('امسح', 50, 158, { width: 50, align: 'center' })
-      setFont(7, 'regular').fillColor(GRAY).text('للتحقق', 50, 165, { width: 50, align: 'center' })
+      doc.fillColor(GRAY).text('للتحقق', 50, 165, { width: 50, align: 'center' })
 
       // ===== Footer ribbon (gold strip at the very bottom) =====
       doc.rect(50, 50, pageW - 100, 6).fill(GOLD)
