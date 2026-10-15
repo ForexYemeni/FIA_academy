@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Mark native packages as external so Next.js doesn't try to bundle them
+  serverExternalPackages: [
+    '@napi-rs/canvas',
+    'bwip-js',
+  ],
 };
 
 export default nextConfig;
