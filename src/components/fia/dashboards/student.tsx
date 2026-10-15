@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
-  Compass, Lock, Plus, Download, Loader2, FileUp, X,
+  Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -664,12 +664,36 @@ function Results() {
 function Certificates({ certificates }: any) {
   const myCerts = certificates.length > 0 ? certificates : []
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [copiedCert, setCopiedCert] = useState<string | null>(null)
 
   const handleDownload = (cert: any) => {
     setDownloading(cert.id)
     // Open PDF in new tab (browser will download or preview)
     window.open(`/api/certificate-pdf?number=${encodeURIComponent(cert.certificate_number)}&format=pdf`, '_blank')
     setTimeout(() => setDownloading(null), 2000)
+  }
+
+  const handleCopyCode = (cert: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(cert.certificate_number)
+    setCopiedCert(cert.id)
+    toast.success('تم نسخ كود الشهادة', { description: cert.certificate_number })
+    setTimeout(() => setCopiedCert(null), 2000)
+  }
+
+  const handleShare = (cert: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const url = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+    if (navigator.share) {
+      navigator.share({
+        title: 'شهادة معتمدة - أكاديمية المستقبل الدولية',
+        text: `شهادة ${cert.student_name || ''} - ${cert.course_title || ''}`,
+        url,
+      }).catch(() => {})
+    } else {
+      navigator.clipboard.writeText(url)
+      toast.success('تم نسخ رابط الشهادة')
+    }
   }
 
   return (
@@ -697,10 +721,29 @@ function Certificates({ certificates }: any) {
                   <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center">
                     <Award className="w-5 h-5 text-gold" />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="font-bold text-navy text-sm line-clamp-1">{c.course_title || 'دورة'}</div>
-                    <div className="text-xs text-muted-foreground font-mono" dir="ltr">{c.certificate_number}</div>
                   </div>
+                </div>
+                {/* Certificate code card — copyable & prominent */}
+                <div className="bg-gradient-to-br from-navy to-navy-light rounded-lg p-3 mb-3 border border-gold/30">
+                  <div className="text-[10px] text-gold/80 font-semibold mb-1">كود الشهادة (قابل للنسخ)</div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 text-white font-mono text-sm md:text-base font-bold tracking-wide truncate" dir="ltr">{c.certificate_number}</div>
+                    <button
+                      onClick={(e) => handleCopyCode(c, e)}
+                      className="flex-shrink-0 w-7 h-7 rounded-md bg-gold hover:bg-gold-light text-navy flex items-center justify-center transition-colors"
+                      title="نسخ الكود"
+                    >
+                      {copiedCert === c.id ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <button
+                    onClick={(e) => handleShare(c, e)}
+                    className="mt-2 w-full text-[10px] text-gold/70 hover:text-gold flex items-center justify-center gap-1 py-1 rounded transition-colors"
+                  >
+                    <Share2 className="w-3 h-3" /> مشاركة الشهادة
+                  </button>
                 </div>
                 <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
                 <div className="flex gap-2">
