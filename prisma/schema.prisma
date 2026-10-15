@@ -1,0 +1,394 @@
+// FIA - Future International Academy Prisma Schema
+// PostgreSQL on Supabase
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres.tzquudmfazysjogorrxz:m773057153M%40%23%24778288150omy@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require"
+}
+
+// ============ Users & Auth ============
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  password  String
+  role      Role    @default(STUDENT)
+  avatar    String?
+  title     String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrollments    Enrollment[]
+  certificates   Certificate[]
+  payments       Payment[]
+  examAttempts   ExamAttempt[]
+  notifications  Notification[]
+
+  @@map("users")
+}
+
+enum Role {
+  STUDENT
+  TRAINER
+  ADMIN
+}
+
+// ============ Courses ============
+model Course {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  shortDescription String
+  description      String
+  category        String?
+  specialization  String?
+  level           Level    @default(BEGINNER)
+  priceType       PriceType @default(FREE)
+  price           Int      @default(0)
+  currency        String   @default("ر.ي")
+  durationHours   Int      @default(0)
+  modulesCount    Int      @default(0)
+  lessonsCount    Int      @default(0)
+  passScore       Int      @default(60)
+  attempts       Int      @default(2)
+  certificateType String?
+  cover           String?
+  status          CourseStatus @default(DRAFT)
+  rating          Float    @default(0)
+  enrolled       Int      @default(0)
+  featured       Boolean  @default(false)
+  objectives     String[] @default([])
+  prerequisites  String[] @default([])
+  targetAudience String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  trainer     Trainer? @relation(fields: [trainerId], references: [id])
+  trainerId   String?
+  modules     Module[]
+  enrollments Enrollment[]
+
+  @@map("courses")
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum PriceType {
+  FREE
+  PAID
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
+}
+
+// ============ Trainers ============
+model Trainer {
+  id              String   @id @default(cuid())
+  name            String
+  title           String
+  specialization  String
+  bio             String
+  avatar          String
+  email           String?  @unique
+  password        String?
+  phone           String?
+  coursesCount    Int      @default(0)
+  yearsExperience Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  courses Course[]
+
+  @@map("trainers")
+}
+
+// ============ Course Modules & Lessons ============
+model Module {
+  id        String  @id @default(cuid())
+  title     String
+  order     Int     @default(1)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  String
+  lessons   Lesson[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id          String     @id @default(cuid())
+  title       String
+  type        LessonType @default(VIDEO)
+  duration    String     @default("00:00")
+  videoUrl    String?
+  textContent String?
+  preview     Boolean    @default(false)
+  order       Int        @default(1)
+  module      Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId    String
+  questions   Question[]
+
+  @@map("lessons")
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  QUIZ
+  PDF
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  text          String
+  options       String[]
+  correctAnswer Int      @default(0)
+  explanation   String?
+  lesson        Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId      String
+
+  @@map("questions")
+}
+
+// ============ Enrollments ============
+model Enrollment {
+  id               String   @id @default(cuid())
+  progress         Int      @default(0)
+  status           EnrollmentStatus @default(ACTIVE)
+  completedLessons Int      @default(0)
+  totalLessons     Int      @default(0)
+  enrolledAt       DateTime @default(now())
+  lastAccess       DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  userId  String
+  course  Course  @relation(fields: [courseId], references: [id])
+  courseId String
+
+  @@map("enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+// ============ Exam Attempts ============
+model ExamAttempt {
+  id            String    @id @default(cuid())
+  score         Int       @default(0)
+  totalScore    Int       @default(100)
+  passed        Boolean   @default(false)
+  attemptNumber Int       @default(1)
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  course  Course @relation(fields: [courseId], references: [id])
+  courseId String
+
+  @@map("exam_attempts")
+}
+
+// ============ Certificates ============
+model Certificate {
+  id                 String   @id @default(cuid())
+  certificateNumber  String   @unique
+  studentName        String
+  courseTitle        String
+  issuedBy           String   @default("أكاديمية المستقبل الدولية")
+  issuedAt           DateTime @default(now())
+  status             CertificateStatus @default(VALID)
+  hasExternalAccreditation Boolean @default(false)
+  externalAccreditationBody String?
+
+  user    User   @relation(fields: [userId], references: [id])
+    userId  String?
+  course  Course @relation(fields: [courseId], references: [id])
+  courseId String?
+
+  @@map("certificates")
+}
+
+enum CertificateStatus {
+  VALID
+  REVOKED
+}
+
+// ============ Payments ============
+model Payment {
+  id           String         @id @default(cuid())
+  amount       Int
+  currency     String         @default("ر.ي")
+  method       String
+  status       PaymentStatus  @default(PENDING)
+  reference    String?
+  date         DateTime       @default(now())
+
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  course  Course @relation(fields: [courseId], references: [id])
+  courseId String
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFYING
+  CONFIRMED
+  REJECTED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+// ============ Partners ============
+model Partner {
+  id          String   @id @default(cuid())
+  name        String
+  logo        String   @default("🤝")
+  description String
+  website     String?
+  status      PartnerStatus @default(ACTIVE)
+  since       String?
+  createdAt   DateTime @default(now())
+
+  @@map("partners")
+}
+
+enum PartnerStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// ============ Licenses ============
+model License {
+  id              String   @id @default(cuid())
+  issuingBody     String
+  type            String
+  number          String   @unique
+  issuedAt        String
+  expiresAt       String?
+  status          LicenseStatus @default(VALID)
+  verificationUrl String?
+
+  @@map("licenses")
+}
+
+enum LicenseStatus {
+  VALID
+  EXPIRED
+  RENEWING
+  SUSPENDED
+}
+
+// ============ Payment Methods ============
+model PaymentMethod {
+  id          String  @id @default(cuid())
+  name        String
+  icon        String  @default("💳")
+  type        PaymentMethodType @default(MANUAL)
+  currency    String  @default("ر.ي")
+  walletId    String?
+  description  String
+  instructions String
+  enabled     Boolean @default(true)
+
+  @@map("payment_methods")
+}
+
+enum PaymentMethodType {
+  AUTOMATIC
+  MANUAL
+}
+
+// ============ Founder & Exec Team ============
+model Founder {
+  id             String   @id @default(cuid())
+  name           String
+  title          String
+  avatar         String
+  bio            String
+  vision         String
+  qualifications String[]
+  achievements   String[]
+
+  @@map("founder")
+}
+
+model ExecTeamMember {
+  id     String @id @default(cuid())
+  name   String
+  title  String
+  avatar String
+  bio    String
+
+  @@map("exec_team")
+}
+
+// ============ Notifications ============
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+
+  @@map("notifications")
+}
+
+// ============ Site Settings ============
+model SiteSettings {
+  id                String   @id @default(cuid())
+  academyName       String   @default("أكاديمية المستقبل الدولية")
+  academyNameEn     String   @default("Future International Academy")
+  slogan            String   @default("نتعلّم اليوم، نصنع المستقبل.")
+  phone             String   @default("+967 700 000 000")
+  email             String   @default("info@fia.edu")
+  address           String   @default("صنعاء، الجمهورية اليمنية")
+  website           String   @default("www.fia.edu")
+  workingHours      String   @default("السبت - الخميس: 8:00 ص - 6:00 م")
+  facebook          String   @default("#")
+  twitter           String   @default("#")
+  instagram         String   @default("#")
+  youtube           String   @default("#")
+  linkedin          String   @default("#")
+  about             String   @default("")
+  vision            String   @default("")
+  mission           String   @default("")
+  telegramBotToken  String   @default("")
+  telegramChannelId String   @default("")
+  updatedAt         DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+// ============ Audit Log ============
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  target    String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
