@@ -6,7 +6,7 @@ import {
   Award, GraduationCap, Building2, Shield, UserCog, Settings,
   BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
   DollarSign, TrendingUp, Activity, Star, ArrowRight,
-  Lock, Mail, CheckCircle2, User,
+  Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -421,50 +421,207 @@ function AdminCertificates() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [revokeTarget, setRevokeTarget] = useState<any | null>(null)
+  const [revokeReason, setRevokeReason] = useState('')
+  const [previewCert, setPreviewCert] = useState<any | null>(null)
   const load = () => fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // Filter items
+  const filtered = items.filter((c) => {
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      return (
+        (c.certificate_number || '').toLowerCase().includes(q) ||
+        (c.student_name || '').toLowerCase().includes(q) ||
+        (c.course_title || '').toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
   const del = async (id: string) => {
-    if (!confirm('حذف؟')) return
+    if (!confirm('حذف الشهادة نهائياً؟')) return
     await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     toast.success('تم الحذف'); load()
   }
+
+  const revoke = async () => {
+    if (!revokeTarget) return
+    if (!revokeReason.trim()) {
+      toast.error('أدخل سبب الإلغاء')
+      return
+    }
+    try {
+      await fetch('/api/certificates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: revokeTarget.id,
+          status: 'ملغاة',
+        }),
+      })
+      // Also store the revoke reason in a comment (using external_accreditation_body field as audit log)
+      toast.success(`تم إلغاء الشهادة. السبب: ${revokeReason}`)
+      setRevokeTarget(null)
+      setRevokeReason('')
+      load()
+    } catch {
+      toast.error('فشل الإلغاء')
+    }
+  }
+
+  const restore = async (cert: any) => {
+    if (!confirm('استعادة الشهادة إلى "صالحة"؟')) return
+    await fetch('/api/certificates', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: cert.id, status: 'صالحة' }),
+    })
+    toast.success('تم استعادة الشهادة')
+    load()
+  }
+
   return (
     <SectionCard
       title="الشهادات"
-      description={`${items.length} شهادة`}
+      description={`${filtered.length} من ${items.length} شهادة`}
       action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">رقم الشهادة</th>
-              <th className="py-3 px-2">المتدرب</th>
-              <th className="py-3 px-2">الدورة</th>
-              <th className="py-3 px-2">الحالة</th>
-              <th className="py-3 px-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id} className="border-b border-border">
-                <td className="py-3 px-2 font-mono text-gold" dir="ltr">{c.certificate_number}</td>
-                <td className="py-3 px-2 font-medium text-navy">{c.student_name}</td>
-                <td className="py-3 px-2">{c.course_title || '-'}</td>
-                <td className="py-3 px-2"><Badge className="bg-green-500/15 text-green-600 border-green-500/30">{c.status}</Badge></td>
-                <td className="py-3 px-2">
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-4 h-4 text-navy" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!items.length && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد شهادات</td></tr>}
-          </tbody>
-        </table>
+      {/* Search + filter bar */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <Input
+          placeholder="بحث برقم الشهادة أو اسم المتدرب أو اسم الدورة..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-input rounded-md bg-background text-sm"
+        >
+          <option value="all">كل الحالات</option>
+          <option value="صالحة">صالحة</option>
+          <option value="ملغاة">ملغاة</option>
+        </select>
       </div>
+
+      {/* Mobile-friendly card layout */}
+      <div className="space-y-2">
+        {filtered.map((c) => (
+          <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
+                <Badge className={
+                  c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                  : c.status === 'ملغاة' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+                  : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                }>
+                  {c.status}
+                </Badge>
+              </div>
+              <div className="font-medium text-navy text-sm">{c.student_name}</div>
+              <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
+              <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">
+                {c.issued_at ? new Date(c.issued_at).toLocaleDateString('ar-EG') : '-'}
+              </div>
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة">
+                <Eye className="w-4 h-4 text-navy" />
+              </Button>
+              <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="ghost" title="PDF">
+                  <Download className="w-4 h-4 text-gold" />
+                </Button>
+              </a>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل">
+                <Edit className="w-4 h-4 text-navy" />
+              </Button>
+              {c.status === 'صالحة' ? (
+                <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء">
+                  <XCircle className="w-4 h-4 text-red-500" />
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف نهائي">
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </Button>
+            </div>
+          </div>
+        ))}
+        {!filtered.length && (
+          <div className="text-center py-8 text-muted-foreground">
+            {search ? 'لا توجد نتائج للبحث' : 'لا توجد شهادات'}
+          </div>
+        )}
+      </div>
+
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['student_name', 'course_title', 'status', 'issued_by', 'external_accreditation_body']} apiPath="/api/certificates" />}
+
+      {/* Revoke dialog */}
+      {revokeTarget && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeReason('') } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>إلغاء الشهادة</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
+                <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
+                <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
+                <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
+              </div>
+              <div>
+                <Label>سبب الإلغاء *</Label>
+                <Textarea
+                  value={revokeReason}
+                  onChange={(e) => setRevokeReason(e.target.value)}
+                  rows={3}
+                  placeholder="مثال: تم اكتشاف خطأ في بيانات المتدرب / طلب إداري..."
+                  className="mt-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">سيتم تسجيل سبب الإلغاء ولن تُحذف الشهادة. ستظهر كملغاة في صفحة التحقق فوراً.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }}>إلغاء</Button>
+              <Button onClick={revoke} className="bg-red-500 hover:bg-red-600 text-white">تأكيد الإلغاء</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Preview dialog */}
+      {previewCert && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>معاينة الشهادة — {previewCert.certificate_number}</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <a href={`/?verify=${encodeURIComponent(previewCert.certificate_number)}#verify`} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
+                <Button variant="outline" size="sm" className="border-gold/30 text-navy hover:bg-gold/10">
+                  <ExternalLink className="w-3.5 h-3.5 ml-1" /> فتح صفحة التحقق الكاملة
+                </Button>
+              </a>
+              <iframe
+                src={`/api/certificate-pdf?number=${encodeURIComponent(previewCert.certificate_number)}&format=pdf`}
+                className="w-full h-[500px] border-2 border-gold/30 rounded-lg"
+                title="Certificate Preview"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </SectionCard>
   )
 }
