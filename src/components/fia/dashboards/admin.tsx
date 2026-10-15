@@ -177,7 +177,7 @@ function AdminOverview() {
       const completedPayments = payments.filter(p => p.status === 'مكتمل')
       const totalRevenue = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
       const pendingPayments = payments.filter(p => p.status === 'قيد الانتظار').length
-      const completedEnrollments = enrollments.filter(e => e.status === 'completed').length
+      const completedEnrollments = enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
       const activeEnrollments = enrollments.filter(e => e.status === 'active').length
 
       setStats({
@@ -383,11 +383,11 @@ function AdminStudents() {
                     <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
                       <span className="truncate">{c.title}</span>
                       <Badge className={
-                        e.status === 'completed' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
+                        e.status === 'completed' || e.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
                         : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-[10px]'
                         : 'bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]'
                       }>
-                        {e.status === 'completed' ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                        {e.status === 'completed' || e.status === 'مكتمل' ? 'مكتمل'  : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
                       </Badge>
                     </div>
                   ) : null
@@ -431,7 +431,7 @@ function AdminStudents() {
                     const c = courses.find(co => co.id === e.course_id)
                     if (!c) return null
                     const isFree = c.price_type === 'مجانية' || c.price === 0
-                    const isCompleted = e.status === 'completed'
+                    const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
                         <div className="flex-1 min-w-0">
@@ -752,7 +752,7 @@ function AdminCertificates() {
 
   // Check if student completed the course
   const isCourseCompleted = (userId: string, courseId: string) => {
-    return enrollments.some(e => e.user_id === userId && e.course_id === courseId && e.status === 'completed')
+    return enrollments.some(e => e.user_id === userId && e.course_id === courseId && (e.status === 'completed' || e.status === 'مكتمل'))
   }
 
   const requestStatusBadge = (status: string) => {
@@ -1489,7 +1489,7 @@ function AdminReports() {
   const pendingRevenue = data.payments.filter(p => p.status === 'قيد الانتظار').reduce((sum, p) => sum + (p.amount || 0), 0)
   const freeCourses = data.courses.filter(c => c.price_type === 'مجانية' || c.price === 0).length
   const paidCourses = data.courses.filter(c => c.price_type !== 'مجانية' && c.price > 0).length
-  const completedEnrs = data.enrollments.filter(e => e.status === 'completed').length
+  const completedEnrs = data.enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
   const totalLessons = data.courses.reduce((sum, c) => sum + (c.lessons_count || 0), 0)
   const avgRating = data.courses.length > 0
     ? (data.courses.reduce((sum, c) => sum + (c.rating || 0), 0) / data.courses.length).toFixed(1)
@@ -1577,7 +1577,7 @@ function AdminLogs() {
       // Enrollment logs
       enrollments.forEach(enr => {
         const course = courses.find(co => co.id === enr.course_id)
-        if (enr.status === 'completed') {
+        if (enr.status === 'completed' || enr.status === 'مكتمل') {
           realLogs.push({ action: `إكمال دورة: ${course?.title || 'دورة'}`, time: enr.completed_at || enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'complete' })
         } else if (enr.status === 'active') {
           realLogs.push({ action: `تسجيل في دورة: ${course?.title || 'دورة'}`, time: enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'enroll' })
