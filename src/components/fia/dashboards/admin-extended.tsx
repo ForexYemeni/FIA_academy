@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Tag, Users, FileText, Star, MessageSquare,
   Newspaper, Mail, HelpCircle, ExternalLink, Clock, CheckCircle2, X,
-  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight,
+  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight, Copy,
 } from 'lucide-react'
 
 // ============================================================================
@@ -220,9 +220,36 @@ export function AdminAffiliates() {
               </div>
               <Users className="w-5 h-5 text-gold" />
             </div>
-            <div className="bg-gold/10 rounded-md p-2 mb-3 text-center">
+            <div className="bg-gold/10 rounded-md p-3 mb-3 text-center border border-gold/20">
               <div className="text-[10px] text-muted-foreground mb-1">كود الإحالة</div>
-              <div className="font-mono font-bold text-navy" dir="ltr">{a.unique_code}</div>
+              <div className="font-mono font-bold text-navy text-lg" dir="ltr">{a.unique_code}</div>
+              <div className="mt-2 pt-2 border-t border-gold/20">
+                <div className="text-[10px] text-muted-foreground mb-1">رابط الدعوة</div>
+                <div className="font-mono text-[10px] text-navy/80 truncate" dir="ltr">
+                  https://fiaacademy.vercel.app/?ref={a.unique_code}
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  const url = `https://fiaacademy.vercel.app/?ref=${a.unique_code}`
+                  try {
+                    await navigator.clipboard.writeText(url)
+                    toast.success('تم نسخ رابط الدعوة')
+                  } catch {
+                    // Fallback — select the URL via a temporary input
+                    const ta = document.createElement('textarea')
+                    ta.value = url
+                    document.body.appendChild(ta)
+                    ta.select()
+                    document.execCommand('copy')
+                    document.body.removeChild(ta)
+                    toast.success('تم نسخ رابط الدعوة')
+                  }
+                }}
+                className="mt-2 w-full bg-navy hover:bg-navy-light text-gold px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1"
+              >
+                <Copy className="w-3 h-3" /> نسخ الرابط
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs mb-3">
               <div className="text-center p-2 bg-muted/30 rounded">

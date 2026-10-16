@@ -33,6 +33,9 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
   const [warnings, setWarnings] = useState<string[]>([])
   const [showFullscreen, setShowFullscreen] = useState(false)
   const recordedRef = useRef(false)
+  // Certificate issuance state (only relevant on results view)
+  const [issuing, setIssuing] = useState(false)
+  const [certNumber, setCertNumber] = useState<string | null>(null)
 
   // Anti-cheat — detect tab switches + window blur
   useEffect(() => {
@@ -121,6 +124,26 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
     const passed = result.passed
     const score = result.score
     const passScore = course?.pass_score || 60
+
+    const issueCertificate = async () => {
+      setIssuing(true)
+      try {
+        const res = await fetch('/api/certificates/issue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: attempt.user_id, course_id: attempt.course_id }),
+        })
+        const data = await res.json()
+        if (!res.ok) { toast.error(data.error || 'فشل إصدار الشهادة'); return }
+        if (data.already) {
+          toast.info('لديك شهادة صادرة بالفعل')
+        } else {
+          toast.success('🎉 تم إصدار شهادتك!')
+        }
+        setCertNumber(data.certificate?.certificate_number || null)
+      } finally { setIssuing(false) }
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-navy/5 to-white py-12 px-4" dir="rtl">
         <div className="max-w-2xl mx-auto">
@@ -141,7 +164,36 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
                 <AlertTriangle className="w-3 h-3 ml-1" /> {tabSwitches} تحذيرات أمنية مسجّلة
               </Badge>
             )}
-            <div className="flex flex-wrap justify-center gap-3">
+
+            {/* Issue certificate — only when passed */}
+            {passed && (
+              <div className="mt-6 p-4 bg-gold/10 border border-gold/30 rounded-lg">
+                {certNumber ? (
+                  <div>
+                    <p className="text-sm font-bold text-navy mb-2">📜 شهادتك الصادرة</p>
+                    <p className="font-mono text-lg text-gold mb-3" dir="ltr">{certNumber}</p>
+                    <a href={`/verify/${certNumber}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg font-bold text-sm">
+                      <CheckCircle2 className="w-4 h-4" /> عرض الشهادة
+                    </a>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-bold text-navy mb-2">🎉 يمكنك الآن إصدار شهادتك!</p>
+                    <p className="text-xs text-muted-foreground mb-3">احصل على شهادة إكمال معتمدة قابلة للتحقق منها عبر QR code</p>
+                    <button
+                      onClick={issueCertificate}
+                      disabled={issuing}
+                      className="inline-flex items-center gap-2 bg-gold hover:bg-gold-light text-navy px-6 py-2.5 rounded-lg font-bold text-sm disabled:opacity-50"
+                    >
+                      {issuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                      {issuing ? 'جاري الإصدار...' : '📜 إصدار الشهادة'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
               <Button onClick={() => router.push('/')} className="bg-navy hover:bg-navy-light">
                 العودة للوحة التحكم
               </Button>
