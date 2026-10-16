@@ -4,25 +4,30 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// This endpoint runs the 004 migration on the live Supabase DB. It does so
-// by issuing many small SQL statements through the Supabase REST endpoint
-// via the `supabaseAdmin` client. Since the JS client doesn't have a raw
-// SQL method, we use the pg_meta extension at /pg/query.
-//
-// Required env vars (set on Vercel):
-//   NEXT_PUBLIC_SUPABASE_URL / SUPABASE_URL
-//   SUPABASE_SERVICE_KEY
-//
-// The /pg/query endpoint is part of the supabase admin REST API and accepts
-// raw SQL. We call it directly with fetch — supabase-js doesn't expose it.
-async function runSqlViaPgMeta(sql: string): Promise<{ ok: number; failed: number; errors: string[] }> {
-  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || ''
-  if (!projectUrl || !serviceKey) {
-    return { ok: 0, failed: 0, errors: ['Supabase URL or service key not set on server'] }
+// On Vercel, env vars are present — we can connect directly via pg.
+// In local dev, env vars may be missing — we fall back to supabaseAdmin checks.
+async function runMigrationViaPg(sql: string): Promise<{ ok: number; failed: number; errors: string[] }> {
+  // Try to load pg dynamically — it's installed as a dependency
+  let Pool: any
+  try {
+    const pg = await import('pg')
+    Pool = pg.Pool
+  } catch {
+    return { ok: 0, failed: 0, errors: ['pg module not available — skipping direct DB migration'] }
   }
 
-  // Split the SQL into individual statements
+  // Construct the connection string from env vars
+  const dbUrl = process.env.DATABASE_URL
+  if (!dbUrl) {
+    return { ok: 0, failed: 0, errors: ['DATABASE_URL not set on server'] }
+  }
+
+  const pool = new Pool({
+    connectionString: dbUrl,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 30000,
+  })
+
   const statements = sql
     .split(/;\s*\n/)
     .map((s) => s.trim())
@@ -31,35 +36,25 @@ async function runSqlViaPgMeta(sql: string): Promise<{ ok: number; failed: numbe
   let ok = 0
   let failed = 0
   const errors: string[] = []
+
   for (const stmt of statements) {
     const meaningful = stmt.replace(/--.*$/gm, '').trim()
     if (!meaningful) continue
     try {
-      const res = await fetch(`${projectUrl}/pg/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({ query: stmt + ';' }),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        const msg = (text || '').substring(0, 200)
-        // expected: "already exists", "duplicate key" — skip silently
-        if (!msg.includes('already exists') && !msg.includes('duplicate key')) {
-          failed++
-          errors.push(`${stmt.substring(0, 80).replace(/\s+/g, ' ')} → ${msg}`)
-        }
-        continue
-      }
+      await pool.query(stmt + ';')
       ok++
     } catch (e: any) {
-      failed++
-      errors.push(`${stmt.substring(0, 80).replace(/\s+/g, ' ')} → ${e.message}`)
+      const msg = e.message || ''
+      if (msg.includes('already exists') || msg.includes('duplicate key')) {
+        // expected when re-running
+      } else {
+        failed++
+        errors.push(`${stmt.substring(0, 80).replace(/\s+/g, ' ')} → ${msg.substring(0, 150)}`)
+      }
     }
   }
+
+  try { await pool.end() } catch {}
   return { ok, failed, errors }
 }
 
@@ -82,8 +77,18 @@ async function listNewTables() {
 }
 
 export async function GET() {
-  // Read the migration SQL file from disk (only works if it's bundled with
-  // the deployment — it is, since supabase/migrations/ is in the repo).
+  // Expose (sanitized) which env vars are actually set on the server,
+  // so we can understand which connection path will work.
+  const envCheck = {
+    has_supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL || !!process.env.SUPABASE_URL,
+    has_service_key: !!process.env.SUPABASE_SERVICE_KEY,
+    has_anon_key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || !!process.env.SUPABASE_ANON_KEY,
+    has_database_url: !!process.env.DATABASE_URL,
+    supabase_url_prefix: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').substring(0, 40),
+    database_url_prefix: (process.env.DATABASE_URL || '').substring(0, 40),
+    jwt_secret_set: !!process.env.JWT_SECRET,
+  }
+
   let sql = ''
   try {
     const fs = await import('fs')
@@ -91,16 +96,17 @@ export async function GET() {
     const sqlPath = path.join(process.cwd(), 'supabase', 'migrations', '004_major_features_extension.sql')
     sql = fs.readFileSync(sqlPath, 'utf8')
   } catch (e: any) {
-    return NextResponse.json({ error: 'Failed to read migration file', details: e.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to read migration file', details: e.message, envCheck }, { status: 500 })
   }
 
-  const result = await runSqlViaPgMeta(sql)
+  const result = await runMigrationViaPg(sql)
   const existing = await listNewTables()
 
   return NextResponse.json({
+    env: envCheck,
     ok: result.ok,
     failed: result.failed,
-    errors: result.errors.slice(0, 10),
+    errors: result.errors.slice(0, 20),
     tables_present: existing,
     tables_count: `${existing.length}/14`,
   })
