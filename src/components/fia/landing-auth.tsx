@@ -14,7 +14,7 @@ type Trainer = { id: string; name: string }
 export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', affiliateCode: '' })
   const [courses, setCourses] = useState<Course[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [founder, setFounder] = useState<any>(null)
@@ -26,6 +26,12 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
     fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/team?role=founder').then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length > 0) setFounder(d[0]) }).catch(() => {})
     fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
+    // Auto-fill the affiliate code field from localStorage if the user
+    // landed via a referral link (layout.tsx stores it there).
+    try {
+      const refCode = localStorage.getItem('fia_ref_code')
+      if (refCode) setForm((prev) => ({ ...prev, affiliateCode: refCode }))
+    } catch {}
   }, [])
 
   const submit = async () => {
@@ -34,12 +40,16 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
       const url = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
       const payload = mode === 'login'
         ? { email: form.email, password: form.password }
-        : { name: form.name, email: form.email, password: form.password, phone: form.phone }
+        : { name: form.name, email: form.email, password: form.password, phone: form.phone, affiliate_code: form.affiliateCode || undefined }
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'فشل العملية'); return }
       setAuth(data.user, data.token)
       toast.success(mode === 'login' ? `مرحباً ${data.user.name}` : 'تم إنشاء الحساب بنجاح')
+      // Clear the stored ref code after successful registration
+      if (mode === 'register') {
+        try { localStorage.removeItem('fia_ref_code'); localStorage.removeItem('fia_ref_id') } catch {}
+      }
     } catch { toast.error('حدث خطأ غير متوقع') }
     finally { setLoading(false) }
   }
@@ -92,6 +102,13 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
             <div>
               <Label htmlFor="phone" className="text-[#0A1F44] font-medium text-xs">رقم الهاتف</Label>
               <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+967 7XX XXX XXX" className="mt-1 h-10 rounded-lg text-sm" dir="ltr" />
+            </div>
+          )}
+          {mode === 'register' && (
+            <div>
+              <Label htmlFor="affiliate" className="text-[#0A1F44] font-medium text-xs">كود الدعوة (اختياري)</Label>
+              <Input id="affiliate" value={form.affiliateCode} onChange={(e) => setForm({ ...form, affiliateCode: e.target.value })} placeholder="FIA-XXXX" className="mt-1 h-10 rounded-lg text-sm font-mono" dir="ltr" />
+              {form.affiliateCode && <p className="text-[10px] text-green-600 mt-1">✓ تمت إضافته تلقائياً من رابط الدعوة</p>}
             </div>
           )}
           <div>

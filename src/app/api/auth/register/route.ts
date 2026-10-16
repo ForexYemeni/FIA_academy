@@ -4,7 +4,7 @@ import { hashPassword, signToken } from '@/lib/auth-server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, phone } = await req.json()
+    const { name, email, password, phone, affiliate_code } = await req.json()
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'الاسم والبريد وكلمة المرور مطلوبة' }, { status: 400 })
     }
@@ -41,6 +41,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Process affiliate referral if a code was provided
+    if (affiliate_code) {
+      try {
+        await processAffiliateReferral(affiliate_code, data.id)
+      } catch { /* non-fatal — the user is still created */ }
+    }
+
     const user = {
       id: data.id,
       email: data.email,
@@ -62,4 +69,31 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
+}
+
+// Look up the affiliate by unique_code, create a referral record
+// linking the affiliate to the new student, and increment the
+// affiliate's total_referrals.
+async function processAffiliateReferral(code: string, studentId: string) {
+  const { data: affiliate } = await supabaseAdmin
+    .from('affiliates')
+    .select('id, commission_percent, total_referrals, total_earnings')
+    .eq('unique_code', code.toUpperCase())
+    .eq('status', 'نشط')
+    .maybeSingle()
+  if (!affiliate) return
+
+  // Create the referral record (commission = 0 until the student pays)
+  await supabaseAdmin.from('affiliate_referrals').insert({
+    affiliate_id: affiliate.id,
+    student_id: studentId,
+    amount: 0,
+    commission: 0,
+    status: 'معلق', // pending — will become 'مكتمل' once the student pays
+  })
+
+  // Increment total_referrals on the affiliate
+  await supabaseAdmin.from('affiliates').update({
+    total_referrals: (affiliate.total_referrals || 0) + 1,
+  }).eq('id', affiliate.id)
 }
