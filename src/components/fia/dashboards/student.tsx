@@ -1732,7 +1732,7 @@ function StudentCertificates({ user }: any) {
 
       {/* Certificate viewer dialog — opens in-app, no new tab */}
       <Dialog open={!!viewing} onOpenChange={(o) => { if (!o) setViewing(null) }}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
