@@ -1293,11 +1293,11 @@ function AdminSite() {
     setSaving(true)
     try {
       const res = await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
-      const data = await res.json()
-      if (data._migration_needed) {
-        toast.error('بعض الحقول لم تُحفظ — يجب تشغيل SQL migration', { description: 'اقرأ التعليمات أسفل الصفحة' })
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error(data.error || 'فشل الحفظ')
       } else {
-        toast.success('تم الحفظ')
+        toast.success('تم الحفظ بنجاح')
       }
     } catch { toast.error('فشل') } finally { setSaving(false) }
   }
@@ -1479,32 +1479,6 @@ function AdminSite() {
                 تفعيل
               </label>
             </div>
-          </div>
-        )}
-
-        {/* Migration notice */}
-        {settings._migration_needed && (
-          <div className="bg-red-50 border border-red-500/30 rounded-lg p-3 text-xs">
-            <div className="font-bold text-red-700 mb-1">⚠ بعض الحقول الجديدة غير محفوظة</div>
-            <div className="text-red-600">شغّل هذا الـ SQL في Supabase Dashboard → SQL Editor:</div>
-            <pre className="bg-white border border-red-200 rounded p-2 mt-2 text-[10px] overflow-x-auto" dir="ltr">{`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_vision TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_mission TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_values TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_team TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_privacy TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_terms TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_refund TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_support TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_facebook TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_facebook_enabled BOOLEAN DEFAULT false;
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_telegram TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_telegram_enabled BOOLEAN DEFAULT false;
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_whatsapp TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_whatsapp_enabled BOOLEAN DEFAULT false;
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_sms TEXT DEFAULT '';
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_sms_enabled BOOLEAN DEFAULT false;
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_partners BOOLEAN DEFAULT false;
-ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_licenses BOOLEAN DEFAULT false;`}</pre>
           </div>
         )}
 
