@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Video, FileText, HelpCircle, FileUp, X, Play, Download,
+  Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -292,6 +292,13 @@ function PdfViewer({ url }: { url?: string }) {
     )
   }
 
+  // Render the PDF inline via Google Docs Viewer. Browsing a raw Telegram file
+  // URL directly (in an <iframe> or <object>) makes the browser download the
+  // file instead of displaying it. Google Docs Viewer fetches and renders the
+  // PDF server-side, so the user always sees the document inside the modal —
+  // no auto-download is triggered.
+  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
@@ -302,15 +309,16 @@ function PdfViewer({ url }: { url?: string }) {
             <div className="text-xs text-muted-foreground">ملف PDF محمي</div>
           </div>
         </div>
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        {/* Opens Google Docs Viewer in a new tab — never triggers a download */}
+        <a href={viewerUrl} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="outline" className="border-navy/30 text-navy hover:bg-navy/5">
-            <Download className="w-3.5 h-3.5 ml-1" /> فتح في تبويب
+            <ArrowRight className="w-3.5 h-3.5 ml-1" /> فتح في تبويب
           </Button>
         </a>
       </div>
       <iframe
-        src={url}
-        className="w-full h-[500px] rounded-lg border-2 border-border"
+        src={viewerUrl}
+        className="w-full h-[600px] rounded-lg border-2 border-border"
         title="PDF Preview"
       />
     </div>

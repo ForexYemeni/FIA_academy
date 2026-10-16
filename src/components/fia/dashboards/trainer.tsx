@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
-  HelpCircle, UserPlus, X,
+  HelpCircle, UserPlus, X, AlertTriangle,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -119,6 +119,55 @@ export function TrainerDashboard() {
 }
 
 function TrainerOverview({ user, courses, students }: any) {
+  // Compute the real average rating from courses that actually carry a
+  // numeric rating. If no ratings exist yet, fall back to a clear message
+  // instead of a hardcoded fake number.
+  const ratedCourses = (courses || []).filter(
+    (c: any) => typeof c.rating === 'number' && c.rating > 0
+  )
+  const avgRating =
+    ratedCourses.length > 0
+      ? (ratedCourses.reduce((acc, c) => acc + c.rating, 0) / ratedCourses.length).toFixed(1)
+      : 'لا توجد تقييمات بعد'
+
+  // Real "active exams" count: lessons with lesson_type === 'exam' across
+  // the trainer's own courses (same data source as TrainerExams).
+  const [examsCount, setExamsCount] = useState<number>(0)
+  const [examsLoading, setExamsLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!courses || courses.length === 0) {
+        setExamsCount(0)
+        return
+      }
+      setExamsLoading(true)
+      try {
+        const results = await Promise.all(
+          courses.map(async (c: any) => {
+            try {
+              const res = await fetch(`/api/lessons?course_id=${c.id}`)
+              const data = await res.json()
+              const lessons = Array.isArray(data) ? data : []
+              return lessons.filter((l: any) => l.lesson_type === 'exam').length
+            } catch {
+              return 0
+            }
+          })
+        )
+        if (cancelled) return
+        setExamsCount(results.reduce((a, b) => a + b, 0))
+      } catch {
+        if (!cancelled) setExamsCount(0)
+      } finally {
+        if (!cancelled) setExamsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [courses])
+
   return (
     <div className="space-y-6">
       <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
@@ -128,9 +177,14 @@ function TrainerOverview({ user, courses, students }: any) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={BookOpen} label="الدورات التدريبية" value={courses.length} color="navy" />
-        <StatCard icon={Users} label="إجمالي المتدربين" value={students.length || 542} color="gold" />
-        <StatCard icon={Star} label="متوسط التقييم" value="4.8" color="green" />
-        <StatCard icon={FileText} label="الاختبارات النشطة" value={3} color="blue" />
+        <StatCard icon={Users} label="إجمالي المتدربين" value={String(students.length)} color="gold" />
+        <StatCard icon={Star} label="متوسط التقييم" value={avgRating} color="green" />
+        <StatCard
+          icon={FileText}
+          label="الاختبارات النشطة"
+          value={examsLoading ? '—' : examsCount}
+          color="blue"
+        />
       </div>
 
       <SectionCard title="أحدث الدورات" description="الدورات التي تدرّسها">
@@ -154,9 +208,12 @@ function TrainerOverview({ user, courses, students }: any) {
 
 function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: any) {
   const [deleting, setDeleting] = useState<string | null>(null)
+  // Course currently awaiting delete confirmation. Null means the dialog is closed.
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الدورة؟')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    const id = deleteTarget.id
     setDeleting(id)
     try {
       const res = await fetch('/api/courses', {
@@ -166,9 +223,11 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
       })
       if (res.ok) {
         toast.success('تم حذف الدورة')
+        setDeleteTarget(null)
         onRefresh()
       } else {
-        toast.error('فشل الحذف')
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل الحذف')
       }
     } catch {
       toast.error('خطأ في الاتصال')
@@ -208,7 +267,7 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(c)}>
                     <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
                   </Button>
-                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(c.id)} disabled={deleting === c.id}>
+                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)} disabled={deleting === c.id}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -217,6 +276,51 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
           </Card>
         ))}
       </div>
+
+      {/* Professional delete-confirmation card */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null) }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              تأكيد الحذف
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <div className="flex items-start gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+              <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-xs text-muted-foreground mb-1">سيتم حذف الدورة التالية:</div>
+                <div className="font-bold text-navy line-clamp-2 break-words">{deleteTarget?.title}</div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={!!deleting}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={!!deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting
+                ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحذف...</>
+                : <><Trash2 className="w-4 h-4 ml-1" /> حذف الدورة</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 }
@@ -448,6 +552,7 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
 
 function TrainerStudents({ students, courses }: any) {
   const [enrollments, setEnrollments] = useState<any[]>([])
+  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false)
 
   useEffect(() => {
     fetch('/api/enrollments').then((r) => r.json()).then((d) => {
@@ -456,27 +561,39 @@ function TrainerStudents({ students, courses }: any) {
       const trainerCourseIds = courses.map((c: any) => c.id)
       const mine = all.filter((e: any) => trainerCourseIds.includes(e.course_id))
       setEnrollments(mine)
-    }).catch(() => {})
+      setEnrollmentsLoaded(true)
+    }).catch(() => setEnrollmentsLoaded(true))
   }, [courses])
 
   // Helper: get all enrollments for a student
   const studentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
 
+  // Filter students to ONLY those enrolled in at least one of this trainer's courses.
+  // The `enrollments` state is already scoped to the trainer's course IDs, so its
+  // user_id values are exactly the students we want to show.
+  const enrolledStudentIds = new Set(enrollments.map((e: any) => e.user_id))
+  const filteredStudents = students.filter((s: any) => enrolledStudentIds.has(s.id))
+
   return (
-    <SectionCard title="متدربوّ" description={`${students.length} متدرب${students.length === 1 ? '' : 'ين'}`}>
+    <SectionCard title="متدربوّ" description={`${filteredStudents.length} متدرب${filteredStudents.length === 1 ? '' : 'ين'}`}>
       {courses.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-muted-foreground">لا يوجد متدربون — أنشئ دورة أولاً</p>
         </div>
-      ) : students.length === 0 ? (
+      ) : !enrollmentsLoaded ? (
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
+          <p className="text-muted-foreground">جاري تحميل المتدربين...</p>
+        </div>
+      ) : filteredStudents.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">لا يوجد متدربون بعد</p>
+          <p className="text-muted-foreground">لا يوجد متدربون في دوراتك بعد</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {students.map((s: any) => {
+          {filteredStudents.map((s: any) => {
             const studentEnrs = studentEnrollments(s.id)
             return (
               <Card key={s.id} className="overflow-hidden">
