@@ -4,8 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   try {
     const num = req.nextUrl.searchParams.get('number')
+    const studentName = req.nextUrl.searchParams.get('student_name')
+    const status = req.nextUrl.searchParams.get('status')
     let query = supabaseAdmin.from('certificates').select('*')
     if (num) query = query.eq('certificate_number', num)
+    if (studentName) query = query.eq('student_name', studentName)
+    if (status) query = query.eq('status', status)
     const { data, error } = await query.order('issued_at', { ascending: false })
     if (error) throw error
     return NextResponse.json(data || [])
