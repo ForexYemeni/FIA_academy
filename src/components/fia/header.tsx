@@ -8,6 +8,9 @@ import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 
 const NAV_LINKS = [
+  { href: '#courses', label: 'دوراتنا' },
+  { href: '#trainers', label: 'مدربونا' },
+  { href: '#team', label: 'المؤسس والفريق' },
   { href: '#about', label: 'من نحن' },
   { href: '#privacy', label: 'سياسة الخصوصية' },
   { href: '#terms', label: 'شروط الاستخدام' },

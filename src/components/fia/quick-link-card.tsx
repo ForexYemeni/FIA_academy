@@ -1,14 +1,29 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
+  BookOpen, GraduationCap, UserCog,
 } from 'lucide-react'
 
 export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | null; onClose: () => void; settings: any }) {
+  const [courses, setCourses] = useState<any[]>([])
+  const [trainers, setTrainers] = useState<any[]>([])
+  const [team, setTeam] = useState<any[]>([])
+
+  useEffect(() => {
+    if (cardId === 'courses') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'trainers') fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'team') fetch('/api/team').then((r) => r.json()).then((d) => setTeam(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [cardId])
+
   if (!cardId) return null
 
   const meta: Record<string, { title: string; icon: any }> = {
+    courses: { title: 'دوراتنا', icon: BookOpen },
+    trainers: { title: 'مدربونا', icon: GraduationCap },
+    team: { title: 'المؤسس والفريق', icon: UserCog },
     about: { title: 'من نحن', icon: Award },
     privacy: { title: 'سياسة الخصوصية', icon: Shield },
     terms: { title: 'شروط الاستخدام', icon: FileText },
@@ -22,6 +37,89 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
   const Icon = m.icon
 
   const getContent = () => {
+    // === COURSES ===
+    if (cardId === 'courses') {
+      if (courses.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا توجد دورات متاحة حالياً</p>
+      return (
+        <div className="space-y-3">
+          {courses.map((c) => (
+            <div key={c.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 rounded-xl bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 h-5 text-[#C9A961]" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-[#0A1F44] text-sm">{c.title}</h4>
+                {c.short_description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{c.short_description}</p>}
+                <div className="flex items-center gap-2 mt-1">
+                  {c.duration_hours && <span className="text-[10px] text-gray-400">{c.duration_hours} ساعة</span>}
+                  {c.level && <span className="text-[10px] text-gray-400">{c.level}</span>}
+                  {c.price_type === 'free' || c.price === 0 ? (
+                    <span className="text-[10px] text-green-600 font-semibold">مجانية</span>
+                  ) : (
+                    <span className="text-[10px] text-[#C9A961] font-semibold">{c.price?.toLocaleString()} {c.currency || 'ر.ي'}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // === TRAINERS ===
+    if (cardId === 'trainers') {
+      if (trainers.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد مدربون حالياً</p>
+      return (
+        <div className="space-y-3">
+          {trainers.map((t) => (
+            <div key={t.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+              {t.avatar ? (
+                <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#C9A961] font-bold text-sm">{t.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1">
+                <h4 className="font-bold text-[#0A1F44] text-sm">{t.name}</h4>
+                {t.title && <p className="text-xs text-gray-500">{t.title}</p>}
+                {t.specialization && <p className="text-[10px] text-gray-400 mt-0.5">{t.specialization}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // === TEAM (founder + leaders) ===
+    if (cardId === 'team') {
+      if (team.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد أعضاء فريق حالياً</p>
+      return (
+        <div className="space-y-3">
+          {team.map((m) => (
+            <div key={m.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+              {m.avatar ? (
+                <img src={m.avatar} alt={m.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#C9A961] font-bold text-sm">{m.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-[#0A1F44] text-sm">{m.name}</h4>
+                  {m.role === 'founder' && <span className="text-[10px] bg-[#C9A961]/15 text-[#C9A961] px-2 py-0.5 rounded-full font-semibold">المؤسس</span>}
+                  {m.role === 'leader' && <span className="text-[10px] bg-blue-500/15 text-blue-600 px-2 py-0.5 rounded-full font-semibold">قيادي</span>}
+                </div>
+                {m.title && <p className="text-xs text-gray-500">{m.title}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // === ABOUT ===
     if (cardId === 'about') {
       return (
         <div className="space-y-3">
@@ -47,6 +145,8 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
         </div>
       )
     }
+
+    // === SOCIAL ===
     if (cardId === 'social') {
       const socials = [
         { key: 'facebook', name: 'فيسبوك', enabled: settings.social_facebook_enabled, url: settings.social_facebook, color: '#1877F2',
@@ -58,29 +158,19 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
         { key: 'sms', name: 'رسائل نصية', enabled: settings.social_sms_enabled, url: settings.social_sms, color: '#34A853',
           icon: <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-2-5c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1s.45-1 1-1h2c.55 0 1 .45 1 1zm-6 0c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1s.45-1 1-1h4c.55 0 1 .45 1 1z"/></svg> },
       ]
-
       const activeSocials = socials.filter((s) => s.enabled && s.url)
-      if (activeSocials.length === 0) {
-        return <p className="text-sm text-gray-500 text-center py-8">لم تتم إضافة روابط التواصل بعد.</p>
-      }
-
+      if (activeSocials.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لم تتم إضافة روابط التواصل بعد.</p>
       return (
         <div className="grid grid-cols-2 gap-3">
           {activeSocials.map((s) => {
-            const href = s.key === 'telegram'
-              ? (s.url.startsWith('http') ? s.url : `https://t.me/${s.url.replace('@', '')}`)
-              : s.key === 'whatsapp'
-              ? (s.url.startsWith('http') ? s.url : `https://wa.me/${s.url.replace(/[^0-9]/g, '')}`)
-              : s.key === 'sms'
-              ? `sms:${s.url}`
-              : s.url
+            const href = s.key === 'telegram' ? (s.url.startsWith('http') ? s.url : `https://t.me/${s.url.replace('@', '')}`)
+              : s.key === 'whatsapp' ? (s.url.startsWith('http') ? s.url : `https://wa.me/${s.url.replace(/[^0-9]/g, '')}`)
+              : s.key === 'sms' ? `sms:${s.url}` : s.url
             return (
               <a key={s.key} href={href} target="_blank" rel="noopener noreferrer"
                 className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all hover:shadow-md"
                 style={{ borderColor: s.color + '40', backgroundColor: s.color + '08' }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: s.color }}>
-                  {s.icon}
-                </div>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: s.color }}>{s.icon}</div>
                 <span className="text-xs font-semibold text-gray-700">{s.name}</span>
               </a>
             )
@@ -89,9 +179,9 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       )
     }
 
+    // === POLICIES ===
     const fieldMap: Record<string, string> = { privacy: 'policy_privacy', terms: 'policy_terms', refund: 'policy_refund', support: 'policy_support' }
     const content = settings[fieldMap[cardId]] || 'هذا المحتوى قيد التحضير. سيتم تحديثه قريباً.'
-
     return (
       <div className="p-4 bg-gray-50 rounded-xl">
         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{content}</p>
