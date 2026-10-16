@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -110,15 +111,26 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
     }
   }
 
-  const del = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا العضو؟')) return
-    await fetch('/api/team', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    toast.success('تم الحذف')
-    load()
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const del = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/team', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      })
+      toast.success('تم حذف العضو')
+      setDeleteTarget(null)
+      load()
+    } catch {
+      toast.error('فشل الحذف')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
@@ -268,7 +280,7 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(m); setOpen(true) }}>
                       <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(m.id!)}>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(m)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -288,6 +300,19 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
           onSave={save}
         />
       )}
+
+      {/* Professional delete confirmation card */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title="حذف عضو الفريق"
+        message="هل أنت متأكد من حذف هذا العضو؟ لا يمكن التراجع عن هذا الإجراء."
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={del}
+        loading={deleting}
+      />
     </div>
   )
 }

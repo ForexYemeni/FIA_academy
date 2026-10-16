@@ -202,11 +202,9 @@ function VideoPlayer({ url }: { url?: string }) {
   }
 
   if (loading) {
+    // Show a black video placeholder — no loading text
     return (
-      <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
-        <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
-        <p className="text-muted-foreground">جاري جلب الفيديو من تيليجرام...</p>
-      </div>
+      <div className="bg-black rounded-lg overflow-hidden" style={{ minHeight: '200px' }} />
     )
   }
 
