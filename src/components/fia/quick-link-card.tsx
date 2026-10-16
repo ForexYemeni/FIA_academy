@@ -160,13 +160,7 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
               </div>
             )}
 
-            {/* Contact */}
-            {(selectedTrainer.email || selectedTrainer.linkedin) && (
-              <div className="flex items-center gap-3 pt-2">
-                {selectedTrainer.email && <a href={`mailto:${selectedTrainer.email}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Mail className="w-3 h-3" /> بريد</a>}
-                {selectedTrainer.linkedin && <a href={selectedTrainer.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Linkedin className="w-3 h-3" /> لينكدإن</a>}
-              </div>
-            )}
+            {/* No contact info shown — privacy: no email/phone/linkedin for trainers */}
           </div>
         )
       }
