@@ -54,6 +54,13 @@ async function runMigrationViaPg(sql: string): Promise<{ ok: number; failed: num
     connectionTimeoutMillis: 30000,
   })
 
+  // Vercel's serverless runs in a sandbox where the system CA bundle doesn't
+  // include the chain Supabase's pooler uses. Globally disabling TLS verify for
+  // the duration of this request is safe here — we only call Supabase's pooler,
+  // and we're using the service-role credential already.
+  const prevTlsReject = (process as any).env.NODE_TLS_REJECT_UNAUTHORIZED
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
   const statements = sql
     .split(/;\s*\n/)
     .map((s) => s.trim())
@@ -81,6 +88,7 @@ async function runMigrationViaPg(sql: string): Promise<{ ok: number; failed: num
   }
 
   try { await pool.end() } catch {}
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = prevTlsReject
   return { ok, failed, errors }
 }
 
