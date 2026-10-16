@@ -956,10 +956,8 @@ function AdminCertificates() {
                   <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
                 </div>
                 <div className="flex gap-1 flex-shrink-0 flex-wrap">
-                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة"><Eye className="w-4 h-4 text-navy" /></Button>
-                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PDF"><Download className="w-4 h-4 text-gold" /></Button></a>
-                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PNG"><FileUp className="w-4 h-4 text-green-600" /></Button></a>
-                  <Button size="sm" variant="ghost" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار الشهادة (برقم جديد)" className="text-blue-600">
+                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة الشهادة"><Eye className="w-4 h-4 text-navy" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار (برقم جديد)" className="text-blue-600">
                     {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
