@@ -26,11 +26,15 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
     fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/team?role=founder').then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length > 0) setFounder(d[0]) }).catch(() => {})
     fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
-    // Auto-fill the affiliate code field from localStorage if the user
-    // landed via a referral link (layout.tsx stores it there).
+    // Auto-fill the affiliate code field. Check TWO sources:
+    // 1. URL ?ref= parameter (direct, synchronous, most reliable)
+    // 2. localStorage fia_ref_code (set by layout script on prior visit)
     try {
-      const refCode = localStorage.getItem('fia_ref_code')
-      if (refCode) setForm((prev) => ({ ...prev, affiliateCode: refCode }))
+      const urlParams = new URLSearchParams(window.location.search)
+      const refFromUrl = urlParams.get('ref')
+      const refFromStorage = localStorage.getItem('fia_ref_code')
+      const refCode = refFromUrl || refFromStorage || ''
+      if (refCode) setForm((prev) => ({ ...prev, affiliateCode: refCode.toUpperCase() }))
     } catch {}
   }, [])
 
