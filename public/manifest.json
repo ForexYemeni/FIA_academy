@@ -1,0 +1,46 @@
+{
+  "name": "أكاديمية المستقبل الدولية",
+  "short_name": "FIA Academy",
+  "description": "منصة التعليم الطبي المعتمدة في اليمن — دورات BLS/ACLS، التمريض، طب الطوارئ، الصيدلة السريرية",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF7EC",
+  "theme_color": "#0A1F44",
+  "categories": ["education", "medical", "health"],
+  "icons": [
+    {
+      "src": "/fia/logo-fia.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fia/logo-fia.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الدورات",
+      "short_name": "دورات",
+      "url": "/#courses",
+      "icons": [{ "src": "/fia/logo-fia.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "المنتدى",
+      "short_name": "منتدى",
+      "url": "/#forum"
+    },
+    {
+      "name": "المدونة",
+      "short_name": "مدونة",
+      "url": "/blog"
+    }
+  ]
+}

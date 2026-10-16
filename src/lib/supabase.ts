@@ -15,12 +15,13 @@ export const supabaseAdmin = createClient(
   }
 )
 
-// Public client (uses anon key, used for client-side reads)
+// Public client (uses anon key, used for client-side reads + Realtime subscriptions)
 export const supabasePublic = createClient(
   supabaseUrl,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || supabaseKey,
   {
-    auth: { persistSession: true }
+    auth: { persistSession: true },
+    realtime: { params: { eventsPerSecond: 5 } },
   }
 )
 
