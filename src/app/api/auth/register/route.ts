@@ -1,31 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { hashPassword, signToken } from '@/lib/auth-server'
 
 export async function POST(req: NextRequest) {
   try {
     const { name, email, password, phone } = await req.json()
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: 'جميع الحقول مطلوبة' }, { status: 400 })
+    if (!email || !password || !name) {
+      return NextResponse.json({ error: 'الاسم والبريد وكلمة المرور مطلوبة' }, { status: 400 })
     }
     if (password.length < 6) {
       return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' }, { status: 400 })
     }
 
-    // Check if email exists in users or trainers
-    const [{ data: existingUser }, { data: existingTrainer }] = await Promise.all([
-      supabaseAdmin.from('users').select('id').eq('email', email).single(),
-      supabaseAdmin.from('trainers').select('id').eq('email', email).single(),
-    ])
-    if (existingUser || existingTrainer) {
-      return NextResponse.json({ error: 'البريد الإلكتروني مسجل مسبقاً' }, { status: 400 })
+    // Check if email is already registered
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+    if (existingUser) {
+      return NextResponse.json({ error: 'البريد الإلكتروني مسجّل مسبقاً' }, { status: 400 })
     }
 
-    const { data: newUser, error } = await supabaseAdmin
+    // Hash the password with bcrypt
+    const passwordHash = await hashPassword(password)
+
+    const { data, error } = await supabaseAdmin
       .from('users')
       .insert({
         name,
         email,
-        password,
+        password: passwordHash,
         phone: phone || null,
         role: 'student',
       })
@@ -33,23 +38,28 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: 'فشل إنشاء الحساب' }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     const user = {
-      id: newUser.id,
-      email: newUser.email,
-      name: newUser.name,
-      phone: newUser.phone || '',
-      password: newUser.password,
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      phone: data.phone || '',
+      password: '', // never return password to client
       role: 'student' as const,
-      avatar: newUser.avatar,
-      title: newUser.title,
-      bio: newUser.bio,
+      avatar: data.avatar,
+      title: data.title,
+      bio: data.bio,
     }
-    const token = Buffer.from(`${newUser.id}:${Date.now()}`).toString('base64')
+    const token = signToken({
+      sub: data.id,
+      email: data.email,
+      role: 'student',
+      name: data.name,
+    })
     return NextResponse.json({ user, token })
-  } catch (e) {
-    return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
