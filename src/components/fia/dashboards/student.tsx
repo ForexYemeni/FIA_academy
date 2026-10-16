@@ -5,6 +5,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
+  Mail, Eye, EyeOff,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -140,7 +141,7 @@ export function StudentDashboard() {
       ) : null}
       {active !== 'course-view' && (
         <>
-          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
+          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
           {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
           {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
@@ -149,15 +150,15 @@ export function StudentDashboard() {
           {/* {active === 'certificates' && <Certificates certificates={certificates} />} */}
           {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
           {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
-          {active === 'notifications' && <Notifications />}
-          {active === 'settings' && <SettingsTab />}
+          {active === 'notifications' && <Notifications userId={user?.id} enrollments={enrollments} courses={courses} />}
+          {active === 'settings' && <SettingsTab user={user} updateUser={updateUser} />}
         </>
       )}
     </DashboardShell>
   )
 }
 
-function Overview({ user, courses, certificates, enrollments }: any) {
+function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
   return (
     <div className="space-y-6">
       <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
@@ -203,7 +204,7 @@ function Overview({ user, courses, certificates, enrollments }: any) {
               </div>
               <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
               <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
-              <Button size="sm" className="w-full bg-navy hover:bg-navy-light">عرض الدورة</Button>
+              <Button size="sm" className="w-full bg-navy hover:bg-navy-light" onClick={() => onViewCourse?.(c)}>عرض الدورة</Button>
             </Card>
           ))}
         </div>
@@ -916,6 +917,16 @@ function Payments({ payments, userId, courses }: any) {
     return ref.replace(/\s*\|\s*PROOF:.*$/i, '').trim() || null
   }
 
+  // Extract the receipt/proof image URL (if any) from the payment's reference
+  // field. The reference field stores the proof URL in the format:
+  // "<ref> | PROOF: <url>" (or just "PROOF: <url>" if no ref was given).
+  const getProofUrl = (p: any): string | null => {
+    const ref = p?.reference
+    if (!ref) return null
+    const match = String(ref).match(/PROOF:\s*(\S+)/i)
+    return match ? match[1] : null
+  }
+
   return (
     <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
       {sortedPayments.length === 0 ? (
@@ -935,6 +946,7 @@ function Payments({ payments, userId, courses }: any) {
             const courseTitle = getCourseTitle(p.course_id)
             const ref = cleanReference(p.reference)
             const dateStr = fmtDate(p.date)
+            const proofUrl = getProofUrl(p)
             return (
               <Card key={p.id} className="p-0 overflow-hidden border-border card-hover">
                 {/* Amount header — large bold */}
@@ -951,6 +963,29 @@ function Payments({ payments, userId, courses }: any) {
                     </Badge>
                   </div>
                 </div>
+
+                {/* Receipt thumbnail (if a proof image was uploaded) */}
+                {proofUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(proofUrl, '_blank', 'noopener,noreferrer')}
+                    className="relative block w-full h-32 bg-muted/40 group cursor-zoom-in"
+                    title="اضغط لعرض الإيصال بالحجم الكامل"
+                  >
+                    <img
+                      src={proofUrl}
+                      alt="إيصال الدفع"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/40 transition-colors flex items-center justify-center">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
+                        <FileUp className="w-3.5 h-3.5" /> عرض الإيصال
+                      </span>
+                    </div>
+                  </button>
+                )}
 
                 {/* Details body */}
                 <div className="p-4 space-y-3">
@@ -1051,66 +1086,519 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
   )
 }
 
-function Notifications() {
-  const notifs = [
-    { title: 'تم إصدار شهادتك', desc: 'شهادة دورة BLS جاهزة للتحميل', time: 'قبل ساعة', read: false },
-    { title: 'تذكير: اختبار قادم', desc: 'اختبار مكافحة العدوى يوم السبت', time: 'قبل 5 ساعات', read: false },
-    { title: 'دورة جديدة متاحة', desc: 'دورة طب الطوارئ المتقدم', time: 'أمس', read: true },
-  ]
+function Notifications({ userId, enrollments, courses }: any) {
+  const [notifs, setNotifs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const items: any[] = []
+
+        // 1. Enrollment-based notifications (from the enrollments prop).
+        //    Each enrollment already encodes a payment_status that we map to a
+        //    human-readable notification.
+        const enrList: any[] = Array.isArray(enrollments) ? enrollments : []
+        const courseMap = new Map<string, any>(
+          (Array.isArray(courses) ? courses : []).map((c: any) => [c.id, c])
+        )
+
+        const fmtTime = (iso?: string | null) => {
+          if (!iso) return null
+          try {
+            return new Date(iso).toLocaleDateString('ar-EG', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
+          } catch {
+            return null
+          }
+        }
+
+        for (const e of enrList) {
+          const c = courseMap.get(e.course_id)
+          const title = c?.title || 'دورة'
+          const ts = fmtTime(e.enrolled_at || (e as any).date)
+          const status = e.payment_status
+          if (status === 'pending') {
+            items.push({
+              id: `enr-pending-${e.id}`,
+              icon: Clock,
+              iconBg: 'bg-yellow-500/15 text-yellow-600',
+              title: 'بانتظار تأكيد الدفع',
+              desc: `طلبك للتسجيل في دورة "${title}" قيد المراجعة من قبل الإدارة`,
+              time: ts,
+            })
+          } else if (status === 'confirmed') {
+            items.push({
+              id: `enr-confirmed-${e.id}`,
+              icon: CheckCircle2,
+              iconBg: 'bg-green-500/15 text-green-600',
+              title: 'تم تأكيد التسجيل',
+              desc: `تم تأكيد تسجيلك في دورة "${title}". يمكنك الآن متابعة الدروس`,
+              time: ts,
+            })
+          } else if (status === 'completed') {
+            items.push({
+              id: `enr-completed-${e.id}`,
+              icon: Award,
+              iconBg: 'bg-gold/15 text-gold',
+              title: 'أكملت الدورة',
+              desc: `تهانينا! لقد أكملت دورة "${title}" بنجاح`,
+              time: ts,
+            })
+          } else if (status === 'free') {
+            items.push({
+              id: `enr-free-${e.id}`,
+              icon: BookOpen,
+              iconBg: 'bg-blue-500/15 text-blue-600',
+              title: 'تسجيل مجاني',
+              desc: `تم تسجيلك مجاناً في دورة "${title}". ابدأ التعلّم الآن`,
+              time: ts,
+            })
+          }
+        }
+
+        // 2. "New lesson added" notifications: compare each enrolled course's
+        //    lessons_count against a baseline we keep in localStorage. On the
+        //    first visit there's no baseline, so we just initialize it without
+        //    showing any "new lesson" notification.
+        const baselineKey = `fia_lesson_baseline_${userId || 'guest'}`
+        let baseline: Record<string, number> = {}
+        try {
+          const stored = localStorage.getItem(baselineKey)
+          if (stored) baseline = JSON.parse(stored) || {}
+        } catch {}
+
+        const newBaseline: Record<string, number> = { ...baseline }
+        // Only check lessons_count for courses the student has access to
+        // (payment_status !== 'pending').
+        const accessible = enrList.filter((e: any) => e.payment_status !== 'pending')
+        for (const e of accessible) {
+          const c = courseMap.get(e.course_id)
+          if (!c) continue
+          const current = Number(c.lessons_count || 0)
+          const prev = baseline[e.course_id] ?? null
+          newBaseline[e.course_id] = current
+          if (prev !== null && current > prev) {
+            items.push({
+              id: `new-lesson-${e.course_id}-${current}`,
+              icon: FileText,
+              iconBg: 'bg-purple-500/15 text-purple-600',
+              title: 'درس جديد',
+              desc: `تمت إضافة ${current - prev} درس جديد في دورة "${c.title}"`,
+              time: 'مؤخراً',
+            })
+          }
+        }
+
+        // Persist the new baseline so future visits can detect new lessons.
+        try {
+          localStorage.setItem(baselineKey, JSON.stringify(newBaseline))
+        } catch {}
+
+        if (!cancelled) setNotifs(items)
+      } catch {
+        if (!cancelled) setNotifs([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [userId, enrollments, courses])
+
   return (
     <SectionCard title="الإشعارات" description="آخر التحديثات والتنبيهات">
-      <div className="space-y-3">
-        {notifs.map((n, i) => (
-          <div key={i} className={`p-4 rounded-lg border ${n.read ? 'bg-muted/20 border-border' : 'bg-gold/5 border-gold/20'}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-semibold text-navy text-sm">{n.title}</div>
-                <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+          <p className="text-sm text-muted-foreground">جاري تحميل الإشعارات...</p>
+        </div>
+      ) : notifs.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+            <Bell className="w-10 h-10 text-muted-foreground/50" />
+          </div>
+          <p className="text-base font-semibold text-navy mb-1">لا توجد إشعارات</p>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            ستظهر هنا تنبيهات عند تأكيد تسجيلك في الدورات أو عند إضافة دروس جديدة.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notifs.map((n) => {
+            const Icon = n.icon
+            return (
+              <div
+                key={n.id}
+                className="p-4 rounded-lg border border-border bg-gold/5 flex items-start gap-3"
+              >
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${n.iconBg}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-navy text-sm">{n.title}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+                </div>
+                {n.time && (
+                  <div className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap" dir="rtl">
+                    {n.time}
+                  </div>
+                )}
               </div>
-              <div className="flex flex-col items-end gap-1">
-                {!n.read && <span className="w-2 h-2 bg-gold rounded-full" />}
-                <span className="text-xs text-muted-foreground">{n.time}</span>
+            )
+          })}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
+function SettingsTab({ user, updateUser }: any) {
+  // Email change state — uses /api/auth/change-credentials
+  const [newEmail, setNewEmail] = useState('')
+  const [emailPwd, setEmailPwd] = useState('')
+  const [showEmailPwd, setShowEmailPwd] = useState(false)
+  const [emailLoading, setEmailLoading] = useState(false)
+
+  // Password change state — uses /api/auth/change-credentials
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+  const [showNewPwd, setShowNewPwd] = useState(false)
+  const [pwdLoading, setPwdLoading] = useState(false)
+
+  // Phone change state — uses /api/students PUT
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [phoneLoading, setPhoneLoading] = useState(false)
+
+  // Email notification preference — persisted to localStorage (real toggle,
+  // not fake) so the choice survives across sessions. Default is OFF ("متوقف").
+  const [emailNotif, setEmailNotif] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`fia_settings_${user?.id || 'guest'}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (typeof parsed.emailNotif === 'boolean') setEmailNotif(parsed.emailNotif)
+      }
+    } catch {}
+  }, [user?.id])
+
+  const saveEmailNotif = (val: boolean) => {
+    setEmailNotif(val)
+    try {
+      const key = `fia_settings_${user?.id || 'guest'}`
+      const stored = localStorage.getItem(key)
+      const obj = stored ? JSON.parse(stored) : {}
+      obj.emailNotif = val
+      localStorage.setItem(key, JSON.stringify(obj))
+    } catch {}
+    toast.success(val ? 'تم تفعيل إشعارات البريد' : 'تم إيقاف إشعارات البريد')
+  }
+
+  // ====== Handlers ======
+  const saveEmail = async () => {
+    if (!newEmail) {
+      toast.error('أدخل البريد الجديد')
+      return
+    }
+    if (!emailPwd) {
+      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+      return
+    }
+    if (newEmail === user?.email) {
+      toast.error('البريد الجديد مطابق للبريد الحالي')
+      return
+    }
+    setEmailLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          currentEmail: user.email,
+          currentPassword: emailPwd,
+          newEmail,
+          role: 'student',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل تحديث البريد')
+        return
+      }
+      toast.success('تم تحديث البريد. يرجى تسجيل الدخول بالبريد الجديد')
+      // Update local state so the user sees the new email immediately
+      updateUser({ email: newEmail })
+      setNewEmail('')
+      setEmailPwd('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  const savePassword = async () => {
+    if (!currentPwd) {
+      toast.error('أدخل كلمة المرور الحالية')
+      return
+    }
+    if (!newPwd) {
+      toast.error('أدخل كلمة المرور الجديدة')
+      return
+    }
+    if (newPwd.length < 6) {
+      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+      return
+    }
+    if (newPwd !== confirmPwd) {
+      toast.error('كلمتا المرور غير متطابقتين')
+      return
+    }
+    setPwdLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          currentEmail: user.email,
+          currentPassword: currentPwd,
+          newPassword: newPwd,
+          role: 'student',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل تغيير كلمة المرور')
+        return
+      }
+      toast.success('تم تغيير كلمة المرور بنجاح')
+      setCurrentPwd('')
+      setNewPwd('')
+      setConfirmPwd('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setPwdLoading(false)
+    }
+  }
+
+  const savePhone = async () => {
+    if (!phone) {
+      toast.error('أدخل رقم الهاتف')
+      return
+    }
+    setPhoneLoading(true)
+    try {
+      const res = await fetch('/api/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id, phone }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل تحديث رقم الهاتف')
+        return
+      }
+      updateUser({ phone })
+      toast.success('تم تحديث رقم الهاتف')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setPhoneLoading(false)
+    }
+  }
+
+  return (
+    <SectionCard title="الإعدادات" description="إدارة حسابك وتفضيلاتك">
+      <div className="space-y-6 max-w-2xl">
+        {/* Account header */}
+        <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
+          <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+            {user?.name?.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-navy">{user?.name}</div>
+            <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+          </div>
+        </div>
+
+        {/* ===== Account section ===== */}
+        <div>
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+            <User className="w-4 h-4 text-gold" /> الحساب
+          </h3>
+
+          <div className="space-y-4">
+            {/* Change email */}
+            <div className="p-4 rounded-lg border border-border bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Mail className="w-4 h-4 text-navy" />
+                <div className="font-semibold text-navy text-sm">تغيير البريد الإلكتروني</div>
+              </div>
+              <div className="space-y-2">
+                <Input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder={user?.email || 'example@fia.edu'}
+                  dir="ltr"
+                />
+                <div className="relative">
+                  <Input
+                    type={showEmailPwd ? 'text' : 'password'}
+                    value={emailPwd}
+                    onChange={(e) => setEmailPwd(e.target.value)}
+                    placeholder="كلمة المرور الحالية للتأكيد"
+                    dir="ltr"
+                    className="pr-3 pl-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailPwd(!showEmailPwd)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+                  >
+                    {showEmailPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <Button
+                  onClick={saveEmail}
+                  disabled={emailLoading || !newEmail || !emailPwd}
+                  className="w-full bg-navy hover:bg-navy-light"
+                >
+                  {emailLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ البريد'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Change password */}
+            <div className="p-4 rounded-lg border border-border bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="w-4 h-4 text-navy" />
+                <div className="font-semibold text-navy text-sm">تغيير كلمة المرور</div>
+              </div>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Input
+                    type={showCurrentPwd ? 'text' : 'password'}
+                    value={currentPwd}
+                    onChange={(e) => setCurrentPwd(e.target.value)}
+                    placeholder="كلمة المرور الحالية"
+                    dir="ltr"
+                    className="pr-3 pl-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPwd(!showCurrentPwd)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+                  >
+                    {showCurrentPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input
+                    type={showNewPwd ? 'text' : 'password'}
+                    value={newPwd}
+                    onChange={(e) => setNewPwd(e.target.value)}
+                    placeholder="كلمة المرور الجديدة"
+                    dir="ltr"
+                    className="pr-3 pl-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPwd(!showNewPwd)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+                  >
+                    {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <Input
+                  type="password"
+                  value={confirmPwd}
+                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  placeholder="تأكيد كلمة المرور الجديدة"
+                  dir="ltr"
+                />
+                {newPwd && confirmPwd && newPwd !== confirmPwd && (
+                  <p className="text-xs text-red-500">كلمتا المرور غير متطابقتين</p>
+                )}
+                {newPwd && confirmPwd && newPwd === confirmPwd && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> كلمتا المرور متطابقتان
+                  </p>
+                )}
+                <Button
+                  onClick={savePassword}
+                  disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd || newPwd !== confirmPwd}
+                  className="w-full bg-navy hover:bg-navy-light"
+                >
+                  {pwdLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ كلمة المرور'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Change phone number */}
+            <div className="p-4 rounded-lg border border-border bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <User className="w-4 h-4 text-navy" />
+                <div className="font-semibold text-navy text-sm">تغيير رقم الهاتف</div>
+              </div>
+              <div className="space-y-2">
+                <Input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="رقم الهاتف الجديد"
+                  dir="ltr"
+                />
+                <Button
+                  onClick={savePhone}
+                  disabled={phoneLoading || !phone || phone === user?.phone}
+                  className="w-full bg-navy hover:bg-navy-light"
+                >
+                  {phoneLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ الهاتف'}
+                </Button>
               </div>
             </div>
           </div>
-        ))}
-      </div>
-    </SectionCard>
-  )
-}
+        </div>
 
-function SettingsTab() {
-  return (
-    <SectionCard title="الإعدادات" description="تخصيص حسابك">
-      <div className="space-y-6 max-w-2xl">
+        {/* ===== Notification preferences ===== */}
         <div>
-          <h3 className="font-semibold text-navy mb-3">الإشعارات</h3>
-          <div className="space-y-3">
-            <SettingToggle label="إشعارات البريد الإلكتروني" desc="تنبيهات حول الدورات والاختبارات" defaultChecked />
-            <SettingToggle label="إشعارات الهاتف" desc="رسائل SMS للتحديثات المهمة" defaultChecked />
-            <SettingToggle label="نشرة أسبوعية" desc="ملخّص أسبوعي بنشاطك" />
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-gold" /> تفضيلات الإشعارات
+          </h3>
+          <div className="p-4 rounded-lg border border-border bg-white flex items-center justify-between">
+            <div>
+              <div className="font-medium text-navy text-sm">إشعارات البريد الإلكتروني</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                تنبيهات حول تأكيد التسجيل والمدفوعات والدروس الجديدة
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-semibold ${emailNotif ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {emailNotif ? 'مفعّل' : 'متوقف'}
+              </span>
+              <button
+                onClick={() => saveEmailNotif(!emailNotif)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${emailNotif ? 'bg-green-500' : 'bg-muted'}`}
+                title={emailNotif ? 'إيقاف' : 'تفعيل'}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${emailNotif ? 'right-0.5' : 'right-5'}`} />
+              </button>
+            </div>
           </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-navy mb-3">الأمان</h3>
-          <Button variant="outline">تغيير كلمة المرور</Button>
-        </div>
       </div>
     </SectionCard>
-  )
-}
-
-function SettingToggle({ label, desc, defaultChecked }: { label: string; desc: string; defaultChecked?: boolean }) {
-  const [on, setOn] = useState(!!defaultChecked)
-  return (
-    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-      <div>
-        <div className="font-medium text-navy text-sm">{label}</div>
-        <div className="text-xs text-muted-foreground">{desc}</div>
-      </div>
-      <button onClick={() => setOn(!on)} className={`relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-gold' : 'bg-muted'}`}>
-        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${on ? 'right-0.5' : 'right-5'}`} />
-      </button>
-    </div>
   )
 }
