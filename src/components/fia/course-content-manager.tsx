@@ -17,6 +17,7 @@ import {
   Database, Copy, ExternalLink, RefreshCw, CheckCircle2, Eye,
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
+import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 
 interface Module {
   id: string
@@ -147,6 +148,14 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
   const [lessonDialog, setLessonDialog] = useState<{ open: boolean; editing: Lesson | null; moduleId: string } | null>(null)
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null)
 
+  // === Confirmation-dialog state for destructive actions ===
+  // moduleDeleteTarget: { id, title } | null  — for module deletion (also wipes its lessons)
+  // lessonDeleteTarget: { id, moduleId, title } | null  — for single-lesson deletion
+  const [moduleDeleteTarget, setModuleDeleteTarget] = useState<{ id: string; title: string } | null>(null)
+  const [deletingModule, setDeletingModule] = useState(false)
+  const [lessonDeleteTarget, setLessonDeleteTarget] = useState<{ id: string; moduleId: string; title: string } | null>(null)
+  const [deletingLesson, setDeletingLesson] = useState(false)
+
   const loadModules = async () => {
     setLoading(true)
     setNeedsSetup(false)
@@ -218,11 +227,17 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
     }
   }
 
-  const deleteModule = async (id: string) => {
-    if (!confirm('حذف الوحدة سيحذف جميع دروسها. متابعة؟')) return
-    await fetch('/api/modules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف')
-    loadModules()
+  const deleteModule = async () => {
+    if (!moduleDeleteTarget) return
+    setDeletingModule(true)
+    try {
+      await fetch('/api/modules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: moduleDeleteTarget.id }) })
+      toast.success('تم الحذف')
+      setModuleDeleteTarget(null)
+      loadModules()
+    } finally {
+      setDeletingModule(false)
+    }
   }
 
   const saveLesson = async (data: any, moduleId: string, editing: Lesson | null) => {
@@ -251,13 +266,14 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
     }
   }
 
-  const deleteLesson = async (id: string, moduleId: string) => {
-    if (!confirm('حذف الدرس؟')) return
+  const deleteLesson = async () => {
+    if (!lessonDeleteTarget) return
+    setDeletingLesson(true)
     try {
       const res = await fetch('/api/lessons', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, module_id: moduleId, course_id: courseId }),
+        body: JSON.stringify({ id: lessonDeleteTarget.id, module_id: lessonDeleteTarget.moduleId, course_id: courseId }),
       })
       if (!res.ok) {
         const result = await res.json().catch(() => ({}))
@@ -265,9 +281,12 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
         return
       }
       toast.success('تم الحذف')
+      setLessonDeleteTarget(null)
       loadModules()
     } catch {
       toast.error('خطأ في الاتصال')
+    } finally {
+      setDeletingLesson(false)
     }
   }
 
@@ -361,7 +380,7 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
                   <Button size="icon" variant="ghost" onClick={() => setModuleDialog({ open: true, editing: m })}>
                     <Edit className="w-4 h-4 text-navy" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => deleteModule(m.id)}>
+                  <Button size="icon" variant="ghost" onClick={() => setModuleDeleteTarget({ id: m.id, title: m.title })}>
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
                 </div>
@@ -400,7 +419,7 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
                             <Button size="icon" variant="ghost" onClick={() => setLessonDialog({ open: true, editing: l, moduleId: m.id })}>
                               <Edit className="w-4 h-4 text-navy" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => deleteLesson(l.id, m.id)}>
+                            <Button size="icon" variant="ghost" onClick={() => setLessonDeleteTarget({ id: l.id, moduleId: m.id, title: l.title })}>
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>
                           </div>
@@ -451,6 +470,36 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
         lesson={previewLesson}
         modules={modules}
         onNavigate={(l) => setPreviewLesson(l)}
+      />
+
+      {/* Module deletion confirm — warns that all lessons inside are also wiped */}
+      <ConfirmDialog
+        open={!!moduleDeleteTarget}
+        onOpenChange={(o) => { if (!o && !deletingModule) setModuleDeleteTarget(null) }}
+        title="تأكيد حذف الوحدة"
+        message="حذف الوحدة سيحذف جميع دروسها. هل تريد المتابعة؟"
+        itemLabel="سيتم حذف الوحدة التالية:"
+        itemName={moduleDeleteTarget?.title}
+        confirmLabel="حذف الوحدة"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={deleteModule}
+        loading={deletingModule}
+      />
+
+      {/* Lesson deletion confirm */}
+      <ConfirmDialog
+        open={!!lessonDeleteTarget}
+        onOpenChange={(o) => { if (!o && !deletingLesson) setLessonDeleteTarget(null) }}
+        title="تأكيد حذف الدرس"
+        message="هل أنت متأكد من حذف هذا الدرس؟"
+        itemLabel="سيتم حذف الدرس التالي:"
+        itemName={lessonDeleteTarget?.title}
+        confirmLabel="حذف الدرس"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={deleteLesson}
+        loading={deletingLesson}
       />
     </div>
   )

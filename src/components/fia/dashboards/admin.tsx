@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { TeamEditor } from '@/components/fia/team-editor'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
+import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -242,6 +243,8 @@ function AdminCourses() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<any | null>(null)
   const [open, setOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -249,11 +252,17 @@ function AdminCourses() {
   }
   useEffect(() => { load() }, [])
 
-  const del = async (id: string) => {
-    if (!confirm('حذف الدورة؟')) return
-    await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف')
-    load()
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -283,7 +292,7 @@ function AdminCourses() {
                 <td className="py-3 px-2">
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-4 h-4 text-navy" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(c)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                   </div>
                 </td>
               </tr>
@@ -293,6 +302,20 @@ function AdminCourses() {
         </table>
       </div>
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['title', 'short_description', 'description', 'level', 'price', 'duration_hours', 'pass_score']} apiPath="/api/courses" />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف الدورة"
+        message="هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء."
+        itemLabel="سيتم حذف الدورة التالية:"
+        itemName={deleteTarget?.title}
+        confirmLabel="حذف الدورة"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }
@@ -315,6 +338,8 @@ function AdminStudents() {
   const [enrollments, setEnrollments] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
@@ -322,12 +347,18 @@ function AdminStudents() {
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }, [])
 
-  const del = async (id: string) => {
-    if (!confirm('حذف المتدرب نهائياً؟')) return
-    await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف')
-    setItems(items.filter((s) => s.id !== id))
-    setSelectedStudent(null)
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setItems(items.filter((s) => s.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      setSelectedStudent(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const filtered = items.filter(s => {
@@ -397,7 +428,7 @@ function AdminStudents() {
               </div>
               <div className="flex gap-1 p-3 pt-0">
                 <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
-                <Button size="sm" variant="ghost" onClick={() => del(s.id)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(s)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
               </div>
             </Card>
           )
@@ -485,6 +516,20 @@ function AdminStudents() {
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف المتدرب"
+        message="سيتم حذف المتدرب نهائياً من النظام. هل أنت متأكد؟"
+        itemLabel="سيتم حذف المتدرب التالي:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف نهائي"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }
@@ -660,16 +705,25 @@ function AdminPaymentMethods() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/payment-methods').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
   const toggle = async (id: string, enabled: boolean) => {
     await fetch('/api/payment-methods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enabled }) })
     setItems(items.map((p) => (p.id === id ? { ...p, enabled } : p)))
   }
-  const del = async (id: string) => {
-    if (!confirm('حذف؟')) return
-    await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف'); load()
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
   }
   return (
     <SectionCard
@@ -689,12 +743,26 @@ function AdminPaymentMethods() {
             {p.wallet_id && <div className="text-xs font-mono text-gold" dir="ltr">{p.wallet_id}</div>}
             <div className="flex gap-2 mt-3">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           </Card>
         ))}
       </div>
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'icon', 'type', 'wallet_id', 'description', 'instructions']} apiPath="/api/payment-methods" />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف طريقة الدفع"
+        message="هل أنت متأكد من الحذف؟"
+        itemLabel="سيتم حذف طريقة الدفع التالية:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }
@@ -714,6 +782,15 @@ function AdminCertificates() {
   const [tab, setTab] = useState<'issued' | 'requests'>('issued')
   const [approveNote, setApproveNote] = useState('')
 
+  // === Confirm-dialog states for the three certificate actions:
+  // del (permanent delete), restore (mark valid again), reissue (regenerate with new number)
+  const [certDeleteTarget, setCertDeleteTarget] = useState<any | null>(null)
+  const [certDeleting, setCertDeleting] = useState(false)
+  const [certRestoreTarget, setCertRestoreTarget] = useState<any | null>(null)
+  const [certRestoring, setCertRestoring] = useState(false)
+  const [reissueTarget, setReissueTarget] = useState<any | null>(null)
+  const [reissuing, setReissuing] = useState<string | null>(null)
+
   const load = () => {
     fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
     fetch('/api/certificate-requests').then((r) => r.json()).then((d) => setRequests(Array.isArray(d) ? d : []))
@@ -731,27 +808,49 @@ function AdminCertificates() {
     return true
   })
 
-  const del = async (id: string) => { if (!confirm('حذف نهائي؟')) return; await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const del = async () => {
+    if (!certDeleteTarget) return
+    setCertDeleting(true)
+    try {
+      await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certDeleteTarget.id }) })
+      toast.success('تم الحذف')
+      setCertDeleteTarget(null)
+      load()
+    } finally {
+      setCertDeleting(false)
+    }
+  }
   const revoke = async () => { if (!revokeTarget || !revokeReason.trim()) { toast.error('أدخل سبب الإلغاء'); return }; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: revokeTarget.id, status: 'ملغاة' }) }); toast.success('تم إلغاء الشهادة'); setRevokeTarget(null); setRevokeReason(''); load() }
-  const restore = async (cert: any) => { if (!confirm('استعادة؟')) return; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cert.id, status: 'صالحة' }) }); toast.success('تمت الاستعادة'); load() }
+  const restore = async () => {
+    if (!certRestoreTarget) return
+    setCertRestoring(true)
+    try {
+      await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certRestoreTarget.id, status: 'صالحة' }) })
+      toast.success('تمت الاستعادة')
+      setCertRestoreTarget(null)
+      load()
+    } finally {
+      setCertRestoring(false)
+    }
+  }
 
   // === Reissue: regenerate the same certificate with a new number & new issued_at ===
   // Use case: certificate has wrong data / student wants fresh copy / status issue — no need to delete user
-  const [reissuing, setReissuing] = useState<string | null>(null)
-  const reissue = async (cert: any) => {
-    if (!confirm(`إعادة إصدار شهادة جديدة لنفس المتدرب؟\n\nالاسم: ${cert.student_name}\nالدورة: ${cert.course_title || '-'}\nالرقم القديم: ${cert.certificate_number}\n\nسيتم:\n- تمييز الشهادة الحالية كـ "مستبدلة"\n- إصدار شهادة جديدة برقم جديد وتاريخ جديد\n- بقاء بيانات المتدرب والتسجيل كما هي`)) return
-    setReissuing(cert.id)
+  const reissue = async () => {
+    if (!reissueTarget) return
+    setReissuing(reissueTarget.id)
     try {
       const res = await fetch('/api/certificates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reissue', id: cert.id }),
+        body: JSON.stringify({ action: 'reissue', id: reissueTarget.id }),
       })
       const data = await res.json()
       if (res.ok && data.success) {
         toast.success('تم إعادة الإصدار بنجاح!', {
           description: `الرقم الجديد: ${data.new_certificate.certificate_number}`,
         })
+        setReissueTarget(null)
         load()
         // Open the new certificate PDF in a new tab automatically
         window.open(`/api/certificate-pdf?number=${encodeURIComponent(data.new_certificate.certificate_number)}&format=pdf`, '_blank')
@@ -835,12 +934,12 @@ function AdminCertificates() {
                   <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة"><Eye className="w-4 h-4 text-navy" /></Button>
                   <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PDF"><Download className="w-4 h-4 text-gold" /></Button></a>
                   <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PNG"><FileUp className="w-4 h-4 text-green-600" /></Button></a>
-                  <Button size="sm" variant="ghost" onClick={() => reissue(c)} disabled={reissuing === c.id} title="إعادة إصدار الشهادة (برقم جديد)" className="text-blue-600">
+                  <Button size="sm" variant="ghost" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار الشهادة (برقم جديد)" className="text-blue-600">
                     {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
-                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
-                  <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => setCertRestoreTarget(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
+                  <Button size="sm" variant="ghost" onClick={() => setCertDeleteTarget(c)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
                 </div>
               </div>
             ))}
@@ -941,6 +1040,51 @@ function AdminCertificates() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Permanent-delete confirm */}
+      <ConfirmDialog
+        open={!!certDeleteTarget}
+        onOpenChange={(o) => { if (!o && !certDeleting) setCertDeleteTarget(null) }}
+        title="تأكيد الحذف النهائي"
+        message="هل أنت متأكد من الحذف النهائي؟"
+        itemLabel="سيتم حذف الشهادة التالية:"
+        itemName={certDeleteTarget ? `${certDeleteTarget.student_name} — ${certDeleteTarget.certificate_number}` : undefined}
+        confirmLabel="حذف نهائي"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={del}
+        loading={certDeleting}
+      />
+
+      {/* Restore certificate confirm */}
+      <ConfirmDialog
+        open={!!certRestoreTarget}
+        onOpenChange={(o) => { if (!o && !certRestoring) setCertRestoreTarget(null) }}
+        title="تأكيد استعادة الشهادة"
+        message={'سيتم تغيير حالة الشهادة إلى "صالحة". هل أنت متأكد؟'}
+        itemLabel="سيتم استعادة الشهادة التالية:"
+        itemName={certRestoreTarget ? `${certRestoreTarget.student_name} — ${certRestoreTarget.certificate_number}` : undefined}
+        confirmLabel="استعادة"
+        cancelLabel="إلغاء"
+        variant="info"
+        onConfirm={restore}
+        loading={certRestoring}
+      />
+
+      {/* Reissue certificate confirm (uses existing reissuing spinner state) */}
+      <ConfirmDialog
+        open={!!reissueTarget}
+        onOpenChange={(o) => { if (!o && !reissuing) setReissueTarget(null) }}
+        title="إعادة إصدار الشهادة"
+        message={'سيتم:\n- تمييز الشهادة الحالية كـ "مستبدلة"\n- إصدار شهادة جديدة برقم جديد وتاريخ جديد\n- بقاء بيانات المتدرب والتسجيل كما هي'}
+        itemLabel="الشهادة الحالية:"
+        itemName={reissueTarget ? `${reissueTarget.student_name} | ${reissueTarget.course_title || '-'} | ${reissueTarget.certificate_number}` : undefined}
+        confirmLabel="إعادة الإصدار"
+        cancelLabel="إلغاء"
+        variant="info"
+        onConfirm={reissue}
+        loading={!!reissuing}
+      />
     </SectionCard>
   )
 }
@@ -949,22 +1093,40 @@ function AdminTrainers() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [checkingTeam, setCheckingTeam] = useState(false)
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
-  const del = async (id: string) => {
-    // Check if this trainer is also a team member (founder/leader)
+
+  // Pre-flight: make sure the trainer is not a team member (founder/leader).
+  // If they are, show a toast error and skip opening the confirm dialog.
+  const requestDelete = async (trainer: any) => {
+    setCheckingTeam(true)
     try {
       const teamRes = await fetch('/api/team')
       const teamData = await teamRes.json()
-      const teamMember = (teamData || []).find((m: any) => m.id === id)
+      const teamMember = (teamData || []).find((m: any) => m.id === trainer.id)
       if (teamMember) {
         toast.error(`لا يمكن حذف هذا المدرب لأنه مسجّل كـ "${teamMember.role === 'founder' ? 'المؤسس' : 'عضو فريق'}" في قسم المؤسس والفريق. احذفه من هناك أولاً.`)
         return
       }
     } catch {}
-    if (!confirm('حذف المدرب؟')) return
-    await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف'); load()
+    setCheckingTeam(false)
+    setDeleteTarget(trainer)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
   }
   return (
     <SectionCard
@@ -996,13 +1158,27 @@ function AdminTrainers() {
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-                <Button size="sm" variant="outline" disabled={isTeamMember} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => del(t.id)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
+                <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
             </Card>
           )
         })}
       </div>
       {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف المدرب"
+        message="هل أنت متأكد من حذف هذا المدرب؟"
+        itemLabel="سيتم حذف المدرب التالي:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف المدرب"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }
@@ -1166,9 +1342,22 @@ function AdminPartners() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/partners').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
-  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
+  }
   const toggleStatus = async (p: any) => {
     const newStatus = p.status === 'نشط' ? 'متوقف' : 'نشط'
     await fetch('/api/partners', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, status: newStatus }) })
@@ -1198,12 +1387,26 @@ function AdminPartners() {
               <Button size="sm" variant="outline" className={p.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(p)}>
                 {p.status === 'نشط' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
               </Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           </Card>
         ))}
       </div>
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'logo', 'description', 'website', 'since', 'status']} apiPath="/api/partners" />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف الشريك"
+        message="هل أنت متأكد من الحذف؟"
+        itemLabel="سيتم حذف الشريك التالي:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }
@@ -1212,9 +1415,22 @@ function AdminLicenses() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/licenses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
-  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
+  }
   const toggleStatus = async (l: any) => {
     const newStatus = l.status === 'ساري' ? 'متوقف' : 'ساري'
     await fetch('/api/licenses', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, status: newStatus }) })
@@ -1243,12 +1459,26 @@ function AdminLicenses() {
               <Button size="sm" variant="outline" className={l.status === 'ساري' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(l)}>
                 {l.status === 'ساري' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
               </Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(l.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(l)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           </Card>
         ))}
       </div>
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['issuing_body', 'type', 'number', 'issued_at', 'expires_at', 'status', 'verification_url']} apiPath="/api/licenses" />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف الترخيص"
+        message="هل أنت متأكد من الحذف؟"
+        itemLabel="سيتم حذف الترخيص التالي:"
+        itemName={deleteTarget?.issuing_body}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }

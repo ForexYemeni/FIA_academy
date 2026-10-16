@@ -445,6 +445,21 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
       })
       if (res.ok) {
         toast.success(course ? 'تم تحديث الدورة' : 'تم إنشاء الدورة')
+        // After a successful create/update, fire-and-forget a publish to the
+        // Telegram channel associated with the bot. Non-blocking: any error
+        // is swallowed via .catch(() => {}) so the trainer UI stays responsive.
+        const data = await res.json().catch(() => null)
+        const savedCourseId = data?.id || course?.id
+        if (savedCourseId) {
+          fetch('/api/telegram-publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              course_id: savedCourseId,
+              action: course ? 'update' : 'create',
+            }),
+          }).catch(() => {})
+        }
         onSaved()
       } else {
         const err = await res.json().catch(() => ({}))
