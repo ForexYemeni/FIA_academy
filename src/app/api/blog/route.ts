@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Generate a URL-friendly slug from a title
+// Generate a URL-friendly ASCII slug from a title — strips Arabic and other
+// non-ASCII characters entirely (URL encoding of Arabic is fragile across
+// CDNs and routers), falls back to a random short ID.
 function slugify(text: string): string {
-  return text
+  // Try to extract ASCII-alphanumeric parts of the title (English fragments,
+  // digits, etc.) — e.g. "BLS / ACLS Course" → "bls-acls-course"
+  const asciiPart = text
     .toString()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\u0600-\u06FFa-zA-Z0-9-]/g, '')
     .toLowerCase()
+    .replace(/[^\x00-\x7F]/g, ' ')       // replace non-ASCII with space
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')         // collapse non-alphanumeric to single hyphen
+    .replace(/^-+|-+$/g, '')             // strip leading/trailing hyphens
+  if (asciiPart.length >= 3) {
+    return `${asciiPart}-${Math.random().toString(36).substring(2, 6)}`
+  }
+  // Pure-Arabic title — generate a random ASCII slug
+  return `post-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`
 }
 
 export async function GET(req: NextRequest) {

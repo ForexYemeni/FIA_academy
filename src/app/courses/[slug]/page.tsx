@@ -67,12 +67,28 @@ export async function generateStaticParams() {
   }
 }
 
+// Decode URL-encoded slug — Next.js 16 doesn't auto-decode path segments,
+// so Arabic or special-char slugs arrive URL-encoded and the DB lookup fails.
+function decodeSlug(raw: string): string {
+  let s = raw || ''
+  try {
+    let decoded = decodeURIComponent(s)
+    while (decoded !== decodeURIComponent(decoded) && decoded.length < 1000) {
+      decoded = decodeURIComponent(decoded)
+    }
+    return decoded
+  } catch {
+    return s
+  }
+}
+
 // Always server-render on demand — newly-created courses must work without a redeploy.
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function Page({ params }: Props) {
-  const { slug } = await params
+  const { slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const { data: course } = await supabaseAdmin
     .from('courses')
     .select('*')
