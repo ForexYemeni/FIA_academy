@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const slug = req.nextUrl.searchParams.get('slug')
+    if (slug) {
+      const { data, error } = await supabaseAdmin
+        .from('courses')
+        .select('*')
+        .eq('slug', slug)
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
+      return NextResponse.json(data)
+    }
     const { data, error } = await supabaseAdmin
       .from('courses')
       .select('*')

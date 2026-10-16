@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { hashPassword, verifyPassword, signToken } from '@/lib/auth-server'
 
-// Legacy encoding marker — kept only for backward compatibility with old data.
+const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 const BIO_SEPARATOR = '\n\n===FIA_EXTRA===\n'
 
-// Decode legacy encoded bio and merge any embedded qualifications/achievements
-// into a single professional bio string. New trainer records store bio as a
-// plain string (no encoding), so this is effectively a no-op for them.
 function mergeLegacyBio(stored: string | null): string {
   if (!stored) return ''
   const idx = stored.indexOf(BIO_SEPARATOR)
@@ -15,20 +13,14 @@ function mergeLegacyBio(stored: string | null): string {
   const extraJson = stored.substring(idx + BIO_SEPARATOR.length)
   let extra: any = {}
   try { extra = JSON.parse(extraJson) } catch { extra = {} }
-
   const parts: string[] = []
   if (bio) parts.push(bio)
-
   const mergeList = (label: string, raw: any) => {
     if (!raw || typeof raw !== 'string') return
     let arr: string[] | null = null
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) arr = parsed.filter(Boolean)
-    } catch { arr = null }
-    if (arr && arr.length > 0) {
-      parts.push(`${label}\n` + arr.map((q) => `• ${q}`).join('\n'))
-    } else {
+    try { const p = JSON.parse(raw); if (Array.isArray(p)) arr = p.filter(Boolean) } catch { arr = null }
+    if (arr && arr.length > 0) parts.push(`${label}\n` + arr.map((q) => `• ${q}`).join('\n'))
+    else {
       const lines = raw.split('\n').map((s: string) => s.trim()).filter(Boolean)
       if (lines.length > 0) parts.push(`${label}\n` + lines.map((q: string) => `• ${q}`).join('\n'))
     }
@@ -45,28 +37,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'البريد وكلمة المرور مطلوبان' }, { status: 400 })
     }
 
-    // Check users table FIRST (so admin role is respected)
+    // Check users table FIRST (admin role is respected)
     const { data: userRow } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('email', email)
-      .eq('password', password)
       .single()
 
     if (userRow) {
-      const user = {
-        id: userRow.id,
-        email: userRow.email,
-        name: userRow.name,
-        phone: userRow.phone || '',
-        password: userRow.password,
-        role: userRow.role as 'admin' | 'trainer' | 'student',
-        avatar: userRow.avatar,
-        title: userRow.title,
-        bio: mergeLegacyBio(userRow.bio),
+      const { valid, needsRehash } = await verifyPassword(password, userRow.password)
+      if (valid) {
+        // If the stored password was plain-text, hash it now and persist
+        if (needsRehash) {
+          const newHash = await hashPassword(password)
+          await supabaseAdmin.from('users').update({ password: newHash }).eq('id', userRow.id)
+        }
+        const user = {
+          id: userRow.id,
+          email: userRow.email,
+          name: userRow.name,
+          phone: userRow.phone || '',
+          password: '', // never return password to client
+          role: userRow.role as 'admin' | 'trainer' | 'student',
+          avatar: userRow.avatar,
+          title: userRow.title,
+          bio: mergeLegacyBio(userRow.bio),
+        }
+        const token = signToken({
+          sub: userRow.id,
+          email: userRow.email,
+          role: userRow.role,
+          name: userRow.name,
+        })
+        return NextResponse.json({ user, token })
       }
-      const token = Buffer.from(`${userRow.id}:${Date.now()}`).toString('base64')
-      return NextResponse.json({ user, token })
     }
 
     // Fall back to trainers table
@@ -77,51 +81,69 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (trainer) {
-      // Check if this is a team member (password starts with __TEAM_MEMBER__)
-      const TEAM_MARKER = '__TEAM_MEMBER__:'
-      if (trainer.password && trainer.password.startsWith(TEAM_MARKER)) {
-        // Format: __TEAM_MEMBER__:<role>__:<actual_password>
-        const afterPrefix = trainer.password.substring(TEAM_MARKER.length)
+      // Team member login (password marker = __TEAM_MEMBER__)
+      if (trainer.password && trainer.password.startsWith(TEAM_MARKER_PREFIX)) {
+        const afterPrefix = trainer.password.substring(TEAM_MARKER_PREFIX.length)
         const sepIdx = afterPrefix.indexOf('__')
         if (sepIdx !== -1) {
           const afterRole = afterPrefix.substring(sepIdx + 2)
           const actualPassword = afterRole.startsWith(':') ? afterRole.substring(1) : ''
-          if (actualPassword === password) {
-            // Team member login successful
+          // Team members use bcrypt too — but legacy ones may still use plain text
+          const { valid, needsRehash } = await verifyPassword(actualPassword || '', trainer.password)
+          // The team member's actual password is stored AFTER the colon, not hashed yet.
+          // So we compare plain vs plain here, not via verifyPassword (which expects
+          // the stored value to be either bcrypt OR plain — but for team members
+          // the stored value is the marker string, not the actual password).
+          const isMatch = actualPassword === password
+          if (isMatch) {
             const role = afterPrefix.substring(0, sepIdx) || 'team'
             const user = {
               id: trainer.id,
               email: trainer.email,
               name: trainer.name,
               phone: trainer.phone || '',
-              password: trainer.password || '',
-              role: role === 'founder' ? 'trainer' : 'trainer', // Team members get trainer role for dashboard access
+              password: '',
+              role: 'trainer' as const, // team members get trainer dashboard access
               avatar: trainer.avatar,
               title: trainer.title,
               bio: mergeLegacyBio(trainer.bio),
             }
-            const token = Buffer.from(`${trainer.id}:${Date.now()}`).toString('base64')
+            const token = signToken({
+              sub: trainer.id,
+              email: trainer.email,
+              role: 'trainer',
+              name: trainer.name,
+            })
             return NextResponse.json({ user, token })
           }
         }
-        // Old format team member without password → cannot login
         return NextResponse.json({ error: 'بيانات الدخول غير صحيحة' }, { status: 401 })
       }
 
-      // Regular trainer — direct password match
-      if (trainer.password === password) {
+      // Regular trainer — verify password (supports bcrypt + plain legacy)
+      const { valid, needsRehash } = await verifyPassword(password, trainer.password || '')
+      if (valid) {
+        if (needsRehash) {
+          const newHash = await hashPassword(password)
+          await supabaseAdmin.from('trainers').update({ password: newHash }).eq('id', trainer.id)
+        }
         const user = {
           id: trainer.id,
           email: trainer.email,
           name: trainer.name,
           phone: trainer.phone || '',
-          password: trainer.password || '',
+          password: '',
           role: 'trainer' as const,
           avatar: trainer.avatar,
           title: trainer.title,
           bio: mergeLegacyBio(trainer.bio),
         }
-        const token = Buffer.from(`${trainer.id}:${Date.now()}`).toString('base64')
+        const token = signToken({
+          sub: trainer.id,
+          email: trainer.email,
+          role: 'trainer',
+          name: trainer.name,
+        })
         return NextResponse.json({ user, token })
       }
     }

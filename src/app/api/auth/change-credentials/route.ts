@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { verifyPassword, hashPassword } from '@/lib/auth-server'
+
+const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +12,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })
     }
 
-    // Determine which table the user is in
-    // role='trainer' → trainers table; otherwise → users table
     const tableName = role === 'trainer' ? 'trainers' : 'users'
 
     const { data: userRow, error: userErr } = await supabaseAdmin
@@ -23,14 +24,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
     }
 
-    // Verify the current password matches
-    if (userRow.password !== currentPassword) {
+    // For team members, the stored password is the marker string, not the
+    // actual password — we extract the real password and compare directly.
+    let passwordVerified = false
+    if (tableName === 'trainers' && userRow.password?.startsWith(TEAM_MARKER_PREFIX)) {
+      const afterPrefix = userRow.password.substring(TEAM_MARKER_PREFIX.length)
+      const sepIdx = afterPrefix.indexOf('__')
+      if (sepIdx !== -1) {
+        const afterRole = afterPrefix.substring(sepIdx + 2)
+        const actualPassword = afterRole.startsWith(':') ? afterRole.substring(1) : ''
+        if (actualPassword === currentPassword) passwordVerified = true
+      }
+    } else {
+      // Regular user/trainer — verify via bcrypt (with plain-text legacy fallback)
+      const { valid } = await verifyPassword(currentPassword, userRow.password || '')
+      if (valid) passwordVerified = true
+    }
+
+    if (!passwordVerified) {
       return NextResponse.json({ error: 'كلمة المرور الحالية غير صحيحة' }, { status: 401 })
     }
 
     // If changing email, check the new email isn't taken
     if (newEmail && newEmail !== userRow.email) {
-      // Check in same table
       const { data: existingSame } = await supabaseAdmin
         .from(tableName)
         .select('id')
@@ -39,7 +55,6 @@ export async function POST(req: NextRequest) {
       if (existingSame) {
         return NextResponse.json({ error: 'البريد الجديد مستخدم بالفعل' }, { status: 400 })
       }
-      // Check in other table
       const otherTable = tableName === 'trainers' ? 'users' : 'trainers'
       const { data: existingOther } = await supabaseAdmin
         .from(otherTable)
@@ -51,10 +66,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build updates
+    // Build updates — hash the new password if provided
     const updates: any = {}
     if (newEmail) updates.email = newEmail
-    if (newPassword) updates.password = newPassword
+    if (newPassword) {
+      // For team members, preserve the marker prefix + role + new password
+      if (tableName === 'trainers' && userRow.password?.startsWith(TEAM_MARKER_PREFIX)) {
+        const afterPrefix = userRow.password.substring(TEAM_MARKER_PREFIX.length)
+        const sepIdx = afterPrefix.indexOf('__')
+        const storedRole = sepIdx !== -1 ? afterPrefix.substring(0, sepIdx) : 'team'
+        updates.password = `${TEAM_MARKER_PREFIX}${storedRole}__:${newPassword}`
+      } else {
+        // Hash with bcrypt — replaces the legacy plain-text/old-hash
+        updates.password = await hashPassword(newPassword)
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'لا توجد تغييرات' }, { status: 400 })
@@ -69,9 +95,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
 
-    // Strip password before returning
     const { password, ...safeUser } = updated
-    // For trainers, role is always 'trainer'; for users, use stored role
     const userRole = tableName === 'trainers' ? 'trainer' : (userRow.role || 'student')
     return NextResponse.json({
       success: true,
