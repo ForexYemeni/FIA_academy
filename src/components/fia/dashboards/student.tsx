@@ -878,6 +878,7 @@ function Certificates({ certificates }: any) {
 }
 
 function Payments({ payments, userId, courses }: any) {
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
   // Filter by the current user's id so we never display someone else's payments.
   const myPayments = (payments || []).filter((p: any) => p.user_id === userId)
   // Sort by date DESC (most recent first) for display
@@ -900,26 +901,15 @@ function Payments({ payments, userId, courses }: any) {
   const fmtDate = (d: string | null | undefined) => {
     if (!d) return null
     try {
-      return new Date(d).toLocaleDateString('ar-EG', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    } catch {
-      return null
-    }
+      return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+    } catch { return null }
   }
 
-  // Strip the trailing "| PROOF: https://..." suffix from a reference so we
-  // show the user-friendly reference number (e.g., "JB-123456789") in the UI.
   const cleanReference = (ref: string | null | undefined) => {
     if (!ref) return null
     return ref.replace(/\s*\|\s*PROOF:.*$/i, '').trim() || null
   }
 
-  // Extract the receipt/proof image URL (if any) from the payment's reference
-  // field. The reference field stores the proof URL in the format:
-  // "<ref> | PROOF: <url>" (or just "PROOF: <url>" if no ref was given).
   const getProofUrl = (p: any): string | null => {
     const ref = p?.reference
     if (!ref) return null
@@ -928,6 +918,7 @@ function Payments({ payments, userId, courses }: any) {
   }
 
   return (
+    <>
     <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
       {sortedPayments.length === 0 ? (
         <div className="text-center py-16">
@@ -935,9 +926,7 @@ function Payments({ payments, userId, courses }: any) {
             <CreditCard className="w-10 h-10 text-muted-foreground/50" />
           </div>
           <p className="text-base font-semibold text-navy mb-1">لا توجد مدفوعات بعد</p>
-          <p className="text-xs text-muted-foreground">
-            عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.
-          </p>
+          <p className="text-xs text-muted-foreground">عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -949,7 +938,7 @@ function Payments({ payments, userId, courses }: any) {
             const proofUrl = getProofUrl(p)
             return (
               <Card key={p.id} className="p-0 overflow-hidden border-border card-hover">
-                {/* Amount header — large bold */}
+                {/* Amount header */}
                 <div className="bg-gradient-to-br from-navy to-navy-light p-4 text-white">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -958,30 +947,22 @@ function Payments({ payments, userId, courses }: any) {
                         {fmtAmount(p)} <span className="text-base font-bold text-gold">{p.currency || 'ر.ي'}</span>
                       </div>
                     </div>
-                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>
-                      {statusInfo.label}
-                    </Badge>
+                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>
                   </div>
                 </div>
 
-                {/* Receipt thumbnail (if a proof image was uploaded) */}
+                {/* Receipt thumbnail — opens in-app viewer */}
                 {proofUrl && (
                   <button
                     type="button"
-                    onClick={() => window.open(proofUrl, '_blank', 'noopener,noreferrer')}
-                    className="relative block w-full h-32 bg-muted/40 group cursor-zoom-in"
-                    title="اضغط لعرض الإيصال بالحجم الكامل"
+                    onClick={() => setViewingReceipt(proofUrl)}
+                    className="relative block w-full h-36 bg-muted/40 group cursor-pointer"
+                    title="اضغط لعرض الإيصال"
                   >
-                    <img
-                      src={proofUrl}
-                      alt="إيصال الدفع"
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/40 transition-colors flex items-center justify-center">
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
-                        <FileUp className="w-3.5 h-3.5" /> عرض الإيصال
+                    <img src={proofUrl} alt="إيصال الدفع" className="w-full h-full object-cover" loading="lazy" />
+                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/50 transition-colors flex items-center justify-center">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5">
+                        <FileUp className="w-4 h-4" /> عرض الإيصال
                       </span>
                     </div>
                   </button>
@@ -995,7 +976,6 @@ function Payments({ payments, userId, courses }: any) {
                       <div className="text-sm font-semibold text-navy line-clamp-2">{courseTitle}</div>
                     </div>
                   )}
-
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <div className="text-[11px] text-muted-foreground mb-0.5">طريقة الدفع</div>
@@ -1006,11 +986,12 @@ function Payments({ payments, userId, courses }: any) {
                       <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
                     </div>
                   </div>
-
-                  <div>
-                    <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
-                    <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref || '-'}</div>
-                  </div>
+                  {ref && (
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
+                      <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref}</div>
+                    </div>
+                  )}
                 </div>
               </Card>
             )
@@ -1018,6 +999,29 @@ function Payments({ payments, userId, courses }: any) {
         </div>
       )}
     </SectionCard>
+
+    {/* In-app receipt viewer — professional lightbox */}
+    <Dialog open={!!viewingReceipt} onOpenChange={(o) => { if (!o) setViewingReceipt(null) }}>
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+        <DialogHeader className="p-4 border-b border-border">
+          <DialogTitle className="text-navy text-lg flex items-center gap-2">
+            <FileUp className="w-5 h-5 text-green-600" /> إيصال الدفع
+          </DialogTitle>
+        </DialogHeader>
+        <div className="p-4 bg-muted/10">
+          {viewingReceipt && (
+            <div className="relative w-full flex items-center justify-center">
+              <img
+                src={viewingReceipt}
+                alt="إيصال الدفع"
+                className="max-w-full max-h-[60vh] rounded-lg border border-border shadow-lg object-contain"
+              />
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
