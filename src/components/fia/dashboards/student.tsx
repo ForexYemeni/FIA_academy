@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
-  Mail, Eye, EyeOff,
+  Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
+import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -32,6 +33,9 @@ const NAV: NavItem[] = [
   { id: 'results', label: 'نتائجي', icon: TrendingUp },
   // { id: 'certificates', label: 'شهاداتي', icon: Award },  // DISABLED: certificate feature temporarily removed
   { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+  { id: 'blog', label: 'المدونة', icon: Newspaper },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
   { id: 'profile', label: 'ملفي الشخصي', icon: User },
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
@@ -149,6 +153,9 @@ export function StudentDashboard() {
           {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
           {/* {active === 'certificates' && <Certificates certificates={certificates} />} */}
           {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
+          {active === 'forum' && <SharedForum user={user} />}
+          {active === 'blog' && <SharedBlog />}
+          {active === 'faqs' && <SharedFAQ />}
           {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
           {active === 'notifications' && <Notifications userId={user?.id} enrollments={enrollments} courses={courses} />}
           {active === 'settings' && <SettingsTab user={user} updateUser={updateUser} />}
