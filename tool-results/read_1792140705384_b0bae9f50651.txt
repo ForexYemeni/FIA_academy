@@ -1,0 +1,848 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect } from 'react'
+     4→     4→import { Button } from '@/components/ui/button'
+     5→     5→import { Card } from '@/components/ui/card'
+     6→     6→import { Badge } from '@/components/ui/badge'
+     7→     7→import { Input } from '@/components/ui/input'
+     8→     8→import { Label } from '@/components/ui/label'
+     9→     9→import { Textarea } from '@/components/ui/textarea'
+    10→    10→import {
+    11→    11→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    12→    12→} from '@/components/ui/dialog'
+    13→    13→import { toast } from 'sonner'
+    14→    14→import {
+    15→    15→  Plus, Edit, Trash2, ChevronDown, ChevronUp, Video, FileText,
+    16→    16→  HelpCircle, FileUp, GripVertical, Save, X, Loader2,
+    17→    17→  Database, Copy, ExternalLink, RefreshCw, CheckCircle2, Eye,
+    18→    18→} from 'lucide-react'
+    19→    19→import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
+    20→    20→
+    21→    21→interface Module {
+    22→    22→  id: string
+    23→    23→  course_id: string
+    24→    24→  title: string
+    25→    25→  description?: string
+    26→    26→  position: number
+    27→    27→}
+    28→    28→
+    29→    29→interface Lesson {
+    30→    30→  id: string
+    31→    31→  module_id: string
+    32→    32→  title: string
+    33→    33→  lesson_type: 'video' | 'text' | 'exam' | 'pdf'
+    34→    34→  content?: string
+    35→    35→  video_url?: string
+    36→    36→  pdf_url?: string
+    37→    37→  duration_minutes?: number
+    38→    38→  position: number
+    39→    39→  is_preview?: boolean
+    40→    40→}
+    41→    41→
+    42→    42→const LESSON_TYPES = [
+    43→    43→  { value: 'video', label: 'فيديو', icon: Video, color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+    44→    44→  { value: 'text', label: 'نص', icon: FileText, color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+    45→    45→  { value: 'exam', label: 'اختبار', icon: HelpCircle, color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
+    46→    46→  { value: 'pdf', label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30' },
+    47→    47→]
+    48→    48→
+    49→    49→export function CourseContentManager({ courseId }: { courseId: string }) {
+    50→    50→  const [modules, setModules] = useState<Module[]>([])
+    51→    51→  const [lessonsByModule, setLessonsByModule] = useState<Record<string, Lesson[]>>({})
+    52→    52→  const [loading, setLoading] = useState(true)
+    53→    53→  const [needsSetup, setNeedsSetup] = useState(false)
+    54→    54→  const [setupSqlCopied, setSetupSqlCopied] = useState(false)
+    55→    55→  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+    56→    56→
+    57→    57→  const SETUP_SQL = `-- FIA Academy — Database Setup
+    58→    58→CREATE TABLE IF NOT EXISTS course_modules (
+    59→    59→  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    60→    60→  course_id UUID NOT NULL,
+    61→    61→  title TEXT NOT NULL,
+    62→    62→  description TEXT,
+    63→    63→  position INT DEFAULT 0,
+    64→    64→  created_at TIMESTAMPTZ DEFAULT NOW()
+    65→    65→);
+    66→    66→
+    67→    67→CREATE TABLE IF NOT EXISTS course_lessons (
+    68→    68→  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    69→    69→  module_id UUID NOT NULL,
+    70→    70→  title TEXT NOT NULL,
+    71→    71→  lesson_type TEXT DEFAULT 'text',
+    72→    72→  content TEXT,
+    73→    73→  video_url TEXT,
+    74→    74→  pdf_url TEXT,
+    75→    75→  duration_minutes INT DEFAULT 0,
+    76→    76→  position INT DEFAULT 0,
+    77→    77→  is_preview BOOLEAN DEFAULT false,
+    78→    78→  created_at TIMESTAMPTZ DEFAULT NOW()
+    79→    79→);
+    80→    80→
+    81→    81→CREATE TABLE IF NOT EXISTS enrollments (
+    82→    82→  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    83→    83→  user_id TEXT NOT NULL,
+    84→    84→  course_id UUID NOT NULL,
+    85→    85→  status TEXT DEFAULT 'active',
+    86→    86→  progress INT DEFAULT 0,
+    87→    87→  payment_status TEXT DEFAULT 'free',
+    88→    88→  amount_paid INT DEFAULT 0,
+    89→    89→  payment_method TEXT,
+    90→    90→  payment_reference TEXT,
+    91→    91→  enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+    92→    92→  completed_at TIMESTAMPTZ,
+    93→    93→  UNIQUE (user_id, course_id)
+    94→    94→);
+    95→    95→
+    96→    96→CREATE TABLE IF NOT EXISTS team_members (
+    97→    97→  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    98→    98→  user_id TEXT,
+    99→    99→  name TEXT NOT NULL,
+   100→   100→  title TEXT,
+   101→   101→  role TEXT DEFAULT 'team',
+   102→   102→  specialization TEXT,
+   103→   103→  bio TEXT,
+   104→   104→  vision TEXT,
+   105→   105→  mission TEXT,
+   106→   106→  qualifications TEXT,
+   107→   107→  achievements TEXT,
+   108→   108→  avatar TEXT,
+   109→   109→  email TEXT,
+   110→   110→  phone TEXT,
+   111→   111→  linkedin TEXT,
+   112→   112→  twitter TEXT,
+   113→   113→  years_experience INT DEFAULT 0,
+   114→   114→  display_order INT DEFAULT 0,
+   115→   115→  is_active BOOLEAN DEFAULT true,
+   116→   116→  created_at TIMESTAMPTZ DEFAULT NOW()
+   117→   117→);
+   118→   118→
+   119→   119→ALTER TABLE course_modules ENABLE ROW LEVEL SECURITY;
+   120→   120→ALTER TABLE course_lessons ENABLE ROW LEVEL SECURITY;
+   121→   121→ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
+   122→   122→ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+   123→   123→
+   124→   124→CREATE POLICY "allow_all_modules" ON course_modules FOR ALL USING (true) WITH CHECK (true);
+   125→   125→CREATE POLICY "allow_all_lessons" ON course_lessons FOR ALL USING (true) WITH CHECK (true);
+   126→   126→CREATE POLICY "allow_all_enrollments" ON enrollments FOR ALL USING (true) WITH CHECK (true);
+   127→   127→CREATE POLICY "allow_all_team" ON team_members FOR ALL USING (true) WITH CHECK (true);
+   128→   128→
+   129→   129→INSERT INTO team_members (name, title, role, specialization, bio, vision, mission, email, phone, years_experience, display_order, is_active)
+   130→   130→SELECT 'د. عبدالرحمن المحمدي', 'المؤسس والمدير التنفيذي', 'founder', 'الطب الباطني والتعليم الطبي',
+   131→   131→       'طبيب استشاري وخبير تعليم طبي مع 15 عامًا من الخبرة.',
+   132→   132→       'أن نكون المرجع الأول للتعليم الطبي المستمر في المنطقة.',
+   133→   133→       'تمكين الكوادر الصحية بمعارف ومهارات تخدم المرضى.',
+   134→   134→       'admin@fia.edu', '+967 700 000 001', 15, 0, true
+   135→   135→WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
+   136→   136→
+   137→   137→  const copySql = () => {
+   138→   138→    navigator.clipboard.writeText(SETUP_SQL).then(() => {
+   139→   139→      setSetupSqlCopied(true)
+   140→   140→      toast.success('تم نسخ SQL! الصقه في Supabase SQL Editor واضغط Run')
+   141→   141→      setTimeout(() => setSetupSqlCopied(false), 4000)
+   142→   142→    })
+   143→   143→  }
+   144→   144→
+   145→   145→  // Dialogs
+   146→   146→  const [moduleDialog, setModuleDialog] = useState<{ open: boolean; editing: Module | null }>({ open: false, editing: null })
+   147→   147→  const [lessonDialog, setLessonDialog] = useState<{ open: boolean; editing: Lesson | null; moduleId: string } | null>(null)
+   148→   148→  const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null)
+   149→   149→
+   150→   150→  const loadModules = async () => {
+   151→   151→    setLoading(true)
+   152→   152→    setNeedsSetup(false)
+   153→   153→    try {
+   154→   154→      const res = await fetch(`/api/modules?course_id=${courseId}`)
+   155→   155→      const data = await res.json()
+   156→   156→      if (data.needs_setup) {
+   157→   157→        setNeedsSetup(true)
+   158→   158→        setModules([])
+   159→   159→        setLoading(false)
+   160→   160→        return
+   161→   161→      }
+   162→   162→      const mods = Array.isArray(data) ? data : []
+   163→   163→      setModules(mods)
+   164→   164→      if (mods.length > 0 && expanded.size === 0) {
+   165→   165→        setExpanded(new Set([mods[0].id]))
+   166→   166→      }
+   167→   167→      const lessonRes = await fetch(`/api/lessons?course_id=${courseId}`)
+   168→   168→      const allLessons = await lessonRes.json()
+   169→   169→      const byModule: Record<string, Lesson[]> = {}
+   170→   170→      ;(allLessons || []).forEach((l: Lesson) => {
+   171→   171→        if (!byModule[l.module_id]) byModule[l.module_id] = []
+   172→   172→        byModule[l.module_id].push(l)
+   173→   173→      })
+   174→   174→      setLessonsByModule(byModule)
+   175→   175→    } catch {
+   176→   176→      // ignore
+   177→   177→    } finally {
+   178→   178→      setLoading(false)
+   179→   179→    }
+   180→   180→  }
+   181→   181→
+   182→   182→  useEffect(() => {
+   183→   183→    loadModules()
+   184→   184→  }, [courseId])
+   185→   185→
+   186→   186→  const toggleModule = (id: string) => {
+   187→   187→    setExpanded((prev) => {
+   188→   188→      const next = new Set(prev)
+   189→   189→      if (next.has(id)) next.delete(id)
+   190→   190→      else next.add(id)
+   191→   191→      return next
+   192→   192→    })
+   193→   193→  }
+   194→   194→
+   195→   195→  const saveModule = async (data: any) => {
+   196→   196→    try {
+   197→   197→      const res = await fetch('/api/modules', {
+   198→   198→        method: moduleDialog.editing ? 'PUT' : 'POST',
+   199→   199→        headers: { 'Content-Type': 'application/json' },
+   200→   200→        body: JSON.stringify(moduleDialog.editing ? { id: moduleDialog.editing.id, ...data } : { course_id: courseId, ...data }),
+   201→   201→      })
+   202→   202→      const result = await res.json()
+   203→   203→      if (res.ok) {
+   204→   204→        toast.success(moduleDialog.editing ? 'تم تحديث الوحدة' : 'تمت إضافة الوحدة')
+   205→   205→        setModuleDialog({ open: false, editing: null })
+   206→   206→        loadModules()
+   207→   207→      } else if (result.needs_setup) {
+   208→   208→        setNeedsSetup(true)
+   209→   209→        setModuleDialog({ open: false, editing: null })
+   210→   210→        toast.error('يجب تنفيذ SQL أولاً')
+   211→   211→      } else {
+   212→   212→        toast.error(result.error || 'فشل الحفظ')
+   213→   213→      }
+   214→   214→    } catch {
+   215→   215→      toast.error('خطأ في الاتصال بالخادم')
+   216→   216→    }
+   217→   217→  }
+   218→   218→
+   219→   219→  const deleteModule = async (id: string) => {
+   220→   220→    if (!confirm('حذف الوحدة سيحذف جميع دروسها. متابعة؟')) return
+   221→   221→    await fetch('/api/modules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   222→   222→    toast.success('تم الحذف')
+   223→   223→    loadModules()
+   224→   224→  }
+   225→   225→
+   226→   226→  const saveLesson = async (data: any, moduleId: string, editing: Lesson | null) => {
+   227→   227→    try {
+   228→   228→      const res = await fetch('/api/lessons', {
+   229→   229→        method: editing ? 'PUT' : 'POST',
+   230→   230→        headers: { 'Content-Type': 'application/json' },
+   231→   231→        body: JSON.stringify(editing ? { id: editing.id, ...data } : { module_id: moduleId, ...data }),
+   232→   232→      })
+   233→   233→      if (res.ok) {
+   234→   234→        toast.success(editing ? 'تم تحديث الدرس' : 'تمت إضافة الدرس')
+   235→   235→        setLessonDialog(null)
+   236→   236→        loadModules()
+   237→   237→      } else {
+   238→   238→        const result = await res.json()
+   239→   239→        toast.error(result.error || 'فشل الحفظ')
+   240→   240→      }
+   241→   241→    } catch {
+   242→   242→      toast.error('خطأ في الاتصال')
+   243→   243→    }
+   244→   244→  }
+   245→   245→
+   246→   246→  const deleteLesson = async (id: string) => {
+   247→   247→    if (!confirm('حذف الدرس؟')) return
+   248→   248→    await fetch('/api/lessons', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   249→   249→    toast.success('تم الحذف')
+   250→   250→    loadModules()
+   251→   251→  }
+   252→   252→
+   253→   253→  if (loading) {
+   254→   254→    return (
+   255→   255→      <div className="text-center py-12">
+   256→   256→        <Loader2 className="w-8 h-8 animate-spin mx-auto text-navy mb-3" />
+   257→   257→        <p className="text-sm text-muted-foreground">جاري تحميل محتوى الدورة...</p>
+   258→   258→      </div>
+   259→   259→    )
+   260→   260→  }
+   261→   261→
+   262→   262→  // ===== Database setup needed =====
+   263→   263→  if (needsSetup) {
+   264→   264→    return (
+   265→   265→      <div className="space-y-4">
+   266→   266→        <Card className="p-8 text-center bg-amber-50 border-2 border-amber-300">
+   267→   267→          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500 flex items-center justify-center mb-4">
+   268→   268→            <Database className="w-8 h-8 text-white" />
+   269→   269→          </div>
+   270→   270→          <h3 className="font-bold text-navy text-lg mb-2">تهيئة قاعدة البيانات مطلوبة</h3>
+   271→   271→          <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
+   272→   272→            لتفعيل نظام الوحدات والدروس، يجب إنشاء جداول في Supabase. اضغط زر النسخ ثم الصق في Supabase SQL Editor واضغط Run.
+   273→   273→          </p>
+   274→   274→          <div className="flex gap-2 justify-center flex-wrap">
+   275→   275→            <Button onClick={copySql} className="bg-navy hover:bg-navy-light">
+   276→   276→              {setupSqlCopied ? <CheckCircle2 className="w-4 h-4 ml-1" /> : <Copy className="w-4 h-4 ml-1" />}
+   277→   277→              {setupSqlCopied ? 'تم النسخ!' : 'نسخ SQL'}
+   278→   278→            </Button>
+   279→   279→            <a href="https://supabase.com/dashboard/project/tzquudmfazysjogorrxz/sql/new" target="_blank" rel="noopener noreferrer">
+   280→   280→              <Button variant="outline" className="border-navy/30 text-navy hover:bg-navy/5">
+   281→   281→                <ExternalLink className="w-4 h-4 ml-1" /> فتح SQL Editor
+   282→   282→              </Button>
+   283→   283→            </a>
+   284→   284→            <Button variant="outline" onClick={loadModules} className="border-navy/30 text-navy hover:bg-navy/5">
+   285→   285→              <RefreshCw className="w-4 h-4 ml-1" /> إعادة المحاولة
+   286→   286→            </Button>
+   287→   287→          </div>
+   288→   288→          <details className="mt-5 text-right">
+   289→   289→            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-navy">عرض SQL الكامل</summary>
+   290→   290→            <pre className="mt-3 text-xs bg-navy text-white p-4 rounded-lg overflow-x-auto max-h-72 overflow-y-auto font-mono" dir="ltr">{SETUP_SQL}</pre>
+   291→   291→          </details>
+   292→   292→        </Card>
+   293→   293→      </div>
+   294→   294→    )
+   295→   295→  }
+   296→   296→
+   297→   297→  return (
+   298→   298→    <div className="space-y-4">
+   299→   299→      <div className="flex items-center justify-between">
+   300→   300→        <div>
+   301→   301→          <h3 className="font-bold text-navy text-lg">محتوى الدورة</h3>
+   302→   302→          <p className="text-sm text-muted-foreground">{modules.length} وحدة، {Object.values(lessonsByModule).flat().length} درس</p>
+   303→   303→        </div>
+   304→   304→        <Button
+   305→   305→          className="bg-navy hover:bg-navy-light"
+   306→   306→          onClick={() => setModuleDialog({ open: true, editing: null })}
+   307→   307→        >
+   308→   308→          <Plus className="w-4 h-4 ml-1" /> وحدة جديدة
+   309→   309→        </Button>
+   310→   310→      </div>
+   311→   311→
+   312→   312→      {modules.length === 0 ? (
+   313→   313→        <Card className="p-12 text-center">
+   314→   314→          <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   315→   315→          <p className="text-muted-foreground mb-4">لا توجد وحدات في هذه الدورة بعد</p>
+   316→   316→          <Button className="bg-navy hover:bg-navy-light" onClick={() => setModuleDialog({ open: true, editing: null })}>
+   317→   317→            <Plus className="w-4 h-4 ml-1" /> أضف أول وحدة
+   318→   318→          </Button>
+   319→   319→        </Card>
+   320→   320→      ) : (
+   321→   321→        modules.map((m, idx) => {
+   322→   322→          const isExpanded = expanded.has(m.id)
+   323→   323→          const lessons = lessonsByModule[m.id] || []
+   324→   324→          return (
+   325→   325→            <Card key={m.id} className="overflow-hidden">
+   326→   326→              {/* Module header */}
+   327→   327→              <div className="flex items-center justify-between p-4 bg-muted/30 border-b border-border">
+   328→   328→                <button onClick={() => toggleModule(m.id)} className="flex items-center gap-3 flex-1 text-right">
+   329→   329→                  <GripVertical className="w-5 h-5 text-muted-foreground" />
+   330→   330→                  <div className="w-8 h-8 rounded-lg bg-navy text-gold flex items-center justify-center text-sm font-bold flex-shrink-0">
+   331→   331→                    {idx + 1}
+   332→   332→                  </div>
+   333→   333→                  <div className="flex-1">
+   334→   334→                    <div className="font-bold text-navy">{m.title}</div>
+   335→   335→                    <div className="text-xs text-muted-foreground">{m.description || `${lessons.length} درس`}</div>
+   336→   336→                  </div>
+   337→   337→                  {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+   338→   338→                </button>
+   339→   339→                <div className="flex gap-1">
+   340→   340→                  <Button size="icon" variant="ghost" onClick={() => setModuleDialog({ open: true, editing: m })}>
+   341→   341→                    <Edit className="w-4 h-4 text-navy" />
+   342→   342→                  </Button>
+   343→   343→                  <Button size="icon" variant="ghost" onClick={() => deleteModule(m.id)}>
+   344→   344→                    <Trash2 className="w-4 h-4 text-red-500" />
+   345→   345→                  </Button>
+   346→   346→                </div>
+   347→   347→              </div>
+   348→   348→
+   349→   349→              {/* Module lessons */}
+   350→   350→              {isExpanded && (
+   351→   351→                <div className="p-4 space-y-2">
+   352→   352→                  {lessons.length === 0 ? (
+   353→   353→                    <div className="text-center py-6 text-muted-foreground text-sm">
+   354→   354→                      لا توجد دروس في هذه الوحدة
+   355→   355→                    </div>
+   356→   356→                  ) : (
+   357→   357→                    lessons.map((l, li) => {
+   358→   358→                      const type = LESSON_TYPES.find((t) => t.value === l.lesson_type) || LESSON_TYPES[0]
+   359→   359→                      const Icon = type.icon
+   360→   360→                      return (
+   361→   361→                        <div key={l.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg hover:shadow-sm transition-shadow">
+   362→   362→                          <div className="flex items-center gap-3 flex-1">
+   363→   363→                            <GripVertical className="w-4 h-4 text-muted-foreground/50" />
+   364→   364→                            <Badge className={type.color}><Icon className="w-3 h-3 ml-1" /> {type.label}</Badge>
+   365→   365→                            <div className="flex-1">
+   366→   366→                              <div className="font-medium text-navy text-sm flex items-center gap-2">
+   367→   367→                                {l.title}
+   368→   368→                                {l.is_preview && <Badge variant="outline" className="text-xs">معاينة مجانية</Badge>}
+   369→   369→                              </div>
+   370→   370→                              {l.duration_minutes ? (
+   371→   371→                                <div className="text-xs text-muted-foreground">{l.duration_minutes} دقيقة</div>
+   372→   372→                              ) : null}
+   373→   373→                            </div>
+   374→   374→                          </div>
+   375→   375→                          <div className="flex gap-1">
+   376→   376→                            <Button size="icon" variant="ghost" onClick={() => setPreviewLesson(l)} title="معاينة الدرس">
+   377→   377→                              <Eye className="w-4 h-4 text-gold" />
+   378→   378→                            </Button>
+   379→   379→                            <Button size="icon" variant="ghost" onClick={() => setLessonDialog({ open: true, editing: l, moduleId: m.id })}>
+   380→   380→                              <Edit className="w-4 h-4 text-navy" />
+   381→   381→                            </Button>
+   382→   382→                            <Button size="icon" variant="ghost" onClick={() => deleteLesson(l.id)}>
+   383→   383→                              <Trash2 className="w-4 h-4 text-red-500" />
+   384→   384→                            </Button>
+   385→   385→                          </div>
+   386→   386→                        </div>
+   387→   387→                      )
+   388→   388→                    })
+   389→   389→                  )}
+   390→   390→                  <Button
+   391→   391→                    variant="outline"
+   392→   392→                    size="sm"
+   393→   393→                    className="w-full mt-2 border-dashed"
+   394→   394→                    onClick={() => setLessonDialog({ open: true, editing: null, moduleId: m.id })}
+   395→   395→                  >
+   396→   396→                    <Plus className="w-4 h-4 ml-1" /> إضافة درس
+   397→   397→                  </Button>
+   398→   398→                </div>
+   399→   399→              )}
+   400→   400→            </Card>
+   401→   401→          )
+   402→   402→        })
+   403→   403→      )}
+   404→   404→
+   405→   405→      {/* Module dialog */}
+   406→   406→      {moduleDialog.open && (
+   407→   407→        <ModuleDialog
+   408→   408→          open={moduleDialog.open}
+   409→   409→          onOpenChange={(o) => setModuleDialog({ open: o, editing: moduleDialog.editing })}
+   410→   410→          editing={moduleDialog.editing}
+   411→   411→          onSave={saveModule}
+   412→   412→        />
+   413→   413→      )}
+   414→   414→
+   415→   415→      {/* Lesson dialog */}
+   416→   416→      {lessonDialog?.open && (
+   417→   417→        <LessonDialog
+   418→   418→          open={lessonDialog.open}
+   419→   419→          onOpenChange={(o) => setLessonDialog(o ? { ...lessonDialog, open: o } : null)}
+   420→   420→          editing={lessonDialog.editing}
+   421→   421→          moduleId={lessonDialog.moduleId}
+   422→   422→          onSave={(data: any) => saveLesson(data, lessonDialog.moduleId, lessonDialog.editing)}
+   423→   423→        />
+   424→   424→      )}
+   425→   425→
+   426→   426→      {/* Lesson preview modal */}
+   427→   427→      <LessonPreviewModal
+   428→   428→        open={!!previewLesson}
+   429→   429→        onOpenChange={(o) => { if (!o) setPreviewLesson(null) }}
+   430→   430→        lesson={previewLesson}
+   431→   431→        modules={modules}
+   432→   432→        onNavigate={(l) => setPreviewLesson(l)}
+   433→   433→      />
+   434→   434→    </div>
+   435→   435→  )
+   436→   436→}
+   437→   437→
+   438→   438→// ============== Module Dialog ==============
+   439→   439→function ModuleDialog({ open, onOpenChange, editing, onSave }: any) {
+   440→   440→  const [title, setTitle] = useState(editing?.title || '')
+   441→   441→  const [description, setDescription] = useState(editing?.description || '')
+   442→   442→  const [position, setPosition] = useState(editing?.position || 0)
+   443→   443→
+   444→   444→  useEffect(() => {
+   445→   445→    setTitle(editing?.title || '')
+   446→   446→    setDescription(editing?.description || '')
+   447→   447→    setPosition(editing?.position || 0)
+   448→   448→  }, [editing])
+   449→   449→
+   450→   450→  return (
+   451→   451→    <Dialog open={open} onOpenChange={onOpenChange}>
+   452→   452→      <DialogContent className="sm:max-w-md">
+   453→   453→        <DialogHeader>
+   454→   454→          <DialogTitle>{editing ? 'تعديل الوحدة' : 'وحدة جديدة'}</DialogTitle>
+   455→   455→        </DialogHeader>
+   456→   456→        <div className="space-y-4 py-4">
+   457→   457→          <div>
+   458→   458→            <Label>عنوان الوحدة *</Label>
+   459→   459→            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: الوحدة الأولى - الأساسيات" className="mt-1" />
+   460→   460→          </div>
+   461→   461→          <div>
+   462→   462→            <Label>وصف مختصر</Label>
+   463→   463→            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="mt-1" />
+   464→   464→          </div>
+   465→   465→          <div>
+   466→   466→            <Label>الترتيب</Label>
+   467→   467→            <Input type="number" value={position} onChange={(e) => setPosition(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+   468→   468→          </div>
+   469→   469→        </div>
+   470→   470→        <DialogFooter>
+   471→   471→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   472→   472→          <Button
+   473→   473→            className="bg-navy hover:bg-navy-light"
+   474→   474→            onClick={() => { if (!title) { toast.error('أدخل العنوان'); return } onSave({ title, description, position }); }}
+   475→   475→          >
+   476→   476→            <Save className="w-4 h-4 ml-1" /> حفظ
+   477→   477→          </Button>
+   478→   478→        </DialogFooter>
+   479→   479→      </DialogContent>
+   480→   480→    </Dialog>
+   481→   481→  )
+   482→   482→}
+   483→   483→
+   484→   484→// ============== Lesson Dialog ==============
+   485→   485→function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
+   486→   486→  const [title, setTitle] = useState(editing?.title || '')
+   487→   487→  const [lessonType, setLessonType] = useState<'video' | 'text' | 'exam' | 'pdf'>(editing?.lesson_type || 'video')
+   488→   488→  const [content, setContent] = useState(editing?.content || '')
+   489→   489→  const [videoUrl, setVideoUrl] = useState(editing?.video_url || '')
+   490→   490→  const [pdfUrl, setPdfUrl] = useState(editing?.pdf_url || '')
+   491→   491→  const [duration, setDuration] = useState(editing?.duration_minutes || 0)
+   492→   492→  const [isPreview, setIsPreview] = useState(editing?.is_preview || false)
+   493→   493→  const [position, setPosition] = useState(editing?.position || 0)
+   494→   494→  const [savingPdf, setSavingPdf] = useState(false)
+   495→   495→
+   496→   496→  useEffect(() => {
+   497→   497→    setTitle(editing?.title || '')
+   498→   498→    setLessonType(editing?.lesson_type || 'video')
+   499→   499→    setContent(editing?.content || '')
+   500→   500→    setVideoUrl(editing?.video_url || '')
+   501→   501→    setPdfUrl(editing?.pdf_url || '')
+   502→   502→    setDuration(editing?.duration_minutes || 0)
+   503→   503→    setIsPreview(editing?.is_preview || false)
+   504→   504→    setPosition(editing?.position || 0)
+   505→   505→  }, [editing])
+   506→   506→
+   507→   507→  const handlePdfUpload = async (file: File) => {
+   508→   508→    setSavingPdf(true)
+   509→   509→    try {
+   510→   510→      const fd = new FormData()
+   511→   511→      fd.append('file', file)
+   512→   512→      fd.append('folder', 'pdfs')
+   513→   513→      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+   514→   514→      const data = await res.json()
+   515→   515→      if (data.url) {
+   516→   516→        setPdfUrl(data.url)
+   517→   517→        toast.success('تم رفع PDF')
+   518→   518→      } else toast.error('فشل رفع PDF')
+   519→   519→    } finally {
+   520→   520→      setSavingPdf(false)
+   521→   521→    }
+   522→   522→  }
+   523→   523→
+   524→   524→  // Telegram video upload helper
+   525→   525→  const [telegramInfo, setTelegramInfo] = useState<{ botToken: string; channelId: string } | null>(null)
+   526→   526→  const [uploadingVideo, setUploadingVideo] = useState(false)
+   527→   527→
+   528→   528→  const handleVideoUpload = async (file: File) => {
+   529→   529→    setUploadingVideo(true)
+   530→   530→    try {
+   531→   531→      // 1. Get Telegram bot info
+   532→   532→      const infoRes = await fetch('/api/upload/telegram', {
+   533→   533→        method: 'POST',
+   534→   534→        headers: { 'Content-Type': 'application/json' },
+   535→   535→        body: JSON.stringify({ fileName: file.name, fileSize: file.size, caption: `FIA Lesson Video: ${title}` }),
+   536→   536→      })
+   537→   537→      const info = await infoRes.json()
+   538→   538→      if (!info.botToken) {
+   539→   539→        toast.error('فشل الحصول على معلومات تيليجرام')
+   540→   540→        return
+   541→   541→      }
+   542→   542→
+   543→   543→      // 2. Upload to Telegram directly
+   544→   544→      const fd = new FormData()
+   545→   545→      fd.append('chat_id', info.channelId)
+   546→   546→      fd.append('caption', info.caption)
+   547→   547→      fd.append('video', file)
+   548→   548→      const tgRes = await fetch(`https://api.telegram.org/bot${info.botToken}/sendVideo`, { method: 'POST', body: fd })
+   549→   549→      const tgData = await tgRes.json()
+   550→   550→      if (tgData.ok && tgData.result?.video) {
+   551→   551→        const fileId = tgData.result.video.file_id
+   552→   552→        // 3. Get the actual downloadable file URL from Telegram
+   553→   553→        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
+   554→   554→        const fileData = await fileRes.json()
+   555→   555→        if (fileData.ok && fileData.result?.file_path) {
+   556→   556→          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
+   557→   557→          setVideoUrl(directUrl)
+   558→   558→          toast.success('تم رفع الفيديو بنجاح')
+   559→   559→        } else {
+   560→   560→          // Fallback: use file_id directly as URL (won't play but stored for reference)
+   561→   561→          setVideoUrl(`tg://${fileId}`)
+   562→   562→          toast.success('تم رفع الفيديو إلى تيليجرام (الرابط المباشر غير متاح)')
+   563→   563→        }
+   564→   564→      } else if (tgData.ok && tgData.result?.document) {
+   565→   565→        const fileId = tgData.result.document.file_id
+   566→   566→        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
+   567→   567→        const fileData = await fileRes.json()
+   568→   568→        if (fileData.ok && fileData.result?.file_path) {
+   569→   569→          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
+   570→   570→          setVideoUrl(directUrl)
+   571→   571→          toast.success('تم رفع الفيديو بنجاح')
+   572→   572→        } else {
+   573→   573→          setVideoUrl(`tg://${fileId}`)
+   574→   574→          toast.success('تم رفع الملف إلى تيليجرام')
+   575→   575→        }
+   576→   576→      } else {
+   577→   577→        toast.error('فشل رفع الفيديو: ' + (tgData.description || ''))
+   578→   578→      }
+   579→   579→    } catch (e: any) {
+   580→   580→      toast.error('خطأ في الرفع')
+   581→   581→    } finally {
+   582→   582→      setUploadingVideo(false)
+   583→   583→    }
+   584→   584→  }
+   585→   585→
+   586→   586→  return (
+   587→   587→    <Dialog open={open} onOpenChange={onOpenChange}>
+   588→   588→      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+   589→   589→        <DialogHeader>
+   590→   590→          <DialogTitle>{editing ? 'تعديل الدرس' : 'درس جديد'}</DialogTitle>
+   591→   591→        </DialogHeader>
+   592→   592→        <div className="space-y-4 py-4">
+   593→   593→          <div>
+   594→   594→            <Label>عنوان الدرس *</Label>
+   595→   595→            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: مقدمة في الإنعاش القلبي" className="mt-1" />
+   596→   596→          </div>
+   597→   597→
+   598→   598→          <div>
+   599→   599→            <Label>نوع الدرس</Label>
+   600→   600→            <div className="grid grid-cols-4 gap-2 mt-1">
+   601→   601→              {LESSON_TYPES.map((t) => {
+   602→   602→                const Icon = t.icon
+   603→   603→                const active = lessonType === t.value
+   604→   604→                return (
+   605→   605→                  <button
+   606→   606→                    key={t.value}
+   607→   607→                    type="button"
+   608→   608→                    onClick={() => setLessonType(t.value as any)}
+   609→   609→                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+   610→   610→                      active ? `${t.color} border-current` : 'border-border bg-muted/30 hover:border-muted'
+   611→   611→                    }`}
+   612→   612→                  >
+   613→   613→                    <Icon className="w-5 h-5" />
+   614→   614→                    <span className="text-xs">{t.label}</span>
+   615→   615→                  </button>
+   616→   616→                )
+   617→   617→              })}
+   618→   618→            </div>
+   619→   619→          </div>
+   620→   620→
+   621→   621→          {lessonType === 'video' && (
+   622→   622→            <div className="space-y-3">
+   623→   623→              <div>
+   624→   624→                <Label>رفع فيديو (عبر تيليجرام بوت)</Label>
+   625→   625→                <input
+   626→   626→                  type="file"
+   627→   627→                  accept="video/*"
+   628→   628→                  className="hidden"
+   629→   629→                  id="video-upload"
+   630→   630→                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f) }}
+   631→   631→                />
+   632→   632→                <Button
+   633→   633→                  variant="outline"
+   634→   634→                  className="w-full mt-1"
+   635→   635→                  disabled={uploadingVideo}
+   636→   636→                  onClick={() => document.getElementById('video-upload')?.click()}
+   637→   637→                >
+   638→   638→                  {uploadingVideo ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Video className="w-4 h-4 ml-1" />}
+   639→   639→                  {uploadingVideo ? 'جاري الرفع إلى تيليجرام...' : 'اختر فيديو'}
+   640→   640→                </Button>
+   641→   641→              </div>
+   642→   642→              <div>
+   643→   643→                <Label>أو أدخل رابط الفيديو مباشرة</Label>
+   644→   644→                <Input value={videoUrl.startsWith('tg://') ? '' : videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://..." dir="ltr" className="mt-1" />
+   645→   645→                {videoUrl.startsWith('tg://') && (
+   646→   646→                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
+   647→   647→                    <Video className="w-3 h-3" /> تم رفع الفيديو عبر تيليجرام
+   648→   648→                    <button onClick={() => setVideoUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
+   649→   649→                  </div>
+   650→   650→                )}
+   651→   651→              </div>
+   652→   652→            </div>
+   653→   653→          )}
+   654→   654→
+   655→   655→          {lessonType === 'pdf' && (
+   656→   656→            <div className="space-y-3">
+   657→   657→              <div>
+   658→   658→                <Label>رفع ملف PDF</Label>
+   659→   659→                <input
+   660→   660→                  type="file"
+   661→   661→                  accept="application/pdf"
+   662→   662→                  className="hidden"
+   663→   663→                  id="pdf-upload"
+   664→   664→                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f) }}
+   665→   665→                />
+   666→   666→                <Button
+   667→   667→                  variant="outline"
+   668→   668→                  className="w-full mt-1"
+   669→   669→                  disabled={savingPdf}
+   670→   670→                  onClick={() => document.getElementById('pdf-upload')?.click()}
+   671→   671→                >
+   672→   672→                  {savingPdf ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileUp className="w-4 h-4 ml-1" />}
+   673→   673→                  {savingPdf ? 'جاري الرفع...' : 'اختر PDF'}
+   674→   674→                </Button>
+   675→   675→              </div>
+   676→   676→              {pdfUrl && (
+   677→   677→                <div className="text-xs text-green-600 flex items-center gap-2">
+   678→   678→                  <FileUp className="w-3 h-3" /> {pdfUrl.split('/').pop()}
+   679→   679→                  <button onClick={() => setPdfUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
+   680→   680→                </div>
+   681→   681→              )}
+   682→   682→            </div>
+   683→   683→          )}
+   684→   684→
+   685→   685→          {lessonType === 'text' && (
+   686→   686→            <div>
+   687→   687→              <Label>محتوى الدرس النصي</Label>
+   688→   688→              <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={6} placeholder="اكتب محتوى الدرس هنا..." className="mt-1" />
+   689→   689→            </div>
+   690→   690→          )}
+   691→   691→
+   692→   692→          {lessonType === 'exam' && (
+   693→   693→            <ExamBuilder value={content} onChange={setContent} />
+   694→   694→          )}
+   695→   695→
+   696→   696→          <div className="grid grid-cols-2 gap-3">
+   697→   697→            <div>
+   698→   698→              <Label>المدة (دقيقة)</Label>
+   699→   699→              <Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+   700→   700→            </div>
+   701→   701→            <div>
+   702→   702→              <Label>الترتيب</Label>
+   703→   703→              <Input type="number" value={position} onChange={(e) => setPosition(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+   704→   704→            </div>
+   705→   705→          </div>
+   706→   706→
+   707→   707→          <div className="flex items-center gap-2">
+   708→   708→            <input
+   709→   709→              type="checkbox"
+   710→   710→              id="preview"
+   711→   711→              checked={isPreview}
+   712→   712→              onChange={(e) => setIsPreview(e.target.checked)}
+   713→   713→              className="w-4 h-4 accent-gold"
+   714→   714→            />
+   715→   715→            <Label htmlFor="preview" className="cursor-pointer">درس معاينة مجانية (يمكن للزوار مشاهدته دون تسجيل)</Label>
+   716→   716→          </div>
+   717→   717→        </div>
+   718→   718→
+   719→   719→        <DialogFooter>
+   720→   720→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   721→   721→          <Button
+   722→   722→            className="bg-navy hover:bg-navy-light"
+   723→   723→            onClick={() => {
+   724→   724→              if (!title) { toast.error('أدخل العنوان'); return }
+   725→   725→              const data: any = {
+   726→   726→                title,
+   727→   727→                lesson_type: lessonType,
+   728→   728→                content: content || null,
+   729→   729→                video_url: videoUrl || null,
+   730→   730→                pdf_url: pdfUrl || null,
+   731→   731→                duration_minutes: duration,
+   732→   732→                position,
+   733→   733→                is_preview: isPreview,
+   734→   734→              }
+   735→   735→              onSave(data)
+   736→   736→            }}
+   737→   737→          >
+   738→   738→            <Save className="w-4 h-4 ml-1" /> حفظ
+   739→   739→          </Button>
+   740→   740→        </DialogFooter>
+   741→   741→      </DialogContent>
+   742→   742→    </Dialog>
+   743→   743→  )
+   744→   744→}
+   745→   745→
+   746→   746→// ============== Visual Exam Builder (no JSON editing) ==============
+   747→   747→function ExamBuilder({ value, onChange }: { value?: string | null; onChange: (v: string) => void }) {
+   748→   748→  const [questions, setQuestions] = useState<any[]>(() => {
+   749→   749→    if (!value) return []
+   750→   750→    try {
+   751→   751→      const parsed = JSON.parse(value)
+   752→   752→      return Array.isArray(parsed) ? parsed : []
+   753→   753→    } catch {
+   754→   754→      return []
+   755→   755→    }
+   756→   756→  })
+   757→   757→
+   758→   758→  const updateJson = (qs: any[]) => {
+   759→   759→    setQuestions(qs)
+   760→   760→    onChange(JSON.stringify(qs))
+   761→   761→  }
+   762→   762→
+   763→   763→  const addQuestion = () => {
+   764→   764→    updateJson([...questions, { q: '', options: ['', '', '', ''], answer: 0 }])
+   765→   765→  }
+   766→   766→
+   767→   767→  const updateQuestion = (i: number, field: string, val: any) => {
+   768→   768→    const qs = [...questions]
+   769→   769→    qs[i] = { ...qs[i], [field]: val }
+   770→   770→    updateJson(qs)
+   771→   771→  }
+   772→   772→
+   773→   773→  const removeQuestion = (i: number) => {
+   774→   774→    updateJson(questions.filter((_, idx) => idx !== i))
+   775→   775→  }
+   776→   776→
+   777→   777→  return (
+   778→   778→    <div className="space-y-3">
+   779→   779→      <div className="flex items-center justify-between">
+   780→   780→        <Label className="flex items-center gap-1">
+   781→   781→          <HelpCircle className="w-4 h-4 text-purple-600" /> أسئلة الاختبار
+   782→   782→        </Label>
+   783→   783→        <Button type="button" size="sm" variant="outline" onClick={addQuestion}>
+   784→   784→          <Plus className="w-3.5 h-3.5 ml-1" /> سؤال جديد
+   785→   785→        </Button>
+   786→   786→      </div>
+   787→   787→
+   788→   788→      {questions.length === 0 ? (
+   789→   789→        <div className="text-center py-8 bg-purple-500/5 border border-purple-500/30 rounded-lg">
+   790→   790→          <HelpCircle className="w-10 h-10 text-purple-600/30 mx-auto mb-2" />
+   791→   791→          <p className="text-sm text-muted-foreground">لا توجد أسئلة بعد</p>
+   792→   792→          <p className="text-xs text-muted-foreground mt-1">اضغط "سؤال جديد" لإضافة أول سؤال</p>
+   793→   793→        </div>
+   794→   794→      ) : (
+   795→   795→        <div className="space-y-3 max-h-96 overflow-y-auto fia-scroll pr-1">
+   796→   796→          {questions.map((q, qi) => (
+   797→   797→            <Card key={qi} className="p-3 border-purple-500/20">
+   798→   798→              <div className="flex items-start gap-2 mb-2">
+   799→   799→                <Badge variant="outline" className="text-xs bg-purple-500/5 border-purple-500/30 text-purple-600 flex-shrink-0">
+   800→   800→                  سؤال {qi + 1}
+   801→   801→                </Badge>
+   802→   802→                <Input
+   803→   803→                  value={q.q || ''}
+   804→   804→                  onChange={(e) => updateQuestion(qi, 'q', e.target.value)}
+   805→   805→                  placeholder="اكتب السؤال هنا..."
+   806→   806→                  className="flex-1 text-sm"
+   807→   807→                />
+   808→   808→                <Button type="button" size="icon" variant="ghost" onClick={() => removeQuestion(qi)} className="flex-shrink-0">
+   809→   809→                  <Trash2 className="w-4 h-4 text-red-500" />
+   810→   810→                </Button>
+   811→   811→              </div>
+   812→   812→
+   813→   813→              <div className="space-y-1.5">
+   814→   814→                <div className="text-xs text-muted-foreground">الإجابات (اضغط الدائرة لتحديد الإجابة الصحيحة):</div>
+   815→   815→                {(q.options || []).map((opt: string, oi: number) => (
+   816→   816→                  <div key={oi} className="flex items-center gap-2">
+   817→   817→                    <button
+   818→   818→                      type="button"
+   819→   819→                      onClick={() => updateQuestion(qi, 'answer', oi)}
+   820→   820→                      className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+   821→   821→                        q.answer === oi ? 'bg-green-500 border-green-500' : 'border-muted-foreground/40 hover:border-purple-400'
+   822→   822→                      }`}
+   823→   823→                      title="تحديد كإجابة صحيحة"
+   824→   824→                    >
+   825→   825→                      {q.answer === oi && <CheckCircle2 className="w-3 h-3 text-white" />}
+   826→   826→                    </button>
+   827→   827→                    <Input
+   828→   828→                      value={opt}
+   829→   829→                      onChange={(e) => {
+   830→   830→                        const newOptions = [...(q.options || [])]
+   831→   831→                        newOptions[oi] = e.target.value
+   832→   832→                        updateQuestion(qi, 'options', newOptions)
+   833→   833→                      }}
+   834→   834→                      placeholder={`الخيار ${oi + 1}`}
+   835→   835→                      className={`text-sm flex-1 ${q.answer === oi ? 'border-green-500/40 bg-green-500/5' : ''}`}
+   836→   836→                      dir="rtl"
+   837→   837→                    />
+   838→   838→                  </div>
+   839→   839→                ))}
+   840→   840→              </div>
+   841→   841→            </Card>
+   842→   842→          ))}
+   843→   843→        </div>
+   844→   844→      )}
+   845→   845→    </div>
+   846→   846→  )
+   847→   847→}
+   848→   848→

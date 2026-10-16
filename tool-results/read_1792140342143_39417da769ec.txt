@@ -1,0 +1,1893 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, FileText, Users, CreditCard,
+     6→  Award, GraduationCap, Building2, Shield, UserCog, Settings,
+     7→  BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
+     8→  DollarSign, TrendingUp, Activity, Star, ArrowRight,
+     9→  Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
+    10→  Loader2, FileUp, Clock, RefreshCw,
+    11→} from 'lucide-react'
+    12→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    13→import { useAuth } from '@/lib/auth-store'
+    14→import { Button } from '@/components/ui/button'
+    15→import { Card } from '@/components/ui/card'
+    16→import { Badge } from '@/components/ui/badge'
+    17→import { Input } from '@/components/ui/input'
+    18→import { Label } from '@/components/ui/label'
+    19→import { Textarea } from '@/components/ui/textarea'
+    20→import { Switch } from '@/components/ui/switch'
+    21→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+    22→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    23→import { toast } from 'sonner'
+    24→import { TeamEditor } from '@/components/fia/team-editor'
+    25→import { CourseContentManager } from '@/components/fia/course-content-manager'
+    26→
+    27→const NAV: NavItem[] = [
+    28→  { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
+    29→  { id: 'courses', label: 'الدورات', icon: BookOpen },
+    30→  { id: 'content', label: 'محتوى الدورات', icon: FileText },
+    31→  { id: 'exams', label: 'الاختبارات', icon: FileText },
+    32→  { id: 'students', label: 'المتدربون', icon: Users },
+    33→  { id: 'payments', label: 'المدفوعات', icon: CreditCard },
+    34→  { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
+    35→  // { id: 'certificates', label: 'الشهادات', icon: Award },  // DISABLED: certificate feature temporarily removed
+    36→  { id: 'trainers', label: 'المدربون', icon: GraduationCap },
+    37→  { id: 'partners', label: 'الشركاء', icon: Building2 },
+    38→  { id: 'licenses', label: 'التراخيص', icon: Shield },
+    39→  { id: 'founder', label: 'المؤسس والفريق', icon: UserCog },
+    40→  { id: 'site', label: 'إعدادات الموقع', icon: Settings },
+    41→  { id: 'account', label: 'الحساب والأمان', icon: User },
+    42→  { id: 'reports', label: 'التقارير', icon: BarChart3 },
+    43→  { id: 'logs', label: 'سجل العمليات', icon: ScrollText },
+    44→]
+    45→
+    46→export function AdminDashboard() {
+    47→  const [active, setActive] = useState('overview')
+    48→  const [contentCourseId, setContentCourseId] = useState<string | null>(null)
+    49→  const user = useAuth((s) => s.user)
+    50→  const updateUser = useAuth((s) => s.updateUser)
+    51→  const logout = useAuth((s) => s.logout)
+    52→
+    53→  return (
+    54→    <DashboardShell
+    55→      nav={NAV}
+    56→      active={active}
+    57→      onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
+    58→      roleLabel="مدير"
+    59→      roleColor="bg-red-500/15 text-red-600 border-red-500/30"
+    60→    >
+    61→      {active === 'overview' && <AdminOverview />}
+    62→      {active === 'courses' && <AdminCourses />}
+    63→      {active === 'content' && (
+    64→        <AdminContent
+    65→          contentCourseId={contentCourseId}
+    66→          setContentCourseId={setContentCourseId}
+    67→        />
+    68→      )}
+    69→      {active === 'exams' && <AdminExams />}
+    70→      {active === 'students' && <AdminStudents />}
+    71→      {active === 'payments' && <AdminPayments />}
+    72→      {active === 'payment-methods' && <AdminPaymentMethods />}
+    73→      {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
+    74→      {/* {active === 'certificates' && <AdminCertificates />} */}
+    75→      {active === 'trainers' && <AdminTrainers />}
+    76→      {active === 'partners' && <AdminPartners />}
+    77→      {active === 'licenses' && <AdminLicenses />}
+    78→      {active === 'founder' && <AdminFounder user={user} />}
+    79→      {active === 'site' && <AdminSite />}
+    80→      {active === 'account' && <AdminAccount user={user} updateUser={updateUser} logout={logout} />}
+    81→      {active === 'reports' && <AdminReports />}
+    82→      {active === 'logs' && <AdminLogs />}
+    83→    </DashboardShell>
+    84→  )
+    85→}
+    86→
+    87→// ============== Admin Content Viewer (all courses + lessons) ==============
+    88→function AdminContent({ contentCourseId, setContentCourseId }: any) {
+    89→  const [courses, setCourses] = useState<any[]>([])
+    90→
+    91→  useEffect(() => {
+    92→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    93→  }, [])
+    94→
+    95→  if (contentCourseId) {
+    96→    return (
+    97→      <div className="space-y-4">
+    98→        <Button variant="ghost" onClick={() => setContentCourseId(null)} className="text-navy hover:bg-navy/5">
+    99→          <ArrowRight className="w-4 h-4 ml-1" /> العودة لقائمة الدورات
+   100→        </Button>
+   101→        <CourseContentManager courseId={contentCourseId} />
+   102→      </div>
+   103→    )
+   104→  }
+   105→
+   106→  return (
+   107→    <SectionCard
+   108→      title="محتوى الدورات"
+   109→      description="تصفّح كل الدورات والدروس"
+   110→    >
+   111→      {courses.length === 0 ? (
+   112→        <div className="text-center py-12">
+   113→          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   114→          <p className="text-muted-foreground">لا توجد دورات بعد</p>
+   115→        </div>
+   116→      ) : (
+   117→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   118→          {courses.map((c: any) => {
+   119→            const isFree = c.price_type === 'مجانية' || c.price === 0
+   120→            return (
+   121→              <Card key={c.id} className="overflow-hidden card-hover">
+   122→                <div className="h-32 bg-navy relative">
+   123→                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   124→                  <div className="absolute top-2 right-2 flex gap-1">
+   125→                    <Badge className="bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+   126→                  </div>
+   127→                  <div className="absolute top-2 left-2">
+   128→                    <Badge className={isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}>
+   129→                      {isFree ? 'مجانية' : 'مدفوعة'}
+   130→                    </Badge>
+   131→                  </div>
+   132→                </div>
+   133→                <div className="p-4">
+   134→                  <h3 className="font-bold text-navy text-sm mb-2 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+   135→                  <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   136→                    <span>{c.modules_count || 0} وحدة</span>
+   137→                    <span>{c.lessons_count || 0} درس</span>
+   138→                    <span>{c.duration_hours || 0} ساعة</span>
+   139→                  </div>
+   140→                  <div className="text-xs text-muted-foreground mb-3">
+   141→                    {c.enrolled || 0} متدرب مسجّل
+   142→                  </div>
+   143→                  <Button
+   144→                    size="sm"
+   145→                    className="w-full bg-navy hover:bg-navy-light"
+   146→                    onClick={() => setContentCourseId(c.id)}
+   147→                  >
+   148→                    <FileText className="w-3.5 h-3.5 ml-1" /> عرض المحتوى
+   149→                  </Button>
+   150→                </div>
+   151→              </Card>
+   152→            )
+   153→          })}
+   154→        </div>
+   155→      )}
+   156→    </SectionCard>
+   157→  )
+   158→}
+   159→
+   160→function AdminOverview() {
+   161→  const [stats, setStats] = useState({ courses: 0, trainers: 0, students: 0, payments: 0, totalRevenue: 0, pendingPayments: 0, completedEnrollments: 0, activeEnrollments: 0 })
+   162→
+   163→  useEffect(() => {
+   164→    Promise.all([
+   165→      fetch('/api/courses').then((r) => r.json()),
+   166→      fetch('/api/trainers').then((r) => r.json()),
+   167→      fetch('/api/students?role=student').then((r) => r.json()),
+   168→      fetch('/api/payments').then((r) => r.json()),
+   169→      fetch('/api/enrollments').then((r) => r.json()),
+   170→    ]).then(([c, t, s, p, e]) => {
+   171→      const courses = Array.isArray(c) ? c : []
+   172→      const trainers = Array.isArray(t) ? t : []
+   173→      const students = Array.isArray(s) ? s : []
+   174→      const payments = Array.isArray(p) ? p : []
+   175→      const enrollments = Array.isArray(e) ? e : []
+   176→
+   177→      // Calculate REAL revenue from completed payments only
+   178→      const completedPayments = payments.filter(p => p.status === 'مكتمل')
+   179→      const totalRevenue = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
+   180→      const pendingPayments = payments.filter(p => p.status === 'قيد الانتظار').length
+   181→      const completedEnrollments = enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
+   182→      const activeEnrollments = enrollments.filter(e => e.status === 'active').length
+   183→
+   184→      setStats({
+   185→        courses: courses.length,
+   186→        trainers: trainers.length,
+   187→        students: students.length,
+   188→        payments: payments.length,
+   189→        totalRevenue,
+   190→        pendingPayments,
+   191→        completedEnrollments,
+   192→        activeEnrollments,
+   193→      })
+   194→    }).catch(() => {})
+   195→  }, [])
+   196→
+   197→  return (
+   198→    <div className="space-y-6">
+   199→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   200→        <h2 className="text-2xl font-bold mb-1">لوحة تحكم الإدارة 👑</h2>
+   201→        <p className="text-white/80">نظرة شاملة على المنصة</p>
+   202→      </div>
+   203→
+   204→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   205→        <StatCard icon={BookOpen} label="إجمالي الدورات" value={stats.courses} color="navy" />
+   206→        <StatCard icon={GraduationCap} label="المدربون" value={stats.trainers} color="gold" />
+   207→        <StatCard icon={Users} label="المتدربون" value={stats.students} color="blue" />
+   208→        <StatCard icon={CreditCard} label="المعاملات" value={stats.payments} color="green" />
+   209→      </div>
+   210→
+   211→      <SectionCard title="نظرة عامة مالية" description="إحصائيات حقيقية من قاعدة البيانات">
+   212→        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   213→          <div className="bg-gradient-to-br from-navy to-navy-light text-white p-5 rounded-xl">
+   214→            <DollarSign className="w-6 h-6 text-gold mb-2" />
+   215→            <div className="text-2xl font-bold">{stats.totalRevenue.toLocaleString()}</div>
+   216→            <div className="text-white/70 text-sm">ر.ي إجمالي الإيرادات (مكتمل)</div>
+   217→          </div>
+   218→          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
+   219→            <Clock className="w-6 h-6 mb-2" />
+   220→            <div className="text-2xl font-bold">{stats.pendingPayments}</div>
+   221→            <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
+   222→          </div>
+   223→          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+   224→            <CheckCircle2 className="w-6 h-6 mb-2" />
+   225→            <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
+   226→            <div className="text-white/80 text-sm">دورات مكتملة</div>
+   227→          </div>
+   228→          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
+   229→            <Activity className="w-6 h-6 mb-2" />
+   230→            <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
+   231→            <div className="text-white/80 text-sm">تسجيلات نشطة</div>
+   232→          </div>
+   233→        </div>
+   234→      </SectionCard>
+   235→    </div>
+   236→  )
+   237→}
+   238→
+   239→// ============== COURSES ==============
+   240→function AdminCourses() {
+   241→  const [items, setItems] = useState<any[]>([])
+   242→  const [loading, setLoading] = useState(true)
+   243→  const [editing, setEditing] = useState<any | null>(null)
+   244→  const [open, setOpen] = useState(false)
+   245→
+   246→  const load = () => {
+   247→    setLoading(true)
+   248→    fetch('/api/courses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+   249→  }
+   250→  useEffect(() => { load() }, [])
+   251→
+   252→  const del = async (id: string) => {
+   253→    if (!confirm('حذف الدورة؟')) return
+   254→    await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   255→    toast.success('تم الحذف')
+   256→    load()
+   257→  }
+   258→
+   259→  return (
+   260→    <SectionCard
+   261→      title="إدارة الدورات"
+   262→      description={`${items.length} دورة`}
+   263→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+   264→    >
+   265→      <div className="overflow-x-auto">
+   266→        <table className="w-full text-sm">
+   267→          <thead>
+   268→            <tr className="border-b border-border text-right text-muted-foreground">
+   269→              <th className="py-3 px-2">العنوان</th>
+   270→              <th className="py-3 px-2">المستوى</th>
+   271→              <th className="py-3 px-2">السعر</th>
+   272→              <th className="py-3 px-2">الحالة</th>
+   273→              <th className="py-3 px-2">إجراءات</th>
+   274→            </tr>
+   275→          </thead>
+   276→          <tbody>
+   277→            {items.map((c) => (
+   278→              <tr key={c.id} className="border-b border-border">
+   279→                <td className="py-3 px-2 font-medium text-navy">{c.title}</td>
+   280→                <td className="py-3 px-2">{c.level}</td>
+   281→                <td className="py-3 px-2">{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency}`}</td>
+   282→                <td className="py-3 px-2"><Badge className="bg-green-500/15 text-green-600 border-green-500/30">{c.status}</Badge></td>
+   283→                <td className="py-3 px-2">
+   284→                  <div className="flex gap-1">
+   285→                    <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-4 h-4 text-navy" /></Button>
+   286→                    <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+   287→                  </div>
+   288→                </td>
+   289→              </tr>
+   290→            ))}
+   291→            {!items.length && !loading && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد دورات</td></tr>}
+   292→          </tbody>
+   293→        </table>
+   294→      </div>
+   295→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['title', 'short_description', 'description', 'level', 'price', 'duration_hours', 'pass_score']} apiPath="/api/courses" />}
+   296→    </SectionCard>
+   297→  )
+   298→}
+   299→
+   300→function AdminExams() {
+   301→  return (
+   302→    <SectionCard title="الاختبارات" description="إدارة الاختبارات">
+   303→      <div className="text-center py-12">
+   304→        <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   305→        <p className="text-muted-foreground mb-4">لا توجد اختبارات</p>
+   306→        <Button className="bg-navy hover:bg-navy-light"><Plus className="w-4 h-4 ml-1" /> اختبار جديد</Button>
+   307→      </div>
+   308→    </SectionCard>
+   309→  )
+   310→}
+   311→
+   312→function AdminStudents() {
+   313→  const [items, setItems] = useState<any[]>([])
+   314→  const [courses, setCourses] = useState<any[]>([])
+   315→  const [enrollments, setEnrollments] = useState<any[]>([])
+   316→  const [search, setSearch] = useState('')
+   317→  const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
+   318→
+   319→  useEffect(() => {
+   320→    fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   321→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+   322→    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+   323→  }, [])
+   324→
+   325→  const del = async (id: string) => {
+   326→    if (!confirm('حذف المتدرب نهائياً؟')) return
+   327→    await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   328→    toast.success('تم الحذف')
+   329→    setItems(items.filter((s) => s.id !== id))
+   330→    setSelectedStudent(null)
+   331→  }
+   332→
+   333→  const filtered = items.filter(s => {
+   334→    if (!search.trim()) return true
+   335→    const q = search.toLowerCase()
+   336→    return (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q) || (s.phone || '').includes(q)
+   337→  })
+   338→
+   339→  // Get student's enrollments
+   340→  const getStudentEnrollments = (studentId: string) => enrollments.filter(e => e.user_id === studentId)
+   341→
+   342→  return (
+   343→    <SectionCard title="المتدربون" description={`${filtered.length} متدرب`}>
+   344→      <div className="flex gap-2 mb-4">
+   345→        <Input placeholder="بحث بالاسم أو البريد أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+   346→      </div>
+   347→
+   348→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   349→        {filtered.map((s) => {
+   350→          const sEnrs = getStudentEnrollments(s.id)
+   351→          return (
+   352→            <Card key={s.id} className="overflow-hidden card-hover">
+   353→              <div className="p-4 bg-fia-gradient text-white">
+   354→                <div className="flex items-center gap-3">
+   355→                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold/30 flex-shrink-0 bg-navy-light">
+   356→                    {s.avatar ? (
+   357→                      <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+   358→                    ) : (
+   359→                      <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl">{s.name?.charAt(0)}</div>
+   360→                    )}
+   361→                  </div>
+   362→                  <div className="flex-1 min-w-0">
+   363→                    <div className="font-bold text-sm truncate">{s.name}</div>
+   364→                    <div className="text-xs text-white/70 truncate" dir="ltr">{s.email}</div>
+   365→                  </div>
+   366→                </div>
+   367→              </div>
+   368→              <div className="p-4 space-y-2">
+   369→                {s.phone && (
+   370→                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   371→                    <span>📞</span><span dir="ltr">{s.phone}</span>
+   372→                  </div>
+   373→                )}
+   374→                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   375→                  <span>📅</span><span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+   376→                </div>
+   377→                <div className="flex items-center gap-2 text-xs">
+   378→                  <span>📚</span>
+   379→                  <span className="font-semibold text-navy">{sEnrs.length} دورة مسجّلة</span>
+   380→                </div>
+   381→                {sEnrs.slice(0, 2).map((e) => {
+   382→                  const c = courses.find(co => co.id === e.course_id)
+   383→                  return c ? (
+   384→                    <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
+   385→                      <span className="truncate">{c.title}</span>
+   386→                      <Badge className={
+   387→                        e.status === 'completed' || e.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
+   388→                        : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-[10px]'
+   389→                        : 'bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]'
+   390→                      }>
+   391→                        {e.status === 'completed' || e.status === 'مكتمل' ? 'مكتمل'  : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   392→                      </Badge>
+   393→                    </div>
+   394→                  ) : null
+   395→                })}
+   396→                {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground">+{sEnrs.length - 2} دورة أخرى</div>}
+   397→              </div>
+   398→              <div className="flex gap-1 p-3 pt-0">
+   399→                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
+   400→                <Button size="sm" variant="ghost" onClick={() => del(s.id)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
+   401→              </div>
+   402→            </Card>
+   403→          )
+   404→        })}
+   405→      </div>
+   406→
+   407→      {filtered.length === 0 && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
+   408→
+   409→      {/* Student detail modal */}
+   410→      {selectedStudent && (
+   411→        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedStudent(null) }}>
+   412→          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+   413→            <DialogHeader><DialogTitle>تفاصيل المتدرب</DialogTitle></DialogHeader>
+   414→            <div className="space-y-4 py-4">
+   415→              <div className="flex items-center gap-4 p-4 bg-fia-gradient rounded-lg text-white">
+   416→                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/30 bg-navy-light">
+   417→                  {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gold font-bold text-2xl">{selectedStudent.name?.charAt(0)}</div>}
+   418→                </div>
+   419→                <div>
+   420→                  <div className="font-bold text-lg">{selectedStudent.name}</div>
+   421→                  <div className="text-xs text-white/70" dir="ltr">{selectedStudent.email}</div>
+   422→                </div>
+   423→              </div>
+   424→              <div className="grid grid-cols-2 gap-3">
+   425→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
+   426→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
+   427→              </div>
+   428→              <div>
+   429→                <h4 className="font-bold text-navy text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
+   430→                <div className="space-y-2">
+   431→                  {getStudentEnrollments(selectedStudent.id).map((e) => {
+   432→                    const c = courses.find(co => co.id === e.course_id)
+   433→                    if (!c) return null
+   434→                    const isFree = c.price_type === 'مجانية' || c.price === 0
+   435→                    const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+   436→                    return (
+   437→                      <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+   438→                        <div className="flex-1 min-w-0">
+   439→                          <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+   440→                          <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
+   441→                        </div>
+   442→                        <div className="flex items-center gap-2 flex-shrink-0">
+   443→                          {/* DISABLED: certificate issuance button removed — will be re-enabled when design+prompt provided */}
+   444→                          {/* {isCompleted && (
+   445→                            <Button
+   446→                              size="sm"
+   447→                              className="bg-gold hover:bg-gold-light text-navy text-xs"
+   448→                              onClick={async () => {
+   449→                                // Auto-issue certificate directly
+   450→                                const certNum = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+   451→                                await fetch('/api/certificates', {
+   452→                                  method: 'POST',
+   453→                                  headers: { 'Content-Type': 'application/json' },
+   454→                                  body: JSON.stringify({
+   455→                                    student_name: selectedStudent.name,
+   456→                                    course_title: c.title,
+   457→                                    status: 'صالحة',
+   458→                                    issued_by: 'أكاديمية المستقبل الدولية',
+   459→                                  }),
+   460→                                })
+   461→                                toast.success(`تم إصدار الشهادة: ${certNum}`)
+   462→                              }}
+   463→                            >
+   464→                              <Award className="w-3.5 h-3.5 ml-1" /> إصدار شهادة
+   465→                            </Button>
+   466→                          )} */}
+   467→                          <Badge className={
+   468→                            isCompleted ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   469→                            : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   470→                            : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+   471→                          }>
+   472→                            {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   473→                          </Badge>
+   474→                        </div>
+   475→                      </div>
+   476→                    )
+   477→                  })}
+   478→                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة</p>}
+   479→                </div>
+   480→              </div>
+   481→            </div>
+   482→            <DialogFooter>
+   483→              <Button variant="outline" onClick={() => setSelectedStudent(null)}>إغلاق</Button>
+   484→            </DialogFooter>
+   485→          </DialogContent>
+   486→        </Dialog>
+   487→      )}
+   488→    </SectionCard>
+   489→  )
+   490→}
+   491→
+   492→function AdminPayments() {
+   493→  const [items, setItems] = useState<any[]>([])
+   494→  const [courses, setCourses] = useState<any[]>([])
+   495→  const [search, setSearch] = useState('')
+   496→  const [statusFilter, setStatusFilter] = useState('all')
+   497→  const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
+   498→
+   499→  const load = () => {
+   500→    fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   501→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+   502→  }
+   503→  useEffect(() => { load() }, [])
+   504→
+   505→  const updateStatus = async (id: string, status: string) => {
+   506→    await fetch('/api/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+   507→    toast.success(status === 'مكتمل' ? 'تم قبول الدفع' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
+   508→    load()
+   509→    setSelectedPayment(null)
+   510→  }
+   511→
+   512→  const filtered = items.filter(p => {
+   513→    if (statusFilter !== 'all' && p.status !== statusFilter) return false
+   514→    if (search.trim()) {
+   515→      const q = search.toLowerCase()
+   516→      return (p.reference || '').toLowerCase().includes(q) || (p.method || '').toLowerCase().includes(q)
+   517→    }
+   518→    return true
+   519→  })
+   520→
+   521→  // Extract proof URL from reference field (format: "JB-123 | PROOF: https://...")
+   522→  const extractProofUrl = (ref: string) => {
+   523→    if (!ref) return null
+   524→    const match = ref.match(/PROOF:\s*(https?:\/\/[^\s|]+)/i)
+   525→    return match ? match[1] : null
+   526→  }
+   527→
+   528→  // Get course for payment
+   529→  const getCourse = (courseId: string) => courses.find(c => c.id === courseId)
+   530→
+   531→  return (
+   532→    <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
+   533→      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+   534→        <Input placeholder="بحث برقم المعاملة أو الطريقة..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+   535→        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+   536→          <option value="all">كل الحالات</option>
+   537→          <option value="قيد الانتظار">قيد الانتظار</option>
+   538→          <option value="مكتمل">مكتمل</option>
+   539→          <option value="ملغي">ملغي</option>
+   540→        </select>
+   541→      </div>
+   542→
+   543→      <div className="space-y-2">
+   544→        {filtered.map((p) => {
+   545→          const course = getCourse(p.course_id)
+   546→          const proofUrl = extractProofUrl(p.reference)
+   547→          const isPending = p.status === 'قيد الانتظار'
+   548→          return (
+   549→            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+   550→              <div className="flex-1 min-w-0">
+   551→                <div className="flex items-center gap-2 mb-1 flex-wrap">
+   552→                  <span className="font-bold text-navy text-sm">{p.amount?.toLocaleString()} {p.currency || 'ر.ي'}</span>
+   553→                  <Badge className={
+   554→                    p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   555→                    : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+   556→                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   557→                  }>{p.status}</Badge>
+   558→                  {proofUrl && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">📎 إثبات دفع</Badge>}
+   559→                </div>
+   560→                <div className="text-xs text-muted-foreground">
+   561→                  {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
+   562→                  {' • '}
+   563→                  <span>{p.method || '-'}</span>
+   564→                  {' • '}
+   565→                  <span dir="ltr">{p.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</span>
+   566→                </div>
+   567→                <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
+   568→              </div>
+   569→              <div className="flex gap-1 flex-shrink-0">
+   570→                <Button size="sm" variant="ghost" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
+   571→                  <Eye className="w-4 h-4 text-navy" />
+   572→                </Button>
+   573→                {isPending && (
+   574→                  <>
+   575→                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
+   576→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
+   577→                    </Button>
+   578→                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => updateStatus(p.id, 'ملغي')}>
+   579→                      <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+   580→                    </Button>
+   581→                  </>
+   582→                )}
+   583→              </div>
+   584→            </div>
+   585→          )
+   586→        })}
+   587→        {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
+   588→      </div>
+   589→
+   590→      {/* Payment detail modal with proof image */}
+   591→      {selectedPayment && (
+   592→        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedPayment(null) }}>
+   593→          <DialogContent className="sm:max-w-lg">
+   594→            <DialogHeader><DialogTitle>تفاصيل المعاملة</DialogTitle></DialogHeader>
+   595→            <div className="space-y-4 py-4">
+   596→              <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
+   597→                <span className="text-sm font-semibold text-navy">المبلغ:</span>
+   598→                <span className="text-xl font-extrabold text-gold">{selectedPayment.amount?.toLocaleString()} {selectedPayment.currency || 'ر.ي'}</span>
+   599→              </div>
+   600→              <div className="grid grid-cols-2 gap-3">
+   601→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
+   602→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
+   603→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{selectedPayment.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</div></div>
+   604→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
+   605→                  <Badge className={
+   606→                    selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   607→                    : selectedPayment.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+   608→                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   609→                  }>{selectedPayment.status}</Badge>
+   610→                </div>
+   611→              </div>
+   612→              {(() => {
+   613→                const course = getCourse(selectedPayment.course_id)
+   614→                return course ? (
+   615→                  <div className="bg-muted/30 p-3 rounded-lg">
+   616→                    <div className="text-xs text-muted-foreground">الدورة</div>
+   617→                    <div className="text-sm font-medium text-navy">{course.title}</div>
+   618→                    <div className="text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
+   619→                  </div>
+   620→                ) : null
+   621→              })()}
+   622→
+   623→              {/* Proof image */}
+   624→              {(() => {
+   625→                const proofUrl = extractProofUrl(selectedPayment.reference)
+   626→                return proofUrl ? (
+   627→                  <div>
+   628→                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
+   629→                    <div className="rounded-lg overflow-hidden border-2 border-gold/30">
+   630→                      <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain rounded-lg mx-auto" />
+   631→                    </div>
+   632→                  </div>
+   633→                ) : (
+   634→                  <div className="text-center py-4 text-muted-foreground text-sm">لا يوجد إثبات دفع مرفق</div>
+   635→                )
+   636→              })()}
+   637→
+   638→              {selectedPayment.status === 'قيد الانتظار' && (
+   639→                <div className="flex gap-2 pt-2">
+   640→                  <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
+   641→                    <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
+   642→                  </Button>
+   643→                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => updateStatus(selectedPayment.id, 'ملغي')}>
+   644→                    <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
+   645→                  </Button>
+   646→                </div>
+   647→              )}
+   648→            </div>
+   649→            <DialogFooter>
+   650→              <Button variant="outline" onClick={() => setSelectedPayment(null)}>إغلاق</Button>
+   651→            </DialogFooter>
+   652→          </DialogContent>
+   653→        </Dialog>
+   654→      )}
+   655→    </SectionCard>
+   656→  )
+   657→}
+   658→
+   659→function AdminPaymentMethods() {
+   660→  const [items, setItems] = useState<any[]>([])
+   661→  const [open, setOpen] = useState(false)
+   662→  const [editing, setEditing] = useState<any | null>(null)
+   663→  const load = () => fetch('/api/payment-methods').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   664→  useEffect(() => { load() }, [])
+   665→  const toggle = async (id: string, enabled: boolean) => {
+   666→    await fetch('/api/payment-methods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enabled }) })
+   667→    setItems(items.map((p) => (p.id === id ? { ...p, enabled } : p)))
+   668→  }
+   669→  const del = async (id: string) => {
+   670→    if (!confirm('حذف؟')) return
+   671→    await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   672→    toast.success('تم الحذف'); load()
+   673→  }
+   674→  return (
+   675→    <SectionCard
+   676→      title="طرق الدفع"
+   677→      description={`${items.length} طريقة`}
+   678→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديدة</Button>}
+   679→    >
+   680→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   681→        {items.map((p) => (
+   682→          <Card key={p.id} className="p-5">
+   683→            <div className="flex items-start justify-between mb-3">
+   684→              <div className="text-3xl">{p.icon}</div>
+   685→              <Switch checked={!!p.enabled} onCheckedChange={(v) => toggle(p.id, v)} />
+   686→            </div>
+   687→            <div className="font-bold text-navy">{p.name}</div>
+   688→            <div className="text-xs text-muted-foreground mb-2">{p.description || ''}</div>
+   689→            {p.wallet_id && <div className="text-xs font-mono text-gold" dir="ltr">{p.wallet_id}</div>}
+   690→            <div className="flex gap-2 mt-3">
+   691→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+   692→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+   693→            </div>
+   694→          </Card>
+   695→        ))}
+   696→      </div>
+   697→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'icon', 'type', 'wallet_id', 'description', 'instructions']} apiPath="/api/payment-methods" />}
+   698→    </SectionCard>
+   699→  )
+   700→}
+   701→
+   702→function AdminCertificates() {
+   703→  const [items, setItems] = useState<any[]>([])
+   704→  const [requests, setRequests] = useState<any[]>([])
+   705→  const [courses, setCourses] = useState<any[]>([])
+   706→  const [enrollments, setEnrollments] = useState<any[]>([])
+   707→  const [open, setOpen] = useState(false)
+   708→  const [editing, setEditing] = useState<any | null>(null)
+   709→  const [search, setSearch] = useState('')
+   710→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   711→  const [revokeTarget, setRevokeTarget] = useState<any | null>(null)
+   712→  const [revokeReason, setRevokeReason] = useState('')
+   713→  const [previewCert, setPreviewCert] = useState<any | null>(null)
+   714→  const [tab, setTab] = useState<'issued' | 'requests'>('issued')
+   715→  const [approveNote, setApproveNote] = useState('')
+   716→
+   717→  const load = () => {
+   718→    fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   719→    fetch('/api/certificate-requests').then((r) => r.json()).then((d) => setRequests(Array.isArray(d) ? d : []))
+   720→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+   721→    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+   722→  }
+   723→  useEffect(() => { load() }, [])
+   724→
+   725→  const filtered = items.filter((c) => {
+   726→    if (statusFilter !== 'all' && c.status !== statusFilter) return false
+   727→    if (search.trim()) {
+   728→      const q = search.trim().toLowerCase()
+   729→      return (c.certificate_number || '').toLowerCase().includes(q) || (c.student_name || '').toLowerCase().includes(q) || (c.course_title || '').toLowerCase().includes(q)
+   730→    }
+   731→    return true
+   732→  })
+   733→
+   734→  const del = async (id: string) => { if (!confirm('حذف نهائي؟')) return; await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+   735→  const revoke = async () => { if (!revokeTarget || !revokeReason.trim()) { toast.error('أدخل سبب الإلغاء'); return }; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: revokeTarget.id, status: 'ملغاة' }) }); toast.success('تم إلغاء الشهادة'); setRevokeTarget(null); setRevokeReason(''); load() }
+   736→  const restore = async (cert: any) => { if (!confirm('استعادة؟')) return; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cert.id, status: 'صالحة' }) }); toast.success('تمت الاستعادة'); load() }
+   737→
+   738→  // === Reissue: regenerate the same certificate with a new number & new issued_at ===
+   739→  // Use case: certificate has wrong data / student wants fresh copy / status issue — no need to delete user
+   740→  const [reissuing, setReissuing] = useState<string | null>(null)
+   741→  const reissue = async (cert: any) => {
+   742→    if (!confirm(`إعادة إصدار شهادة جديدة لنفس المتدرب؟\n\nالاسم: ${cert.student_name}\nالدورة: ${cert.course_title || '-'}\nالرقم القديم: ${cert.certificate_number}\n\nسيتم:\n- تمييز الشهادة الحالية كـ "مستبدلة"\n- إصدار شهادة جديدة برقم جديد وتاريخ جديد\n- بقاء بيانات المتدرب والتسجيل كما هي`)) return
+   743→    setReissuing(cert.id)
+   744→    try {
+   745→      const res = await fetch('/api/certificates', {
+   746→        method: 'POST',
+   747→        headers: { 'Content-Type': 'application/json' },
+   748→        body: JSON.stringify({ action: 'reissue', id: cert.id }),
+   749→      })
+   750→      const data = await res.json()
+   751→      if (res.ok && data.success) {
+   752→        toast.success('تم إعادة الإصدار بنجاح!', {
+   753→          description: `الرقم الجديد: ${data.new_certificate.certificate_number}`,
+   754→        })
+   755→        load()
+   756→        // Open the new certificate PDF in a new tab automatically
+   757→        window.open(`/api/certificate-pdf?number=${encodeURIComponent(data.new_certificate.certificate_number)}&format=pdf`, '_blank')
+   758→      } else {
+   759→        toast.error(data.error || 'فشل في إعادة الإصدار')
+   760→      }
+   761→    } catch (e: any) {
+   762→      toast.error('خطأ في الشبكة')
+   763→    } finally {
+   764→      setReissuing(null)
+   765→    }
+   766→  }
+   767→
+   768→  // Certificate request actions
+   769→  const handleRequestAction = async (reqId: string, action: string, note?: string) => {
+   770→    try {
+   771→      const res = await fetch('/api/certificate-requests', {
+   772→        method: 'PUT',
+   773→        headers: { 'Content-Type': 'application/json' },
+   774→        body: JSON.stringify({ id: reqId, action, note }),
+   775→      })
+   776→      if (res.ok) {
+   777→        toast.success(action === 'issue' ? 'تم إصدار الشهادة بنجاح!' : action === 'reject' ? 'تم رفض الطلب' : 'تم التحديث')
+   778→        load()
+   779→      } else {
+   780→        const d = await res.json(); toast.error(d.error || 'فشل')
+   781→      }
+   782→    } catch { toast.error('خطأ') }
+   783→  }
+   784→
+   785→  // Check if student completed the course
+   786→  const isCourseCompleted = (userId: string, courseId: string) => {
+   787→    return enrollments.some(e => e.user_id === userId && e.course_id === courseId && (e.status === 'completed' || e.status === 'مكتمل'))
+   788→  }
+   789→
+   790→  const requestStatusBadge = (status: string) => {
+   791→    const map: any = {
+   792→      pending: { label: 'بانتظار موافقة المدرب', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
+   793→      trainer_approved: { label: 'بانتظار موافقة المدير', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+   794→      admin_approved: { label: 'بانتظار دفع الرسوم', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
+   795→      issued: { label: 'تم الإصدار', color: 'bg-green-500/15 text-green-600 border-green-500/30' },
+   796→      rejected: { label: 'مرفوض', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+   797→    }
+   798→    return map[status] || map.pending
+   799→  }
+   800→
+   801→  return (
+   802→    <SectionCard
+   803→      title="الشهادات"
+   804→      description={tab === 'issued' ? `${filtered.length} شهادة صادرة` : `${requests.length} طلب شهادة`}
+   805→    >
+   806→      {/* Tabs */}
+   807→      <div className="flex gap-2 border-b border-border pb-3 mb-4">
+   808→        <button onClick={() => setTab('issued')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'issued' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📄 الشهادات الصادرة</button>
+   809→        <button onClick={() => setTab('requests')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'requests' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📋 طلبات الشهادات {requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length > 0 && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 mr-1">{requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length}</span>}</button>
+   810→      </div>
+   811→
+   812→      {tab === 'issued' ? (
+   813→        <>
+   814→          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+   815→            <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+   816→            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+   817→              <option value="all">كل الحالات</option>
+   818→              <option value="صالحة">صالحة</option>
+   819→              <option value="ملغاة">ملغاة</option>
+   820→              <option value="مستبدلة">مستبدلة (تم إعادة إصدارها)</option>
+   821→            </select>
+   822→          </div>
+   823→          <div className="space-y-2">
+   824→            {filtered.map((c) => (
+   825→              <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+   826→                <div className="flex-1 min-w-0">
+   827→                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+   828→                    <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
+   829→                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : c.status === 'مستبدلة' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
+   830→                  </div>
+   831→                  <div className="font-medium text-navy text-sm">{c.student_name}</div>
+   832→                  <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
+   833→                </div>
+   834→                <div className="flex gap-1 flex-shrink-0 flex-wrap">
+   835→                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة"><Eye className="w-4 h-4 text-navy" /></Button>
+   836→                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PDF"><Download className="w-4 h-4 text-gold" /></Button></a>
+   837→                  <a href={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" title="PNG"><FileUp className="w-4 h-4 text-green-600" /></Button></a>
+   838→                  <Button size="sm" variant="ghost" onClick={() => reissue(c)} disabled={reissuing === c.id} title="إعادة إصدار الشهادة (برقم جديد)" className="text-blue-600">
+   839→                    {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+   840→                  </Button>
+   841→                  <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
+   842→                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => restore(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
+   843→                  <Button size="sm" variant="ghost" onClick={() => del(c.id)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+   844→                </div>
+   845→              </div>
+   846→            ))}
+   847→            {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
+   848→          </div>
+   849→        </>
+   850→      ) : (
+   851→        /* Certificate requests tab */
+   852→        <div className="space-y-2">
+   853→          {requests.map((r) => {
+   854→            const badge = requestStatusBadge(r.status)
+   855→            const completed = isCourseCompleted(r.user_id, r.course_id)
+   856→            return (
+   857→              <div key={r.id} className="p-3 bg-white border border-border rounded-lg">
+   858→                <div className="flex items-center gap-2 mb-2 flex-wrap">
+   859→                  <Badge className={badge.color}>{badge.label}</Badge>
+   860→                  {completed && <Badge className="bg-green-500/15 text-green-600 border-green-500/30">✅ الدورة مكتملة</Badge>}
+   861→                  {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
+   862→                </div>
+   863→                <div className="font-medium text-navy text-sm">{r.student_name}</div>
+   864→                <div className="text-xs text-muted-foreground">{r.course_title || '-'}</div>
+   865→                {r.amount > 0 && <div className="text-xs text-muted-foreground mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
+   866→                {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
+   867→                {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
+   868→                {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
+   869→                {r.cert_number && <div className="text-xs font-mono text-green-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
+   870→                {r.verify_code && <div className="text-xs font-mono text-green-600" dir="ltr">رمز التحقق: {r.verify_code}</div>}
+   871→
+   872→                {/* Action buttons based on status */}
+   873→                <div className="flex gap-2 mt-3 pt-2 border-t border-border">
+   874→                  {r.status === 'pending' && (
+   875→                    <>
+   876→                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
+   877→                        <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
+   878→                      </Button>
+   879→                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>
+   880→                        <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+   881→                      </Button>
+   882→                    </>
+   883→                  )}
+   884→                  {r.status === 'trainer_approved' && (
+   885→                    <Button size="sm" className="bg-navy hover:bg-navy-light text-gold text-xs" onClick={() => handleRequestAction(r.id, 'admin_approve', 'تمت الموافقة على الطلب')}>
+   886→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدير
+   887→                    </Button>
+   888→                  )}
+   889→                  {r.status === 'admin_approved' && (
+   890→                    <Button size="sm" className="bg-gold hover:bg-gold-light text-navy text-xs" onClick={() => handleRequestAction(r.id, 'issue')}>
+   891→                      <Award className="w-3.5 h-3.5 ml-1" /> إصدار الشهادة
+   892→                    </Button>
+   893→                  )}
+   894→                  {r.status === 'issued' && r.cert_number && (
+   895→                    <a href={`/api/certificate-pdf?number=${encodeURIComponent(r.cert_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
+   896→                      <Button size="sm" variant="outline" className="border-gold/30 text-navy hover:bg-gold/10 text-xs">
+   897→                        <Download className="w-3.5 h-3.5 ml-1" /> تحميل الشهادة
+   898→                      </Button>
+   899→                    </a>
+   900→                  )}
+   901→                </div>
+   902→              </div>
+   903→            )
+   904→          })}
+   905→          {requests.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد طلبات شهادات</div>}
+   906→        </div>
+   907→      )}
+   908→
+   909→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['student_name', 'course_title', 'status', 'issued_by', 'external_accreditation_body']} apiPath="/api/certificates" />}
+   910→
+   911→      {revokeTarget && (
+   912→        <Dialog open={true} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeReason('') } }}>
+   913→          <DialogContent className="sm:max-w-md">
+   914→            <DialogHeader><DialogTitle>إلغاء الشهادة</DialogTitle></DialogHeader>
+   915→            <div className="space-y-3 py-4">
+   916→              <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
+   917→                <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
+   918→                <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
+   919→                <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
+   920→              </div>
+   921→              <div><Label>سبب الإلغاء *</Label><Textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={3} placeholder="مثال: خطأ في بيانات المتدرب..." className="mt-1" /></div>
+   922→            </div>
+   923→            <DialogFooter>
+   924→              <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }}>إلغاء</Button>
+   925→              <Button onClick={revoke} className="bg-red-500 hover:bg-red-600 text-white">تأكيد الإلغاء</Button>
+   926→            </DialogFooter>
+   927→          </DialogContent>
+   928→        </Dialog>
+   929→      )}
+   930→
+   931→      {previewCert && (
+   932→        <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
+   933→          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+   934→            <DialogHeader><DialogTitle>معاينة — {previewCert.certificate_number}</DialogTitle></DialogHeader>
+   935→            <div className="py-2">
+   936→              <a href={`/?verify=${encodeURIComponent(previewCert.certificate_number)}#verify`} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
+   937→                <Button variant="outline" size="sm" className="border-gold/30 text-navy hover:bg-gold/10"><ExternalLink className="w-3.5 h-3.5 ml-1" /> فتح صفحة التحقق</Button>
+   938→              </a>
+   939→              <iframe src={`/api/certificate-pdf?number=${encodeURIComponent(previewCert.certificate_number)}&format=pdf`} className="w-full h-[500px] border-2 border-gold/30 rounded-lg" title="Certificate Preview" />
+   940→            </div>
+   941→          </DialogContent>
+   942→        </Dialog>
+   943→      )}
+   944→    </SectionCard>
+   945→  )
+   946→}
+   947→
+   948→function AdminTrainers() {
+   949→  const [items, setItems] = useState<any[]>([])
+   950→  const [open, setOpen] = useState(false)
+   951→  const [editing, setEditing] = useState<any | null>(null)
+   952→  const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   953→  useEffect(() => { load() }, [])
+   954→  const del = async (id: string) => {
+   955→    // Check if this trainer is also a team member (founder/leader)
+   956→    try {
+   957→      const teamRes = await fetch('/api/team')
+   958→      const teamData = await teamRes.json()
+   959→      const teamMember = (teamData || []).find((m: any) => m.id === id)
+   960→      if (teamMember) {
+   961→        toast.error(`لا يمكن حذف هذا المدرب لأنه مسجّل كـ "${teamMember.role === 'founder' ? 'المؤسس' : 'عضو فريق'}" في قسم المؤسس والفريق. احذفه من هناك أولاً.`)
+   962→        return
+   963→      }
+   964→    } catch {}
+   965→    if (!confirm('حذف المدرب؟')) return
+   966→    await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+   967→    toast.success('تم الحذف'); load()
+   968→  }
+   969→  return (
+   970→    <SectionCard
+   971→      title="المدربون"
+   972→      description={`${items.length} مدرب`}
+   973→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+   974→    >
+   975→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   976→        {items.map((t) => {
+   977→          // Check if this trainer is a team member
+   978→          const isTeamMember = t.password && t.password.startsWith('__TEAM_MEMBER__')
+   979→          return (
+   980→            <Card key={t.id} className="p-5">
+   981→              <div className="flex items-center gap-3 mb-3">
+   982→                <Avatar className="w-14 h-14 border-2 border-gold/30">
+   983→                  <AvatarImage src={t.avatar || ''} />
+   984→                  <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
+   985→                </Avatar>
+   986→                <div>
+   987→                  <div className="font-bold text-navy">{t.name}</div>
+   988→                  <div className="text-xs text-gold">{t.title}</div>
+   989→                  {isTeamMember && <Badge className="mt-1 bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">👑 عضو فريق</Badge>}
+   990→                </div>
+   991→              </div>
+   992→              <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
+   993→              <div className="text-xs space-y-1 mb-3">
+   994→                <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
+   995→                <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
+   996→              </div>
+   997→              <div className="flex gap-2">
+   998→                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+   999→                <Button size="sm" variant="outline" disabled={isTeamMember} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => del(t.id)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1000→              </div>
+  1001→            </Card>
+  1002→          )
+  1003→        })}
+  1004→      </div>
+  1005→      {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+  1006→    </SectionCard>
+  1007→  )
+  1008→}
+  1009→
+  1010→function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
+  1011→  const [form, setForm] = useState<any>(
+  1012→    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
+  1013→  )
+  1014→  const [saving, setSaving] = useState(false)
+  1015→  const [showPwd, setShowPwd] = useState(false)
+  1016→  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  1017→
+  1018→  useEffect(() => {
+  1019→    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
+  1020→  }, [initial])
+  1021→
+  1022→  const handleAvatarUpload = async (file: File) => {
+  1023→    setUploadingAvatar(true)
+  1024→    try {
+  1025→      const compressedFile = await new Promise<File>((resolve, reject) => {
+  1026→        const reader = new FileReader()
+  1027→        reader.onload = (e) => {
+  1028→          const img = new Image()
+  1029→          img.onload = () => {
+  1030→            const maxW = 512, maxH = 512
+  1031→            let { width, height } = img
+  1032→            if (width > maxW) { height = (height * maxW) / width; width = maxW }
+  1033→            if (height > maxH) { width = (width * maxH) / height; height = maxH }
+  1034→            const canvas = document.createElement('canvas')
+  1035→            canvas.width = width; canvas.height = height
+  1036→            const ctx = canvas.getContext('2d')!
+  1037→            ctx.drawImage(img, 0, 0, width, height)
+  1038→            canvas.toBlob((blob) => {
+  1039→              if (!blob) { reject(new Error('Compression failed')); return }
+  1040→              resolve(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+  1041→            }, 'image/jpeg', 0.85)
+  1042→          }
+  1043→          img.onerror = () => reject(new Error('Image load failed'))
+  1044→          img.src = e.target?.result as string
+  1045→        }
+  1046→        reader.onerror = () => reject(new Error('File read failed'))
+  1047→        reader.readAsDataURL(file)
+  1048→      })
+  1049→
+  1050→      const fd = new FormData()
+  1051→      fd.append('file', compressedFile)
+  1052→      fd.append('folder', 'trainer-avatars')
+  1053→      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+  1054→      const data = await res.json()
+  1055→      if (data.url) {
+  1056→        setForm({ ...form, avatar: data.url })
+  1057→        toast.success('تم رفع صورة المدرب')
+  1058→      } else {
+  1059→        toast.error(data.error || 'فشل رفع الصورة')
+  1060→      }
+  1061→    } catch {
+  1062→      toast.error('خطأ في رفع الصورة')
+  1063→    } finally {
+  1064→      setUploadingAvatar(false)
+  1065→    }
+  1066→  }
+  1067→
+  1068→  const save = async () => {
+  1069→    if (!form.name || !form.email) { toast.error('الاسم والبريد مطلوبان'); return }
+  1070→    if (!initial && !form.password) { toast.error('كلمة المرور مطلوبة'); return }
+  1071→    setSaving(true)
+  1072→    try {
+  1073→      const res = await fetch('/api/trainers', {
+  1074→        method: initial ? 'PUT' : 'POST',
+  1075→        headers: { 'Content-Type': 'application/json' },
+  1076→        body: JSON.stringify(initial ? { id: initial.id, ...form } : form),
+  1077→      })
+  1078→      if (res.ok) {
+  1079→        toast.success(initial ? 'تم التحديث' : 'تمت الإضافة')
+  1080→        onSaved(); onOpenChange(false)
+  1081→      } else {
+  1082→        const d = await res.json(); toast.error(d.error || 'فشل')
+  1083→      }
+  1084→    } catch { toast.error('خطأ') } finally { setSaving(false) }
+  1085→  }
+  1086→
+  1087→  const TITLES = ['استشاري', 'أخصائي', 'محاضر', 'مدرب معتمد', 'مدرس']
+  1088→  const SPECIALIZATIONS = ['الطب الباطني', 'طب الطوارئ', 'التمريض', 'الإنعاش القلبي الرئوي', 'مكافحة العدوى', 'صحة الأم والطفل', 'الصيدلة السريرية', 'إدارة المنشآت الصحية', 'التعليم الطبي']
+  1089→
+  1090→  return (
+  1091→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1092→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+  1093→        <DialogHeader><DialogTitle>{initial ? 'تعديل مدرب' : 'إضافة مدرب جديد'}</DialogTitle></DialogHeader>
+  1094→        <div className="space-y-4 py-4">
+  1095→          {/* Avatar upload */}
+  1096→          <div className="flex items-center gap-4">
+  1097→            <div className="relative flex-shrink-0">
+  1098→              <Avatar className="w-16 h-16 border-2 border-gold/30">
+  1099→                <AvatarImage src={form.avatar || ''} />
+  1100→                <AvatarFallback className="bg-navy text-gold text-xl">{form.name?.charAt(0) || '؟'}</AvatarFallback>
+  1101→              </Avatar>
+  1102→              <input type="file" accept="image/*" className="hidden" id="trainer-avatar" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f) }} />
+  1103→              <button
+  1104→                onClick={() => document.getElementById('trainer-avatar')?.click()}
+  1105→                disabled={uploadingAvatar}
+  1106→                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gold text-navy flex items-center justify-center text-xs disabled:opacity-50"
+  1107→                title="رفع صورة"
+  1108→              >
+  1109→                {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
+  1110→              </button>
+  1111→            </div>
+  1112→            <div className="flex-1">
+  1113→              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم المدرب *" className="text-base font-medium" />
+  1114→            </div>
+  1115→          </div>
+  1116→
+  1117→          {/* Quick selects */}
+  1118→          <div className="grid grid-cols-2 gap-3">
+  1119→            <div>
+  1120→              <Label className="text-xs">المسمى</Label>
+  1121→              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1122→                <option value="">— اختر —</option>
+  1123→                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+  1124→              </select>
+  1125→            </div>
+  1126→            <div>
+  1127→              <Label className="text-xs">التخصص</Label>
+  1128→              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1129→                <option value="">— اختر —</option>
+  1130→                {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+  1131→              </select>
+  1132→            </div>
+  1133→          </div>
+  1134→
+  1135→          {/* Email + Password */}
+  1136→          <div><Label className="text-xs">البريد الإلكتروني *</Label>
+  1137→            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" placeholder="example@fia.edu" />
+  1138→          </div>
+  1139→          <div>
+  1140→            <Label className="text-xs">كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}</Label>
+  1141→            <div className="relative mt-1">
+  1142→              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" placeholder="••••••••" />
+  1143→              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+  1144→                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1145→              </button>
+  1146→            </div>
+  1147→          </div>
+  1148→
+  1149→          {/* Phone */}
+  1150→          <div><Label className="text-xs">الهاتف</Label>
+  1151→            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
+  1152→          </div>
+  1153→        </div>
+  1154→        <DialogFooter>
+  1155→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1156→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+  1157→            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ'}
+  1158→          </Button>
+  1159→        </DialogFooter>
+  1160→      </DialogContent>
+  1161→    </Dialog>
+  1162→  )
+  1163→}
+  1164→
+  1165→function AdminPartners() {
+  1166→  const [items, setItems] = useState<any[]>([])
+  1167→  const [open, setOpen] = useState(false)
+  1168→  const [editing, setEditing] = useState<any | null>(null)
+  1169→  const load = () => fetch('/api/partners').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1170→  useEffect(() => { load() }, [])
+  1171→  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  1172→  const toggleStatus = async (p: any) => {
+  1173→    const newStatus = p.status === 'نشط' ? 'متوقف' : 'نشط'
+  1174→    await fetch('/api/partners', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, status: newStatus }) })
+  1175→    toast.success(newStatus === 'نشط' ? 'تم تنشيط الشراكة' : 'تم إيقاف الشراكة')
+  1176→    load()
+  1177→  }
+  1178→  return (
+  1179→    <SectionCard title="الشركاء" description={`${items.length} شريك`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+  1180→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1181→        {items.map((p) => (
+  1182→          <Card key={p.id} className="p-5">
+  1183→            <div className="flex items-start gap-3 mb-3">
+  1184→              <div className="text-3xl">{p.logo}</div>
+  1185→              <div className="flex-1">
+  1186→                <div className="font-bold text-navy">{p.name}</div>
+  1187→                <div className="text-xs text-muted-foreground">{p.description}</div>
+  1188→                {p.since && <Badge variant="outline" className="mt-1 text-xs">منذ {p.since}</Badge>}
+  1189→              </div>
+  1190→            </div>
+  1191→            <div className="mb-3">
+  1192→              <Badge className={p.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
+  1193→                {p.status === 'نشط' ? '● نشط' : '● متوقف'}
+  1194→              </Badge>
+  1195→            </div>
+  1196→            <div className="flex gap-2">
+  1197→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1198→              <Button size="sm" variant="outline" className={p.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(p)}>
+  1199→                {p.status === 'نشط' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+  1200→              </Button>
+  1201→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1202→            </div>
+  1203→          </Card>
+  1204→        ))}
+  1205→      </div>
+  1206→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'logo', 'description', 'website', 'since', 'status']} apiPath="/api/partners" />}
+  1207→    </SectionCard>
+  1208→  )
+  1209→}
+  1210→
+  1211→function AdminLicenses() {
+  1212→  const [items, setItems] = useState<any[]>([])
+  1213→  const [open, setOpen] = useState(false)
+  1214→  const [editing, setEditing] = useState<any | null>(null)
+  1215→  const load = () => fetch('/api/licenses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1216→  useEffect(() => { load() }, [])
+  1217→  const del = async (id: string) => { if (!confirm('حذف؟')) return; await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); toast.success('تم الحذف'); load() }
+  1218→  const toggleStatus = async (l: any) => {
+  1219→    const newStatus = l.status === 'ساري' ? 'متوقف' : 'ساري'
+  1220→    await fetch('/api/licenses', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, status: newStatus }) })
+  1221→    toast.success(newStatus === 'ساري' ? 'تم تنشيط الترخيص' : 'تم إيقاف الترخيص')
+  1222→    load()
+  1223→  }
+  1224→  return (
+  1225→    <SectionCard title="التراخيص" description={`${items.length} ترخيص`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+  1226→      <div className="grid md:grid-cols-2 gap-4">
+  1227→        {items.map((l) => (
+  1228→          <Card key={l.id} className="p-5">
+  1229→            <div className="flex items-start justify-between mb-3">
+  1230→              <div>
+  1231→                <div className="font-bold text-navy">{l.issuing_body}</div>
+  1232→                <div className="text-xs text-gold">{l.type}</div>
+  1233→              </div>
+  1234→              <Badge className={l.status === 'ساري' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{l.status === 'ساري' ? '● ساري' : '● متوقف'}</Badge>
+  1235→            </div>
+  1236→            <div className="text-xs text-muted-foreground mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
+  1237→            <div className="flex justify-between text-xs text-muted-foreground mb-3">
+  1238→              <span>إصدار: <span dir="ltr">{l.issued_at}</span></span>
+  1239→              <span>انتهاء: <span dir="ltr">{l.expires_at}</span></span>
+  1240→            </div>
+  1241→            <div className="flex gap-2">
+  1242→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(l); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1243→              <Button size="sm" variant="outline" className={l.status === 'ساري' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(l)}>
+  1244→                {l.status === 'ساري' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+  1245→              </Button>
+  1246→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => del(l.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1247→            </div>
+  1248→          </Card>
+  1249→        ))}
+  1250→      </div>
+  1251→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['issuing_body', 'type', 'number', 'issued_at', 'expires_at', 'status', 'verification_url']} apiPath="/api/licenses" />}
+  1252→    </SectionCard>
+  1253→  )
+  1254→}
+  1255→
+  1256→function AdminFounder({ user }: any) {
+  1257→  const [tab, setTab] = useState<'founder' | 'team'>('founder')
+  1258→
+  1259→  return (
+  1260→    <SectionCard title="المؤسس والفريق" description="إدارة معلومات المؤسس وأعضاء الفريق بشكل احترافي">
+  1261→      <div className="space-y-5">
+  1262→        <div className="flex gap-2 border-b border-border pb-3">
+  1263→          <button
+  1264→            onClick={() => setTab('founder')}
+  1265→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'founder' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+  1266→          >
+  1267→            👑 المؤسس
+  1268→          </button>
+  1269→          <button
+  1270→            onClick={() => setTab('team')}
+  1271→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'team' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+  1272→          >
+  1273→            👥 الفريق القيادي
+  1274→          </button>
+  1275→        </div>
+  1276→
+  1277→        {tab === 'founder' ? (
+  1278→          <TeamEditor filterRole="founder" />
+  1279→        ) : (
+  1280→          <TeamEditor filterRole="leader" />
+  1281→        )}
+  1282→      </div>
+  1283→    </SectionCard>
+  1284→  )
+  1285→}
+  1286→
+  1287→function AdminSite() {
+  1288→  const [settings, setSettings] = useState<any>({})
+  1289→  const [saving, setSaving] = useState(false)
+  1290→  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
+  1291→  useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
+  1292→  const save = async () => {
+  1293→    setSaving(true)
+  1294→    try {
+  1295→      const res = await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+  1296→      if (!res.ok) {
+  1297→        const data = await res.json()
+  1298→        toast.error(data.error || 'فشل الحفظ')
+  1299→      } else {
+  1300→        toast.success('تم الحفظ بنجاح')
+  1301→      }
+  1302→    } catch { toast.error('فشل') } finally { setSaving(false) }
+  1303→  }
+  1304→
+  1305→  return (
+  1306→    <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
+  1307→      {/* Tabs */}
+  1308→      <div className="flex gap-2 border-b border-border pb-3 mb-4 flex-wrap">
+  1309→        {[
+  1310→          { id: 'basic', label: 'معلومات أساسية' },
+  1311→          { id: 'about', label: 'من نحن' },
+  1312→          { id: 'policies', label: 'السياسات' },
+  1313→          { id: 'social', label: 'التواصل' },
+  1314→          { id: 'visibility', label: 'الإظهار' },
+  1315→        ].map((t) => (
+  1316→          <button key={t.id} onClick={() => setTab(t.id as any)}
+  1317→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === t.id ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>
+  1318→            {t.label}
+  1319→          </button>
+  1320→        ))}
+  1321→      </div>
+  1322→
+  1323→      <div className="space-y-4 max-w-3xl">
+  1324→        {/* BASIC */}
+  1325→        {tab === 'basic' && (
+  1326→          <div className="space-y-4">
+  1327→            <div className="grid sm:grid-cols-2 gap-4">
+  1328→              <div><Label>اسم الأكاديمية (عربي)</Label><Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="mt-1" /></div>
+  1329→              <div><Label>اسم الأكاديمية (إنجليزي)</Label><Input value={settings.academy_name_en || ''} onChange={(e) => setSettings({ ...settings, academy_name_en: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1330→              <div><Label>الاختصار</Label><Input value={settings.academy_short || ''} onChange={(e) => setSettings({ ...settings, academy_short: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1331→              <div><Label>الهاتف</Label><Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1332→              <div><Label>البريد</Label><Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1333→              <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
+  1334→            </div>
+  1335→            <div className="border-t border-border pt-4">
+  1336→              <h3 className="font-bold text-navy mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
+  1337→              <div className="grid sm:grid-cols-2 gap-4">
+  1338→                <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+  1339→                <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+  1340→              </div>
+  1341→            </div>
+  1342→          </div>
+  1343→        )}
+  1344→
+  1345→        {/* ABOUT US */}
+  1346→        {tab === 'about' && (
+  1347→          <div className="space-y-4">
+  1348→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1349→              💡 يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
+  1350→            </div>
+  1351→            <div>
+  1352→              <Label>رؤيتنا</Label>
+  1353→              <textarea value={settings.about_vision || ''} onChange={(e) => setSettings({ ...settings, about_vision: e.target.value })}
+  1354→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رؤية الأكاديمية..." />
+  1355→            </div>
+  1356→            <div>
+  1357→              <Label>رسالتنا</Label>
+  1358→              <textarea value={settings.about_mission || ''} onChange={(e) => setSettings({ ...settings, about_mission: e.target.value })}
+  1359→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رسالة الأكاديمية..." />
+  1360→            </div>
+  1361→            <div>
+  1362→              <Label>قيمنا</Label>
+  1363→              <textarea value={settings.about_values || ''} onChange={(e) => setSettings({ ...settings, about_values: e.target.value })}
+  1364→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب قيم الأكاديمية..." />
+  1365→            </div>
+  1366→            <div>
+  1367→              <Label>فريقنا</Label>
+  1368→              <textarea value={settings.about_team || ''} onChange={(e) => setSettings({ ...settings, about_team: e.target.value })}
+  1369→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب وصف فريق الأكاديمية..." />
+  1370→            </div>
+  1371→          </div>
+  1372→        )}
+  1373→
+  1374→        {/* POLICIES */}
+  1375→        {tab === 'policies' && (
+  1376→          <div className="space-y-4">
+  1377→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1378→              💡 تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
+  1379→            </div>
+  1380→            <div>
+  1381→              <Label>سياسة الخصوصية</Label>
+  1382→              <textarea value={settings.policy_privacy || ''} onChange={(e) => setSettings({ ...settings, policy_privacy: e.target.value })}
+  1383→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الخصوصية..." />
+  1384→            </div>
+  1385→            <div>
+  1386→              <Label>شروط الاستخدام</Label>
+  1387→              <textarea value={settings.policy_terms || ''} onChange={(e) => setSettings({ ...settings, policy_terms: e.target.value })}
+  1388→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب شروط الاستخدام..." />
+  1389→            </div>
+  1390→            <div>
+  1391→              <Label>سياسة الاسترداد</Label>
+  1392→              <textarea value={settings.policy_refund || ''} onChange={(e) => setSettings({ ...settings, policy_refund: e.target.value })}
+  1393→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الاسترداد..." />
+  1394→            </div>
+  1395→            <div>
+  1396→              <Label>الدعم والمساعدة</Label>
+  1397→              <textarea value={settings.policy_support || ''} onChange={(e) => setSettings({ ...settings, policy_support: e.target.value })}
+  1398→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب معلومات الدعم..." />
+  1399→            </div>
+  1400→          </div>
+  1401→        )}
+  1402→
+  1403→        {/* SOCIAL */}
+  1404→        {tab === 'social' && (
+  1405→          <div className="space-y-4">
+  1406→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1407→              💡 كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
+  1408→            </div>
+  1409→            {/* Facebook */}
+  1410→            <div className="border border-border rounded-lg p-3">
+  1411→              <div className="flex items-center justify-between mb-2">
+  1412→                <Label className="font-bold">فيسبوك</Label>
+  1413→                <label className="flex items-center gap-2 text-xs">
+  1414→                  <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} />
+  1415→                  تفعيل
+  1416→                </label>
+  1417→              </div>
+  1418→              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm" />
+  1419→            </div>
+  1420→            {/* Telegram */}
+  1421→            <div className="border border-border rounded-lg p-3">
+  1422→              <div className="flex items-center justify-between mb-2">
+  1423→                <Label className="font-bold">تيليجرام (قناة أو يوزر)</Label>
+  1424→                <label className="flex items-center gap-2 text-xs">
+  1425→                  <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} />
+  1426→                  تفعيل
+  1427→                </label>
+  1428→              </div>
+  1429→              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm" />
+  1430→            </div>
+  1431→            {/* WhatsApp */}
+  1432→            <div className="border border-border rounded-lg p-3">
+  1433→              <div className="flex items-center justify-between mb-2">
+  1434→                <Label className="font-bold">واتساب (قناة)</Label>
+  1435→                <label className="flex items-center gap-2 text-xs">
+  1436→                  <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} />
+  1437→                  تفعيل
+  1438→                </label>
+  1439→              </div>
+  1440→              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm" />
+  1441→            </div>
+  1442→            {/* SMS */}
+  1443→            <div className="border border-border rounded-lg p-3">
+  1444→              <div className="flex items-center justify-between mb-2">
+  1445→                <Label className="font-bold">رقم للمراسلات النصية (SMS)</Label>
+  1446→                <label className="flex items-center gap-2 text-xs">
+  1447→                  <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} />
+  1448→                  تفعيل
+  1449→                </label>
+  1450→              </div>
+  1451→              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm" />
+  1452→            </div>
+  1453→          </div>
+  1454→        )}
+  1455→
+  1456→        {/* VISIBILITY */}
+  1457→        {tab === 'visibility' && (
+  1458→          <div className="space-y-4">
+  1459→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1460→              💡 تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
+  1461→            </div>
+  1462→            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+  1463→              <div>
+  1464→                <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
+  1465→                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+  1466→              </div>
+  1467→              <label className="flex items-center gap-2 text-xs">
+  1468→                <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} />
+  1469→                تفعيل
+  1470→              </label>
+  1471→            </div>
+  1472→            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+  1473→              <div>
+  1474→                <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
+  1475→                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+  1476→              </div>
+  1477→              <label className="flex items-center gap-2 text-xs">
+  1478→                <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} />
+  1479→                تفعيل
+  1480→              </label>
+  1481→            </div>
+  1482→          </div>
+  1483→        )}
+  1484→
+  1485→        <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
+  1486→      </div>
+  1487→    </SectionCard>
+  1488→  )
+  1489→}
+  1490→
+  1491→// ============== Admin Account & Security (change email + password) ==============
+  1492→function AdminAccount({ user, updateUser, logout }: any) {
+  1493→  const [currentPassword, setCurrentPassword] = useState('')
+  1494→  const [newEmail, setNewEmail] = useState('')
+  1495→  const [newPassword, setNewPassword] = useState('')
+  1496→  const [confirmPassword, setConfirmPassword] = useState('')
+  1497→  const [showCurrent, setShowCurrent] = useState(false)
+  1498→  const [showNew, setShowNew] = useState(false)
+  1499→  const [loading, setLoading] = useState(false)
+  1500→
+  1501→  const save = async () => {
+  1502→    if (!currentPassword) {
+  1503→      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+  1504→      return
+  1505→    }
+  1506→    if (newPassword && newPassword !== confirmPassword) {
+  1507→      toast.error('كلمتا المرور الجديدتان غير متطابقتين')
+  1508→      return
+  1509→    }
+  1510→    if (newPassword && newPassword.length < 6) {
+  1511→      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+  1512→      return
+  1513→    }
+  1514→    if (!newEmail && !newPassword) {
+  1515→      toast.error('لا توجد تغييرات للحفظ')
+  1516→      return
+  1517→    }
+  1518→    setLoading(true)
+  1519→    try {
+  1520→      const res = await fetch('/api/auth/change-credentials', {
+  1521→        method: 'POST',
+  1522→        headers: { 'Content-Type': 'application/json' },
+  1523→        body: JSON.stringify({
+  1524→          userId: user.id,
+  1525→          currentEmail: user.email,
+  1526→          currentPassword,
+  1527→          newEmail: newEmail || undefined,
+  1528→          newPassword: newPassword || undefined,
+  1529→        }),
+  1530→      })
+  1531→      const data = await res.json()
+  1532→      if (!res.ok) {
+  1533→        toast.error(data.error || 'فشل التحديث')
+  1534→        return
+  1535→      }
+  1536→      toast.success('تم تحديث بيانات الدخول بنجاح')
+  1537→      // Update auth state
+  1538→      updateUser({
+  1539→        email: newEmail || user.email,
+  1540→        password: newPassword || user.password,
+  1541→      })
+  1542→      // Reset form
+  1543→      setCurrentPassword('')
+  1544→      setNewEmail('')
+  1545→      setNewPassword('')
+  1546→      setConfirmPassword('')
+  1547→      // Logout if email changed (so they can re-login with new credentials)
+  1548→      if (newEmail) {
+  1549→        setTimeout(() => {
+  1550→          logout()
+  1551→          toast.info('تم تحديث البريد. يرجى تسجيل الدخول بالبيانات الجديدة')
+  1552→        }, 2000)
+  1553→      }
+  1554→    } catch (e) {
+  1555→      toast.error('خطأ في الاتصال')
+  1556→    } finally {
+  1557→      setLoading(false)
+  1558→    }
+  1559→  }
+  1560→
+  1561→  return (
+  1562→    <SectionCard title="الحساب والأمان" description="تغيير البريد الإلكتروني وكلمة المرور للمؤسس">
+  1563→      <div className="space-y-5 max-w-2xl">
+  1564→        {/* Current account info */}
+  1565→        <div className="bg-muted/30 p-4 rounded-lg border border-border">
+  1566→          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
+  1567→          <div className="flex items-center gap-3">
+  1568→            <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+  1569→              {user?.name?.charAt(0)}
+  1570→            </div>
+  1571→            <div>
+  1572→              <div className="font-bold text-navy">{user?.name}</div>
+  1573→              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+  1574→            </div>
+  1575→          </div>
+  1576→        </div>
+  1577→
+  1578→        {/* Security verification */}
+  1579→        <div>
+  1580→          <Label className="text-navy font-semibold">كلمة المرور الحالية *</Label>
+  1581→          <div className="relative mt-1">
+  1582→            <Input
+  1583→              type={showCurrent ? 'text' : 'password'}
+  1584→              value={currentPassword}
+  1585→              onChange={(e) => setCurrentPassword(e.target.value)}
+  1586→              placeholder="••••••••"
+  1587→              dir="ltr"
+  1588→            />
+  1589→            <button
+  1590→              type="button"
+  1591→              onClick={() => setShowCurrent(!showCurrent)}
+  1592→              className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1593→            >
+  1594→              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1595→            </button>
+  1596→          </div>
+  1597→          <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
+  1598→        </div>
+  1599→
+  1600→        {/* New email */}
+  1601→        <div className="border-t border-border pt-4">
+  1602→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1603→            <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
+  1604→          </h3>
+  1605→          <div>
+  1606→            <Label>البريد الجديد</Label>
+  1607→            <Input
+  1608→              type="email"
+  1609→              value={newEmail}
+  1610→              onChange={(e) => setNewEmail(e.target.value)}
+  1611→              placeholder={user?.email || 'example@fia.edu'}
+  1612→              dir="ltr"
+  1613→              className="mt-1"
+  1614→            />
+  1615→            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+  1616→          </div>
+  1617→        </div>
+  1618→
+  1619→        {/* New password */}
+  1620→        <div className="border-t border-border pt-4">
+  1621→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1622→            <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
+  1623→          </h3>
+  1624→          <div className="space-y-3">
+  1625→            <div>
+  1626→              <Label>كلمة المرور الجديدة</Label>
+  1627→              <div className="relative mt-1">
+  1628→                <Input
+  1629→                  type={showNew ? 'text' : 'password'}
+  1630→                  value={newPassword}
+  1631→                  onChange={(e) => setNewPassword(e.target.value)}
+  1632→                  placeholder="••••••••"
+  1633→                  dir="ltr"
+  1634→                />
+  1635→                <button
+  1636→                  type="button"
+  1637→                  onClick={() => setShowNew(!showNew)}
+  1638→                  className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1639→                >
+  1640→                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1641→                </button>
+  1642→              </div>
+  1643→            </div>
+  1644→            <div>
+  1645→              <Label>تأكيد كلمة المرور</Label>
+  1646→              <Input
+  1647→                type="password"
+  1648→                value={confirmPassword}
+  1649→                onChange={(e) => setConfirmPassword(e.target.value)}
+  1650→                placeholder="••••••••"
+  1651→                dir="ltr"
+  1652→                className="mt-1"
+  1653→              />
+  1654→              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+  1655→                <p className="text-xs text-red-500 mt-1">كلمتا المرور غير متطابقتين</p>
+  1656→              )}
+  1657→              {newPassword && confirmPassword && newPassword === confirmPassword && (
+  1658→                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+  1659→                  <CheckCircle2 className="w-3 h-3" /> كلمتا المرور متطابقتان
+  1660→                </p>
+  1661→              )}
+  1662→            </div>
+  1663→            <p className="text-xs text-muted-foreground">اتركها فارغاً إذا لم ترد تغيير كلمة المرور</p>
+  1664→          </div>
+  1665→        </div>
+  1666→
+  1667→        <Button onClick={save} disabled={loading || !currentPassword} className="bg-navy hover:bg-navy-light">
+  1668→          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+  1669→        </Button>
+  1670→      </div>
+  1671→    </SectionCard>
+  1672→  )
+  1673→}
+  1674→
+  1675→function AdminReports() {
+  1676→  const [data, setData] = useState<any>({ courses: [], payments: [], students: [], enrollments: [], trainers: [] })
+  1677→
+  1678→  useEffect(() => {
+  1679→    Promise.all([
+  1680→      fetch('/api/courses').then(r => r.json()),
+  1681→      fetch('/api/payments').then(r => r.json()),
+  1682→      fetch('/api/students?role=student').then(r => r.json()),
+  1683→      fetch('/api/enrollments').then(r => r.json()),
+  1684→      fetch('/api/trainers').then(r => r.json()),
+  1685→    ]).then(([c, p, s, e, t]) => {
+  1686→      setData({
+  1687→        courses: Array.isArray(c) ? c : [],
+  1688→        payments: Array.isArray(p) ? p : [],
+  1689→        students: Array.isArray(s) ? s : [],
+  1690→        enrollments: Array.isArray(e) ? e : [],
+  1691→        trainers: Array.isArray(t) ? t : [],
+  1692→      })
+  1693→    })
+  1694→  }, [])
+  1695→
+  1696→  const completedRevenue = data.payments.filter(p => p.status === 'مكتمل').reduce((sum, p) => sum + (p.amount || 0), 0)
+  1697→  const pendingRevenue = data.payments.filter(p => p.status === 'قيد الانتظار').reduce((sum, p) => sum + (p.amount || 0), 0)
+  1698→  const freeCourses = data.courses.filter(c => c.price_type === 'مجانية' || c.price === 0).length
+  1699→  const paidCourses = data.courses.filter(c => c.price_type !== 'مجانية' && c.price > 0).length
+  1700→  const completedEnrs = data.enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
+  1701→  const totalLessons = data.courses.reduce((sum, c) => sum + (c.lessons_count || 0), 0)
+  1702→  const avgRating = data.courses.length > 0
+  1703→    ? (data.courses.reduce((sum, c) => sum + (c.rating || 0), 0) / data.courses.length).toFixed(1)
+  1704→    : '0.0'
+  1705→  const totalEnrolled = data.courses.reduce((sum, c) => sum + (c.enrolled || 0), 0)
+  1706→
+  1707→  const reportCards = [
+  1708→    { icon: DollarSign, label: 'إجمالي الإيرادات المكتملة', value: `${completedRevenue.toLocaleString()} ر.ي`, color: 'from-navy to-navy-light', textCol: 'text-gold' },
+  1709→    { icon: Clock, label: 'إيرادات قيد الانتظار', value: `${pendingRevenue.toLocaleString()} ر.ي`, color: 'from-yellow-500 to-yellow-600', textCol: 'text-white' },
+  1710→    { icon: BookOpen, label: 'الدورات المدفوعة', value: paidCourses, color: 'from-gold to-gold-light', textCol: 'text-navy' },
+  1711→    { icon: BookOpen, label: 'الدورات المجانية', value: freeCourses, color: 'from-green-500 to-green-600', textCol: 'text-white' },
+  1712→    { icon: FileText, label: 'إجمالي الدروس', value: totalLessons, color: 'from-blue-500 to-blue-600', textCol: 'text-white' },
+  1713→    { icon: CheckCircle2, label: 'تسجيلات مكتملة', value: completedEnrs, color: 'from-purple-500 to-purple-600', textCol: 'text-white' },
+  1714→    { icon: Users, label: 'إجمالي التسجيلات', value: totalEnrolled, color: 'from-cyan-500 to-cyan-600', textCol: 'text-white' },
+  1715→    { icon: Star, label: 'متوسط التقييم', value: `${avgRating} / 5`, color: 'from-amber-500 to-orange-500', textCol: 'text-white' },
+  1716→  ]
+  1717→
+  1718→  return (
+  1719→    <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
+  1720→      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  1721→        {reportCards.map((r, i) => {
+  1722→          const Icon = r.icon
+  1723→          return (
+  1724→            <div key={i} className={`bg-gradient-to-br ${r.color} text-white p-5 rounded-xl`}>
+  1725→              <Icon className={`w-6 h-6 ${r.textCol} mb-2`} />
+  1726→              <div className="text-xl font-bold">{r.value}</div>
+  1727→              <div className="text-white/80 text-xs mt-1">{r.label}</div>
+  1728→            </div>
+  1729→          )
+  1730→        })}
+  1731→      </div>
+  1732→
+  1733→      {/* Top courses by enrollment */}
+  1734→      <div className="mt-6">
+  1735→        <h4 className="font-bold text-navy text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
+  1736→        <div className="space-y-2">
+  1737→          {[...data.courses].sort((a, b) => (b.enrolled || 0) - (a.enrolled || 0)).slice(0, 5).map((c, i) => (
+  1738→            <div key={c.id} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
+  1739→              <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">{i + 1}</div>
+  1740→              <div className="flex-1 min-w-0">
+  1741→                <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+  1742→                <div className="text-xs text-muted-foreground">{c.specialization || '-'}</div>
+  1743→              </div>
+  1744→              <div className="text-sm font-bold text-navy">{c.enrolled || 0} متدرب</div>
+  1745→              <Badge className={c.price_type === 'مجانية' || c.price === 0 ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
+  1746→                {c.price_type === 'مجانية' || c.price === 0 ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || ''}`}
+  1747→              </Badge>
+  1748→            </div>
+  1749→          ))}
+  1750→          {data.courses.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد دورات</div>}
+  1751→        </div>
+  1752→      </div>
+  1753→    </SectionCard>
+  1754→  )
+  1755→}
+  1756→
+  1757→function AdminLogs() {
+  1758→  const [logs, setLogs] = useState<any[]>([])
+  1759→
+  1760→  useEffect(() => {
+  1761→    // Generate REAL logs from actual data (payments + enrollments + courses)
+  1762→    Promise.all([
+  1763→      fetch('/api/payments').then(r => r.json()),
+  1764→      fetch('/api/enrollments').then(r => r.json()),
+  1765→      fetch('/api/courses').then(r => r.json()),
+  1766→    ]).then(([p, e, c]) => {
+  1767→      const payments = Array.isArray(p) ? p : []
+  1768→      const enrollments = Array.isArray(e) ? e : []
+  1769→      const courses = Array.isArray(c) ? c : []
+  1770→
+  1771→      const realLogs: any[] = []
+  1772→
+  1773→      // Payment logs
+  1774→      payments.forEach(pay => {
+  1775→        const course = courses.find(co => co.id === pay.course_id)
+  1776→        if (pay.status === 'مكتمل') {
+  1777→          realLogs.push({ action: `قبول دفع ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'payment' })
+  1778→        } else if (pay.status === 'ملغي') {
+  1779→          realLogs.push({ action: `رفض دفع ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'cancel' })
+  1780→        } else if (pay.status === 'قيد الانتظار') {
+  1781→          realLogs.push({ action: `طلب دفع جديد ${pay.amount?.toLocaleString()} ${pay.currency || 'ر.ي'} — ${course?.title || 'دورة'}`, time: pay.date, user: pay.user_id || 'متدرب', type: 'pending' })
+  1782→        }
+  1783→      })
+  1784→
+  1785→      // Enrollment logs
+  1786→      enrollments.forEach(enr => {
+  1787→        const course = courses.find(co => co.id === enr.course_id)
+  1788→        if (enr.status === 'completed' || enr.status === 'مكتمل') {
+  1789→          realLogs.push({ action: `إكمال دورة: ${course?.title || 'دورة'}`, time: enr.completed_at || enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'complete' })
+  1790→        } else if (enr.status === 'active') {
+  1791→          realLogs.push({ action: `تسجيل في دورة: ${course?.title || 'دورة'}`, time: enr.enrolled_at, user: enr.user_id || 'متدرب', type: 'enroll' })
+  1792→        }
+  1793→      })
+  1794→
+  1795→      // Sort by date descending
+  1796→      realLogs.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
+  1797→
+  1798→      setLogs(realLogs.slice(0, 50))
+  1799→    })
+  1800→  }, [])
+  1801→
+  1802→  const iconMap: any = {
+  1803→    payment: { icon: CheckCircle2, color: 'bg-green-500', text: 'text-green-600' },
+  1804→    cancel: { icon: XCircle, color: 'bg-red-500', text: 'text-red-600' },
+  1805→    pending: { icon: Clock, color: 'bg-yellow-500', text: 'text-yellow-600' },
+  1806→    complete: { icon: Award, color: 'bg-navy', text: 'text-navy' },
+  1807→    enroll: { icon: Users, color: 'bg-blue-500', text: 'text-blue-600' },
+  1808→  }
+  1809→
+  1810→  return (
+  1811→    <SectionCard title="سجل العمليات" description={`${logs.length} عملية حقيقية`}>
+  1812→      <div className="space-y-2 max-h-[600px] overflow-y-auto fia-scroll">
+  1813→        {logs.map((l, i) => {
+  1814→          const cfg = iconMap[l.type] || iconMap.enroll
+  1815→          const Icon = cfg.icon
+  1816→          return (
+  1817→            <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+  1818→              <div className="flex items-center gap-3 min-w-0">
+  1819→                <div className={`w-8 h-8 rounded-lg ${cfg.color} flex items-center justify-center flex-shrink-0`}>
+  1820→                  <Icon className="w-4 h-4 text-white" />
+  1821→                </div>
+  1822→                <div className="min-w-0">
+  1823→                  <div className="text-sm font-medium text-navy truncate">{l.action}</div>
+  1824→                  <div className="text-xs text-muted-foreground" dir="ltr">{l.user}</div>
+  1825→                </div>
+  1826→              </div>
+  1827→              <div className="text-xs text-muted-foreground flex-shrink-0" dir="ltr">{l.time ? new Date(l.time).toLocaleString('ar-EG') : '-'}</div>
+  1828→            </div>
+  1829→          )
+  1830→        })}
+  1831→        {logs.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد عمليات مسجّلة</div>}
+  1832→      </div>
+  1833→    </SectionCard>
+  1834→  )
+  1835→}
+  1836→
+  1837→// Generic simple dialog
+  1838→function SimpleDialog({ open, onOpenChange, title, onSaved, initial, fields, apiPath }: any) {
+  1839→  const [form, setForm] = useState<any>(initial || {})
+  1840→  const [saving, setSaving] = useState(false)
+  1841→
+  1842→  useEffect(() => { setForm(initial || {}) }, [initial])
+  1843→
+  1844→  const save = async () => {
+  1845→    setSaving(true)
+  1846→    try {
+  1847→      const res = await fetch(apiPath, {
+  1848→        method: initial ? 'PUT' : 'POST',
+  1849→        headers: { 'Content-Type': 'application/json' },
+  1850→        body: JSON.stringify(initial ? { id: initial.id, ...form } : form),
+  1851→      })
+  1852→      if (res.ok) { toast.success('تم الحفظ'); onSaved(); onOpenChange(false) }
+  1853→      else { const d = await res.json(); toast.error(d.error || 'فشل') }
+  1854→    } catch { toast.error('خطأ') } finally { setSaving(false) }
+  1855→  }
+  1856→
+  1857→  const fieldLabels: Record<string, string> = {
+  1858→    title: 'العنوان', short_description: 'وصف مختصر', description: 'الوصف', level: 'المستوى',
+  1859→    price: 'السعر', duration_hours: 'عدد الساعات', pass_score: 'درجة النجاح', name: 'الاسم',
+  1860→    icon: 'الأيقونة (إيموجي)', type: 'النوع', wallet_id: 'معرف المحفظة', instructions: 'التعليمات',
+  1861→    student_name: 'اسم المتدرب', course_title: 'عنوان الدورة', status: 'الحالة', issued_by: 'جهة الإصدار',
+  1862→    external_accreditation_body: 'جهة الاعتماد الخارجي', logo: 'الشعار (إيموجي)', website: 'الموقع',
+  1863→    since: 'منذ', issuing_body: 'جهة الإصدار', number: 'الرقم', issued_at: 'تاريخ الإصدار',
+  1864→    expires_at: 'تاريخ الانتهاء', verification_url: 'رابط التحقق',
+  1865→  }
+  1866→
+  1867→  return (
+  1868→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1869→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+  1870→        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+  1871→        <div className="space-y-3 py-4">
+  1872→          {fields.map((f: string) => (
+  1873→            <div key={f}>
+  1874→              <Label>{fieldLabels[f] || f}</Label>
+  1875→              {['description', 'instructions'].includes(f) ? (
+  1876→                <Textarea value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: e.target.value })} rows={2} className="mt-1" />
+  1877→              ) : ['price', 'duration_hours', 'pass_score'].includes(f) ? (
+  1878→                <Input type="number" value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" />
+  1879→              ) : (
+  1880→                <Input value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: e.target.value })} dir={f === 'number' || f === 'website' || f === 'verification_url' || f === 'wallet_id' ? 'ltr' : 'rtl'} className="mt-1" />
+  1881→              )}
+  1882→            </div>
+  1883→          ))}
+  1884→        </div>
+  1885→        <DialogFooter>
+  1886→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1887→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? 'جاري...' : 'حفظ'}</Button>
+  1888→        </DialogFooter>
+  1889→      </DialogContent>
+  1890→    </Dialog>
+  1891→  )
+  1892→}
+  1893→

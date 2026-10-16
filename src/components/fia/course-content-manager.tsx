@@ -28,14 +28,14 @@ interface Module {
 
 interface Lesson {
   id: string
-  module_id: string
+  module_id?: string
   title: string
   lesson_type: 'video' | 'text' | 'exam' | 'pdf'
   content?: string
   video_url?: string
   pdf_url?: string
   duration_minutes?: number
-  position: number
+  position?: number
   is_preview?: boolean
 }
 
@@ -168,8 +168,10 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
       const allLessons = await lessonRes.json()
       const byModule: Record<string, Lesson[]> = {}
       ;(allLessons || []).forEach((l: Lesson) => {
-        if (!byModule[l.module_id]) byModule[l.module_id] = []
-        byModule[l.module_id].push(l)
+        const mid = l.module_id
+        if (!mid) return
+        if (!byModule[mid]) byModule[mid] = []
+        byModule[mid].push(l)
       })
       setLessonsByModule(byModule)
     } catch {
@@ -225,17 +227,23 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
 
   const saveLesson = async (data: any, moduleId: string, editing: Lesson | null) => {
     try {
+      // The /api/lessons route requires { id, module_id, course_id } for PUT
+      // and { module_id, course_id, ... } for POST. Always include course_id
+      // to avoid an expensive full-table scan on the server.
+      const body = editing
+        ? { id: editing.id, module_id: moduleId, course_id: courseId, ...data }
+        : { module_id: moduleId, course_id: courseId, ...data }
       const res = await fetch('/api/lessons', {
         method: editing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing ? { id: editing.id, ...data } : { module_id: moduleId, ...data }),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
         toast.success(editing ? 'تم تحديث الدرس' : 'تمت إضافة الدرس')
         setLessonDialog(null)
         loadModules()
       } else {
-        const result = await res.json()
+        const result = await res.json().catch(() => ({}))
         toast.error(result.error || 'فشل الحفظ')
       }
     } catch {
@@ -243,11 +251,24 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
     }
   }
 
-  const deleteLesson = async (id: string) => {
+  const deleteLesson = async (id: string, moduleId: string) => {
     if (!confirm('حذف الدرس؟')) return
-    await fetch('/api/lessons', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    toast.success('تم الحذف')
-    loadModules()
+    try {
+      const res = await fetch('/api/lessons', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, module_id: moduleId, course_id: courseId }),
+      })
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}))
+        toast.error(result.error || 'فشل الحذف')
+        return
+      }
+      toast.success('تم الحذف')
+      loadModules()
+    } catch {
+      toast.error('خطأ في الاتصال')
+    }
   }
 
   if (loading) {
@@ -379,7 +400,7 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
                             <Button size="icon" variant="ghost" onClick={() => setLessonDialog({ open: true, editing: l, moduleId: m.id })}>
                               <Edit className="w-4 h-4 text-navy" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => deleteLesson(l.id)}>
+                            <Button size="icon" variant="ghost" onClick={() => deleteLesson(l.id, m.id)}>
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>
                           </div>
@@ -510,74 +531,45 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('folder', 'pdfs')
+      fd.append('caption', `FIA Lesson PDF: ${title || ''}`)
       const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (data.url) {
         setPdfUrl(data.url)
         toast.success('تم رفع PDF')
-      } else toast.error('فشل رفع PDF')
+      } else {
+        toast.error('فشل رفع PDF: ' + (data.error || ''))
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
     } finally {
       setSavingPdf(false)
     }
   }
 
-  // Telegram video upload helper
-  const [telegramInfo, setTelegramInfo] = useState<{ botToken: string; channelId: string } | null>(null)
   const [uploadingVideo, setUploadingVideo] = useState(false)
 
+  // Upload a video file to the Telegram bot via the server-side /api/upload/image
+  // endpoint (which uses Telegram's sendVideo internally) and store the resulting
+  // public URL in the lesson's video_url field. The trainer can also paste a
+  // Telegram file URL / direct link directly into the input below.
   const handleVideoUpload = async (file: File) => {
     setUploadingVideo(true)
     try {
-      // 1. Get Telegram bot info
-      const infoRes = await fetch('/api/upload/telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, fileSize: file.size, caption: `FIA Lesson Video: ${title}` }),
-      })
-      const info = await infoRes.json()
-      if (!info.botToken) {
-        toast.error('فشل الحصول على معلومات تيليجرام')
-        return
-      }
-
-      // 2. Upload to Telegram directly
       const fd = new FormData()
-      fd.append('chat_id', info.channelId)
-      fd.append('caption', info.caption)
-      fd.append('video', file)
-      const tgRes = await fetch(`https://api.telegram.org/bot${info.botToken}/sendVideo`, { method: 'POST', body: fd })
-      const tgData = await tgRes.json()
-      if (tgData.ok && tgData.result?.video) {
-        const fileId = tgData.result.video.file_id
-        // 3. Get the actual downloadable file URL from Telegram
-        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
-        const fileData = await fileRes.json()
-        if (fileData.ok && fileData.result?.file_path) {
-          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
-          setVideoUrl(directUrl)
-          toast.success('تم رفع الفيديو بنجاح')
-        } else {
-          // Fallback: use file_id directly as URL (won't play but stored for reference)
-          setVideoUrl(`tg://${fileId}`)
-          toast.success('تم رفع الفيديو إلى تيليجرام (الرابط المباشر غير متاح)')
-        }
-      } else if (tgData.ok && tgData.result?.document) {
-        const fileId = tgData.result.document.file_id
-        const fileRes = await fetch(`https://api.telegram.org/bot${info.botToken}/getFile?file_id=${fileId}`)
-        const fileData = await fileRes.json()
-        if (fileData.ok && fileData.result?.file_path) {
-          const directUrl = `https://api.telegram.org/file/bot${info.botToken}/${fileData.result.file_path}`
-          setVideoUrl(directUrl)
-          toast.success('تم رفع الفيديو بنجاح')
-        } else {
-          setVideoUrl(`tg://${fileId}`)
-          toast.success('تم رفع الملف إلى تيليجرام')
-        }
+      fd.append('file', file)
+      fd.append('folder', 'videos')
+      fd.append('caption', `FIA Lesson Video: ${title || ''}`)
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (data.url) {
+        setVideoUrl(data.url)
+        toast.success('تم رفع الفيديو بنجاح')
       } else {
-        toast.error('فشل رفع الفيديو: ' + (tgData.description || ''))
+        toast.error('فشل رفع الفيديو: ' + (data.error || ''))
       }
-    } catch (e: any) {
-      toast.error('خطأ في الرفع')
+    } catch {
+      toast.error('خطأ في الاتصال')
     } finally {
       setUploadingVideo(false)
     }
@@ -627,7 +619,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                   accept="video/*"
                   className="hidden"
                   id="video-upload"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f) }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = '' }}
                 />
                 <Button
                   variant="outline"
@@ -641,10 +633,23 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
               </div>
               <div>
                 <Label>أو أدخل رابط الفيديو مباشرة</Label>
-                <Input value={videoUrl.startsWith('tg://') ? '' : videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://..." dir="ltr" className="mt-1" />
-                {videoUrl.startsWith('tg://') && (
+                <Input
+                  value={videoUrl.startsWith('tg://') ? '' : videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://..."
+                  dir="ltr"
+                  className="mt-1"
+                />
+                {videoUrl && videoUrl.startsWith('tg://') && (
                   <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
-                    <Video className="w-3 h-3" /> تم رفع الفيديو عبر تيليجرام
+                    <Video className="w-3 h-3" /> تم رفع الفيديو عبر تيليجرام (معرّف قديم)
+                    <button onClick={() => setVideoUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
+                  </div>
+                )}
+                {videoUrl && !videoUrl.startsWith('tg://') && (
+                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
+                    <Video className="w-3 h-3" /> رابط الفيديو جاهز
+                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-navy underline truncate max-w-[16rem]">{videoUrl.split('/').pop() || 'فتح'}</a>
                     <button onClick={() => setVideoUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
                   </div>
                 )}
@@ -661,7 +666,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                   accept="application/pdf"
                   className="hidden"
                   id="pdf-upload"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f) }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }}
                 />
                 <Button
                   variant="outline"

@@ -36,6 +36,20 @@ const NAV: NavItem[] = [
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
+// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
+// Show only the human-readable text in the UI, but preserve the extra data on save.
+const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
+const splitBio = (raw: string) => {
+  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
+  return i === -1 ? raw : raw.slice(0, i).trimEnd()
+}
+const joinBio = (display: string, original?: string) => {
+  if (!original) return display
+  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
+  if (i === -1) return display
+  return `${display.trimEnd()}\n\n${original.slice(i)}`
+}
+
 export function StudentDashboard() {
   const [active, setActive] = useState('overview')
   const [viewingCourse, setViewingCourse] = useState<any | null>(null)
@@ -46,7 +60,7 @@ export function StudentDashboard() {
   const [certificates, setCertificates] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '' })
+  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || '') })
 
   const loadEnrollments = () => {
     if (!user?.id) return
@@ -812,7 +826,7 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
         name: profile.name,
         phone: profile.phone,
         title: profile.title,
-        bio: profile.bio,
+        bio: joinBio(profile.bio, user?.bio),
       })
       toast.success('تم تحديث الملف الشخصي')
     } catch {

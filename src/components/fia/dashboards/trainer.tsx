@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
+  HelpCircle, UserPlus, X,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -29,6 +30,20 @@ const NAV: NavItem[] = [
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
+// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
+// Show only the human-readable text in the UI, but preserve the extra data on save.
+const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
+const splitBio = (raw: string) => {
+  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
+  return i === -1 ? raw : raw.slice(0, i).trimEnd()
+}
+const joinBio = (display: string, original?: string) => {
+  if (!original) return display
+  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
+  if (i === -1) return display
+  return `${display.trimEnd()}\n\n${original.slice(i)}`
+}
+
 export function TrainerDashboard() {
   const [active, setActive] = useState('overview')
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
@@ -39,7 +54,7 @@ export function TrainerDashboard() {
   const [students, setStudents] = useState<any[]>([])
   const [editing, setEditing] = useState<any | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '', specialization: user?.title || '' })
+  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || ''), specialization: user?.title || '' })
 
   const loadCourses = () => {
     fetch('/api/courses').then((r) => r.json()).then((d) => {
@@ -69,7 +84,7 @@ export function TrainerDashboard() {
       active={active}
       onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
       roleLabel="مدرب"
-      roleColor="bg-purple-500/15 text-purple-600 border-purple-500/30"
+      roleColor="bg-green-500/15 text-green-600 border-green-500/30"
     >
       {active === 'overview' && <TrainerOverview user={user} courses={courses} students={students} />}
       {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
@@ -82,9 +97,9 @@ export function TrainerDashboard() {
         </div>
       )}
       {active === 'students' && <TrainerStudents students={students} courses={courses} />}
-      {active === 'exams' && <TrainerExams />}
+      {active === 'exams' && <TrainerExams courses={courses} />}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
-      {active === 'notifications' && <TrainerNotifs />}
+      {active === 'notifications' && <TrainerNotifs courses={courses} />}
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
 
       {isDialogOpen && (
@@ -223,18 +238,52 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
     }
   )
   const [saving, setSaving] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+
+  // Keep the form in sync with the `course` prop whenever the dialog opens or
+  // the course being edited changes. Without this, a dialog that stays mounted
+  // across course switches would show stale state (and could overwrite the
+  // wrong course's `cover` field).
+  useEffect(() => {
+    if (open) {
+      setForm(
+        course || {
+          title: '',
+          short_description: '',
+          description: '',
+          level: 'متوسط',
+          price_type: 'مجانية',
+          price: 0,
+          currency: 'ر.ي',
+          duration_hours: 0,
+          pass_score: 60,
+          cover: '',
+          status: 'منشورة',
+        }
+      )
+    }
+  }, [open, course])
 
   const handleUploadCover = async (file: File) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('folder', 'courses')
-    const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
-    const data = await res.json()
-    if (data.url) {
-      setForm({ ...form, cover: data.url })
-      toast.success('تم رفع الصورة')
-    } else {
-      toast.error('فشل رفع الصورة')
+    setUploadingCover(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('folder', 'courses')
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (data.url) {
+        // Store the Telegram-hosted URL on form.cover — it is later persisted
+        // to the courses.cover column by the save() call below.
+        setForm((prev: any) => ({ ...prev, cover: data.url }))
+        toast.success('تم رفع صورة الغلاف')
+      } else {
+        toast.error('فشل رفع الصورة: ' + (data.error || ''))
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setUploadingCover(false)
     }
   }
 
@@ -246,8 +295,21 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
     setSaving(true)
     try {
       const slug = form.title.toLowerCase().replace(/\s+/g, '-').slice(0, 80)
-      const body = {
-        ...form,
+      // Build the payload. Always include `cover` (string URL or null) so the
+      // courses.cover column is updated on every save — even when the trainer
+      // cleared the field.
+      const body: any = {
+        title: form.title,
+        short_description: form.short_description ?? '',
+        description: form.description ?? '',
+        level: form.level,
+        price_type: form.price_type,
+        price: Number(form.price) || 0,
+        currency: form.currency || 'ر.ي',
+        duration_hours: Number(form.duration_hours) || 0,
+        pass_score: Number(form.pass_score) || 60,
+        status: form.status || 'منشورة',
+        cover: form.cover ?? null,
         slug,
         trainer_id: trainerId,
         modules_count: form.modules_count || 0,
@@ -262,7 +324,8 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
         toast.success(course ? 'تم تحديث الدورة' : 'تم إنشاء الدورة')
         onSaved()
       } else {
-        toast.error('فشل الحفظ')
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل الحفظ')
       }
     } catch {
       toast.error('خطأ')
@@ -333,18 +396,40 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
           </div>
           <div>
             <Label>صورة الغلاف</Label>
-            <div className="flex items-center gap-3 mt-1">
-              {form.cover && <img src={form.cover} alt="cover" className="w-16 h-16 object-cover rounded-md" />}
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              {form.cover ? (
+                <div className="relative w-16 h-16 rounded-md overflow-hidden border border-border">
+                  <img src={form.cover} alt="cover" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, cover: '' })}
+                    className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-md p-0.5"
+                    title="إزالة الصورة"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-md border border-dashed border-border bg-muted/30 flex items-center justify-center text-muted-foreground/40">
+                  <FileUp className="w-5 h-5" />
+                </div>
+              )}
               <label className="cursor-pointer">
-                <Button variant="outline" type="button" onClick={() => document.getElementById('cover-upload')?.click()}>
-                  <FileUp className="w-4 h-4 ml-1" /> رفع صورة
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={uploadingCover}
+                  onClick={() => document.getElementById('cover-upload')?.click()}
+                >
+                  {uploadingCover ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileUp className="w-4 h-4 ml-1" />}
+                  {uploadingCover ? 'جاري الرفع...' : form.cover ? 'تغيير الصورة' : 'رفع صورة'}
                 </Button>
                 <input
                   id="cover-upload"
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadCover(f) }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadCover(f); e.target.value = '' }}
                 />
               </label>
             </div>
@@ -466,17 +551,138 @@ function TrainerStudents({ students, courses }: any) {
   )
 }
 
-function TrainerExams() {
+function TrainerExams({ courses }: { courses: any[] }) {
+  const [loading, setLoading] = useState(true)
+  const [exams, setExams] = useState<any[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadExams = async () => {
+      if (!courses || courses.length === 0) {
+        setExams([])
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      try {
+        // Fetch lessons for each course in parallel
+        const results = await Promise.all(
+          courses.map(async (c) => {
+            try {
+              const res = await fetch(`/api/lessons?course_id=${c.id}`)
+              const data = await res.json()
+              const lessons = Array.isArray(data) ? data : []
+              // Filter exam-type lessons only
+              return lessons
+                .filter((l: any) => l.lesson_type === 'exam')
+                .map((l: any) => {
+                  // Parse question count from content JSON
+                  let questions: any[] = []
+                  if (l.content) {
+                    try {
+                      const parsed = JSON.parse(l.content)
+                      if (Array.isArray(parsed)) questions = parsed
+                    } catch {}
+                  }
+                  return {
+                    ...l,
+                    course_id: c.id,
+                    course_title: c.title,
+                    course_pass_score: c.pass_score,
+                    questions_count: questions.length,
+                    questions,
+                  }
+                })
+            } catch {
+              return []
+            }
+          })
+        )
+        if (cancelled) return
+        const flat = results.flat()
+        setExams(flat)
+      } catch {
+        if (!cancelled) setExams([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadExams()
+    return () => { cancelled = true }
+  }, [courses])
+
+  const totalQuestions = exams.reduce((acc, e) => acc + (e.questions_count || 0), 0)
+  const totalCoursesWithExams = new Set(exams.map((e) => e.course_id)).size
+
   return (
-    <SectionCard title="الاختبارات" description="إدارة اختبارات دوراتك">
-      <div className="text-center py-12">
-        <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-        <p className="text-muted-foreground mb-4">لم تنشئ أي اختبار بعد</p>
-        <Button className="bg-navy hover:bg-navy-light">
-          <Plus className="w-4 h-4 ml-1" /> اختبار جديد
-        </Button>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatCard icon={FileText} label="الاختبارات" value={exams.length} color="blue" />
+        <StatCard icon={HelpCircle} label="إجمالي الأسئلة" value={totalQuestions} color="navy" />
+        <StatCard icon={BookOpen} label="دورات بها اختبارات" value={totalCoursesWithExams} color="gold" />
       </div>
-    </SectionCard>
+
+      <SectionCard
+        title="الاختبارات"
+        description="الاختبارات المستندة إلى محتوى دوراتك التدريبية"
+      >
+        {loading ? (
+          <div className="text-center py-12">
+            <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+            <p className="text-muted-foreground text-sm">جاري تحميل الاختبارات...</p>
+          </div>
+        ) : exams.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+            <p className="text-muted-foreground mb-2">لا توجد اختبارات بعد</p>
+            <p className="text-xs text-muted-foreground">
+              أنشئ دروساً من نوع "اختبار" في محتوى دوراتك لتظهر هنا
+            </p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {exams.map((exam) => (
+              <Card key={exam.id} className="overflow-hidden card-hover">
+                <div className="p-4 border-b border-border bg-purple-500/5">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 flex-shrink-0">
+                      <HelpCircle className="w-3 h-3 ml-1" /> اختبار
+                    </Badge>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">
+                      {exam.questions_count} سؤال
+                    </Badge>
+                  </div>
+                  <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2">{exam.title}</h3>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <BookOpen className="w-3 h-3" />
+                    <span className="truncate">{exam.course_title}</span>
+                  </div>
+                </div>
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">درجة النجاح</span>
+                    <Badge variant="outline" className="text-xs">
+                      {exam.course_pass_score || 60}%
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">المدة</span>
+                    <span className="text-navy font-medium">
+                      {exam.duration_minutes ? `${exam.duration_minutes} دقيقة` : 'غير محدد'}
+                    </span>
+                  </div>
+                  {exam.is_preview && (
+                    <Badge variant="outline" className="text-xs w-full justify-center mt-2">
+                      <Eye className="w-3 h-3 ml-1" /> معاينة مجانية
+                    </Badge>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
   )
 }
 
@@ -491,7 +697,7 @@ function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
         name: profile.name,
         phone: profile.phone,
         title: profile.title,
-        bio: profile.bio,
+        bio: joinBio(profile.bio, user?.bio),
       })
       toast.success('تم تحديث الملف الشخصي')
     } catch {
@@ -730,19 +936,161 @@ function TrainerAccountSettings({ user, updateUser, logout }: any) {
   )
 }
 
-function TrainerNotifs() {
+function TrainerNotifs({ courses }: { courses: any[] }) {
+  const [loading, setLoading] = useState(true)
+  const [notifs, setNotifs] = useState<any[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadNotifs = async () => {
+      if (!courses || courses.length === 0) {
+        setNotifs([])
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      try {
+        const courseIds = courses.map((c) => c.id)
+        const courseById = new Map(courses.map((c) => [c.id, c]))
+
+        // Fetch enrollments for all courses (we'll filter on the client)
+        const [enrRes, stuRes] = await Promise.all([
+          fetch('/api/enrollments'),
+          fetch('/api/students?role=student'),
+        ])
+        const [enrollments, students] = await Promise.all([enrRes.json(), stuRes.json()])
+
+        if (cancelled) return
+
+        const enrList = Array.isArray(enrollments) ? enrollments : []
+        const stuList = Array.isArray(students) ? students : []
+        const studentById = new Map(stuList.map((s: any) => [s.id, s]))
+
+        // Only enrollments for this trainer's courses
+        const mine = enrList.filter((e: any) => courseIds.includes(e.course_id))
+
+        // Sort by enrolled_at desc
+        mine.sort((a: any, b: any) => {
+          const aT = a.enrolled_at ? new Date(a.enrolled_at).getTime() : 0
+          const bT = b.enrolled_at ? new Date(b.enrolled_at).getTime() : 0
+          return bT - aT
+        })
+
+        // Build notification objects — newest 25
+        const built = mine.slice(0, 25).map((e: any) => {
+          const student = studentById.get(e.user_id)
+          const course = courseById.get(e.course_id)
+          const isFree = !e.amount_paid || e.amount_paid === 0
+          return {
+            id: e.id,
+            type: 'enrollment',
+            studentName: student?.name || 'متدرب',
+            studentAvatar: student?.avatar,
+            courseTitle: course?.title || 'دورة',
+            enrolledAt: e.enrolled_at,
+            isFree,
+            amountPaid: e.amount_paid,
+            currency: e.currency,
+            paymentStatus: e.payment_status,
+          }
+        })
+
+        if (!cancelled) setNotifs(built)
+      } catch {
+        if (!cancelled) setNotifs([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadNotifs()
+    return () => { cancelled = true }
+  }, [courses])
+
+  const formatRelativeTime = (iso: string | null | undefined) => {
+    if (!iso) return ''
+    try {
+      const date = new Date(iso)
+      const diffMs = Date.now() - date.getTime()
+      const diffMin = Math.floor(diffMs / 60000)
+      if (diffMin < 1) return 'الآن'
+      if (diffMin < 60) return `منذ ${diffMin} دقيقة`
+      const diffHr = Math.floor(diffMin / 60)
+      if (diffHr < 24) return `منذ ${diffHr} ساعة`
+      const diffDay = Math.floor(diffHr / 24)
+      if (diffDay < 30) return `منذ ${diffDay} يوم`
+      return date.toLocaleDateString('ar-EG')
+    } catch {
+      return ''
+    }
+  }
+
   return (
-    <SectionCard title="الإشعارات" description="إشعاراتك">
-      <div className="space-y-3">
-        <div className="p-4 bg-gold/5 border border-gold/20 rounded-lg">
-          <div className="font-semibold text-navy text-sm">متدرب جديد في دورتك</div>
-          <div className="text-xs text-muted-foreground mt-1">انضم أحمد محمد إلى دورة BLS & ACLS</div>
+    <SectionCard
+      title="الإشعارات"
+      description="آخر التسجيلات في دوراتك التدريبية"
+    >
+      {loading ? (
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+          <p className="text-muted-foreground text-sm">جاري تحميل الإشعارات...</p>
         </div>
-        <div className="p-4 bg-muted/30 border border-border rounded-lg">
-          <div className="font-semibold text-navy text-sm">تم تسليم نتائج الاختبار</div>
-          <div className="text-xs text-muted-foreground mt-1">12 متدرب اجتازوا اختبار الوحدة الأولى</div>
+      ) : notifs.length === 0 ? (
+        <div className="text-center py-12">
+          <Bell className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">لا توجد إشعارات</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            ستظهر هنا إشعارات التسجيل الجديدة في دوراتك
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {notifs.map((n) => (
+            <div
+              key={n.id}
+              className="p-4 bg-gold/5 border border-gold/20 rounded-lg flex items-start gap-3"
+            >
+              <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center text-gold font-bold flex-shrink-0 border border-gold/30 overflow-hidden">
+                {n.studentAvatar ? (
+                  <img src={n.studentAvatar} alt={n.studentName} className="w-full h-full object-cover" />
+                ) : (
+                  <UserPlus className="w-5 h-5" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-navy text-sm">
+                  متدرب جديد في دورتك
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  <span className="font-medium text-navy">{n.studentName}</span>
+                  {' '}انضم إلى{' '}
+                  <span className="font-medium text-navy">{n.courseTitle}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge
+                    className={
+                      n.isFree
+                        ? 'bg-green-500/15 text-green-600 border-green-500/30 text-xs'
+                        : 'bg-gold/15 text-gold border-gold/30 text-xs'
+                    }
+                  >
+                    {n.isFree ? 'مجانية' : `${(n.amountPaid || 0).toLocaleString()} ${n.currency || 'ر.ي'}`}
+                  </Badge>
+                  {n.paymentStatus === 'pending' && (
+                    <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 text-xs">
+                      بانتظار الدفع
+                    </Badge>
+                  )}
+                  {n.enrolledAt && (
+                    <span className="text-xs text-muted-foreground">
+                      {formatRelativeTime(n.enrolledAt)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </SectionCard>
   )
 }

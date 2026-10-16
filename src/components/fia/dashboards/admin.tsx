@@ -1674,8 +1674,11 @@ function AdminAccount({ user, updateUser, logout }: any) {
 
 function AdminReports() {
   const [data, setData] = useState<any>({ courses: [], payments: [], students: [], enrollments: [], trainers: [] })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setLoading(true)
     Promise.all([
       fetch('/api/courses').then(r => r.json()),
       fetch('/api/payments').then(r => r.json()),
@@ -1683,6 +1686,9 @@ function AdminReports() {
       fetch('/api/enrollments').then(r => r.json()),
       fetch('/api/trainers').then(r => r.json()),
     ]).then(([c, p, s, e, t]) => {
+      // Routes return {error: ...} on failure — guard against that
+      const anyError = [c, p, s, e, t].find((r: any) => r && typeof r === 'object' && !Array.isArray(r) && r.error)
+      if (anyError) throw new Error((anyError as any).error)
       setData({
         courses: Array.isArray(c) ? c : [],
         payments: Array.isArray(p) ? p : [],
@@ -1690,66 +1696,167 @@ function AdminReports() {
         enrollments: Array.isArray(e) ? e : [],
         trainers: Array.isArray(t) ? t : [],
       })
+      setError(null)
+    }).catch((err) => {
+      setError(err?.message || 'فشل تحميل البيانات')
+    }).finally(() => {
+      setLoading(false)
     })
   }, [])
 
-  const completedRevenue = data.payments.filter(p => p.status === 'مكتمل').reduce((sum, p) => sum + (p.amount || 0), 0)
-  const pendingRevenue = data.payments.filter(p => p.status === 'قيد الانتظار').reduce((sum, p) => sum + (p.amount || 0), 0)
-  const freeCourses = data.courses.filter(c => c.price_type === 'مجانية' || c.price === 0).length
-  const paidCourses = data.courses.filter(c => c.price_type !== 'مجانية' && c.price > 0).length
-  const completedEnrs = data.enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
-  const totalLessons = data.courses.reduce((sum, c) => sum + (c.lessons_count || 0), 0)
-  const avgRating = data.courses.length > 0
-    ? (data.courses.reduce((sum, c) => sum + (c.rating || 0), 0) / data.courses.length).toFixed(1)
-    : '0.0'
-  const totalEnrolled = data.courses.reduce((sum, c) => sum + (c.enrolled || 0), 0)
+  // --- REAL computations from fetched data (no hardcoded numbers) ---
+
+  // Total counts (per task spec)
+  const totalStudents = data.students.length
+  const totalCourses = data.courses.length
+  const totalTrainers = data.trainers.length // /api/trainers already strips team members
+
+  // Total revenue: sum of all payment amounts; also break out completed vs pending
+  const totalRevenue = data.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+  const completedRevenue = data.payments
+    .filter((p: any) => p.status === 'مكتمل' || p.status === 'completed' || p.status === 'paid')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+  const pendingRevenue = data.payments
+    .filter((p: any) => p.status === 'قيد الانتظار' || p.status === 'pending')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+
+  // Most popular courses: group enrollments by course_id, count, sort desc
+  const enrollmentCountByCourse = new Map<string, number>()
+  data.enrollments.forEach((e: any) => {
+    if (e.course_id) {
+      enrollmentCountByCourse.set(e.course_id, (enrollmentCountByCourse.get(e.course_id) || 0) + 1)
+    }
+  })
+  const popularCourses = data.courses
+    .map((c: any) => ({ ...c, enrollment_count: enrollmentCountByCourse.get(c.id) || 0 }))
+    .sort((a: any, b: any) => b.enrollment_count - a.enrollment_count)
+    .slice(0, 5)
+
+  // Recent enrollments: sort by enrolled_at/date desc, show last 10
+  const recentEnrollments = [...data.enrollments]
+    .sort((a: any, b: any) =>
+      new Date(b.enrolled_at || b.date || 0).getTime() - new Date(a.enrolled_at || a.date || 0).getTime()
+    )
+    .slice(0, 10)
 
   const reportCards = [
-    { icon: DollarSign, label: 'إجمالي الإيرادات المكتملة', value: `${completedRevenue.toLocaleString()} ر.ي`, color: 'from-navy to-navy-light', textCol: 'text-gold' },
+    { icon: Users, label: 'إجمالي المتدربين', value: totalStudents, color: 'from-navy to-navy-light', textCol: 'text-gold' },
+    { icon: BookOpen, label: 'إجمالي الدورات', value: totalCourses, color: 'from-gold to-gold-light', textCol: 'text-navy' },
+    { icon: UserCog, label: 'إجمالي المدربين', value: totalTrainers, color: 'from-blue-500 to-blue-600', textCol: 'text-white' },
+    { icon: DollarSign, label: 'إجمالي الإيرادات', value: `${totalRevenue.toLocaleString()} ر.ي`, color: 'from-green-500 to-green-600', textCol: 'text-white' },
+    { icon: CheckCircle2, label: 'إيرادات مكتملة', value: `${completedRevenue.toLocaleString()} ر.ي`, color: 'from-emerald-500 to-emerald-600', textCol: 'text-white' },
     { icon: Clock, label: 'إيرادات قيد الانتظار', value: `${pendingRevenue.toLocaleString()} ر.ي`, color: 'from-yellow-500 to-yellow-600', textCol: 'text-white' },
-    { icon: BookOpen, label: 'الدورات المدفوعة', value: paidCourses, color: 'from-gold to-gold-light', textCol: 'text-navy' },
-    { icon: BookOpen, label: 'الدورات المجانية', value: freeCourses, color: 'from-green-500 to-green-600', textCol: 'text-white' },
-    { icon: FileText, label: 'إجمالي الدروس', value: totalLessons, color: 'from-blue-500 to-blue-600', textCol: 'text-white' },
-    { icon: CheckCircle2, label: 'تسجيلات مكتملة', value: completedEnrs, color: 'from-purple-500 to-purple-600', textCol: 'text-white' },
-    { icon: Users, label: 'إجمالي التسجيلات', value: totalEnrolled, color: 'from-cyan-500 to-cyan-600', textCol: 'text-white' },
-    { icon: Star, label: 'متوسط التقييم', value: `${avgRating} / 5`, color: 'from-amber-500 to-orange-500', textCol: 'text-white' },
   ]
+
+  if (loading) {
+    return (
+      <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+          <div className="text-sm text-muted-foreground">جاري تحميل البيانات...</div>
+        </div>
+      </SectionCard>
+    )
+  }
+
+  if (error) {
+    return (
+      <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <XCircle className="w-8 h-8 text-red-500" />
+          <div className="text-sm text-red-600">{error}</div>
+        </div>
+      </SectionCard>
+    )
+  }
+
+  const isEmpty =
+    totalStudents === 0 &&
+    totalCourses === 0 &&
+    totalTrainers === 0 &&
+    data.payments.length === 0 &&
+    data.enrollments.length === 0
 
   return (
     <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {reportCards.map((r, i) => {
-          const Icon = r.icon
-          return (
-            <div key={i} className={`bg-gradient-to-br ${r.color} text-white p-5 rounded-xl`}>
-              <Icon className={`w-6 h-6 ${r.textCol} mb-2`} />
-              <div className="text-xl font-bold">{r.value}</div>
-              <div className="text-white/80 text-xs mt-1">{r.label}</div>
-            </div>
-          )
-        })}
-      </div>
+      {isEmpty ? (
+        <div className="text-center py-12 text-muted-foreground">لا توجد بيانات</div>
+      ) : (
+        <>
+          {/* Summary stat cards */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {reportCards.map((r, i) => {
+              const Icon = r.icon
+              return (
+                <div key={i} className={`bg-gradient-to-br ${r.color} text-white p-5 rounded-xl`}>
+                  <Icon className={`w-6 h-6 ${r.textCol} mb-2`} />
+                  <div className="text-xl font-bold">{r.value}</div>
+                  <div className="text-white/80 text-xs mt-1">{r.label}</div>
+                </div>
+              )
+            })}
+          </div>
 
-      {/* Top courses by enrollment */}
-      <div className="mt-6">
-        <h4 className="font-bold text-navy text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
-        <div className="space-y-2">
-          {[...data.courses].sort((a, b) => (b.enrolled || 0) - (a.enrolled || 0)).slice(0, 5).map((c, i) => (
-            <div key={c.id} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
-              <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">{i + 1}</div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-navy text-sm truncate">{c.title}</div>
-                <div className="text-xs text-muted-foreground">{c.specialization || '-'}</div>
-              </div>
-              <div className="text-sm font-bold text-navy">{c.enrolled || 0} متدرب</div>
-              <Badge className={c.price_type === 'مجانية' || c.price === 0 ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
-                {c.price_type === 'مجانية' || c.price === 0 ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || ''}`}
-              </Badge>
+          {/* Most popular courses by REAL enrollment count (computed from /api/enrollments) */}
+          <div className="mt-6">
+            <h4 className="font-bold text-navy text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
+            <div className="space-y-2">
+              {popularCourses.map((c: any, i: number) => (
+                <div key={c.id} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
+                  <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">{i + 1}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+                    <div className="text-xs text-muted-foreground">{c.specialization || '-'}</div>
+                  </div>
+                  <div className="text-sm font-bold text-navy">{c.enrollment_count} متدرب</div>
+                  <Badge className={c.price_type === 'مجانية' || c.price === 0 ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
+                    {c.price_type === 'مجانية' || c.price === 0 ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || ''}`}
+                  </Badge>
+                </div>
+              ))}
+              {popularCourses.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد بيانات</div>}
             </div>
-          ))}
-          {data.courses.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد دورات</div>}
-        </div>
-      </div>
+          </div>
+
+          {/* Recent enrollments (sorted by date desc, last 10) */}
+          <div className="mt-6">
+            <h4 className="font-bold text-navy text-sm mb-3">أحدث التسجيلات</h4>
+            <div className="space-y-2">
+              {recentEnrollments.map((e: any, i: number) => {
+                const course = data.courses.find((c: any) => c.id === e.course_id)
+                const student = data.students.find((s: any) => s.id === e.user_id)
+                const statusLabel =
+                  e.status === 'completed' || e.status === 'مكتمل' ? 'مكتمل'
+                  : e.status === 'active' ? 'نشط'
+                  : e.status === 'cancelled' || e.status === 'ملغي' ? 'ملغي'
+                  : (e.status || '-')
+                const statusClass =
+                  e.status === 'completed' || e.status === 'مكتمل'
+                    ? 'bg-green-500/15 text-green-600 border-green-500/30'
+                    : e.status === 'active'
+                      ? 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                      : 'bg-muted text-muted-foreground border-border'
+                return (
+                  <div key={e.id || i} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
+                    <div className="w-8 h-8 rounded-lg bg-gold/15 flex items-center justify-center text-navy flex-shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-navy text-sm truncate">{student?.name || student?.email || 'متدرب'}</div>
+                      <div className="text-xs text-muted-foreground truncate">{course?.title || 'دورة غير محددة'}</div>
+                    </div>
+                    <Badge className={statusClass}>{statusLabel}</Badge>
+                    <div className="text-xs text-muted-foreground flex-shrink-0" dir="ltr">
+                      {e.enrolled_at ? new Date(e.enrolled_at).toLocaleDateString('ar-EG') : '-'}
+                    </div>
+                  </div>
+                )
+              })}
+              {recentEnrollments.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد بيانات</div>}
+            </div>
+          </div>
+        </>
+      )}
     </SectionCard>
   )
 }
