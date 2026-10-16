@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
 import { CourseReviews } from '@/components/fia/course-reviews'
+import { CertificateRequest } from '@/components/fia/certificate-request'
 import { useAuth } from '@/lib/auth-store'
 
 interface Module {
@@ -268,6 +269,11 @@ export function StudentCourseViewer({
       <Card className="p-6">
         <CourseReviews courseId={course.id} allowAdd={true} />
       </Card>
+
+      {/* Certificate request — visible when course is fully completed */}
+      {progress === 100 && allLessons.length > 0 && (
+        <CertificateRequest courseId={course.id} courseTitle={course.title} />
+      )}
 
       {/* Lesson preview modal */}
       <LessonPreviewModal
