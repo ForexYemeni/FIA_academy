@@ -24,6 +24,35 @@ interface DashboardShellProps {
   children: React.ReactNode
 }
 
+// Role markers stored in user.password for team members.
+// Format: `__TEAM_MEMBER__:<role>__:<actual_password>` (or `__TEAM_MEMBER__:<role>__`).
+const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
+
+interface RoleBadge {
+  label: string
+  color: string
+}
+
+// Derive the role badge from the user's password marker.
+// Returns null if the user is a regular account (no team marker), in which
+// case the caller should fall back to the passed roleLabel/roleColor.
+function deriveRoleBadge(password: string | null | undefined): RoleBadge | null {
+  if (!password || !password.startsWith(TEAM_MARKER_PREFIX)) return null
+  const afterPrefix = password.substring(TEAM_MARKER_PREFIX.length)
+  const roleEnd = afterPrefix.indexOf('__')
+  const role = roleEnd === -1 ? 'team' : (afterPrefix.substring(0, roleEnd) || 'team')
+  switch (role) {
+    case 'founder':
+      return { label: 'المؤسس', color: 'bg-gold/20 text-gold border-gold/40' }
+    case 'leader':
+      return { label: 'قائد', color: 'bg-blue-500/20 text-blue-600 border-blue-500/40' }
+    case 'team':
+      return { label: 'فريق', color: 'bg-gray-500/20 text-gray-600 border-gray-500/40' }
+    default:
+      return null
+  }
+}
+
 export function DashboardShell({
   nav,
   active,
@@ -35,6 +64,11 @@ export function DashboardShell({
   const user = useAuth((s) => s.user)
   const logout = useAuth((s) => s.logout)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Override the role badge if the user has a team-member marker in their password.
+  const derived = deriveRoleBadge(user?.password)
+  const effectiveLabel = derived?.label ?? roleLabel
+  const effectiveColor = derived?.color ?? roleColor
 
   const Sidebar = (
     <div className="h-full flex flex-col">
@@ -66,7 +100,7 @@ export function DashboardShell({
             <div className="text-white/60 text-xs truncate" dir="ltr">{user?.email}</div>
           </div>
         </div>
-        <Badge className={`mt-3 ${roleColor}`}>{roleLabel}</Badge>
+        <Badge className={`mt-3 ${effectiveColor}`}>{effectiveLabel}</Badge>
       </div>
 
       <nav className="flex-1 p-2 overflow-y-auto fia-scroll">

@@ -1,0 +1,932 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, FileText, Award, CreditCard,
+     6→  User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
+     7→  Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
+     8→} from 'lucide-react'
+     9→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    10→import { useAuth } from '@/lib/auth-store'
+    11→import { Button } from '@/components/ui/button'
+    12→import { Card } from '@/components/ui/card'
+    13→import { Badge } from '@/components/ui/badge'
+    14→import { Input } from '@/components/ui/input'
+    15→import { Label } from '@/components/ui/label'
+    16→import { Textarea } from '@/components/ui/textarea'
+    17→import { Progress } from '@/components/ui/progress'
+    18→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    19→import {
+    20→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    21→} from '@/components/ui/dialog'
+    22→import { toast } from 'sonner'
+    23→import { AvatarUploader } from '@/components/fia/avatar-uploader'
+    24→import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
+    25→
+    26→const NAV: NavItem[] = [
+    27→  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+    28→  { id: 'courses', label: 'دوراتي', icon: BookOpen },
+    29→  { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
+    30→  { id: 'exams', label: 'اختباراتي', icon: FileText },
+    31→  { id: 'results', label: 'نتائجي', icon: TrendingUp },
+    32→  // { id: 'certificates', label: 'شهاداتي', icon: Award },  // DISABLED: certificate feature temporarily removed
+    33→  { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
+    34→  { id: 'profile', label: 'ملفي الشخصي', icon: User },
+    35→  { id: 'notifications', label: 'الإشعارات', icon: Bell },
+    36→  { id: 'settings', label: 'الإعدادات', icon: Settings },
+    37→]
+    38→
+    39→export function StudentDashboard() {
+    40→  const [active, setActive] = useState('overview')
+    41→  const [viewingCourse, setViewingCourse] = useState<any | null>(null)
+    42→  const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
+    43→  const user = useAuth((s) => s.user)
+    44→  const updateUser = useAuth((s) => s.updateUser)
+    45→  const [courses, setCourses] = useState<any[]>([])
+    46→  const [certificates, setCertificates] = useState<any[]>([])
+    47→  const [payments, setPayments] = useState<any[]>([])
+    48→  const [enrollments, setEnrollments] = useState<any[]>([])
+    49→  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '' })
+    50→
+    51→  const loadEnrollments = () => {
+    52→    if (!user?.id) return
+    53→    fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
+    54→  }
+    55→
+    56→  useEffect(() => {
+    57→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    58→    fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+    59→    fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+    60→    loadEnrollments()
+    61→  }, [user?.id])
+    62→
+    63→  const onEnrolled = () => {
+    64→    loadEnrollments()
+    65→  }
+    66→
+    67→  return (
+    68→    <DashboardShell
+    69→      nav={NAV}
+    70→      active={active}
+    71→      onNavigate={(id) => { setActive(id); if (id !== 'course-view') setViewingCourse(null) }}
+    72→      roleLabel="متدرب"
+    73→      roleColor="bg-blue-500/15 text-blue-600 border-blue-500/30"
+    74→    >
+    75→      {active === 'course-view' && viewingCourse ? (
+    76→        <StudentCourseViewer
+    77→          course={viewingCourse}
+    78→          enrollment={viewingEnrollment}
+    79→          onBack={() => { setViewingCourse(null); setActive('courses'); loadEnrollments() }}
+    80→        />
+    81→      ) : null}
+    82→      {active !== 'course-view' && (
+    83→        <>
+    84→          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
+    85→          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
+    86→          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
+    87→          {active === 'exams' && <Exams />}
+    88→          {active === 'results' && <Results />}
+    89→          {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
+    90→          {/* {active === 'certificates' && <Certificates certificates={certificates} />} */}
+    91→          {active === 'payments' && <Payments payments={payments} />}
+    92→          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+    93→          {active === 'notifications' && <Notifications />}
+    94→          {active === 'settings' && <SettingsTab />}
+    95→        </>
+    96→      )}
+    97→    </DashboardShell>
+    98→  )
+    99→}
+   100→
+   101→function Overview({ user, courses, certificates, enrollments }: any) {
+   102→  return (
+   103→    <div className="space-y-6">
+   104→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   105→        <h2 className="text-2xl font-bold mb-1">أهلاً، {user?.name} 👋</h2>
+   106→        <p className="text-white/80">إليك ملخّص نشاطك في أكاديمية المستقبل الدولية</p>
+   107→      </div>
+   108→
+   109→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   110→        <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
+   111→        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
+   112→        <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
+   113→        <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
+   114→      </div>
+   115→
+   116→      <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
+   117→        <div className="space-y-4">
+   118→          {enrollments && enrollments.length > 0 ? (
+   119→            enrollments.slice(0, 3).map((e: any) => {
+   120→              const c = courses.find((x:any) => x.id === e.course_id)
+   121→              if (!c) return null
+   122→              return (
+   123→                <div key={e.id} className="space-y-2">
+   124→                  <div className="flex items-center justify-between">
+   125→                    <div className="font-medium text-navy text-sm">{c.title}</div>
+   126→                    <span className="text-xs text-muted-foreground">{e.progress || 0}%</span>
+   127→                  </div>
+   128→                  <Progress value={e.progress || 0} className="h-2" />
+   129→                </div>
+   130→              )
+   131→            })
+   132→          ) : (
+   133→            <div className="text-center py-6 text-muted-foreground text-sm">لا توجد دورات مسجّلة بعد — تصفّح الدورات المتاحة</div>
+   134→          )}
+   135→        </div>
+   136→      </SectionCard>
+   137→
+   138→      <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات">
+   139→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   140→          {courses.slice(0, 3).map((c: any) => (
+   141→            <Card key={c.id} className="p-4 card-hover">
+   142→              <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden">
+   143→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   144→              </div>
+   145→              <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
+   146→              <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
+   147→              <Button size="sm" className="w-full bg-navy hover:bg-navy-light">عرض الدورة</Button>
+   148→            </Card>
+   149→          ))}
+   150→        </div>
+   151→      </SectionCard>
+   152→    </div>
+   153→  )
+   154→}
+   155→
+   156→function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
+   157→  const [requesting, setRequesting] = useState<string | null>(null)
+   158→
+   159→  const requestCertificate = async (course: any) => {
+   160→    setRequesting(course.id)
+   161→    try {
+   162→      const res = await fetch('/api/certificate-requests', {
+   163→        method: 'POST',
+   164→        headers: { 'Content-Type': 'application/json' },
+   165→        body: JSON.stringify({
+   166→          user_id: course.enrollment.user_id,
+   167→          course_id: course.id,
+   168→          student_name: studentName || course.enrollment.user_id || 'متدرب',
+   169→          course_title: course.title,
+   170→          fee: 0,
+   171→        }),
+   172→      })
+   173→      const data = await res.json()
+   174→      if (res.ok) {
+   175→        toast.success('تم إرسال طلب الشهادة! سيتم مراجعته من قبل المدرب والإدارة')
+   176→      } else {
+   177→        toast.error(data.error || 'فشل الطلب')
+   178→      }
+   179→    } catch {
+   180→      toast.error('خطأ في الاتصال')
+   181→    } finally {
+   182→      setRequesting(null)
+   183→    }
+   184→  }
+   185→
+   186→  const enrolled = (enrollments || [])
+   187→    .map((e: any) => {
+   188→      const course = courses.find((c: any) => c.id === e.course_id)
+   189→      return course ? { ...course, enrollment: e } : null
+   190→    })
+   191→    .filter(Boolean)
+   192→
+   193→  return (
+   194→    <SectionCard title="دوراتي المسجّلة" description={`${enrolled.length} دورة`}>
+   195→      {enrolled.length === 0 ? (
+   196→        <div className="text-center py-12">
+   197→          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   198→          <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
+   199→          <p className="text-xs text-muted-foreground mb-4">تصفّح الدورات المتاحة في قسم "استكشاف الدورات"</p>
+   200→        </div>
+   201→      ) : (
+   202→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   203→          {enrolled.map((c: any) => (
+   204→            <Card key={c.id} className="overflow-hidden card-hover">
+   205→              <div className="h-32 bg-navy relative">
+   206→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   207→                <div className="absolute top-2 right-2">
+   208→                  <Badge className={
+   209→                    (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'bg-green-500 text-white'
+   210→                    : c.enrollment.payment_status === 'pending' ? 'bg-yellow-500 text-white'
+   211→                    : 'bg-blue-500 text-white'
+   212→                  }>
+   213→                    {(c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'مكتملة' : c.enrollment.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   214→                  </Badge>
+   215→                </div>
+   216→              </div>
+   217→              <div className="p-4">
+   218→                <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+   219→                <Progress value={c.enrollment.progress || 0} className="h-2 mb-2" />
+   220→                <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   221→                  <span>{c.enrollment.progress || 0}% مكتمل</span>
+   222→                  <span>{c.duration_hours} ساعة</span>
+   223→                </div>
+   224→                {c.enrollment.payment_status === 'pending' ? (
+   225→                  <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
+   226→                    بانتظار تأكيد الدفع
+   227→                  </Button>
+   228→                ) : (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? (
+   229→                  <div className="space-y-2">
+   230→                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
+   231→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
+   232→                    </Button>
+   233→                    <div className="grid grid-cols-2 gap-2">
+   234→                      <Button
+   235→                        size="sm"
+   236→                        variant="outline"
+   237→                        className="border-navy/30 text-navy hover:bg-navy/5"
+   238→                        onClick={() => onContinue(c, c.enrollment)}
+   239→                      >
+   240→                        <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
+   241→                      </Button>
+   242→                      {/* DISABLED: certificate request button removed — will be re-enabled when design+prompt provided */}
+   243→                      {/* <Button
+   244→                        size="sm"
+   245→                        className="bg-gold hover:bg-gold-light text-navy"
+   246→                        disabled={requesting === c.id}
+   247→                        onClick={() => requestCertificate(c)}
+   248→                      >
+   249→                        {requesting === c.id ? (
+   250→                          <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري...</>
+   251→                        ) : (
+   252→                          <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
+   253→                        )}
+   254→                      </Button> */}
+   255→                    </div>
+   256→                  </div>
+   257→                ) : (
+   258→                  <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>
+   259→                    متابعة التعلّم
+   260→                  </Button>
+   261→                )}
+   262→              </div>
+   263→            </Card>
+   264→          ))}
+   265→        </div>
+   266→      )}
+   267→    </SectionCard>
+   268→  )
+   269→}
+   270→
+   271→function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
+   272→  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+   273→  const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
+   274→  const [enrolling, setEnrolling] = useState<string | null>(null)
+   275→
+   276→  useEffect(() => {
+   277→    fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
+   278→  }, [])
+   279→
+   280→  const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
+   281→
+   282→  const enrollFree = async (course: any) => {
+   283→    // Double-check client-side before calling API
+   284→    if (isEnrolled(course.id)) {
+   285→      toast.info('أنت مسجّل في هذه الدورة')
+   286→      return
+   287→    }
+   288→    setEnrolling(course.id)
+   289→    try {
+   290→      const res = await fetch('/api/enrollments', {
+   291→        method: 'POST',
+   292→        headers: { 'Content-Type': 'application/json' },
+   293→        body: JSON.stringify({ user_id: userId, course_id: course.id, payment_status: 'free' }),
+   294→      })
+   295→      const data = await res.json()
+   296→      if (data.already_enrolled) {
+   297→        toast.info('أنت مسجّل في هذه الدورة')
+   298→      } else if (res.ok) {
+   299→        toast.success(`تم التسجيل في دورة: ${course.title}`)
+   300→        onEnrolled()
+   301→      } else toast.error('فشل التسجيل')
+   302→    } catch {
+   303→      toast.error('خطأ')
+   304→    } finally {
+   305→      setEnrolling(null)
+   306→    }
+   307→  }
+   308→
+   309→  const enrollPaid = async (course: any, method: any, reference: string, proofUrl?: string | null) => {
+   310→    // Double-check client-side before calling API
+   311→    if (isEnrolled(course.id)) {
+   312→      toast.info('أنت مسجّل في هذه الدورة')
+   313→      return
+   314→    }
+   315→    setEnrolling(course.id)
+   316→    try {
+   317→      // Combine reference with proof URL
+   318→      const fullReference = proofUrl ? `${reference} | PROOF: ${proofUrl}` : reference
+   319→
+   320→      // 1. Create enrollment with pending payment
+   321→      const res = await fetch('/api/enrollments', {
+   322→        method: 'POST',
+   323→        headers: { 'Content-Type': 'application/json' },
+   324→        body: JSON.stringify({
+   325→          user_id: userId,
+   326→          course_id: course.id,
+   327→          payment_status: 'pending',
+   328→          amount_paid: course.price,
+   329→          payment_method: method.name,
+   330→          payment_reference: fullReference,
+   331→        }),
+   332→      })
+   333→      const data = await res.json()
+   334→      if (data.already_enrolled) {
+   335→        toast.info('أنت مسجّل في هذه الدورة')
+   336→      } else if (res.ok) {
+   337→        // 2. Create payment record with proof URL
+   338→        await fetch('/api/payments', {
+   339→          method: 'POST',
+   340→          headers: { 'Content-Type': 'application/json' },
+   341→          body: JSON.stringify({
+   342→            amount: course.price,
+   343→            currency: course.currency || 'ر.ي',
+   344→            method: method.name,
+   345→            status: 'قيد الانتظار',
+   346→            reference: fullReference,
+   347→            user_id: userId,
+   348→            course_id: course.id,
+   349→          }),
+   350→        })
+   351→        toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
+   352→        onEnrolled()
+   353→        setPayDialog(null)
+   354→      } else toast.error('فشل التسجيل')
+   355→    } catch {
+   356→      toast.error('خطأ')
+   357→    } finally {
+   358→      setEnrolling(null)
+   359→    }
+   360→  }
+   361→
+   362→  return (
+   363→    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة">
+   364→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   365→        {courses.map((c: any) => {
+   366→          const enrolled = isEnrolled(c.id)
+   367→          const isFree = c.price_type === 'مجانية' || c.price === 0
+   368→          return (
+   369→            <Card key={c.id} className="overflow-hidden card-hover">
+   370→              <div className="h-32 bg-navy relative">
+   371→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   372→                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+   373→                {isFree ? (
+   374→                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية</Badge>
+   375→                ) : (
+   376→                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة</Badge>
+   377→                )}
+   378→              </div>
+   379→              <div className="p-4">
+   380→                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+   381→                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
+   382→                <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+   383→                  <span className="flex items-center gap-1">
+   384→                    <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
+   385→                  </span>
+   386→                  <span className="font-bold text-navy">
+   387→                    {isFree ? <span className="text-green-600">مجانية</span> : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}
+   388→                  </span>
+   389→                </div>
+   390→                {enrolled ? (
+   391→                  <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 bg-green-500/5">
+   392→                    <CheckCircle2 className="w-4 h-4 ml-1" /> مسجّل
+   393→                  </Button>
+   394→                ) : isFree ? (
+   395→                  <Button
+   396→                    size="sm"
+   397→                    className="w-full bg-green-600 hover:bg-green-700"
+   398→                    onClick={() => enrollFree(c)}
+   399→                    disabled={enrolling === c.id}
+   400→                  >
+   401→                    {enrolling === c.id ? 'جاري التسجيل...' : 'سجّل الآن'}
+   402→                  </Button>
+   403→                ) : (
+   404→                  <Button
+   405→                    size="sm"
+   406→                    className="w-full bg-gold hover:bg-gold-light text-navy"
+   407→                    onClick={() => setPayDialog({ course: c, open: true })}
+   408→                  >
+   409→                    <Lock className="w-3.5 h-3.5 ml-1" /> اشترك الآن
+   410→                  </Button>
+   411→                )}
+   412→              </div>
+   413→            </Card>
+   414→          )
+   415→        })}
+   416→      </div>
+   417→
+   418→      {payDialog?.open && (
+   419→        <PaymentDialog
+   420→          course={payDialog.course}
+   421→          methods={paymentMethods}
+   422→          open={payDialog.open}
+   423→          onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
+   424→          onPay={(method: any, reference: string, proofUrl?: string | null) => enrollPaid(payDialog.course, method, reference, proofUrl)}
+   425→          loading={enrolling === payDialog.course.id}
+   426→        />
+   427→      )}
+   428→    </SectionCard>
+   429→  )
+   430→}
+   431→
+   432→function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: any) {
+   433→  const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
+   434→  const [reference, setReference] = useState('')
+   435→  const [proofUrl, setProofUrl] = useState<string | null>(null)
+   436→  const [uploadingProof, setUploadingProof] = useState(false)
+   437→
+   438→  const handleProofUpload = async (file: File) => {
+   439→    setUploadingProof(true)
+   440→    try {
+   441→      // Compress image on client side
+   442→      const reader = new FileReader()
+   443→      reader.onload = (e) => {
+   444→        const img = new Image()
+   445→        img.onload = () => {
+   446→          const maxW = 1024, maxH = 1024
+   447→          let { width, height } = img
+   448→          if (width > maxW) { height = (height * maxW) / width; width = maxW }
+   449→          if (height > maxH) { width = (width * maxH) / height; height = maxH }
+   450→          const canvas = document.createElement('canvas')
+   451→          canvas.width = width; canvas.height = height
+   452→          const ctx = canvas.getContext('2d')!
+   453→          ctx.drawImage(img, 0, 0, width, height)
+   454→          canvas.toBlob(async (blob) => {
+   455→            if (!blob) { setUploadingProof(false); return }
+   456→            const fd = new FormData()
+   457→            fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
+   458→            fd.append('folder', 'payment-proofs')
+   459→            const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+   460→            const data = await res.json()
+   461→            if (data.url) {
+   462→              setProofUrl(data.url)
+   463→              toast.success('تم رفع إثبات الدفع')
+   464→            } else {
+   465→              toast.error('فشل رفع الصورة')
+   466→            }
+   467→            setUploadingProof(false)
+   468→          }, 'image/jpeg', 0.85)
+   469→        }
+   470→        img.src = e.target?.result as string
+   471→      }
+   472→      reader.readAsDataURL(file)
+   473→    } catch {
+   474→      toast.error('خطأ في الرفع')
+   475→      setUploadingProof(false)
+   476→    }
+   477→  }
+   478→
+   479→  return (
+   480→    <Dialog open={open} onOpenChange={onOpenChange}>
+   481→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+   482→        <button
+   483→          onClick={() => onOpenChange(false)}
+   484→          className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50"
+   485→          title="إغلاق"
+   486→        >
+   487→          <X className="w-4 h-4 text-muted-foreground" />
+   488→        </button>
+   489→        <DialogHeader>
+   490→          <DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle>
+   491→        </DialogHeader>
+   492→        <div className="space-y-4 py-4">
+   493→          <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
+   494→            <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
+   495→            <span className="text-xl font-extrabold text-gold">
+   496→              {course.price?.toLocaleString()} {course.currency || 'ر.ي'}
+   497→            </span>
+   498→          </div>
+   499→
+   500→          <div>
+   501→            <Label className="text-navy">اختر طريقة الدفع</Label>
+   502→            <div className="grid grid-cols-2 gap-2 mt-2">
+   503→              {methods.map((m: any) => (
+   504→                <button
+   505→                  key={m.id}
+   506→                  onClick={() => setSelectedMethod(m)}
+   507→                  className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+   508→                    selectedMethod?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:border-muted'
+   509→                  }`}
+   510→                >
+   511→                  <span className="text-2xl">{m.icon}</span>
+   512→                  <div className="text-right">
+   513→                    <div className="font-bold text-navy text-sm">{m.name}</div>
+   514→                    {m.wallet_id && <div className="text-xs text-muted-foreground font-mono" dir="ltr">{m.wallet_id}</div>}
+   515→                  </div>
+   516→                </button>
+   517→              ))}
+   518→            </div>
+   519→          </div>
+   520→
+   521→          {selectedMethod && (
+   522→            <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
+   523→              <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
+   524→              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم ارفع صورة الإيصال.'}</p>
+   525→            </div>
+   526→          )}
+   527→
+   528→          <div>
+   529→            <Label htmlFor="ref">رقم المعاملة / المرجع</Label>
+   530→            <Input
+   531→              id="ref"
+   532→              value={reference}
+   533→              onChange={(e) => setReference(e.target.value)}
+   534→              placeholder="مثال: JB-123456789"
+   535→              dir="ltr"
+   536→              className="mt-1"
+   537→            />
+   538→          </div>
+   539→
+   540→          {/* Payment proof upload */}
+   541→          <div>
+   542→            <Label className="text-navy">رفع صورة إثبات الدفع (إيصال)</Label>
+   543→            <input
+   544→              type="file"
+   545→              accept="image/*"
+   546→              className="hidden"
+   547→              id="proof-upload"
+   548→              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProofUpload(f) }}
+   549→            />
+   550→            <div className="mt-1 flex items-center gap-3">
+   551→              {proofUrl ? (
+   552→                <div className="flex items-center gap-2 flex-1">
+   553→                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-md border-2 border-green-500/30" />
+   554→                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1">
+   555→                    <CheckCircle2 className="w-3.5 h-3.5" /> تم رفع الإيصال
+   556→                  </div>
+   557→                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs">إزالة</button>
+   558→                </div>
+   559→              ) : (
+   560→                <Button type="button" variant="outline" disabled={uploadingProof} className="flex-1" onClick={() => document.getElementById('proof-upload')?.click()}>
+   561→                  {uploadingProof ? (
+   562→                    <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</>
+   563→                  ) : (
+   564→                    <><FileUp className="w-4 h-4 ml-1" /> اختر صورة الإيصال</>
+   565→                  )}
+   566→                </Button>
+   567→              )}
+   568→            </div>
+   569→          </div>
+   570→        </div>
+   571→        <DialogFooter>
+   572→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   573→          <Button
+   574→            className="bg-navy hover:bg-navy-light"
+   575→            disabled={loading || !selectedMethod || !reference.trim() || !proofUrl}
+   576→            onClick={() => onPay(selectedMethod, reference, proofUrl)}
+   577→          >
+   578→            {loading ? 'جاري المعالجة...' : 'تأكيد الاشتراك'}
+   579→          </Button>
+   580→        </DialogFooter>
+   581→      </DialogContent>
+   582→    </Dialog>
+   583→  )
+   584→}
+   585→
+   586→function Exams() {
+   587→  const exams = [
+   588→    { name: 'اختبار BLS الأساسي', course: 'BLS & ACLS', score: 85, status: 'ناجح', date: '2025-09-12' },
+   589→    { name: 'مكافحة العدوى - الوحدة 1', course: 'Infection Control', score: 0, status: 'لم يُجرَب', date: null },
+   590→    { name: 'أساسيات التمريض', course: 'Nursing Fundamentals', score: 0, status: 'متاح', date: null },
+   591→  ]
+   592→  return (
+   593→    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك">
+   594→      <div className="space-y-3">
+   595→        {exams.map((e, i) => (
+   596→          <div key={i} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
+   597→            <div>
+   598→              <div className="font-semibold text-navy text-sm">{e.name}</div>
+   599→              <div className="text-xs text-muted-foreground mt-1">{e.course}</div>
+   600→            </div>
+   601→            <div className="flex items-center gap-3">
+   602→              {e.score > 0 ? (
+   603→                <>
+   604→                  <div className="text-right">
+   605→                    <div className="font-bold text-navy">{e.score}%</div>
+   606→                    <div className="text-xs text-green-600">{e.status}</div>
+   607→                  </div>
+   608→                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30">{e.status}</Badge>
+   609→                </>
+   610→              ) : (
+   611→                <Button size="sm" className="bg-navy hover:bg-navy-light">ابدأ الاختبار</Button>
+   612→              )}
+   613→            </div>
+   614→          </div>
+   615→        ))}
+   616→      </div>
+   617→    </SectionCard>
+   618→  )
+   619→}
+   620→
+   621→function Results() {
+   622→  const results = [
+   623→    { exam: 'BLS الأساسي', score: 85, total: 100, status: 'ناجح', date: '2025-09-12' },
+   624→    { exam: 'مكافحة العدوى', score: 92, total: 100, status: 'ناجح', date: '2025-09-20' },
+   625→    { exam: 'ACLS المتقدم', score: 55, total: 100, status: 'راسب', date: '2025-09-25' },
+   626→  ]
+   627→  return (
+   628→    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات">
+   629→      <div className="overflow-x-auto">
+   630→        <table className="w-full text-sm">
+   631→          <thead>
+   632→            <tr className="border-b border-border text-right text-muted-foreground">
+   633→              <th className="py-3 px-2">الاختبار</th>
+   634→              <th className="py-3 px-2">النتيجة</th>
+   635→              <th className="py-3 px-2">النسبة</th>
+   636→              <th className="py-3 px-2">الحالة</th>
+   637→              <th className="py-3 px-2">التاريخ</th>
+   638→            </tr>
+   639→          </thead>
+   640→          <tbody>
+   641→            {results.map((r, i) => (
+   642→              <tr key={i} className="border-b border-border">
+   643→                <td className="py-3 px-2 font-medium text-navy">{r.exam}</td>
+   644→                <td className="py-3 px-2">{r.score}/{r.total}</td>
+   645→                <td className="py-3 px-2">
+   646→                  <div className="flex items-center gap-2">
+   647→                    <Progress value={r.score} className="w-16 h-2" />
+   648→                    <span>{r.score}%</span>
+   649→                  </div>
+   650→                </td>
+   651→                <td className="py-3 px-2">
+   652→                  <Badge className={r.status === 'ناجح' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
+   653→                    {r.status}
+   654→                  </Badge>
+   655→                </td>
+   656→                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{r.date}</td>
+   657→              </tr>
+   658→            ))}
+   659→          </tbody>
+   660→        </table>
+   661→      </div>
+   662→    </SectionCard>
+   663→  )
+   664→}
+   665→
+   666→function Certificates({ certificates }: any) {
+   667→  const myCerts = certificates.length > 0 ? certificates : []
+   668→  const [downloading, setDownloading] = useState<string | null>(null)
+   669→  const [copiedCert, setCopiedCert] = useState<string | null>(null)
+   670→
+   671→  const handleDownload = (cert: any) => {
+   672→    setDownloading(cert.id)
+   673→    // Open PDF in new tab (browser will download or preview)
+   674→    window.open(`/api/certificate-pdf?number=${encodeURIComponent(cert.certificate_number)}&format=pdf`, '_blank')
+   675→    setTimeout(() => setDownloading(null), 2000)
+   676→  }
+   677→
+   678→  const handleCopyCode = (cert: any, e: React.MouseEvent) => {
+   679→    e.stopPropagation()
+   680→    navigator.clipboard.writeText(cert.certificate_number)
+   681→    setCopiedCert(cert.id)
+   682→    toast.success('تم نسخ كود الشهادة', { description: cert.certificate_number })
+   683→    setTimeout(() => setCopiedCert(null), 2000)
+   684→  }
+   685→
+   686→  const handleShare = (cert: any, e: React.MouseEvent) => {
+   687→    e.stopPropagation()
+   688→    const url = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+   689→    if (navigator.share) {
+   690→      navigator.share({
+   691→        title: 'شهادة معتمدة - أكاديمية المستقبل الدولية',
+   692→        text: `شهادة ${cert.student_name || ''} - ${cert.course_title || ''}`,
+   693→        url,
+   694→      }).catch(() => {})
+   695→    } else {
+   696→      navigator.clipboard.writeText(url)
+   697→      toast.success('تم نسخ رابط الشهادة')
+   698→    }
+   699→  }
+   700→
+   701→  return (
+   702→    <SectionCard title="شهاداتي" description="الشهادات التي حصلت عليها">
+   703→      {myCerts.length === 0 ? (
+   704→        <div className="text-center py-12">
+   705→          <Award className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   706→          <p className="text-muted-foreground mb-2">لا توجد شهادات بعد</p>
+   707→          <p className="text-xs text-muted-foreground">أنهِ دورة بنجاح للحصول على شهادة معتمدة</p>
+   708→        </div>
+   709→      ) : (
+   710→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   711→          {myCerts.map((c: any) => (
+   712→            <Card key={c.id} className="overflow-hidden card-hover border-2 border-gold/20">
+   713→              <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden cursor-pointer" onClick={() => handleDownload(c)}>
+   714→                <img
+   715→                  src={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`}
+   716→                  alt={c.course_title || 'certificate'}
+   717→                  className="w-full h-full object-cover"
+   718→                  loading="lazy"
+   719→                />
+   720→              </div>
+   721→              <div className="p-4">
+   722→                <div className="flex items-center gap-2 mb-2">
+   723→                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center">
+   724→                    <Award className="w-5 h-5 text-gold" />
+   725→                  </div>
+   726→                  <div className="flex-1 min-w-0">
+   727→                    <div className="font-bold text-navy text-sm line-clamp-1">{c.course_title || 'دورة'}</div>
+   728→                  </div>
+   729→                </div>
+   730→                {/* Certificate code card — copyable & prominent */}
+   731→                <div className="bg-gradient-to-br from-navy to-navy-light rounded-lg p-3 mb-3 border border-gold/30">
+   732→                  <div className="text-[10px] text-gold/80 font-semibold mb-1">كود الشهادة (قابل للنسخ)</div>
+   733→                  <div className="flex items-center gap-2">
+   734→                    <div className="flex-1 text-white font-mono text-sm md:text-base font-bold tracking-wide truncate" dir="ltr">{c.certificate_number}</div>
+   735→                    <button
+   736→                      onClick={(e) => handleCopyCode(c, e)}
+   737→                      className="flex-shrink-0 w-7 h-7 rounded-md bg-gold hover:bg-gold-light text-navy flex items-center justify-center transition-colors"
+   738→                      title="نسخ الكود"
+   739→                    >
+   740→                      {copiedCert === c.id ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-3.5 h-3.5" />}
+   741→                    </button>
+   742→                  </div>
+   743→                  <button
+   744→                    onClick={(e) => handleShare(c, e)}
+   745→                    className="mt-2 w-full text-[10px] text-gold/70 hover:text-gold flex items-center justify-center gap-1 py-1 rounded transition-colors"
+   746→                  >
+   747→                    <Share2 className="w-3 h-3" /> مشاركة الشهادة
+   748→                  </button>
+   749→                </div>
+   750→                <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
+   751→                <div className="flex gap-2">
+   752→                  <Button size="sm" className="flex-1 bg-navy hover:bg-navy-light" onClick={() => handleDownload(c)} disabled={downloading === c.id}>
+   753→                    <Download className="w-3.5 h-3.5 ml-1" /> PDF
+   754→                  </Button>
+   755→                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`, '_blank')}>
+   756→                    صورة
+   757→                  </Button>
+   758→                </div>
+   759→              </div>
+   760→            </Card>
+   761→          ))}
+   762→        </div>
+   763→      )}
+   764→    </SectionCard>
+   765→  )
+   766→}
+   767→
+   768→function Payments({ payments }: any) {
+   769→  const myPayments = payments.length > 0 ? payments : [
+   770→    { id: '1', amount: 35000, currency: 'ر.ي', method: 'جيب', status: 'مكتمل', reference: 'JB-7842', date: '2025-09-10' }
+   771→  ]
+   772→  return (
+   773→    <SectionCard title="مدفوعاتي" description="سجل المعاملات المالية">
+   774→      <div className="overflow-x-auto">
+   775→        <table className="w-full text-sm">
+   776→          <thead>
+   777→            <tr className="border-b border-border text-right text-muted-foreground">
+   778→              <th className="py-3 px-2">المبلغ</th>
+   779→              <th className="py-3 px-2">الطريقة</th>
+   780→              <th className="py-3 px-2">المرجع</th>
+   781→              <th className="py-3 px-2">الحالة</th>
+   782→              <th className="py-3 px-2">التاريخ</th>
+   783→            </tr>
+   784→          </thead>
+   785→          <tbody>
+   786→            {myPayments.map((p: any, i: number) => (
+   787→              <tr key={i} className="border-b border-border">
+   788→                <td className="py-3 px-2 font-bold text-navy">{p.amount.toLocaleString()} {p.currency || 'ر.ي'}</td>
+   789→                <td className="py-3 px-2">{p.method || '-'}</td>
+   790→                <td className="py-3 px-2 font-mono" dir="ltr">{p.reference || '-'}</td>
+   791→                <td className="py-3 px-2">
+   792→                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30">{p.status}</Badge>
+   793→                </td>
+   794→                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</td>
+   795→              </tr>
+   796→            ))}
+   797→          </tbody>
+   798→        </table>
+   799→      </div>
+   800→    </SectionCard>
+   801→  )
+   802→}
+   803→
+   804→function Profile({ profile, setProfile, user, updateUser }: any) {
+   805→  const [loading, setLoading] = useState(false)
+   806→
+   807→  const save = async () => {
+   808→    setLoading(true)
+   809→    try {
+   810→      // Update locally — in real app, would call /api/students PUT
+   811→      updateUser({
+   812→        name: profile.name,
+   813→        phone: profile.phone,
+   814→        title: profile.title,
+   815→        bio: profile.bio,
+   816→      })
+   817→      toast.success('تم تحديث الملف الشخصي')
+   818→    } catch {
+   819→      toast.error('فشل التحديث')
+   820→    } finally {
+   821→      setLoading(false)
+   822→    }
+   823→  }
+   824→
+   825→  return (
+   826→    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك الشخصية">
+   827→      <div className="space-y-6 max-w-2xl">
+   828→        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+   829→          <AvatarUploader
+   830→            userId={user.id}
+   831→            role="student"
+   832→            initialUrl={user?.avatar}
+   833→            name={user?.name}
+   834→            size="xl"
+   835→            onUploaded={(url) => updateUser({ avatar: url })}
+   836→          />
+   837→        </div>
+   838→
+   839→        <div className="grid sm:grid-cols-2 gap-4">
+   840→          <div>
+   841→            <Label className="text-navy">الاسم الكامل</Label>
+   842→            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+   843→          </div>
+   844→          <div>
+   845→            <Label className="text-navy">البريد الإلكتروني</Label>
+   846→            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
+   847→          </div>
+   848→          <div>
+   849→            <Label className="text-navy">رقم الهاتف</Label>
+   850→            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
+   851→          </div>
+   852→          <div>
+   853→            <Label className="text-navy">التخصص</Label>
+   854→            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+   855→          </div>
+   856→        </div>
+   857→        <div>
+   858→          <Label className="text-navy">نبذة تعريفية</Label>
+   859→          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+   860→        </div>
+   861→        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
+   862→          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+   863→        </Button>
+   864→      </div>
+   865→    </SectionCard>
+   866→  )
+   867→}
+   868→
+   869→function Notifications() {
+   870→  const notifs = [
+   871→    { title: 'تم إصدار شهادتك', desc: 'شهادة دورة BLS جاهزة للتحميل', time: 'قبل ساعة', read: false },
+   872→    { title: 'تذكير: اختبار قادم', desc: 'اختبار مكافحة العدوى يوم السبت', time: 'قبل 5 ساعات', read: false },
+   873→    { title: 'دورة جديدة متاحة', desc: 'دورة طب الطوارئ المتقدم', time: 'أمس', read: true },
+   874→  ]
+   875→  return (
+   876→    <SectionCard title="الإشعارات" description="آخر التحديثات والتنبيهات">
+   877→      <div className="space-y-3">
+   878→        {notifs.map((n, i) => (
+   879→          <div key={i} className={`p-4 rounded-lg border ${n.read ? 'bg-muted/20 border-border' : 'bg-gold/5 border-gold/20'}`}>
+   880→            <div className="flex items-start justify-between gap-3">
+   881→              <div>
+   882→                <div className="font-semibold text-navy text-sm">{n.title}</div>
+   883→                <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+   884→              </div>
+   885→              <div className="flex flex-col items-end gap-1">
+   886→                {!n.read && <span className="w-2 h-2 bg-gold rounded-full" />}
+   887→                <span className="text-xs text-muted-foreground">{n.time}</span>
+   888→              </div>
+   889→            </div>
+   890→          </div>
+   891→        ))}
+   892→      </div>
+   893→    </SectionCard>
+   894→  )
+   895→}
+   896→
+   897→function SettingsTab() {
+   898→  return (
+   899→    <SectionCard title="الإعدادات" description="تخصيص حسابك">
+   900→      <div className="space-y-6 max-w-2xl">
+   901→        <div>
+   902→          <h3 className="font-semibold text-navy mb-3">الإشعارات</h3>
+   903→          <div className="space-y-3">
+   904→            <SettingToggle label="إشعارات البريد الإلكتروني" desc="تنبيهات حول الدورات والاختبارات" defaultChecked />
+   905→            <SettingToggle label="إشعارات الهاتف" desc="رسائل SMS للتحديثات المهمة" defaultChecked />
+   906→            <SettingToggle label="نشرة أسبوعية" desc="ملخّص أسبوعي بنشاطك" />
+   907→          </div>
+   908→        </div>
+   909→        <div>
+   910→          <h3 className="font-semibold text-navy mb-3">الأمان</h3>
+   911→          <Button variant="outline">تغيير كلمة المرور</Button>
+   912→        </div>
+   913→      </div>
+   914→    </SectionCard>
+   915→  )
+   916→}
+   917→
+   918→function SettingToggle({ label, desc, defaultChecked }: { label: string; desc: string; defaultChecked?: boolean }) {
+   919→  const [on, setOn] = useState(!!defaultChecked)
+   920→  return (
+   921→    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+   922→      <div>
+   923→        <div className="font-medium text-navy text-sm">{label}</div>
+   924→        <div className="text-xs text-muted-foreground">{desc}</div>
+   925→      </div>
+   926→      <button onClick={() => setOn(!on)} className={`relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-gold' : 'bg-muted'}`}>
+   927→        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${on ? 'right-0.5' : 'right-5'}`} />
+   928→      </button>
+   929→    </div>
+   930→  )
+   931→}
+   932→
