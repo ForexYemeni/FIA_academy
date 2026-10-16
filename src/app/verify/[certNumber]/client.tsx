@@ -1,13 +1,19 @@
 'use client'
 
+import { useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   CheckCircle2, XCircle, Download, Calendar, Award, Shield,
-  Sparkles, Globe, FileText, ExternalLink,
+  Sparkles, FileText, Copy, Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function VerifyClient({ certificate }: { certificate: any }) {
+  const certRef = useRef<HTMLDivElement>(null)
+  const [downloading, setDownloading] = useState(false)
+
   if (!certificate) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-red-50 px-4" dir="rtl">
@@ -28,6 +34,49 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
   const issuedAt = certificate.issued_at ? new Date(certificate.issued_at) : null
   const isVerified = certificate.status === 'صالحة'
 
+  // Download certificate as PNG image using html-to-image
+  const downloadAsImage = async () => {
+    if (!certRef.current) return
+    setDownloading(true)
+    try {
+      // Dynamically import html-to-image (it's a client-only lib)
+      const htmlToImage = await import('html-to-image')
+      const dataUrl = await htmlToImage.toPng(certRef.current, {
+        quality: 0.95,
+        pixelRatio: 2,
+        backgroundColor: '#FBF7EC',
+        cacheBust: true,
+      })
+      const link = document.createElement('a')
+      link.download = `FIA-Certificate-${certificate.certificate_number}.png`
+      link.href = dataUrl
+      link.click()
+      toast.success('تم تنزيل الشهادة كصورة')
+    } catch (e: any) {
+      // Fallback — use the browser's print-to-PDF
+      toast.info('تعذّر التنزيل المباشر — استخدم طباعة / حفظ PDF')
+      window.print()
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  // Copy certificate number
+  const copyCertNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(certificate.certificate_number)
+      toast.success('تم نسخ رقم الشهادة')
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = certificate.certificate_number
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      toast.success('تم نسخ رقم الشهادة')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy/5 via-white to-gold/5 py-12 px-4" dir="rtl">
       <div className="max-w-5xl mx-auto">
@@ -44,8 +93,8 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
           </p>
         </div>
 
-        {/* === CERTIFICATE CARD — completely redesigned === */}
-        <div className="relative">
+        {/* === CERTIFICATE CARD — ref for image download === */}
+        <div ref={certRef} className="relative">
           {/* Outer glow */}
           <div className="absolute -inset-4 bg-gradient-to-r from-gold/15 via-navy/5 to-gold/15 rounded-3xl blur-2xl" />
 
@@ -93,7 +142,6 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
                     <div className="text-center py-8">
                       <p className="text-base md:text-lg text-muted-foreground mb-4">تشهد أكاديمية المستقبل الدولية بأن</p>
 
-                      {/* Student name — large, elegant */}
                       <h2 className="text-3xl md:text-5xl font-bold text-navy mb-6 leading-tight"
                           style={{ fontFamily: 'var(--font-cairo), sans-serif', letterSpacing: '-0.02em' }}>
                         {certificate.student_name}
@@ -165,10 +213,6 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
                     <div className="text-center mt-10 pt-8 border-t border-gold/15">
                       <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-widest mb-2">صادر عن</div>
                       <div className="font-bold text-navy text-sm md:text-base mb-1">{certificate.issued_by || 'أكاديمية المستقبل الدولية'}</div>
-                      <div className="flex items-center justify-center gap-1.5 mt-2">
-                        <Globe className="w-3 h-3 text-gold" />
-                        <span className="text-[10px] md:text-xs text-gold font-medium" dir="ltr">fiaacademy.vercel.app/verify/{certificate.certificate_number}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -180,24 +224,32 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
           </Card>
         </div>
 
-        {/* Verify URL */}
-        <div className="text-center mt-6">
-          <p className="text-xs text-muted-foreground">يمكن التحقق من صحة هذه الشهادة في أي وقت عبر الرابط:</p>
-          <p className="font-mono text-sm text-navy mt-1" dir="ltr">
-            fiaacademy.vercel.app/verify/{certificate.certificate_number}
-          </p>
-        </div>
-
-        {/* Actions */}
+        {/* Action buttons */}
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-          <a href="/" className="inline-flex items-center gap-2 bg-navy hover:bg-navy-light text-white px-6 py-3 rounded-lg font-bold text-sm shadow-md transition-all">
-            <Globe className="w-4 h-4" /> انضم إلى دوراتنا
-          </a>
+          {/* Download as image */}
           <button
-            onClick={() => window.print()}
+            onClick={downloadAsImage}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 bg-navy hover:bg-navy-light text-white px-6 py-3 rounded-lg font-bold text-sm shadow-md transition-all disabled:opacity-50"
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? 'جاري التنزيل...' : 'تنزيل الشهادة (صورة)'}
+          </button>
+
+          {/* Copy cert number */}
+          <button
+            onClick={copyCertNumber}
             className="inline-flex items-center gap-2 border border-gold/30 text-gold hover:bg-gold/10 px-6 py-3 rounded-lg font-bold text-sm transition-all"
           >
-            <Download className="w-4 h-4" /> طباعة / حفظ PDF
+            <Copy className="w-4 h-4" /> نسخ رقم الشهادة
+          </button>
+
+          {/* Print */}
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 border border-navy/20 text-navy hover:bg-navy/5 px-6 py-3 rounded-lg font-bold text-sm transition-all"
+          >
+            <FileText className="w-4 h-4" /> طباعة / PDF
           </button>
         </div>
       </div>
