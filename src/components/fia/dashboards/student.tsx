@@ -26,6 +26,7 @@ import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
 import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CertificateRequest } from '@/components/fia/certificate-request'
+import { CertificateViewer } from '@/components/fia/certificate-viewer'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
