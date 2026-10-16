@@ -161,6 +161,32 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
 
+    // Send notifications — to the user + to all admins
+    try {
+      // Lookup course title
+      const { data: course } = await supabaseAdmin.from('courses').select('title').eq('id', body.course_id).maybeSingle()
+      const courseTitle = course?.title || 'دورة'
+      // Notify the student
+      await supabaseAdmin.from('notifications').insert({
+        user_id: body.user_id,
+        type: 'enrollment',
+        title: 'تم تسجيلك في الدورة بنجاح',
+        body: `أنت الآن مسجّل في دورة "${courseTitle}". ابدأ التعلم الآن!`,
+        link: '/',
+      })
+      // Notify all admins
+      const { data: admins } = await supabaseAdmin.from('users').select('id').eq('role', 'admin')
+      for (const admin of admins || []) {
+        await supabaseAdmin.from('notifications').insert({
+          user_id: admin.id,
+          type: 'enrollment',
+          title: 'تسجيل جديد في دورة',
+          body: `متدرب جديد سجّل في دورة "${courseTitle}"`,
+          link: '/',
+        })
+      }
+    } catch {}
+
     return NextResponse.json(toEnrollment(data as StoredEnrollment))
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

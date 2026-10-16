@@ -24,7 +24,36 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(false)
   const [recipient, setRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [searchQ, setSearchQ] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Search for users to start a new conversation
+  const searchUsers = (q: string) => {
+    setSearchQ(q)
+    if (q.length < 2) { setSearchResults([]); return }
+    setSearching(true)
+    fetch(`/api/users-search?q=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        // Filter out the current user + admins (admins can't be messaged directly via this UI)
+        const arr = Array.isArray(d) ? d.filter((u: any) => u.id !== user?.id && u.role !== 'admin') : []
+        setSearchResults(arr)
+      })
+      .catch(() => {})
+      .finally(() => setSearching(false))
+  }
+
+  const startConversationWith = (u: any) => {
+    setRecipient({ id: u.id, name: u.name })
+    setSearchQ('')
+    setSearchResults([])
+    // Check if conversation already exists
+    const existing = conversations.find((c) => c.other_id === u.id)
+    if (existing) setActiveConvId(existing.id)
+    else { setActiveConvId(null); setMessages([]) }
+  }
 
   const loadConversations = useCallback(() => {
     if (!user?.id) return
@@ -186,8 +215,44 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
           </DialogHeader>
 
           <div className="flex-1 flex min-h-0">
-            {/* Sidebar — conversations list */}
-            <div className="w-64 border-l border-border overflow-y-auto bg-muted/30 hidden md:block">
+            {/* Sidebar — conversations list + new conversation search */}
+            <div className="w-64 border-l border-border overflow-y-auto bg-muted/30 hidden md:flex flex-col">
+              {/* Search to start new conversation */}
+              <div className="p-3 border-b border-border bg-white">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={searchQ}
+                    onChange={(e) => searchUsers(e.target.value)}
+                    placeholder="ابحث عن مستخدم لمراسلته..."
+                    className="text-xs pr-8"
+                  />
+                </div>
+                {searching && <p className="text-[10px] text-muted-foreground mt-1">جاري البحث...</p>}
+                {searchResults.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                    {searchResults.map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => startConversationWith(u)}
+                        className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-muted text-right"
+                      >
+                        <Avatar className="w-7 h-7">
+                          <AvatarImage src={u.avatar || ''} />
+                          <AvatarFallback className="bg-navy text-gold text-[10px]">{u.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-navy truncate">{u.name}</div>
+                          <div className="text-[9px] text-muted-foreground">{u.email}</div>
+                        </div>
+                        {u.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 text-[8px] px-1 py-0">مدرب</Badge>}
+                        {u.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 text-[8px] px-1 py-0">متدرب</Badge>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {recipient && (
                 <div className="p-3 bg-gold/10 border-b border-gold/20">
                   <div className="text-xs font-bold text-navy">محادثة جديدة مع</div>
@@ -195,8 +260,8 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                 </div>
               )}
               {conversations.length === 0 && !recipient ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  لا توجد محادثات بعد
+                <div className="p-6 text-center text-xs text-muted-foreground flex-1 flex items-center justify-center">
+                  لا توجد محادثات بعد — ابحث عن مستخدم في الأعلى لبدء محادثة
                 </div>
               ) : (
                 conversations.map((c) => (

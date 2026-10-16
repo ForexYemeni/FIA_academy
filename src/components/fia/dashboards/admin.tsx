@@ -42,7 +42,7 @@ const NAV: NavItem[] = [
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
   { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
   { id: 'affiliates', label: 'المسوّقون', icon: Users },
-  // { id: 'certificates', label: 'الشهادات', icon: Award },  // DISABLED: certificate feature temporarily removed
+  { id: 'certificates', label: 'الشهادات', icon: Award },  // Re-enabled
   { id: 'trainers', label: 'المدربون', icon: GraduationCap },
   { id: 'reviews', label: 'تقييمات المتدربين', icon: Star },
   { id: 'partners', label: 'الشركاء', icon: Building2 },
@@ -89,8 +89,8 @@ export function AdminDashboard() {
       {active === 'payment-methods' && <AdminPaymentMethods />}
       {active === 'coupons' && <AdminCoupons />}
       {active === 'affiliates' && <AdminAffiliates />}
-      {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
-      {/* {active === 'certificates' && <AdminCertificates />} */}
+      {/* Certificate management — re-enabled */}
+      {active === 'certificates' && <AdminCertificates />}
       {active === 'trainers' && <AdminTrainers />}
       {active === 'reviews' && <AdminReviews />}
       {active === 'partners' && <AdminPartners />}
