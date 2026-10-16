@@ -1084,6 +1084,7 @@ function CategoryDialog({ open, onOpenChange, initial, onSaved }: any) {
 export function AdminBlog() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
+  const [viewingPost, setViewingPost] = useState<any | null>(null)
   const [editing, setEditing] = useState<any | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -1101,36 +1102,113 @@ export function AdminBlog() {
     } finally { setDeleting(false) }
   }
 
-  return (
-    <SectionCard title="المدونة" description={`${items.length} مقال`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> مقال جديد</Button>}>
-      <div className="space-y-3">
-        {items.map((p) => (
-          <Card key={p.id} className="p-4">
-            <div className="flex items-start gap-4">
-              {p.cover && <img src={p.cover} alt={p.title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs">{p.status}</Badge>
-                  {p.tags && <Badge variant="outline" className="text-xs">{p.tags.split(',')[0]}</Badge>}
-                </div>
-                <h4 className="font-bold text-navy">{p.title}</h4>
-                {p.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.excerpt}</p>}
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
-                  <span><Eye className="w-3 h-3 inline" /> {p.views || 0}</span>
-                  <span><Clock className="w-3 h-3 inline" /> {p.published_at ? new Date(p.published_at).toLocaleDateString('ar-EG') : ''}</span>
-                  <a href={`/blog/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">
-                    <ExternalLink className="w-3 h-3 inline" /> عرض
-                  </a>
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Button size="sm" variant="outline" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5" /></Button>
-                <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+  // In-place article preview view
+  if (viewingPost) {
+    return (
+      <SectionCard
+        title={viewingPost.title}
+        description={viewingPost.published_at ? new Date(viewingPost.published_at).toLocaleDateString('ar-EG') : ''}
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setEditing(viewingPost); setOpen(true) }}>
+              <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setViewingPost(null)}>
+              <ArrowRight className="w-4 h-4 ml-1" /> رجوع للقائمة
+            </Button>
+          </div>
+        }
+      >
+        <article className="max-w-3xl mx-auto">
+          {viewingPost.cover && (
+            <div className="aspect-video rounded-2xl overflow-hidden shadow-xl mb-6">
+              <img src={viewingPost.cover} alt={viewingPost.title} className="w-full h-full object-cover" />
             </div>
-          </Card>
-        ))}
-      </div>
+          )}
+          {viewingPost.tags && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {viewingPost.tags.split(',').map((t: string, i: number) => (
+                <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
+              ))}
+            </div>
+          )}
+          {viewingPost.excerpt && (
+            <p className="text-lg text-navy/80 leading-relaxed mb-6 border-r-4 border-gold pr-4">
+              {viewingPost.excerpt}
+            </p>
+          )}
+          <div className="prose prose-lg max-w-none text-navy/90 leading-loose whitespace-pre-wrap">
+            {viewingPost.body}
+          </div>
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Eye className="w-3.5 h-3.5" /> {viewingPost.views || 0} قراءة
+            </span>
+            <a
+              href={`/blog/${viewingPost.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-gold hover:underline"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> فتح الرابط العام
+            </a>
+          </div>
+        </article>
+      </SectionCard>
+    )
+  }
+
+  return (
+    <SectionCard title="المدونة" description={`${items.length} مقال`} action={
+      <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}>
+        <Plus className="w-4 h-4 ml-1" /> مقال جديد
+      </Button>
+    }>
+      {items.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Newspaper className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>لا توجد مقالات بعد. اضغط "مقال جديد" لنشر أول مقال.</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {items.map((p) => (
+            <Card key={p.id} className="overflow-hidden hover:shadow-lg transition-all group flex flex-col">
+              {p.cover ? (
+                <div className="aspect-video overflow-hidden bg-navy/10">
+                  <img src={p.cover} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                </div>
+              ) : (
+                <div className="aspect-video bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Newspaper className="w-12 h-12 text-gold/40" />
+                </div>
+              )}
+              <div className="p-5 flex-1 flex flex-col">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-[10px]">{p.status || 'منشور'}</Badge>
+                  {p.tags && <Badge variant="outline" className="text-[10px] text-gold border-gold/30">{p.tags.split(',')[0].trim()}</Badge>}
+                </div>
+                <h4 className="font-bold text-navy text-base mb-2 line-clamp-2">{p.title}</h4>
+                {p.excerpt && <p className="text-xs text-muted-foreground line-clamp-3 mb-3 flex-1">{p.excerpt}</p>}
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-3 border-t border-border">
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.published_at ? new Date(p.published_at).toLocaleDateString('ar-EG') : ''}</span>
+                  <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {p.views || 0}</span>
+                </div>
+                <div className="flex gap-1.5 mt-3">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewingPost(p)}>
+                    <Eye className="w-3.5 h-3.5 ml-1" /> عرض
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setEditing(p); setOpen(true) }}>
+                    <Edit className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
       {open && <BlogPostDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={() => { setOpen(false); load() }} />}
 
       <ConfirmDialog
@@ -1153,6 +1231,7 @@ export function AdminBlog() {
 function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' })
   const [saving, setSaving] = useState(false)
+  const [preview, setPreview] = useState(false)
   useEffect(() => { setForm(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' }) }, [initial])
 
   const save = async () => {
@@ -1167,18 +1246,84 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{initial ? 'تعديل مقال' : 'مقال جديد'}</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-4">
-          <div><Label>العنوان *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" /></div>
-          <div><Label>مقتصر (excerpt)</Label><Textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} className="mt-1" /></div>
-          <div><Label>المحتوى *</Label><Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={10} className="mt-1" /></div>
-          <div><Label>رابط صورة الغلاف</Label><Input value={form.cover} onChange={(e) => setForm({ ...form, cover: e.target.value })} dir="ltr" className="mt-1" /></div>
-          <div><Label>الوسوم (مفصولة بفاصلة)</Label><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className="mt-1" placeholder="تعليم، طب، تدريب" /></div>
-        </div>
+      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{initial ? 'تعديل مقال' : 'مقال جديد'}</DialogTitle>
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              <button
+                onClick={() => setPreview(false)}
+                className={`px-3 py-1 text-xs font-bold rounded ${!preview ? 'bg-navy text-gold' : 'text-muted-foreground'}`}
+              >تحرير</button>
+              <button
+                onClick={() => setPreview(true)}
+                className={`px-3 py-1 text-xs font-bold rounded ${preview ? 'bg-navy text-gold' : 'text-muted-foreground'}`}
+              >معاينة</button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {preview ? (
+          /* Live preview — exactly what readers will see */
+          <div className="overflow-y-auto py-4 max-h-[70vh]">
+            <article>
+              {form.cover && (
+                <div className="aspect-video rounded-xl overflow-hidden shadow-md mb-4">
+                  <img src={form.cover} alt={form.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+              {form.tags && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {form.tags.split(',').map((t: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
+                  ))}
+                </div>
+              )}
+              <h1 className="text-2xl font-bold text-navy mb-3">{form.title || 'العنوان غير مكتوب'}</h1>
+              {form.excerpt && (
+                <p className="text-base text-navy/80 leading-relaxed mb-4 border-r-4 border-gold pr-3">{form.excerpt}</p>
+              )}
+              <div className="text-navy/90 leading-loose whitespace-pre-wrap">
+                {form.body || 'المحتوى فارغ'}
+              </div>
+            </article>
+          </div>
+        ) : (
+          <div className="space-y-4 py-4 overflow-y-auto max-h-[70vh]">
+            <div>
+              <Label>العنوان *</Label>
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" placeholder="عنوان جذاب للمقال" />
+            </div>
+            <div>
+              <Label>مقتطف (مقدمة قصيرة تظهر في قائمة المقالات)</Label>
+              <Textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} className="mt-1" placeholder="جملة أو جملتان تلخصان المقال" />
+            </div>
+            <div>
+              <Label>المحتوى *</Label>
+              <Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={12} className="mt-1 leading-relaxed" placeholder="اكتب محتوى المقال هنا... استخدم أسطر فارغة لفصل الفقرات." />
+              <p className="text-[10px] text-muted-foreground mt-1">💡 استخدم أسطر فارغة لفصل الفقرات. سيتم الحفاظ على التنسيق عند العرض.</p>
+            </div>
+            <div>
+              <Label>رابط صورة الغلاف</Label>
+              <Input value={form.cover} onChange={(e) => setForm({ ...form, cover: e.target.value })} dir="ltr" className="mt-1" placeholder="https://..." />
+              {form.cover && (
+                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-border">
+                  <img src={form.cover} alt="cover preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+            <div>
+              <Label>الوسوم (مفصولة بفاصلة)</Label>
+              <Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className="mt-1" placeholder="تعليم، طب، تدريب" />
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} نشر</Button>
+          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} نشر
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
