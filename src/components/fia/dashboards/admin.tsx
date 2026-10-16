@@ -1185,14 +1185,14 @@ function AdminTrainers() {
 
 function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
+    initial || { name: '', title: '', specialization: '', bio: '', qualifications: '', achievements: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   useEffect(() => {
-    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
+    setForm(initial || { name: '', title: '', specialization: '', bio: '', qualifications: '', achievements: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
   }, [initial])
 
   const handleAvatarUpload = async (file: File) => {
@@ -1325,6 +1325,48 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
           {/* Phone */}
           <div><Label className="text-xs">الهاتف</Label>
             <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
+          </div>
+
+          {/* Professional Bio — النبذة التعريفية */}
+          <div className="border-t border-border pt-3">
+            <Label className="text-xs font-bold text-navy">النبذة التعريفية</Label>
+            <p className="text-[10px] text-muted-foreground mb-2">اكتب نبذة احترافية عن المدرب — تظهر للزوار عند الضغط على المدرب في الصفحة الرئيسية</p>
+            <textarea
+              value={form.bio || ''}
+              onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              className="w-full min-h-[120px] p-3 border border-input rounded-md text-sm leading-relaxed"
+              placeholder="مثال: مدرب و محاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي..."
+            />
+          </div>
+
+          {/* Qualifications — المؤهلات العلمية */}
+          <div>
+            <Label className="text-xs font-bold text-navy">المؤهلات العلمية</Label>
+            <p className="text-[10px] text-muted-foreground mb-2">كل مؤهل في سطر منفصل</p>
+            <textarea
+              value={form.qualifications || ''}
+              onChange={(e) => setForm({ ...form, qualifications: e.target.value })}
+              className="w-full min-h-[80px] p-3 border border-input rounded-md text-sm"
+              placeholder={"مثال:\nبكالوريوس آداب وعلوم إنسانية\nماستر حقوق وعلوم سياسية"}
+            />
+          </div>
+
+          {/* Achievements — الإنجازات */}
+          <div>
+            <Label className="text-xs font-bold text-navy">الإنجازات</Label>
+            <p className="text-[10px] text-muted-foreground mb-2">كل إنجاز في سطر منفصل</p>
+            <textarea
+              value={form.achievements || ''}
+              onChange={(e) => setForm({ ...form, achievements: e.target.value })}
+              className="w-full min-h-[80px] p-3 border border-input rounded-md text-sm"
+              placeholder={"مثال:\nمشارك في عدة مؤتمرات دولية\nمؤلف لـ 6 كتب في طبعات دولية"}
+            />
+          </div>
+
+          {/* Years experience */}
+          <div>
+            <Label className="text-xs">سنوات الخبرة</Label>
+            <Input type="number" value={form.years_experience || 0} onChange={(e) => setForm({ ...form, years_experience: parseInt(e.target.value) || 0 })} className="mt-1" />
           </div>
         </div>
         <DialogFooter>
