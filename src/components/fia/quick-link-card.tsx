@@ -4,19 +4,25 @@ import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
-  BookOpen, GraduationCap, UserCog,
+  BookOpen, GraduationCap, UserCog, Crown, ChevronLeft, X, Star, Briefcase, Phone, Linkedin,
 } from 'lucide-react'
 
 export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | null; onClose: () => void; settings: any }) {
   const [courses, setCourses] = useState<any[]>([])
   const [trainers, setTrainers] = useState<any[]>([])
   const [team, setTeam] = useState<any[]>([])
+  const [selectedMember, setSelectedMember] = useState<any | null>(null)
+  const [selectedTrainer, setSelectedTrainer] = useState<any | null>(null)
 
   useEffect(() => {
     if (cardId === 'courses') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     if (cardId === 'trainers') fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
     if (cardId === 'team') fetch('/api/team').then((r) => r.json()).then((d) => setTeam(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'trainers') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
   }, [cardId])
+
+  // Reset selection when card changes
+  useEffect(() => { setSelectedMember(null); setSelectedTrainer(null) }, [cardId])
 
   if (!cardId) return null
 
@@ -35,6 +41,12 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
   const m = meta[cardId]
   if (!m) return null
   const Icon = m.icon
+
+  // Parse qualifications/achievements from string to array
+  const parseList = (str: string | null | undefined): string[] => {
+    if (!str) return []
+    try { const arr = JSON.parse(str); return Array.isArray(arr) ? arr : [] } catch { return str.split('\n').filter((s: string) => s.trim()) }
+  }
 
   const getContent = () => {
     // === COURSES ===
@@ -66,13 +78,107 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       )
     }
 
-    // === TRAINERS ===
+    // === TRAINERS (clickable → show achievements + courses) ===
     if (cardId === 'trainers') {
+      if (selectedTrainer) {
+        // === DETAIL VIEW for selected trainer ===
+        const trainerCourses = courses.filter((c) => c.trainer_id === selectedTrainer.id)
+        const achievements = parseList(selectedTrainer.achievements)
+        const qualifications = parseList(selectedTrainer.qualifications)
+
+        return (
+          <div className="space-y-4">
+            {/* Back button */}
+            <button onClick={() => setSelectedTrainer(null)} className="flex items-center gap-1 text-xs text-[#C9A961] hover:text-[#0A1F44] mb-2">
+              <ChevronLeft className="w-4 h-4 rotate-180" /> رجوع للقائمة
+            </button>
+
+            {/* Trainer header */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-[#0A1F44] to-[#102a63] rounded-xl text-white">
+              {selectedTrainer.avatar ? (
+                <img src={selectedTrainer.avatar} alt={selectedTrainer.name} className="w-16 h-16 rounded-full object-cover border-2 border-[#C9A961] flex-shrink-0" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-white/10 border-2 border-[#C9A961] flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#C9A961] font-bold text-xl">{selectedTrainer.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div>
+                <h4 className="font-bold text-white text-base">{selectedTrainer.name}</h4>
+                {selectedTrainer.title && <p className="text-[#C9A961] text-xs">{selectedTrainer.title}</p>}
+                {selectedTrainer.specialization && <p className="text-white/60 text-[10px] mt-0.5">{selectedTrainer.specialization}</p>}
+                {selectedTrainer.years_experience > 0 && <p className="text-white/40 text-[10px] mt-0.5">{selectedTrainer.years_experience} سنوات خبرة</p>}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {selectedTrainer.bio && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1">النبذة المهنية</h5>
+                <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedTrainer.bio}</p>
+              </div>
+            )}
+
+            {/* Qualifications */}
+            {qualifications.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Star className="w-3 h-3 text-[#C9A961]" /> المؤهلات</h5>
+                <ul className="space-y-1">
+                  {qualifications.map((q, i) => (
+                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                      <span className="text-[#C9A961] mt-0.5">•</span> {q}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Achievements */}
+            {achievements.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Briefcase className="w-3 h-3 text-[#C9A961]" /> الإنجازات</h5>
+                <ul className="space-y-1">
+                  {achievements.map((a, i) => (
+                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                      <span className="text-[#C9A961] mt-0.5">•</span> {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Courses */}
+            {trainerCourses.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><BookOpen className="w-3 h-3 text-[#C9A961]" /> الدورات ({trainerCourses.length})</h5>
+                <div className="space-y-1.5">
+                  {trainerCourses.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 text-xs text-gray-600 p-1.5 bg-white rounded-lg">
+                      <BookOpen className="w-3 h-3 text-[#C9A961] flex-shrink-0" /> {c.title}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contact */}
+            {(selectedTrainer.email || selectedTrainer.linkedin) && (
+              <div className="flex items-center gap-3 pt-2">
+                {selectedTrainer.email && <a href={`mailto:${selectedTrainer.email}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Mail className="w-3 h-3" /> بريد</a>}
+                {selectedTrainer.linkedin && <a href={selectedTrainer.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Linkedin className="w-3 h-3" /> لينكدإن</a>}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      // === LIST VIEW for trainers ===
       if (trainers.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد مدربون حالياً</p>
       return (
-        <div className="space-y-3">
+        <div className="space-y-2">
+          <p className="text-[10px] text-gray-400 mb-2 text-center">اضغط على أي مدرب لعرض الإنجازات والدورات</p>
           {trainers.map((t) => (
-            <div key={t.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+            <button key={t.id} onClick={() => setSelectedTrainer(t)}
+              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all text-right">
               {t.avatar ? (
                 <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
               ) : (
@@ -80,40 +186,153 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
                   <span className="text-[#C9A961] font-bold text-sm">{t.name?.charAt(0)}</span>
                 </div>
               )}
-              <div className="flex-1">
+              <div className="flex-1 text-right">
                 <h4 className="font-bold text-[#0A1F44] text-sm">{t.name}</h4>
                 {t.title && <p className="text-xs text-gray-500">{t.title}</p>}
                 {t.specialization && <p className="text-[10px] text-gray-400 mt-0.5">{t.specialization}</p>}
               </div>
-            </div>
+              <ChevronLeft className="w-4 h-4 text-gray-300 flex-shrink-0" />
+            </button>
           ))}
         </div>
       )
     }
 
-    // === TEAM (founder + leaders) ===
+    // === TEAM (founder first with crown badge, clickable → details) ===
     if (cardId === 'team') {
-      if (team.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد أعضاء فريق حالياً</p>
-      return (
-        <div className="space-y-3">
-          {team.map((m) => (
-            <div key={m.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-              {m.avatar ? (
-                <img src={m.avatar} alt={m.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
-                  <span className="text-[#C9A961] font-bold text-sm">{m.name?.charAt(0)}</span>
-                </div>
-              )}
-              <div className="flex-1">
+      if (selectedMember) {
+        // === DETAIL VIEW for selected member ===
+        const qualifications = parseList(selectedMember.qualifications)
+        const achievements = parseList(selectedMember.achievements)
+
+        return (
+          <div className="space-y-4">
+            <button onClick={() => setSelectedMember(null)} className="flex items-center gap-1 text-xs text-[#C9A961] hover:text-[#0A1F44] mb-2">
+              <ChevronLeft className="w-4 h-4 rotate-180" /> رجوع للقائمة
+            </button>
+
+            {/* Member header — special styling for founder */}
+            <div className={`flex items-center gap-3 p-4 rounded-xl text-white ${selectedMember.role === 'founder' ? 'bg-gradient-to-l from-[#C9A961] via-[#D4AF37] to-[#C9A961]' : 'bg-gradient-to-l from-[#0A1F44] to-[#102a63]'}`}>
+              <div className="relative">
+                {selectedMember.avatar ? (
+                  <img src={selectedMember.avatar} alt={selectedMember.name} className={`w-16 h-16 rounded-full object-cover flex-shrink-0 ${selectedMember.role === 'founder' ? 'border-2 border-white' : 'border-2 border-[#C9A961]'}`} />
+                ) : (
+                  <div className={`w-16 h-16 rounded-full ${selectedMember.role === 'founder' ? 'bg-white/20' : 'bg-white/10'} flex items-center justify-center flex-shrink-0`}>
+                    <span className={`font-bold text-xl ${selectedMember.role === 'founder' ? 'text-[#0A1F44]' : 'text-[#C9A961]'}`}>{selectedMember.name?.charAt(0)}</span>
+                  </div>
+                )}
+                {selectedMember.role === 'founder' && (
+                  <div className="absolute -top-1 -right-1 text-xl">👑</div>
+                )}
+              </div>
+              <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-[#0A1F44] text-sm">{m.name}</h4>
-                  {m.role === 'founder' && <span className="text-[10px] bg-[#C9A961]/15 text-[#C9A961] px-2 py-0.5 rounded-full font-semibold">المؤسس</span>}
-                  {m.role === 'leader' && <span className="text-[10px] bg-blue-500/15 text-blue-600 px-2 py-0.5 rounded-full font-semibold">قيادي</span>}
+                  <h4 className="font-bold text-white text-base">{selectedMember.name}</h4>
+                  {selectedMember.role === 'founder' && <span className="text-[10px] bg-[#0A1F44] text-[#C9A961] px-2 py-0.5 rounded-full font-bold">المؤسس</span>}
+                  {selectedMember.role === 'leader' && <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">قيادي</span>}
                 </div>
-                {m.title && <p className="text-xs text-gray-500">{m.title}</p>}
+                {selectedMember.title && <p className={`text-xs ${selectedMember.role === 'founder' ? 'text-[#0A1F44]/80' : 'text-[#C9A961]'}`}>{selectedMember.title}</p>}
+                {selectedMember.specialization && <p className="text-white/60 text-[10px] mt-0.5">{selectedMember.specialization}</p>}
               </div>
             </div>
+
+            {/* Bio */}
+            {selectedMember.bio && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1">النبذة المهنية</h5>
+                <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.bio}</p>
+              </div>
+            )}
+
+            {/* Vision */}
+            {selectedMember.vision && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1 flex items-center gap-1"><Eye className="w-3 h-3 text-[#C9A961]" /> الرؤية</h5>
+                <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.vision}</p>
+              </div>
+            )}
+
+            {/* Mission */}
+            {selectedMember.mission && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1 flex items-center gap-1"><Target className="w-3 h-3 text-[#C9A961]" /> الرسالة</h5>
+                <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.mission}</p>
+              </div>
+            )}
+
+            {/* Qualifications */}
+            {qualifications.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Star className="w-3 h-3 text-[#C9A961]" /> المؤهلات</h5>
+                <ul className="space-y-1">
+                  {qualifications.map((q, i) => (<li key={i} className="text-xs text-gray-600 flex items-start gap-1"><span className="text-[#C9A961] mt-0.5">•</span> {q}</li>))}
+                </ul>
+              </div>
+            )}
+
+            {/* Achievements */}
+            {achievements.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Briefcase className="w-3 h-3 text-[#C9A961]" /> الإنجازات</h5>
+                <ul className="space-y-1">
+                  {achievements.map((a, i) => (<li key={i} className="text-xs text-gray-600 flex items-start gap-1"><span className="text-[#C9A961] mt-0.5">•</span> {a}</li>))}
+                </ul>
+              </div>
+            )}
+
+            {/* Contact */}
+            {(selectedMember.email || selectedMember.linkedin) && (
+              <div className="flex items-center gap-3 pt-2">
+                {selectedMember.email && <a href={`mailto:${selectedMember.email}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Mail className="w-3 h-3" /> بريد</a>}
+                {selectedMember.linkedin && <a href={selectedMember.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Linkedin className="w-3 h-3" /> لينكدإن</a>}
+                {selectedMember.phone && <a href={`tel:${selectedMember.phone}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Phone className="w-3 h-3" /> هاتف</a>}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      // === LIST VIEW for team — founder first with crown ===
+      if (team.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد أعضاء فريق حالياً</p>
+
+      // Sort: founder first, then leaders, then team
+      const sorted = [...team].sort((a, b) => {
+        const order = { founder: 0, leader: 1, team: 2 }
+        return (order[a.role as keyof typeof order] || 3) - (order[b.role as keyof typeof order] || 3)
+      })
+
+      return (
+        <div className="space-y-2">
+          <p className="text-[10px] text-gray-400 mb-2 text-center">اضغط على أي عضو لعرض التفاصيل</p>
+          {sorted.map((member) => (
+            <button key={member.id} onClick={() => setSelectedMember(member)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right relative ${
+                member.role === 'founder'
+                  ? 'bg-gradient-to-l from-[#C9A961]/10 to-[#F5E5B3]/10 border border-[#C9A961]/30 hover:border-[#C9A961]/50'
+                  : 'bg-gray-50 hover:bg-gray-100'
+              }`}>
+              <div className="relative flex-shrink-0">
+                {member.avatar ? (
+                  <img src={member.avatar} alt={member.name} className={`w-12 h-12 rounded-full object-cover ${member.role === 'founder' ? 'border-2 border-[#C9A961]' : ''}`} />
+                ) : (
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${member.role === 'founder' ? 'bg-[#C9A961]' : 'bg-[#0A1F44]'}`}>
+                    <span className={`font-bold text-sm ${member.role === 'founder' ? 'text-[#0A1F44]' : 'text-[#C9A961]'}`}>{member.name?.charAt(0)}</span>
+                  </div>
+                )}
+                {member.role === 'founder' && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#C9A961] rounded-full flex items-center justify-center text-[10px]">👑</div>
+                )}
+              </div>
+              <div className="flex-1 text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  {member.role === 'founder' && <span className="text-[9px] bg-[#C9A961] text-[#0A1F44] px-2 py-0.5 rounded-full font-bold flex-shrink-0">★ المؤسس</span>}
+                  {member.role === 'leader' && <span className="text-[9px] bg-blue-500/15 text-blue-600 px-2 py-0.5 rounded-full font-bold flex-shrink-0">قيادي</span>}
+                  <h4 className="font-bold text-[#0A1F44] text-sm">{member.name}</h4>
+                </div>
+                {member.title && <p className="text-xs text-gray-500 mt-0.5">{member.title}</p>}
+              </div>
+              <ChevronLeft className="w-4 h-4 text-gray-300 flex-shrink-0" />
+            </button>
           ))}
         </div>
       )
