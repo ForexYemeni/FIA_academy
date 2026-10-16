@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET /api/payments — admin: list all payments
-export async function GET() {
+// GET /api/payments — admin: list all PAID payments only.
+// Free enrollments (amount=0, method='free') are tracked in the
+// enrollments system, NOT in payments — so we filter them out here
+// to keep the admin's "المدفوعات" view clean.
+export async function GET(req: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
+    const userId = req.nextUrl.searchParams.get('user_id')
+    let query = supabaseAdmin
       .from('payments')
       .select('*')
+      // Exclude free enrollments: amount = 0 + method = 'free' + reference starts with FREE
+      .or('amount.gt.0,method.neq.free')
+      // Also exclude certificate requests stored in the payments table
+      .neq('method', 'certificate_request')
       .order('date', { ascending: false })
+    if (userId) query = query.eq('user_id', userId)
+    const { data, error } = await query
     if (error) throw error
     return NextResponse.json(data || [])
   } catch (e: any) {

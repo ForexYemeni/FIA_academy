@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-store'
-import { supabasePublic } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
-  Award, Loader2, CheckCircle2, FileText, Clock, X,
+  Award, Loader2, CheckCircle2, FileText, Clock, X, Download, ExternalLink,
 } from 'lucide-react'
 
 // Show the user's certificate-request + certificate status for a course.
@@ -18,7 +17,7 @@ import {
 export function CertificateRequest({ courseId, courseTitle }: { courseId: string; courseTitle: string }) {
   const user = useAuth((s) => s.user)
   const [loading, setLoading] = useState(true)
-  const [existing, setExisting] = useState<any>(null) // existing cert-request row (from payments table)
+  const [existing, setExisting] = useState<any>(null) // existing cert-request row
   const [certificate, setCertificate] = useState<any>(null) // issued certificate row
   const [requesting, setRequesting] = useState(false)
 
@@ -26,35 +25,38 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
     if (!user?.id) return
     setLoading(true)
     try {
-      // Look up the certificate-request (stored in payments table with method='certificate_request')
-      // Use direct supabase client — can't filter by JSON in method, so we filter by user_id + course_id + method
-      const { data: paymentRows } = await supabasePublic
-        .from('payments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-      const reqRow = (paymentRows || []).find((p: any) =>
-        p.method === 'certificate_request' && p.reference?.startsWith('__CERT_REQUEST__:')
-      )
-      if (reqRow) {
-        // Parse the stored request JSON
-        try {
-          const jsonStr = reqRow.reference.substring('__CERT_REQUEST__:'.length)
-          const data = JSON.parse(jsonStr)
-          setExisting({ id: reqRow.id, ...data, created_at: reqRow.date })
-        } catch {
-          setExisting({ id: reqRow.id, status: 'pending' })
-        }
+      // Fetch all payment rows for this user + course via REST API.
+      // The certificate-request record is stored as a payment row with
+      // method='certificate_request' and a JSON-encoded reference field.
+      const payRes = await fetch(`/api/enrollments?user_id=${user.id}&course_id=${courseId}`)
+      const payData = await payRes.json()
+      // Look for any certificate-request markers stored alongside
+      const allPayRes = await fetch(`/api/payments?user_id=${user.id}`)
+      if (allPayRes.ok) {
+        const allPay = await allPayRes.json()
+        // We also need to look up certificate_request rows — but /api/payments
+        // now excludes them. So we directly query /api/certificate-requests.
+      }
+      // Fetch certificate-requests for this user
+      const reqRes = await fetch(`/api/certificate-requests?user_id=${user.id}`)
+      if (reqRes.ok) {
+        const reqData = await reqRes.json()
+        const arr = Array.isArray(reqData) ? reqData : (reqData.requests || [])
+        const mine = arr.find((r: any) => r.course_id === courseId)
+        if (mine) setExisting(mine)
+        else setExisting(null)
       }
 
-      // Look up an issued certificate (by student_name + course_title)
-      const { data: cert } = await supabasePublic
-        .from('certificates')
-        .select('*')
-        .eq('student_name', user.name || '')
-        .eq('course_title', courseTitle)
-        .maybeSingle()
-      if (cert) setCertificate(cert)
+      // Look up issued certificate for this student + course_title
+      if (user?.name) {
+        const certRes = await fetch(`/api/certificates?student_name=${encodeURIComponent(user.name)}`)
+        if (certRes.ok) {
+          const certs = await certRes.json()
+          const mine = (Array.isArray(certs) ? certs : []).find((c: any) => c.course_title === courseTitle && c.status === 'صالحة')
+          if (mine) setCertificate(mine)
+          else setCertificate(null)
+        }
+      }
     } catch (e: any) {
       // silent
     } finally {
@@ -96,8 +98,9 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
   // If a certificate is already issued
   if (certificate) {
     return (
-      <Card className="p-6 bg-gradient-to-br from-gold/10 to-navy/5 border-gold/30">
-        <div className="text-center">
+      <Card className="p-6 bg-gradient-to-br from-gold/10 via-white to-navy/5 border-gold/30 overflow-hidden relative">
+        <div className="absolute top-4 right-4 w-32 h-32 bg-gold/10 rounded-full blur-3xl" />
+        <div className="relative text-center">
           <div className="w-16 h-16 mx-auto rounded-full bg-gold/15 flex items-center justify-center mb-3">
             <CheckCircle2 className="w-8 h-8 text-gold" />
           </div>
@@ -159,8 +162,10 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
 
   // No request yet — show the request CTA
   return (
-    <Card className="p-6 bg-gradient-to-br from-navy to-navy-light text-white border-gold/30">
-      <div className="text-center">
+    <Card className="p-6 bg-gradient-to-br from-navy to-navy-light text-white border-gold/30 overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-40 h-40 bg-gold/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gold/5 rounded-full blur-2xl" />
+      <div className="relative text-center">
         <div className="w-16 h-16 mx-auto rounded-full bg-gold/20 flex items-center justify-center mb-3">
           <Award className="w-8 h-8 text-gold" />
         </div>

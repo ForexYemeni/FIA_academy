@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code')
+    const userId = req.nextUrl.searchParams.get('user_id')
     if (code) {
       // Look up a single affiliate by their unique_code (public view)
       const { data, error } = await supabaseAdmin
@@ -16,6 +17,19 @@ export async function GET(req: NextRequest) {
       if (!data) return NextResponse.json({ valid: false }, { status: 404 })
       return NextResponse.json({ valid: true, affiliate: data })
     }
+    if (userId) {
+      // Look up the affiliate record for a specific user (used by the
+      // AffiliateDashboard component in the student/trainer dashboards).
+      const { data, error } = await supabaseAdmin
+        .from('affiliates')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return NextResponse.json({ valid: false }, { status: 404 })
+      return NextResponse.json({ valid: true, affiliate: data })
+    }
+    // List all affiliates (admin view)
     const { data, error } = await supabaseAdmin
       .from('affiliates')
       .select('*')
