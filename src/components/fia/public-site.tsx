@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Shield, Award, Users, Clock, BookOpen, GraduationCap, Stethoscope,
-  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X,
+  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X, Building2,
 } from 'lucide-react'
 
 type Course = {
@@ -334,60 +334,147 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
         onClose={() => setSelectedTrainer(null)}
       />
 
-      {/* PARTNERS & LICENSES — only shown if admin has enabled them via site_settings */}
-      {(showPartners || showLicenses) && (partners.length > 0 || licenses.length > 0) && (
-      <section id="partners" className="py-20 bg-navy text-white">
-        <div className="container mx-auto px-4 lg:px-6">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <Badge className="bg-gold/15 text-gold border-gold/30 mb-3">شركاؤنا واعتماداتنا</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">معتمدون من الجهات الموثوقة</h2>
-            <p className="text-white/70 text-lg">نتعاون مع أبرز المؤسسات الصحية المحلية والدولية</p>
-          </div>
-
-          {showPartners && partners.length > 0 && (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-              {partners.map((p) => (
-                <Card key={p.id} className="bg-white/5 border-gold/20 p-6 card-hover">
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl">{p.logo || '🤝'}</div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-white mb-1">{p.name}</h3>
-                      <p className="text-white/60 text-sm">{p.description}</p>
-                      {p.since && <Badge variant="outline" className="mt-2 border-gold/30 text-gold">شريك منذ {p.since}</Badge>}
-                    </div>
-                  </div>
-                </Card>
-              ))}
+      {/* PARTNERS — shown only if admin enabled show_partners */}
+      {showPartners && (
+        <section id="partners" className="py-20 bg-gradient-to-b from-navy to-navy-light text-white scroll-mt-20">
+          <div className="container mx-auto px-4 lg:px-6">
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <Badge className="bg-gold/15 text-gold border-gold/30 mb-3">شركاؤنا</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">معتمدون من الجهات الموثوقة</h2>
+              <p className="text-white/70 text-lg">نتعاون مع أبرز المؤسسات الصحية المحلية والدولية</p>
             </div>
-          )}
 
-          {showLicenses && licenses.length > 0 && (
-            <div id="licenses" className="scroll-mt-20">
-              <h3 className="text-xl font-bold text-gold mb-6 text-center">التراخيص والاعتمادات</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                {licenses.map((l) => (
-                  <Card key={l.id} className="bg-white/5 border-gold/20 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="font-bold text-white mb-1">{l.issuing_body}</div>
-                        <div className="text-gold text-sm mb-2">{l.type}</div>
-                        <div className="text-white/60 text-xs">رقم الترخيص: <span dir="ltr" className="font-mono">{l.number}</span></div>
+            {partners.length > 0 ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {partners.map((p) => {
+                  // Only show partners whose status is "نشط" on the public site
+                  if (p.status !== 'نشط') return null
+                  return (
+                    <Card key={p.id} className="bg-white/5 border-gold/20 p-6 card-hover group">
+                      <div className="flex items-start gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-gold/15 flex items-center justify-center text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                          {p.logo || '🤝'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-white mb-1 text-lg">{p.name}</h3>
+                          {p.description && (
+                            <p className="text-white/60 text-sm leading-relaxed">{p.description}</p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2 mt-3">
+                            {p.since && (
+                              <Badge variant="outline" className="border-gold/30 text-gold text-xs">
+                                شريك منذ {p.since}
+                              </Badge>
+                            )}
+                            <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-xs">
+                              <CheckCircle2 className="w-3 h-3 ml-1" /> شراكة فعّالة
+                            </Badge>
+                          </div>
+                          {p.website && (
+                            <a
+                              href={p.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-3 text-gold hover:text-gold-light text-xs font-medium transition-colors"
+                              dir="ltr"
+                            >
+                              <Award className="w-3.5 h-3.5" />
+                              زيارة الموقع الرسمي
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      <Badge className="bg-green-500/15 text-green-400 border-green-500/30">
-                        <CheckCircle2 className="w-3 h-3 ml-1" /> {l.status}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-white/10 text-xs text-white/50 flex justify-between">
-                      <span>تاريخ الإصدار: <span dir="ltr">{l.issued_at}</span></span>
-                      <span>ينتهي: <span dir="ltr">{l.expires_at}</span></span>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  )
+                })}
               </div>
+            ) : (
+              <div className="text-center py-12 text-white/50">
+                <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">سيتم عرض الشركاء هنا فور إضافتهم من حساب الإدارة</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* LICENSES — shown only if admin enabled show_licenses */}
+      {showLicenses && (
+        <section id="licenses" className="py-20 bg-white scroll-mt-20">
+          <div className="container mx-auto px-4 lg:px-6">
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">التراخيص والاعتمادات</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold text-navy mb-4">اعتمادات رسمية موثقة</h2>
+              <p className="text-muted-foreground text-lg">تراخيصنا الرسمية من الجهات الصحية والتعليمية المعتمدة</p>
             </div>
-          )}
-        </div>
-      </section>
+
+            {licenses.length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                {licenses.map((l) => {
+                  // Only show licenses whose status is "ساري" on the public site
+                  if (l.status !== 'ساري') return null
+                  return (
+                    <Card key={l.id} className="p-6 card-hover border-2 border-gold/20 hover:border-gold/40 transition-all">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center flex-shrink-0">
+                            <Shield className="w-6 h-6 text-gold" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-navy text-lg leading-tight">{l.issuing_body}</div>
+                            {l.type && <div className="text-gold text-sm font-semibold mt-0.5">{l.type}</div>}
+                          </div>
+                        </div>
+                        <Badge className="bg-green-500/15 text-green-600 border-green-500/30 flex-shrink-0">
+                          <CheckCircle2 className="w-3 h-3 ml-1" /> ساري
+                        </Badge>
+                      </div>
+
+                      {l.number && (
+                        <div className="bg-muted/40 rounded-lg p-3 mb-3 flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">رقم الترخيص</span>
+                          <span className="font-mono text-navy font-bold text-sm" dir="ltr">{l.number}</span>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-3 border-t border-border">
+                        {l.issued_at && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-muted-foreground">إصدار:</span>
+                            <span dir="ltr" className="font-medium text-navy">{l.issued_at}</span>
+                          </span>
+                        )}
+                        {l.expires_at && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-muted-foreground">ينتهي:</span>
+                            <span dir="ltr" className="font-medium text-navy">{l.expires_at}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {l.verification_url && (
+                        <a
+                          href={l.verification_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 mt-3 w-full justify-center bg-navy hover:bg-navy-light text-gold px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          <Shield className="w-4 h-4" />
+                          تحقق من صحة الترخيص
+                        </a>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">سيتم عرض التراخيص هنا فور إضافتها من حساب الإدارة</p>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {/* VERIFY CERTIFICATE — DISABLED: certificate feature temporarily removed */}
