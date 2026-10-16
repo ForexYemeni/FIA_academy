@@ -8,6 +8,7 @@ import {
   DollarSign, TrendingUp, Activity, Star, ArrowRight,
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
+  Gift, Newspaper, MessageSquare, HelpCircle,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -24,20 +25,32 @@ import { toast } from 'sonner'
 import { TeamEditor } from '@/components/fia/team-editor'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+import {
+  AdminCoupons, AdminAffiliates, AdminExamQuestions, AdminReviews,
+  AdminForum, AdminBlog, AdminContact, AdminFaqs,
+} from './admin-extended'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
   { id: 'courses', label: 'الدورات', icon: BookOpen },
   { id: 'content', label: 'محتوى الدورات', icon: FileText },
   { id: 'exams', label: 'الاختبارات', icon: FileText },
+  { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle },
   { id: 'students', label: 'المتدربون', icon: Users },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
+  { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
+  { id: 'affiliates', label: 'المسوّقون', icon: Users },
   // { id: 'certificates', label: 'الشهادات', icon: Award },  // DISABLED: certificate feature temporarily removed
   { id: 'trainers', label: 'المدربون', icon: GraduationCap },
+  { id: 'reviews', label: 'تقييمات المتدربين', icon: Star },
   { id: 'partners', label: 'الشركاء', icon: Building2 },
   { id: 'licenses', label: 'التراخيص', icon: Shield },
   { id: 'founder', label: 'المؤسس والفريق', icon: UserCog },
+  { id: 'blog', label: 'المدونة', icon: Newspaper },
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
+  { id: 'contact', label: 'صندوق الرسائل', icon: Mail },
   { id: 'site', label: 'إعدادات الموقع', icon: Settings },
   { id: 'account', label: 'الحساب والأمان', icon: User },
   { id: 'reports', label: 'التقارير', icon: BarChart3 },
@@ -68,15 +81,23 @@ export function AdminDashboard() {
         />
       )}
       {active === 'exams' && <AdminExams />}
+      {active === 'exam-questions' && <AdminExamQuestions />}
       {active === 'students' && <AdminStudents />}
       {active === 'payments' && <AdminPayments />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
+      {active === 'coupons' && <AdminCoupons />}
+      {active === 'affiliates' && <AdminAffiliates />}
       {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
       {/* {active === 'certificates' && <AdminCertificates />} */}
       {active === 'trainers' && <AdminTrainers />}
+      {active === 'reviews' && <AdminReviews />}
       {active === 'partners' && <AdminPartners />}
       {active === 'licenses' && <AdminLicenses />}
       {active === 'founder' && <AdminFounder user={user} />}
+      {active === 'blog' && <AdminBlog />}
+      {active === 'forum' && <AdminForum />}
+      {active === 'faqs' && <AdminFaqs />}
+      {active === 'contact' && <AdminContact />}
       {active === 'site' && <AdminSite />}
       {active === 'account' && <AdminAccount user={user} updateUser={updateUser} logout={logout} />}
       {active === 'reports' && <AdminReports />}
