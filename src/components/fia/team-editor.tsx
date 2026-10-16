@@ -665,11 +665,11 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">سنوات الخبرة</Label>
-              <Input type="number" value={yearsExp} onChange={(e) => setYearsExp(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" />
+              <Input type="number" value={yearsExp || ''} onChange={(e) => setYearsExp(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" placeholder="0" />
             </div>
             <div>
               <Label className="text-xs">ترتيب العرض</Label>
-              <Input type="number" value={displayOrder} onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" />
+              <Input type="number" value={displayOrder || ''} onChange={(e) => setDisplayOrder(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" placeholder="0" />
             </div>
           </div>
         </div>

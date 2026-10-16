@@ -547,17 +547,17 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
           {form.price_type === 'مدفوعة' && (
             <div>
               <Label>المبلغ</Label>
-              <Input type="number" value={form.price || 0} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" />
+              <Input type="number" value={form.price || ''} onChange={(e) => setForm({ ...form, price: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" placeholder="0" />
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>عدد الساعات</Label>
-              <Input type="number" value={form.duration_hours || 0} onChange={(e) => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" />
+              <Input type="number" value={form.duration_hours || ''} onChange={(e) => setForm({ ...form, duration_hours: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" placeholder="0" />
             </div>
             <div>
               <Label>درجة النجاح (%)</Label>
-              <Input type="number" value={form.pass_score || 60} onChange={(e) => setForm({ ...form, pass_score: parseInt(e.target.value) || 60 })} className="mt-1" dir="ltr" />
+              <Input type="number" value={form.pass_score ?? 60} onChange={(e) => setForm({ ...form, pass_score: e.target.value === '' ? 60 : parseInt(e.target.value) || 60 })} className="mt-1" dir="ltr" placeholder="60" />
             </div>
           </div>
           <div>

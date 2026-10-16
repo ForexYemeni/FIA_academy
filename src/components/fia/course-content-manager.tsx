@@ -550,7 +550,7 @@ function ModuleDialog({ open, onOpenChange, editing, onSave }: any) {
           </div>
           <div>
             <Label>الترتيب</Label>
-            <Input type="number" value={position} onChange={(e) => setPosition(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+            <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" placeholder="0" />
           </div>
         </div>
         <DialogFooter>
@@ -761,11 +761,11 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>المدة (دقيقة)</Label>
-              <Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+              <Input type="number" value={duration || ''} onChange={(e) => setDuration(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" placeholder="0" />
             </div>
             <div>
               <Label>الترتيب</Label>
-              <Input type="number" value={position} onChange={(e) => setPosition(parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" />
+              <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1" placeholder="0" />
             </div>
           </div>
 
