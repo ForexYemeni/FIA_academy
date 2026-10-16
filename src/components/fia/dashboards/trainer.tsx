@@ -42,7 +42,12 @@ export function TrainerDashboard() {
   const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: user?.bio || '', specialization: user?.title || '' })
 
   const loadCourses = () => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/courses').then((r) => r.json()).then((d) => {
+      const all = Array.isArray(d) ? d : []
+      // Filter to ONLY this trainer's courses
+      const mine = all.filter((c: any) => c.trainer_id === user?.id)
+      setCourses(mine)
+    }).catch(() => {})
   }
   const loadStudents = () => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {})
@@ -51,7 +56,7 @@ export function TrainerDashboard() {
   useEffect(() => {
     loadCourses()
     loadStudents()
-  }, [])
+  }, [user?.id])
 
   const navigateToContent = (courseId: string) => {
     setContentCourseId(courseId)
@@ -360,15 +365,26 @@ function TrainerStudents({ students, courses }: any) {
   const [enrollments, setEnrollments] = useState<any[]>([])
 
   useEffect(() => {
-    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [])
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => {
+      const all = Array.isArray(d) ? d : []
+      // Filter to ONLY enrollments in this trainer's courses
+      const trainerCourseIds = courses.map((c: any) => c.id)
+      const mine = all.filter((e: any) => trainerCourseIds.includes(e.course_id))
+      setEnrollments(mine)
+    }).catch(() => {})
+  }, [courses])
 
   // Helper: get all enrollments for a student
   const studentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
 
   return (
     <SectionCard title="متدربوّ" description={`${students.length} متدرب${students.length === 1 ? '' : 'ين'}`}>
-      {students.length === 0 ? (
+      {courses.length === 0 ? (
+        <div className="text-center py-12">
+          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground">لا يوجد متدربون — أنشئ دورة أولاً</p>
+        </div>
+      ) : students.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">لا يوجد متدربون بعد</p>
