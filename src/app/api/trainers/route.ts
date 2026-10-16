@@ -31,7 +31,6 @@ function mergeLegacyBio(bio: string, extra: any): string {
 
   const quals = extra?.qualifications
   if (quals && typeof quals === 'string' && quals.trim()) {
-    // It might be a JSON array (from team-editor) or plain text (from old trainer form)
     let arr: string[] | null = null
     try {
       const parsed = JSON.parse(quals)
@@ -70,6 +69,87 @@ function mergeLegacyBio(bio: string, extra: any): string {
 
   return parts.join('\n\n')
 }
+
+// ---------------------------------------------------------------------------
+// Telegram helper — send a professional "new trainer added" notification
+// ---------------------------------------------------------------------------
+
+async function getBotSettings() {
+  const { data, error } = await supabaseAdmin
+    .from('site_settings')
+    .select('telegram_bot_token, telegram_channel_id')
+    .limit(1)
+    .single()
+  if (error || !data) return { token: '', channelId: '' }
+  return { token: data.telegram_bot_token || '', channelId: data.telegram_channel_id || '' }
+}
+
+// Build a professional Telegram caption block for a newly-added trainer.
+function buildTrainerCaption(t: any): string {
+  const lines: string[] = []
+  lines.push('🎉 تمت إضافة مدرب جديد إلى المنصة')
+  lines.push('')
+  lines.push('━━━━━━━━━━━━━━━━━━━')
+  lines.push('👤 الاسم: ' + (t.name || '—'))
+  if (t.title) lines.push('🏷️ المسمى: ' + t.title)
+  if (t.specialization) lines.push('🎯 التخصص: ' + t.specialization)
+  if (t.email) lines.push('📧 البريد: ' + t.email)
+  if (t.phone) lines.push('📞 الهاتف: ' + t.phone)
+  if (typeof t.years_experience === 'number' && t.years_experience > 0) {
+    lines.push('⏳ سنوات الخبرة: ' + t.years_experience + ' سنة')
+  }
+  lines.push('━━━━━━━━━━━━━━━━━━━')
+  if (t.bio && t.bio.trim()) {
+    lines.push('')
+    lines.push('📝 النبذة التعريفية:')
+    // Trim very long bios to keep Telegram caption limits reasonable (1024 chars)
+    const bioText = t.bio.length > 700 ? t.bio.substring(0, 700) + '…' : t.bio
+    lines.push(bioText)
+  }
+  lines.push('')
+  lines.push('🕐 تاريخ الإضافة: ' + new Date().toLocaleString('ar-EG', { timeZone: 'Asia/Aden' }))
+  lines.push('')
+  lines.push('✅ تم حفظ المدرب في قاعدة البيانات')
+  return lines.join('\n')
+}
+
+// Send the trainer's avatar + professional caption to the Telegram channel.
+// Falls back to a text-only message if the avatar URL is missing.
+async function notifyTelegramNewTrainer(trainer: any): Promise<void> {
+  const { token, channelId } = await getBotSettings()
+  if (!token || !channelId) return
+  const caption = buildTrainerCaption(trainer)
+
+  try {
+    if (trainer.avatar) {
+      // sendPhoto accepts an HTTP URL — re-use the already-uploaded avatar URL
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: channelId,
+          photo: trainer.avatar,
+          caption,
+          parse_mode: 'HTML',
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) return
+      // If sendPhoto-by-URL fails (e.g. URL not yet propagated), fall through
+      // to send a text message so the trainer's data still lands in Telegram.
+    }
+    // Fallback: text-only message
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: channelId, text: caption, parse_mode: 'HTML' }),
+    })
+  } catch {
+    // Non-fatal — the trainer is already saved in the DB.
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
   try {
@@ -122,6 +202,11 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
     const { password, ...rest } = data
+
+    // Send a professional Telegram notification with the new trainer's full info
+    // (fire-and-forget — never blocks the response)
+    notifyTelegramNewTrainer(rest).catch(() => { /* silent */ })
+
     return NextResponse.json(rest)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
