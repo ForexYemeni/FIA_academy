@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,8 +16,10 @@ export const metadata: Metadata = {
   description: "منصة التعليم الطبي المعتمدة الأولى في اليمن. دورات BLS/ACLS، الأمراض المزمنة، التمريض، مكافحة العدوى، طب الطوارئ، صحة الأم والطفل، الصيدلة السريرية وإدارة المنشآت الصحية.",
   keywords: ["أكاديمية المستقبل الدولية", "FIA", "تعليم طبي", "BLS", "ACLS", "تمريض", "طب طوارئ", "شهادات معتمدة", "اليمن", "صنعاء"],
   authors: [{ name: "أكاديمية المستقبل الدولية" }],
+  manifest: "/manifest.json",
   icons: {
     icon: "/fia/logo-fia.png",
+    apple: "/fia/logo-fia.png",
   },
   openGraph: {
     title: "أكاديمية المستقبل الدولية (FIA)",
@@ -26,7 +28,49 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ar_YE",
   },
+  appleWebApp: {
+    capable: true,
+    title: "FIA Academy",
+    statusBarStyle: "black-translucent",
+  },
 };
+
+export const viewport: Viewport = {
+  themeColor: "#0A1F44",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
+// Service worker registration + affiliate tracking — browser-only, safe IIFE
+const SW_REGISTER = `
+(function() {
+  if (typeof window === 'undefined') return
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () {})
+    })
+  }
+  // Affiliate tracking — capture ?ref= on first visit and stash in localStorage
+  try {
+    var params = new URLSearchParams(window.location.search)
+    var ref = params.get('ref')
+    if (ref) {
+      fetch('/api/affiliates?code=' + encodeURIComponent(ref))
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          if (d && d.valid && d.affiliate) {
+            localStorage.setItem('fia_ref_code', ref)
+            localStorage.setItem('fia_ref_id', d.affiliate.id)
+            // Fire-and-forget — record the click (server stores by IP + UA)
+            fetch('/api/affiliate-track?code=' + encodeURIComponent(ref), { method: 'POST' }).catch(function () {})
+          }
+        })
+        .catch(function () {})
+    }
+  } catch (e) {}
+})()
+`
 
 export default function RootLayout({
   children,
@@ -41,6 +85,9 @@ export default function RootLayout({
         {children}
         <Toaster />
         <SonnerToaster position="top-center" richColors />
+        <script
+          dangerouslySetInnerHTML={{ __html: SW_REGISTER }}
+        />
       </body>
     </html>
   );

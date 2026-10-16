@@ -8,6 +8,8 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { Menu, LogOut, Bell } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
+import { NotificationsBell } from '@/components/fia/notifications-bell'
+import { ChatWidget } from '@/components/fia/chat-widget'
 
 export interface NavItem {
   id: string
@@ -178,15 +180,15 @@ export function DashboardShell({
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5 text-navy" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-gold rounded-full" />
-              </Button>
+              <NotificationsBell />
             </div>
           </div>
         </header>
 
         <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">{children}</main>
+
+        {/* Floating chat widget — available in every dashboard */}
+        <ChatWidget />
       </div>
     </div>
   )
