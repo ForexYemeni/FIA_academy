@@ -1,4 +1,6 @@
-// Public blog post detail page — SSG with full SEO metadata per article
+// Public blog post detail page — dynamic (always fresh) with full SEO metadata per article.
+// We don't use SSG here because new blog posts are created at runtime — forcing SSG
+// would 404 on any slug that wasn't pre-rendered at build time.
 import { Metadata, ResolvingMetadata } from 'next'
 import { supabaseAdmin } from '@/lib/supabase'
 import BlogPostClient from './client'
@@ -44,18 +46,11 @@ export async function generateMetadata({ params }: Props, parent: ResolvingMetad
   }
 }
 
-export async function generateStaticParams() {
-  try {
-    const { data } = await supabaseAdmin
-      .from('blog_posts')
-      .select('slug')
-      .eq('status', 'منشور')
-      .not('slug', 'is', null)
-    return (data || []).map((p: any) => ({ slug: p.slug }))
-  } catch { return [] }
-}
-
-export const revalidate = 60
+// Always server-render on demand so newly-created posts work immediately.
+export const dynamic = 'force-dynamic'
+// Disable static rendering — every request re-fetches from the DB so admin
+// edits / new posts are visible without a redeploy.
+export const revalidate = 0
 
 export default async function Page({ params }: Props) {
   const { slug } = await params
@@ -69,25 +64,44 @@ export default async function Page({ params }: Props) {
   if (!post) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-navy text-white" dir="rtl">
-        <div className="text-center">
+        <div className="text-center max-w-md px-4">
           <h1 className="text-3xl font-bold mb-3">المقال غير موجود</h1>
+          <p className="text-white/60 mb-6">قد يكون المقال غير منشور، أو تم حذفه، أو أن الرابط غير صحيح.</p>
           <a href="/blog" className="inline-block bg-gold text-navy px-6 py-3 rounded-lg font-bold">العودة للمدونة</a>
         </div>
       </div>
     )
   }
 
-  // Fetch related posts (same tags, excluding current)
-  let related: any[] = []
-  if (post.tags) {
-    const { data } = await supabaseAdmin
+  // Atomically increment views count — only when this render is a real
+  // page request (not a metadata pre-render). We do the increment before
+  // returning so even the first ever visitor is counted.
+  try {
+    const { data: current } = await supabaseAdmin
       .from('blog_posts')
-      .select('id, title, slug, excerpt, cover')
-      .neq('id', post.id)
-      .eq('status', 'منشور')
-      .limit(3)
-    related = data || []
+      .select('views')
+      .eq('id', post.id)
+      .maybeSingle()
+    const newViews = (current?.views || 0) + 1
+    await supabaseAdmin
+      .from('blog_posts')
+      .update({ views: newViews })
+      .eq('id', post.id)
+    // Reflect the new view count in the data passed to the client
+    post.views = newViews
+  } catch {
+    // Non-fatal — the page still renders even if the views increment fails
   }
+
+  // Fetch related posts (excluding the current one)
+  const { data: relatedData } = await supabaseAdmin
+    .from('blog_posts')
+    .select('id, title, slug, excerpt, cover, tags')
+    .neq('id', post.id)
+    .eq('status', 'منشور')
+    .order('published_at', { ascending: false })
+    .limit(3)
+  const related = relatedData || []
 
   return <BlogPostClient post={post} related={related} />
 }

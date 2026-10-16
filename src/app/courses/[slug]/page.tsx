@@ -67,9 +67,9 @@ export async function generateStaticParams() {
   }
 }
 
-// Disable static rendering — always render fresh so updates show
-export const dynamic = 'force-static'
-export const revalidate = 60
+// Always server-render on demand — newly-created courses must work without a redeploy.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function Page({ params }: Props) {
   const { slug } = await params
