@@ -1,6 +1,13 @@
 -- ===========================================================================
 -- FIA Academy — Final feature extension (chat, notifications, affiliate clicks)
 -- ===========================================================================
+--
+-- NOTE: PostgreSQL does not allow LEAST()/GREATEST() function calls inside
+-- inline UNIQUE constraints in CREATE TABLE. We use a CHECK constraint +
+-- a simple UNIQUE(participant_1, participant_2) instead, and the
+-- application layer (in /api/chat/route.ts) ensures participant_1 is
+-- always the lexicographically smaller UUID before insert.
+-- ===========================================================================
 
 -- 1) Notifications ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS notifications (
@@ -17,6 +24,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON notifications(user_id) WHERE read_at IS NULL;
 
 -- 2) Chat ------------------------------------------------------------------
+-- participant_1 must be the lexicographically smaller UUID (enforced by app).
+-- CHECK constraint rejects same-participant conversations; UNIQUE pair
+-- rejects duplicates.
 CREATE TABLE IF NOT EXISTS chat_conversations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   participant_1 UUID NOT NULL,
@@ -24,7 +34,8 @@ CREATE TABLE IF NOT EXISTS chat_conversations (
   last_message_at TIMESTAMPTZ,
   last_message_body TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(LEAST(participant_1, participant_2), GREATEST(participant_1, participant_2))
+  CHECK (participant_1 <> participant_2),
+  UNIQUE(participant_1, participant_2)
 );
 
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -64,6 +75,17 @@ CREATE POLICY "allow_all_chat_conversations" ON chat_conversations FOR ALL USING
 CREATE POLICY "allow_all_chat_messages" ON chat_messages FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all_affiliate_clicks" ON affiliate_clicks FOR ALL USING (true) WITH CHECK (true);
 
--- Enable Realtime for chat messages + notifications so dashboards update live
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+-- Enable Realtime for chat messages + notifications so dashboards update live.
+-- Wrapped in DO block so re-running the migration doesn't fail with
+-- "relation already in publication" errors.
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+END $$;
