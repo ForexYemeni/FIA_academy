@@ -65,6 +65,10 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
     window.location.href = `/?verify=${encodeURIComponent(verifyNumber.trim())}#verify`
   }
 
+  // Visibility toggles — controlled from admin dashboard
+  const showPartners = settings.show_partners === true
+  const showLicenses = settings.show_licenses === true
+
   return (
     <div className="flex-1">
       {/* HERO */}
@@ -97,9 +101,9 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
                 </a>
               </div>
               <div className="grid grid-cols-3 gap-4 pt-6">
-                <Stat value={`${courses.length || 8}+`} label="دورة تدريبية" />
-                <Stat value="5,200+" label="متدرب نشط" />
-                <Stat value="98%" label="نسبة النجاح" />
+                <Stat value={`${courses.length}`} label="دورة تدريبية" />
+                <Stat value={`${trainers.length}`} label="مدرب معتمد" />
+                <Stat value={founder ? '1' : '0'} label="المؤسس" />
               </div>
             </div>
             <div className="relative">
@@ -313,7 +317,8 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
         </div>
       </section>
 
-      {/* PARTNERS & LICENSES */}
+      {/* PARTNERS & LICENSES — only shown if admin has enabled them via site_settings */}
+      {(showPartners || showLicenses) && (partners.length > 0 || licenses.length > 0) && (
       <section id="partners" className="py-20 bg-navy text-white">
         <div className="container mx-auto px-4 lg:px-6">
           <div className="text-center max-w-3xl mx-auto mb-12">
@@ -322,46 +327,51 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
             <p className="text-white/70 text-lg">نتعاون مع أبرز المؤسسات الصحية المحلية والدولية</p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-            {partners.map((p) => (
-              <Card key={p.id} className="bg-white/5 border-gold/20 p-6 card-hover">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{p.logo || '🤝'}</div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-white mb-1">{p.name}</h3>
-                    <p className="text-white/60 text-sm">{p.description}</p>
-                    {p.since && <Badge variant="outline" className="mt-2 border-gold/30 text-gold">شريك منذ {p.since}</Badge>}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          <div id="licenses" className="scroll-mt-20">
-            <h3 className="text-xl font-bold text-gold mb-6 text-center">التراخيص والاعتمادات</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              {licenses.map((l) => (
-                <Card key={l.id} className="bg-white/5 border-gold/20 p-5">
-                  <div className="flex items-start justify-between gap-4">
+          {showPartners && partners.length > 0 && (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+              {partners.map((p) => (
+                <Card key={p.id} className="bg-white/5 border-gold/20 p-6 card-hover">
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">{p.logo || '🤝'}</div>
                     <div className="flex-1">
-                      <div className="font-bold text-white mb-1">{l.issuing_body}</div>
-                      <div className="text-gold text-sm mb-2">{l.type}</div>
-                      <div className="text-white/60 text-xs">رقم الترخيص: <span dir="ltr" className="font-mono">{l.number}</span></div>
+                      <h3 className="font-bold text-white mb-1">{p.name}</h3>
+                      <p className="text-white/60 text-sm">{p.description}</p>
+                      {p.since && <Badge variant="outline" className="mt-2 border-gold/30 text-gold">شريك منذ {p.since}</Badge>}
                     </div>
-                    <Badge className="bg-green-500/15 text-green-400 border-green-500/30">
-                      <CheckCircle2 className="w-3 h-3 ml-1" /> {l.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-white/10 text-xs text-white/50 flex justify-between">
-                    <span>تاريخ الإصدار: <span dir="ltr">{l.issued_at}</span></span>
-                    <span>ينتهي: <span dir="ltr">{l.expires_at}</span></span>
                   </div>
                 </Card>
               ))}
             </div>
-          </div>
+          )}
+
+          {showLicenses && licenses.length > 0 && (
+            <div id="licenses" className="scroll-mt-20">
+              <h3 className="text-xl font-bold text-gold mb-6 text-center">التراخيص والاعتمادات</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {licenses.map((l) => (
+                  <Card key={l.id} className="bg-white/5 border-gold/20 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="font-bold text-white mb-1">{l.issuing_body}</div>
+                        <div className="text-gold text-sm mb-2">{l.type}</div>
+                        <div className="text-white/60 text-xs">رقم الترخيص: <span dir="ltr" className="font-mono">{l.number}</span></div>
+                      </div>
+                      <Badge className="bg-green-500/15 text-green-400 border-green-500/30">
+                        <CheckCircle2 className="w-3 h-3 ml-1" /> {l.status}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-white/10 text-xs text-white/50 flex justify-between">
+                      <span>تاريخ الإصدار: <span dir="ltr">{l.issued_at}</span></span>
+                      <span>ينتهي: <span dir="ltr">{l.expires_at}</span></span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
+      )}
 
       {/* VERIFY CERTIFICATE — DISABLED: certificate feature temporarily removed */}
       {/* <section id="verify" className="py-20 bg-white">
