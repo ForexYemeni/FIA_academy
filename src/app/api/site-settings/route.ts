@@ -66,7 +66,12 @@ function parseRow(row: any) {
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin.from('site_settings').select('*').limit(1).single()
+    // Select only known-existing columns to avoid schema cache errors
+    const { data, error } = await supabaseAdmin
+      .from('site_settings')
+      .select('id, academy_name, phone, email, address, telegram_bot_token, telegram_channel_id')
+      .limit(1)
+      .single()
     if (error) {
       return NextResponse.json({ ...DEFAULTS })
     }
@@ -102,9 +107,9 @@ export async function PUT(req: NextRequest) {
     const cleanAddress = body.address || ''
     const extraJson = Object.keys(extra).length > 0 ? EXTRA_SEPARATOR + JSON.stringify(extra) : ''
     basicFields.address = cleanAddress + extraJson
-    basicFields.updated_at = new Date().toISOString()
+    // Don't set updated_at explicitly — let DB default handle it (avoids schema cache errors)
 
-    // Try update first
+    // Try update first — select only 'id' to avoid schema cache issues with other columns
     const existing = await supabaseAdmin.from('site_settings').select('id').limit(1).single()
     if (existing.data) {
       const { data, error } = await supabaseAdmin

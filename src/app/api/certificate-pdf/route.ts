@@ -350,7 +350,7 @@ async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: s
   const logoSize = 75 * scale
   const logoX = cardX + cardW - logoSize - 50 * scale
   const logoY = cardY + 45 * scale
-  const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-official.png')
+  const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-fia.png')
   if (fs.existsSync(logoPath)) {
     const logoBuffer = fs.readFileSync(logoPath)
     const logoImg = await loadImage(logoBuffer)
@@ -738,7 +738,7 @@ async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: s
       const logoSize = 75
       const logoX = cardX + cardW - logoSize - 50
       const logoY = cardY + 45
-      const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-official.png')
+      const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-fia.png')
       if (fs.existsSync(logoPath)) {
         doc.save()
         roundRectPath(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12, 10)
