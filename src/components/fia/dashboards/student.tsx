@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
-  Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift,
+  Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
