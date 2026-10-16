@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-// Upload avatar via Telegram Bot → get public URL
+// Upload avatar via Telegram Bot → get public URL, then persist to the DB record
 async function getBotSettings() {
   const { data, error } = await supabaseAdmin
     .from('site_settings')
@@ -41,10 +41,35 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
   return `https://api.telegram.org/file/bot${botToken}/${filePath}`
 }
 
+// Persist the avatar URL to the correct DB table based on role.
+// For team members (password starts with __TEAM_MEMBER__), we still update the trainers row —
+// the avatar column is the same.
+async function persistAvatar(userId: string, role: string, url: string): Promise<void> {
+  if (role === 'trainer') {
+    await supabaseAdmin
+      .from('trainers')
+      .update({ avatar: url })
+      .eq('id', userId)
+  } else if (role === 'student') {
+    await supabaseAdmin
+      .from('users')
+      .update({ avatar: url })
+      .eq('id', userId)
+  } else if (role === 'team') {
+    // Team members live in the trainers table — same update path
+    await supabaseAdmin
+      .from('trainers')
+      .update({ avatar: url })
+      .eq('id', userId)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File
+    const userId = (formData.get('user_id') as string) || ''
+    const role = (formData.get('role') as string) || ''
 
     if (!file) {
       return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 })
@@ -68,6 +93,15 @@ export async function POST(req: NextRequest) {
 
     if (!url) {
       return NextResponse.json({ error: 'فشل رفع الصورة' }, { status: 500 })
+    }
+
+    // Persist to DB so admin / homepage see the new avatar immediately
+    if (userId && role) {
+      try {
+        await persistAvatar(userId, role, url)
+      } catch {
+        // Non-fatal — the URL is still returned to the client which can update its own state.
+      }
     }
 
     return NextResponse.json({ url })

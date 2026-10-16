@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Legacy encoding marker — kept only for backward compatibility with old data.
+const BIO_SEPARATOR = '\n\n===FIA_EXTRA===\n'
+
+// Decode legacy encoded bio and merge any embedded qualifications/achievements
+// into a single professional bio string. New trainer records store bio as a
+// plain string (no encoding), so this is effectively a no-op for them.
+function mergeLegacyBio(stored: string | null): string {
+  if (!stored) return ''
+  const idx = stored.indexOf(BIO_SEPARATOR)
+  if (idx === -1) return stored
+  const bio = stored.substring(0, idx).trim()
+  const extraJson = stored.substring(idx + BIO_SEPARATOR.length)
+  let extra: any = {}
+  try { extra = JSON.parse(extraJson) } catch { extra = {} }
+
+  const parts: string[] = []
+  if (bio) parts.push(bio)
+
+  const mergeList = (label: string, raw: any) => {
+    if (!raw || typeof raw !== 'string') return
+    let arr: string[] | null = null
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) arr = parsed.filter(Boolean)
+    } catch { arr = null }
+    if (arr && arr.length > 0) {
+      parts.push(`${label}\n` + arr.map((q) => `• ${q}`).join('\n'))
+    } else {
+      const lines = raw.split('\n').map((s: string) => s.trim()).filter(Boolean)
+      if (lines.length > 0) parts.push(`${label}\n` + lines.map((q: string) => `• ${q}`).join('\n'))
+    }
+  }
+  mergeList('🎓 المؤهلات العلمية', extra.qualifications)
+  mergeList('🏆 الإنجازات', extra.achievements)
+  return parts.join('\n\n')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
@@ -26,7 +63,7 @@ export async function POST(req: NextRequest) {
         role: userRow.role as 'admin' | 'trainer' | 'student',
         avatar: userRow.avatar,
         title: userRow.title,
-        bio: userRow.bio,
+        bio: mergeLegacyBio(userRow.bio),
       }
       const token = Buffer.from(`${userRow.id}:${Date.now()}`).toString('base64')
       return NextResponse.json({ user, token })
@@ -61,7 +98,7 @@ export async function POST(req: NextRequest) {
               role: role === 'founder' ? 'trainer' : 'trainer', // Team members get trainer role for dashboard access
               avatar: trainer.avatar,
               title: trainer.title,
-              bio: trainer.bio,
+              bio: mergeLegacyBio(trainer.bio),
             }
             const token = Buffer.from(`${trainer.id}:${Date.now()}`).toString('base64')
             return NextResponse.json({ user, token })
@@ -82,7 +119,7 @@ export async function POST(req: NextRequest) {
           role: 'trainer' as const,
           avatar: trainer.avatar,
           title: trainer.title,
-          bio: trainer.bio,
+          bio: mergeLegacyBio(trainer.bio),
         }
         const token = Buffer.from(`${trainer.id}:${Date.now()}`).toString('base64')
         return NextResponse.json({ user, token })

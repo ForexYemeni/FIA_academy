@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
+
+// Legacy encoding marker — kept only for backward compatibility with old data.
+// New trainer bios are stored as plain strings (no encoding).
 const BIO_SEPARATOR = '\n\n===FIA_EXTRA===\n'
 
-// Encode bio + extra fields (qualifications, achievements) into a single bio string
-function encodeBio(bio: string | null, extra: any): string {
-  const bioText = bio || ''
-  const extraJson = JSON.stringify(extra)
-  return extra ? `${bioText}${BIO_SEPARATOR}${extraJson}` : bioText
-}
-
-// Decode bio string into bio text + extra fields
+// Decode legacy bio string into bio text + extra fields (qualifications, achievements)
 function decodeBio(stored: string | null): { bio: string; extra: any } {
   if (!stored) return { bio: '', extra: {} }
   const idx = stored.indexOf(BIO_SEPARATOR)
@@ -26,19 +22,76 @@ function decodeBio(stored: string | null): { bio: string; extra: any } {
   }
 }
 
-export async function GET() {
+// Combine legacy encoded bio + qualifications + achievements into ONE professional bio string.
+// This is used for backward compatibility — old trainers that had separate fields
+// are now presented as a single unified bio.
+function mergeLegacyBio(bio: string, extra: any): string {
+  const parts: string[] = []
+  if (bio && bio.trim()) parts.push(bio.trim())
+
+  const quals = extra?.qualifications
+  if (quals && typeof quals === 'string' && quals.trim()) {
+    // It might be a JSON array (from team-editor) or plain text (from old trainer form)
+    let arr: string[] | null = null
+    try {
+      const parsed = JSON.parse(quals)
+      if (Array.isArray(parsed)) arr = parsed.filter(Boolean)
+    } catch {
+      arr = null
+    }
+    if (arr && arr.length > 0) {
+      parts.push('🎓 المؤهلات العلمية\n' + arr.map((q) => `• ${q}`).join('\n'))
+    } else {
+      const lines = quals.split('\n').map((s: string) => s.trim()).filter(Boolean)
+      if (lines.length > 0) {
+        parts.push('🎓 المؤهلات العلمية\n' + lines.map((q: string) => `• ${q}`).join('\n'))
+      }
+    }
+  }
+
+  const achs = extra?.achievements
+  if (achs && typeof achs === 'string' && achs.trim()) {
+    let arr: string[] | null = null
+    try {
+      const parsed = JSON.parse(achs)
+      if (Array.isArray(parsed)) arr = parsed.filter(Boolean)
+    } catch {
+      arr = null
+    }
+    if (arr && arr.length > 0) {
+      parts.push('🏆 الإنجازات\n' + arr.map((a) => `• ${a}`).join('\n'))
+    } else {
+      const lines = achs.split('\n').map((s: string) => s.trim()).filter(Boolean)
+      if (lines.length > 0) {
+        parts.push('🏆 الإنجازات\n' + lines.map((a: string) => `• ${a}`).join('\n'))
+      }
+    }
+  }
+
+  return parts.join('\n\n')
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('trainers')
-      .select('*')
-      .order('name', { ascending: true })
+    const id = req.nextUrl.searchParams.get('id')
+    let query = supabaseAdmin.from('trainers').select('*')
+    if (id) query = query.eq('id', id)
+    query = query.order('name', { ascending: true })
+    const { data, error } = await query
     if (error) throw error
+
     const safe = (data || [])
       .filter((t: any) => !t.password || !t.password.startsWith(TEAM_MARKER_PREFIX))
       .map(({ password, ...rest }: any) => {
         const { bio, extra } = decodeBio(rest.bio)
-        return { ...rest, bio, qualifications: extra.qualifications || '', achievements: extra.achievements || '' }
+        // Merge legacy encoded qualifications/achievements into a single professional bio
+        const mergedBio = mergeLegacyBio(bio, extra)
+        return { ...rest, bio: mergedBio }
       })
+    // For single-id queries, return a single object; otherwise return array
+    if (id) {
+      return NextResponse.json(safe[0] || null)
+    }
     return NextResponse.json(safe)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -48,19 +101,16 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    // Encode qualifications + achievements into the bio field
-    const extra: any = {}
-    if (body.qualifications) extra.qualifications = body.qualifications
-    if (body.achievements) extra.achievements = body.achievements
-    const encodedBio = encodeBio(body.bio || null, Object.keys(extra).length > 0 ? extra : null)
 
+    // Store bio as a plain string — no more encoding.
+    // (qualifications and achievements are now part of the unified bio text)
     const { data, error } = await supabaseAdmin
       .from('trainers')
       .insert({
         name: body.name,
         title: body.title || null,
         specialization: body.specialization || null,
-        bio: encodedBio,
+        bio: body.bio || null,
         avatar: body.avatar || null,
         email: body.email,
         password: body.password,
@@ -72,8 +122,7 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
     const { password, ...rest } = data
-    const { bio, extra: decoded } = decodeBio(rest.bio)
-    return NextResponse.json({ ...rest, bio, qualifications: decoded.qualifications || '', achievements: decoded.achievements || '' })
+    return NextResponse.json(rest)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -81,25 +130,26 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { id, bio, qualifications, achievements, ...updates } = await req.json()
-    // Encode qualifications + achievements into the bio field
-    const extra: any = {}
-    if (qualifications) extra.qualifications = qualifications
-    if (achievements) extra.achievements = achievements
-    if (bio !== undefined) {
-      updates.bio = encodeBio(bio || null, Object.keys(extra).length > 0 ? extra : null)
+    const { id, ...updates } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    // Bio is stored as plain string now — no encoding.
+    // We only update fields that are explicitly provided.
+    const patch: any = {}
+    for (const key of ['name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count']) {
+      if (updates[key] !== undefined) patch[key] = updates[key]
     }
-    if (!updates.password) delete updates.password
+    // Password update is optional — only set if provided and non-empty
+    if (updates.password) patch.password = updates.password
+
     const { data, error } = await supabaseAdmin
       .from('trainers')
-      .update(updates)
+      .update(patch)
       .eq('id', id)
       .select()
       .single()
     if (error) throw error
     const { password, ...rest } = data
-    const { bio: decodedBio, extra: decoded } = decodeBio(rest.bio)
-    return NextResponse.json({ ...rest, bio: decodedBio, qualifications: decoded.qualifications || '', achievements: decoded.achievements || '' })
+    return NextResponse.json(rest)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

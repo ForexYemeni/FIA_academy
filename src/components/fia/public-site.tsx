@@ -6,10 +6,11 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
   Shield, Award, Users, Clock, BookOpen, GraduationCap, Stethoscope,
-  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin,
+  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X,
 } from 'lucide-react'
 
 type Course = {
@@ -36,11 +37,14 @@ type Trainer = {
   avatar?: string
   courses_count?: number
   years_experience?: number
+  email?: string
+  phone?: string
 }
 
 export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
   const [courses, setCourses] = useState<Course[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
+  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null)
   const [founder, setFounder] = useState<any>(null)
   const [partners, setPartners] = useState<any[]>([])
   const [licenses, setLicenses] = useState<any[]>([])
@@ -280,35 +284,42 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
           <div className="text-center max-w-3xl mx-auto mb-12">
             <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">الفريق التدريبي</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-navy mb-4">نخبة من الخبراء</h2>
-            <p className="text-muted-foreground text-lg">تعلّم على يد أمهر الاستشاريين في مختلف التخصصات</p>
+            <p className="text-muted-foreground text-lg">تعلّم على يد أمهر الاستشاريين في مختلف التخصصات — اضغط على أي مدرب لمعرفة المزيد عنه</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {trainers.length > 0 ? (
               trainers.map((t) => (
-                <Card key={t.id} className="p-6 text-center card-hover">
-                  <div className="relative mx-auto w-28 h-28 mb-4">
-                    {t.avatar ? (
-                      <img src={t.avatar} alt={t.name} className="w-full h-full rounded-full object-cover border-4 border-gold/30" />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-navy flex items-center justify-center text-gold text-3xl font-bold">
-                        {t.name?.charAt(0)}
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSelectedTrainer(t)}
+                  className="text-center focus:outline-none"
+                >
+                  <Card className="p-6 text-center card-hover hover:border-gold/40 hover:shadow-lg transition-all cursor-pointer h-full">
+                    <div className="relative mx-auto w-28 h-28 mb-4">
+                      {t.avatar ? (
+                        <img src={t.avatar} alt={t.name} className="w-full h-full rounded-full object-cover border-4 border-gold/30" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-navy flex items-center justify-center text-gold text-3xl font-bold">
+                          {t.name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-navy text-lg">{t.name}</h3>
+                    <p className="text-gold text-sm font-semibold mb-2">{t.title}</p>
+                    <p className="text-muted-foreground text-xs mb-3">{t.specialization}</p>
+                    <div className="flex justify-around text-center pt-3 border-t border-border">
+                      <div>
+                        <div className="font-bold text-navy">{t.courses_count || 0}</div>
+                        <div className="text-xs text-muted-foreground">دورة</div>
                       </div>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-navy text-lg">{t.name}</h3>
-                  <p className="text-gold text-sm font-semibold mb-2">{t.title}</p>
-                  <p className="text-muted-foreground text-xs mb-3">{t.specialization}</p>
-                  <div className="flex justify-around text-center pt-3 border-t border-border">
-                    <div>
-                      <div className="font-bold text-navy">{t.courses_count || 0}</div>
-                      <div className="text-xs text-muted-foreground">دورة</div>
+                      <div>
+                        <div className="font-bold text-navy">{t.years_experience || 0}+</div>
+                        <div className="text-xs text-muted-foreground">سنوات خبرة</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-navy">{t.years_experience || 0}+</div>
-                      <div className="text-xs text-muted-foreground">سنوات خبرة</div>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
+                </button>
               ))
             ) : (
               <div className="col-span-full text-center py-10 text-muted-foreground">جاري تحميل المدربين...</div>
@@ -316,6 +327,12 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
           </div>
         </div>
       </section>
+
+      {/* Trainer detail dialog — shows the same professional bio saved from admin / trainer dashboard */}
+      <TrainerDetailDialog
+        trainer={selectedTrainer}
+        onClose={() => setSelectedTrainer(null)}
+      />
 
       {/* PARTNERS & LICENSES — only shown if admin has enabled them via site_settings */}
       {(showPartners || showLicenses) && (partners.length > 0 || licenses.length > 0) && (
@@ -442,6 +459,123 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
         </div>
       </section>
     </div>
+  )
+}
+
+// Trainer detail dialog — shows the same professional bio saved from admin / trainer dashboard
+function TrainerDetailDialog({ trainer, onClose }: { trainer: Trainer | null; onClose: () => void }) {
+  return (
+    <Dialog open={!!trainer} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        {trainer && (
+          <>
+            {/* Header — gradient navy banner with avatar */}
+            <div className="relative bg-gradient-to-br from-navy to-navy-light p-8 pb-6 text-center">
+              <button
+                onClick={onClose}
+                className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                aria-label="إغلاق"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="relative mx-auto w-32 h-32 mb-4">
+                {trainer.avatar ? (
+                  <img
+                    src={trainer.avatar}
+                    alt={trainer.name}
+                    className="w-full h-full rounded-full object-cover border-4 border-gold/40 shadow-xl"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-white/10 border-4 border-gold/40 flex items-center justify-center text-gold text-5xl font-bold shadow-xl">
+                    {trainer.name?.charAt(0)}
+                  </div>
+                )}
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gold text-navy text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                  ★ مدرب معتمد
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-1">{trainer.name}</h2>
+              {trainer.title && (
+                <p className="text-gold text-sm font-semibold mb-2">{trainer.title}</p>
+              )}
+              {trainer.specialization && (
+                <p className="text-white/70 text-xs">{trainer.specialization}</p>
+              )}
+            </div>
+
+            {/* Body — bio + stats */}
+            <div className="p-6 space-y-5">
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-navy/5 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-navy">{trainer.courses_count || 0}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">دورة معتمدة</div>
+                </div>
+                <div className="bg-navy/5 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-navy">{trainer.years_experience || 0}+</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">سنوات خبرة</div>
+                </div>
+                <div className="bg-gold/10 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-gold">★</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">مدرب معتمد</div>
+                </div>
+              </div>
+
+              {/* Complete professional bio — preserves line breaks exactly as written */}
+              {trainer.bio && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-5 bg-gold rounded-full" />
+                    <h3 className="font-bold text-navy text-sm">النبذة التعريفية الكاملة</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-navy/[0.02] to-gold/[0.04] border border-gold/15 rounded-lg p-5">
+                    <pre
+                      className="whitespace-pre-wrap font-sans text-sm text-navy/80 leading-relaxed"
+                      dir="rtl"
+                      style={{ fontFamily: 'inherit' }}
+                    >
+                      {trainer.bio}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {!trainer.bio && (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  لا توجد نبذة تعريفية لهذا المدرب بعد.
+                </div>
+              )}
+
+              {/* Contact info (if available) */}
+              {(trainer.phone || trainer.email) && (
+                <div className="border-t border-border pt-4 space-y-2">
+                  <h4 className="text-xs font-bold text-navy mb-2">معلومات التواصل</h4>
+                  {trainer.phone && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" dir="ltr">
+                      <Phone className="w-4 h-4 text-gold" /> {trainer.phone}
+                    </div>
+                  )}
+                  {trainer.email && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" dir="ltr">
+                      <Mail className="w-4 h-4 text-gold" /> {trainer.email}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="px-6 pb-6">
+              <Button
+                onClick={onClose}
+                className="w-full bg-navy hover:bg-navy-light text-white"
+              >
+                إغلاق
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
