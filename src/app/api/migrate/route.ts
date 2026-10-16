@@ -4,26 +4,52 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// On Vercel, env vars are present — we can connect directly via pg.
-// In local dev, env vars may be missing — we fall back to supabaseAdmin checks.
+// On Vercel, env vars are present but the DATABASE_URL points at
+// db.<ref>.supabase.co which Vercel's serverless network can't resolve.
+// We rewrite the URL to use the pooler at aws-0-us-east-1.pooler.supabase.com
+// which IS reachable, and switch the user from `postgres` to `postgres.<ref>`
+// (the project-qualified user required by Supabase's pooler).
+function rewriteDbUrlForPooler(original: string): string | null {
+  if (!original) return null
+  try {
+    // Extract the project ref from the hostname
+    // db.tzquudmfazysjogorrxz.supabase.co → tzquudmfazysjogorrxz
+    const match = original.match(/db\.([a-z0-9]+)\.supabase\.co/)
+    if (!match) return null
+    const projectRef = match[1]
+
+    // Extract user:password
+    const credsMatch = original.match(/^postgresql:\/\/([^:]+):([^@]+)@/)
+    if (!credsMatch) return null
+    const password = decodeURIComponent(credsMatch[2])
+
+    // Pooler connection — transaction mode (port 6543) works fine for DDL
+    // through pgbouncer when statements are sent one-by-one (which we do).
+    return `postgresql://postgres.${projectRef}:${encodeURIComponent(
+      password,
+    )}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require`
+  } catch {
+    return null
+  }
+}
+
 async function runMigrationViaPg(sql: string): Promise<{ ok: number; failed: number; errors: string[] }> {
-  // Try to load pg dynamically — it's installed as a dependency
   let Pool: any
   try {
     const pg = await import('pg')
     Pool = pg.Pool
   } catch {
-    return { ok: 0, failed: 0, errors: ['pg module not available — skipping direct DB migration'] }
+    return { ok: 0, failed: 0, errors: ['pg module not available'] }
   }
 
-  // Construct the connection string from env vars
-  const dbUrl = process.env.DATABASE_URL
-  if (!dbUrl) {
-    return { ok: 0, failed: 0, errors: ['DATABASE_URL not set on server'] }
+  const original = process.env.DATABASE_URL || ''
+  const poolerUrl = rewriteDbUrlForPooler(original)
+  if (!poolerUrl) {
+    return { ok: 0, failed: 0, errors: [`Could not rewrite DATABASE_URL: ${original.substring(0, 60)}...`] }
   }
 
   const pool = new Pool({
-    connectionString: dbUrl,
+    connectionString: poolerUrl,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 30000,
   })
@@ -58,7 +84,6 @@ async function runMigrationViaPg(sql: string): Promise<{ ok: number; failed: num
   return { ok, failed, errors }
 }
 
-// List which of the new tables exist in the DB after migration
 async function listNewTables() {
   const tables = [
     'coupons', 'affiliates', 'affiliate_referrals', 'reviews',
@@ -77,18 +102,6 @@ async function listNewTables() {
 }
 
 export async function GET() {
-  // Expose (sanitized) which env vars are actually set on the server,
-  // so we can understand which connection path will work.
-  const envCheck = {
-    has_supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL || !!process.env.SUPABASE_URL,
-    has_service_key: !!process.env.SUPABASE_SERVICE_KEY,
-    has_anon_key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || !!process.env.SUPABASE_ANON_KEY,
-    has_database_url: !!process.env.DATABASE_URL,
-    supabase_url_prefix: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').substring(0, 40),
-    database_url_prefix: (process.env.DATABASE_URL || '').substring(0, 40),
-    jwt_secret_set: !!process.env.JWT_SECRET,
-  }
-
   let sql = ''
   try {
     const fs = await import('fs')
@@ -96,14 +109,13 @@ export async function GET() {
     const sqlPath = path.join(process.cwd(), 'supabase', 'migrations', '004_major_features_extension.sql')
     sql = fs.readFileSync(sqlPath, 'utf8')
   } catch (e: any) {
-    return NextResponse.json({ error: 'Failed to read migration file', details: e.message, envCheck }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to read migration file', details: e.message }, { status: 500 })
   }
 
   const result = await runMigrationViaPg(sql)
   const existing = await listNewTables()
 
   return NextResponse.json({
-    env: envCheck,
     ok: result.ok,
     failed: result.failed,
     errors: result.errors.slice(0, 20),
