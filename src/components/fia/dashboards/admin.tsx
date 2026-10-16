@@ -1353,7 +1353,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
           {/* Years experience */}
           <div>
             <Label className="text-xs">سنوات الخبرة</Label>
-            <Input type="number" value={form.years_experience || 0} onChange={(e) => setForm({ ...form, years_experience: parseInt(e.target.value) || 0 })} className="mt-1" />
+            <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} className="mt-1" placeholder="0" />
           </div>
         </div>
         <DialogFooter>
@@ -2401,7 +2401,7 @@ function SimpleDialog({ open, onOpenChange, title, onSaved, initial, fields, api
               {['description', 'instructions'].includes(f) ? (
                 <Textarea value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: e.target.value })} rows={2} className="mt-1" />
               ) : ['price', 'duration_hours', 'pass_score'].includes(f) ? (
-                <Input type="number" value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" />
+                <Input type="number" value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} dir="ltr" className="mt-1" placeholder="0" />
               ) : (
                 <Input value={form[f] || ''} onChange={(e) => setForm({ ...form, [f]: e.target.value })} dir={f === 'number' || f === 'website' || f === 'verification_url' || f === 'wallet_id' ? 'ltr' : 'rtl'} className="mt-1" />
               )}
