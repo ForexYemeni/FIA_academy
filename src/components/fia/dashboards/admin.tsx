@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { id: 'students', label: 'المتدربون', icon: Users },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
-  { id: 'certificates', label: 'الشهادات', icon: Award },
+  // { id: 'certificates', label: 'الشهادات', icon: Award },  // DISABLED: certificate feature temporarily removed
   { id: 'trainers', label: 'المدربون', icon: GraduationCap },
   { id: 'partners', label: 'الشركاء', icon: Building2 },
   { id: 'licenses', label: 'التراخيص', icon: Shield },
@@ -70,7 +70,8 @@ export function AdminDashboard() {
       {active === 'students' && <AdminStudents />}
       {active === 'payments' && <AdminPayments />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
-      {active === 'certificates' && <AdminCertificates />}
+      {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
+      {/* {active === 'certificates' && <AdminCertificates />} */}
       {active === 'trainers' && <AdminTrainers />}
       {active === 'partners' && <AdminPartners />}
       {active === 'licenses' && <AdminLicenses />}
@@ -439,7 +440,8 @@ function AdminStudents() {
                           <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {isCompleted && (
+                          {/* DISABLED: certificate issuance button removed — will be re-enabled when design+prompt provided */}
+                          {/* {isCompleted && (
                             <Button
                               size="sm"
                               className="bg-gold hover:bg-gold-light text-navy text-xs"
@@ -461,7 +463,7 @@ function AdminStudents() {
                             >
                               <Award className="w-3.5 h-3.5 ml-1" /> إصدار شهادة
                             </Button>
-                          )}
+                          )} */}
                           <Badge className={
                             isCompleted ? 'bg-green-500/15 text-green-600 border-green-500/30'
                             : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'

@@ -29,7 +29,7 @@ const NAV: NavItem[] = [
   { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
   { id: 'exams', label: 'اختباراتي', icon: FileText },
   { id: 'results', label: 'نتائجي', icon: TrendingUp },
-  { id: 'certificates', label: 'شهاداتي', icon: Award },
+  // { id: 'certificates', label: 'شهاداتي', icon: Award },  // DISABLED: certificate feature temporarily removed
   { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
   { id: 'profile', label: 'ملفي الشخصي', icon: User },
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
@@ -86,7 +86,8 @@ export function StudentDashboard() {
           {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
           {active === 'exams' && <Exams />}
           {active === 'results' && <Results />}
-          {active === 'certificates' && <Certificates certificates={certificates} />}
+          {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
+          {/* {active === 'certificates' && <Certificates certificates={certificates} />} */}
           {active === 'payments' && <Payments payments={payments} />}
           {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
           {active === 'notifications' && <Notifications />}
@@ -238,7 +239,8 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
                       >
                         <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
                       </Button>
-                      <Button
+                      {/* DISABLED: certificate request button removed — will be re-enabled when design+prompt provided */}
+                      {/* <Button
                         size="sm"
                         className="bg-gold hover:bg-gold-light text-navy"
                         disabled={requesting === c.id}
@@ -249,7 +251,7 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
                         ) : (
                           <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
                         )}
-                      </Button>
+                      </Button> */}
                     </div>
                   </div>
                 ) : (
