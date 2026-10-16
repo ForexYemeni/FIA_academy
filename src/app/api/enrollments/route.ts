@@ -23,21 +23,57 @@ interface StoredEnrollment {
   course_id: string | null
 }
 
+// Normalize various Arabic/English payment-table status values into a canonical
+// enrollment `payment_status`. The admin UI marks approved payments as
+// 'مكتمل' and the student-course-viewer marks completed courses as 'مكتمل'
+// too, so we additionally use `progress >= 100` to disambiguate between
+// "payment confirmed, course in progress" (=> 'confirmed') and "course
+// completed" (=> 'completed').
 function toEnrollment(p: StoredEnrollment): any {
   // Determine if it's free or paid
   const isFree = !p.amount || p.amount === 0
-  // Determine payment_status from amount
-  let payment_status = 'free'
-  if (!isFree) {
-    payment_status = p.status === 'paid' ? 'paid' : 'pending'
-  }
+
   // Parse progress from reference field (stored as __PROGRESS__:XX)
   let progress = 0
   if (p.reference) {
     const match = p.reference.match(/__PROGRESS__:(\d+)/)
     if (match) progress = parseInt(match[1]) || 0
-    // If reference contains PROGRESS marker, the actual reference is the part before it
   }
+
+  // Normalize raw status for matching
+  const rawStatus = (p.status || '').trim()
+  const normalizedStatus = rawStatus.toLowerCase()
+  const isApprovedStatus =
+    rawStatus === 'مكتمل' ||
+    rawStatus === 'completed' ||
+    rawStatus === 'paid' ||
+    rawStatus === 'confirmed' ||
+    normalizedStatus === 'completed' ||
+    normalizedStatus === 'paid' ||
+    normalizedStatus === 'confirmed'
+  const isPendingStatus =
+    rawStatus === 'قيد الانتظار' ||
+    rawStatus === 'بانتظار' ||
+    rawStatus === 'pending' ||
+    normalizedStatus === 'pending'
+
+  // Determine payment_status
+  let payment_status: string
+  if (isFree) {
+    // Free enrollments stay 'free' (or 'completed' if course finished)
+    payment_status = progress >= 100 ? 'completed' : 'free'
+  } else if (isApprovedStatus) {
+    // Payment has been confirmed by admin (or course completed by student).
+    // If the course is fully completed (progress 100), label as 'completed'.
+    // Otherwise, treat the approval as 'confirmed' (payment OK, course in progress).
+    payment_status = progress >= 100 ? 'completed' : 'confirmed'
+  } else if (isPendingStatus) {
+    payment_status = 'pending'
+  } else {
+    // 'active' or unknown status — if it's a paid enrollment, assume pending
+    payment_status = 'pending'
+  }
+
   return {
     id: p.id,
     user_id: p.user_id,
