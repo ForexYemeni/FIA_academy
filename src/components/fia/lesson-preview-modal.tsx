@@ -301,20 +301,12 @@ function PdfViewer({ url }: { url?: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileUp className="w-5 h-5 text-green-600 flex-shrink-0" />
-          <div className="min-w-0">
-            <div className="font-medium text-navy text-sm truncate">{url.split('/').pop()}</div>
-            <div className="text-xs text-muted-foreground">ملف PDF محمي</div>
-          </div>
+      <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
+        <FileUp className="w-5 h-5 text-green-600 flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="font-medium text-navy text-sm truncate">{url.split('/').pop()}</div>
+          <div className="text-xs text-muted-foreground">ملف PDF — معاينة داخل التطبيق</div>
         </div>
-        {/* Opens Google Docs Viewer in a new tab — never triggers a download */}
-        <a href={viewerUrl} target="_blank" rel="noopener noreferrer">
-          <Button size="sm" variant="outline" className="border-navy/30 text-navy hover:bg-navy/5">
-            <ArrowRight className="w-3.5 h-3.5 ml-1" /> فتح في تبويب
-          </Button>
-        </a>
       </div>
       <iframe
         src={viewerUrl}
