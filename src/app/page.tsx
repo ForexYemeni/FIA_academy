@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Header } from '@/components/fia/header'
-import { Footer } from '@/components/fia/footer'
 import { LoginModal } from '@/components/fia/login-modal'
 import { LandingAuth } from '@/components/fia/landing-auth'
-import { AboutPage } from '@/components/fia/about-page'
-import { PolicyPage } from '@/components/fia/policy-page'
+import { QuickLinkCard } from '@/components/fia/quick-link-card'
 import { StudentDashboard } from '@/components/fia/dashboards/student'
 import { TrainerDashboard } from '@/components/fia/dashboards/trainer'
 import { AdminDashboard } from '@/components/fia/dashboards/admin'
@@ -15,24 +13,33 @@ import { useAuth } from '@/lib/auth-store'
 export default function Home() {
   const [authOpen, setAuthOpen] = useState(false)
   const user = useAuth((s) => s.user)
-  const [view, setView] = useState<'home' | 'about' | 'privacy' | 'terms' | 'refund' | 'support'>('home')
+  const [activeCard, setActiveCard] = useState<string | null>(null)
+  const [settings, setSettings] = useState<any>({})
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    // Listen for hash changes for navigation
+    fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
+
     const checkHash = () => {
       const h = window.location.hash.replace('#', '')
-      if (['about', 'privacy', 'terms', 'refund', 'support'].includes(h)) {
-        setView(h as any)
+      if (['about', 'privacy', 'terms', 'refund', 'support', 'social'].includes(h)) {
+        setActiveCard(h)
       } else {
-        setView('home')
+        setActiveCard(null)
       }
     }
     checkHash()
     window.addEventListener('hashchange', checkHash)
     return () => window.removeEventListener('hashchange', checkHash)
   }, [])
+
+  const closeCard = () => {
+    setActiveCard(null)
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname)
+    }
+  }
 
   if (!mounted) return null
 
@@ -43,37 +50,16 @@ export default function Home() {
     return <StudentDashboard />
   }
 
-  // If a sub-page view is requested via hash, show that page
-  if (view === 'about') {
-    return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Header onLoginClick={() => setAuthOpen(true)} />
-        <main className="flex-1"><AboutPage /></main>
-        <Footer />
-        <LoginModal open={authOpen} onOpenChange={setAuthOpen} />
-      </div>
-    )
-  }
-  if (view !== 'home') {
-    return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Header onLoginClick={() => setAuthOpen(true)} />
-        <main className="flex-1"><PolicyPage policyType={view} /></main>
-        <Footer />
-        <LoginModal open={authOpen} onOpenChange={setAuthOpen} />
-      </div>
-    )
-  }
-
-  // Default: show landing auth page (login/register + quick links)
+  // Landing page — NO footer (quick links handle everything)
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header onLoginClick={() => setAuthOpen(true)} />
       <main className="flex-1">
         <LandingAuth onLoginClick={() => setAuthOpen(true)} />
       </main>
-      <Footer />
       <LoginModal open={authOpen} onOpenChange={setAuthOpen} />
+      {/* Quick Link Dialog Cards — triggered by sidebar or quick links */}
+      <QuickLinkCard cardId={activeCard} onClose={closeCard} settings={settings} />
     </div>
   )
 }
