@@ -1287,30 +1287,227 @@ function AdminFounder({ user }: any) {
 function AdminSite() {
   const [settings, setSettings] = useState<any>({})
   const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
   const save = async () => {
     setSaving(true)
     try {
-      await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
-      toast.success('تم الحفظ')
+      const res = await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+      const data = await res.json()
+      if (data._migration_needed) {
+        toast.error('بعض الحقول لم تُحفظ — يجب تشغيل SQL migration', { description: 'اقرأ التعليمات أسفل الصفحة' })
+      } else {
+        toast.success('تم الحفظ')
+      }
     } catch { toast.error('فشل') } finally { setSaving(false) }
   }
+
   return (
-    <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية والاتصال">
-      <div className="space-y-4 max-w-2xl">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><Label>اسم الأكاديمية</Label><Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="mt-1" /></div>
-          <div><Label>الهاتف</Label><Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
-          <div><Label>البريد</Label><Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="mt-1" /></div>
-          <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
-        </div>
-        <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-navy mb-3">تكامل تيليجرام</h3>
+    <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-border pb-3 mb-4 flex-wrap">
+        {[
+          { id: 'basic', label: 'معلومات أساسية' },
+          { id: 'about', label: 'من نحن' },
+          { id: 'policies', label: 'السياسات' },
+          { id: 'social', label: 'التواصل' },
+          { id: 'visibility', label: 'الإظهار' },
+        ].map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id as any)}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === t.id ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4 max-w-3xl">
+        {/* BASIC */}
+        {tab === 'basic' && (
           <div className="space-y-4">
-            <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
-            <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div><Label>اسم الأكاديمية (عربي)</Label><Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="mt-1" /></div>
+              <div><Label>اسم الأكاديمية (إنجليزي)</Label><Input value={settings.academy_name_en || ''} onChange={(e) => setSettings({ ...settings, academy_name_en: e.target.value })} dir="ltr" className="mt-1" /></div>
+              <div><Label>الاختصار</Label><Input value={settings.academy_short || ''} onChange={(e) => setSettings({ ...settings, academy_short: e.target.value })} dir="ltr" className="mt-1" /></div>
+              <div><Label>الهاتف</Label><Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
+              <div><Label>البريد</Label><Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="mt-1" /></div>
+              <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div className="border-t border-border pt-4">
+              <h3 className="font-bold text-navy mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+                <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ABOUT US */}
+        {tab === 'about' && (
+          <div className="space-y-4">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+              💡 يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
+            </div>
+            <div>
+              <Label>رؤيتنا</Label>
+              <textarea value={settings.about_vision || ''} onChange={(e) => setSettings({ ...settings, about_vision: e.target.value })}
+                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رؤية الأكاديمية..." />
+            </div>
+            <div>
+              <Label>رسالتنا</Label>
+              <textarea value={settings.about_mission || ''} onChange={(e) => setSettings({ ...settings, about_mission: e.target.value })}
+                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رسالة الأكاديمية..." />
+            </div>
+            <div>
+              <Label>قيمنا</Label>
+              <textarea value={settings.about_values || ''} onChange={(e) => setSettings({ ...settings, about_values: e.target.value })}
+                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب قيم الأكاديمية..." />
+            </div>
+            <div>
+              <Label>فريقنا</Label>
+              <textarea value={settings.about_team || ''} onChange={(e) => setSettings({ ...settings, about_team: e.target.value })}
+                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب وصف فريق الأكاديمية..." />
+            </div>
+          </div>
+        )}
+
+        {/* POLICIES */}
+        {tab === 'policies' && (
+          <div className="space-y-4">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+              💡 تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
+            </div>
+            <div>
+              <Label>سياسة الخصوصية</Label>
+              <textarea value={settings.policy_privacy || ''} onChange={(e) => setSettings({ ...settings, policy_privacy: e.target.value })}
+                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الخصوصية..." />
+            </div>
+            <div>
+              <Label>شروط الاستخدام</Label>
+              <textarea value={settings.policy_terms || ''} onChange={(e) => setSettings({ ...settings, policy_terms: e.target.value })}
+                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب شروط الاستخدام..." />
+            </div>
+            <div>
+              <Label>سياسة الاسترداد</Label>
+              <textarea value={settings.policy_refund || ''} onChange={(e) => setSettings({ ...settings, policy_refund: e.target.value })}
+                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الاسترداد..." />
+            </div>
+            <div>
+              <Label>الدعم والمساعدة</Label>
+              <textarea value={settings.policy_support || ''} onChange={(e) => setSettings({ ...settings, policy_support: e.target.value })}
+                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب معلومات الدعم..." />
+            </div>
+          </div>
+        )}
+
+        {/* SOCIAL */}
+        {tab === 'social' && (
+          <div className="space-y-4">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+              💡 كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
+            </div>
+            {/* Facebook */}
+            <div className="border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="font-bold">فيسبوك</Label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} />
+                  تفعيل
+                </label>
+              </div>
+              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm" />
+            </div>
+            {/* Telegram */}
+            <div className="border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="font-bold">تيليجرام (قناة أو يوزر)</Label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} />
+                  تفعيل
+                </label>
+              </div>
+              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm" />
+            </div>
+            {/* WhatsApp */}
+            <div className="border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="font-bold">واتساب (قناة)</Label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} />
+                  تفعيل
+                </label>
+              </div>
+              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm" />
+            </div>
+            {/* SMS */}
+            <div className="border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="font-bold">رقم للمراسلات النصية (SMS)</Label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} />
+                  تفعيل
+                </label>
+              </div>
+              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm" />
+            </div>
+          </div>
+        )}
+
+        {/* VISIBILITY */}
+        {tab === 'visibility' && (
+          <div className="space-y-4">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+              💡 تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
+            </div>
+            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
+                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} />
+                تفعيل
+              </label>
+            </div>
+            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
+                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} />
+                تفعيل
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Migration notice */}
+        {settings._migration_needed && (
+          <div className="bg-red-50 border border-red-500/30 rounded-lg p-3 text-xs">
+            <div className="font-bold text-red-700 mb-1">⚠ بعض الحقول الجديدة غير محفوظة</div>
+            <div className="text-red-600">شغّل هذا الـ SQL في Supabase Dashboard → SQL Editor:</div>
+            <pre className="bg-white border border-red-200 rounded p-2 mt-2 text-[10px] overflow-x-auto" dir="ltr">{`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_vision TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_mission TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_values TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS about_team TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_privacy TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_terms TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_refund TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS policy_support TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_facebook TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_facebook_enabled BOOLEAN DEFAULT false;
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_telegram TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_telegram_enabled BOOLEAN DEFAULT false;
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_whatsapp TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_whatsapp_enabled BOOLEAN DEFAULT false;
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_sms TEXT DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS social_sms_enabled BOOLEAN DEFAULT false;
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_partners BOOLEAN DEFAULT false;
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_licenses BOOLEAN DEFAULT false;`}</pre>
+          </div>
+        )}
+
         <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
       </div>
     </SectionCard>
