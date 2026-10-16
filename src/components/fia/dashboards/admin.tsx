@@ -1052,7 +1052,7 @@ function AdminCertificates() {
 
       {previewCert && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle className="flex items-center gap-2">
