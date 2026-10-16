@@ -70,9 +70,27 @@ function isTeamMember(trainer: StoredTrainer): boolean {
   return !!trainer.password && trainer.password.startsWith(TEAM_MARKER_PREFIX)
 }
 
+// Extract the actual password from the encoded password field
+// Format: __TEAM_MEMBER__:<role>__:<actual_password>
+function getActualPassword(trainer: StoredTrainer): string | null {
+  if (!trainer.password || !trainer.password.startsWith(TEAM_MARKER_PREFIX)) return null
+  const afterPrefix = trainer.password.substring(TEAM_MARKER_PREFIX.length)
+  // Find the second __ separator
+  const firstSep = afterPrefix.indexOf('__')
+  if (firstSep === -1) return null
+  const afterRole = afterPrefix.substring(firstSep + 2)
+  // If there's a : separator, the password is after it
+  if (afterRole.startsWith(':')) return afterRole.substring(1)
+  return null // old format without password
+}
+
 function getRole(trainer: StoredTrainer): string {
   if (trainer.password && trainer.password.startsWith(TEAM_MARKER_PREFIX)) {
-    return trainer.password.substring(TEAM_MARKER_PREFIX.length).replace(/__$/, '') || 'team'
+    // Format: __TEAM_MEMBER__:<role>__:<password>  OR  __TEAM_MEMBER__:<role>__
+    const afterPrefix = trainer.password.substring(TEAM_MARKER_PREFIX.length)
+    const roleEnd = afterPrefix.indexOf('__')
+    if (roleEnd !== -1) return afterPrefix.substring(0, roleEnd) || 'team'
+    return 'team'
   }
   return 'team'
 }
@@ -155,8 +173,13 @@ export async function POST(req: NextRequest) {
     }
     const encodedBio = encodeBio(body.bio || '', extra)
 
-    // Password field stores the role marker
-    const password = `${TEAM_MARKER_PREFIX}${body.role || 'team'}__`
+    // Password field stores the role marker + actual password
+    // Format: __TEAM_MEMBER__:<role>__:<actual_password>
+    // This allows team members to login while still being identifiable as team members
+    const actualPassword = (body as any).password || ''
+    const password = actualPassword
+      ? `${TEAM_MARKER_PREFIX}${body.role || 'team'}__:${actualPassword}`
+      : `${TEAM_MARKER_PREFIX}${body.role || 'team'}__`
 
     // Check if email already exists in trainers or users
     if (body.email) {
@@ -215,8 +238,11 @@ export async function PUT(req: NextRequest) {
     }
     const encodedBio = encodeBio(updates.bio || '', extra)
 
-    // Password stores the role marker
-    const password = `${TEAM_MARKER_PREFIX}${updates.role || 'team'}__`
+    // Password stores the role marker + actual password (if provided)
+    const updatePassword = (updates as any).password
+    const password = updatePassword
+      ? `${TEAM_MARKER_PREFIX}${updates.role || 'team'}__:${updatePassword}`
+      : `${TEAM_MARKER_PREFIX}${updates.role || 'team'}__`
 
     const { data, error } = await supabaseAdmin
       .from('trainers')
