@@ -11,6 +11,8 @@ import {
   Clock, Play, Lock, CheckCircle2, ArrowRight, Loader2, BookOpen,
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
+import { CourseReviews } from '@/components/fia/course-reviews'
+import { useAuth } from '@/lib/auth-store'
 
 interface Module {
   id: string
@@ -261,6 +263,11 @@ export function StudentCourseViewer({
           )
         })
       )}
+
+      {/* Course reviews — students can rate courses they're enrolled in */}
+      <Card className="p-6">
+        <CourseReviews courseId={course.id} allowAdd={true} />
+      </Card>
 
       {/* Lesson preview modal */}
       <LessonPreviewModal
