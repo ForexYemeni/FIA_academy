@@ -52,6 +52,7 @@ export function TrainerDashboard() {
   const logout = useAuth((s) => s.logout)
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
+  const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<any | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || ''), specialization: user?.title || '' })
@@ -67,6 +68,24 @@ export function TrainerDashboard() {
   const loadStudents = () => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {})
   }
+
+  // Fetch enrollments and filter to ONLY students enrolled in this trainer's courses
+  useEffect(() => {
+    if (courses.length === 0) {
+      setEnrolledStudentIds(new Set())
+      return
+    }
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => {
+      const all = Array.isArray(d) ? d : []
+      const courseIds = courses.map((c: any) => c.id)
+      const myEnrollments = all.filter((e: any) => courseIds.includes(e.course_id))
+      const ids = new Set(myEnrollments.map((e: any) => e.user_id))
+      setEnrolledStudentIds(ids)
+    }).catch(() => {})
+  }, [courses])
+
+  // Filtered students — only those enrolled in this trainer's courses
+  const myStudents = students.filter((s: any) => enrolledStudentIds.has(s.id))
 
   useEffect(() => {
     loadCourses()
@@ -86,7 +105,7 @@ export function TrainerDashboard() {
       roleLabel="مدرب"
       roleColor="bg-green-500/15 text-green-600 border-green-500/30"
     >
-      {active === 'overview' && <TrainerOverview user={user} courses={courses} students={students} />}
+      {active === 'overview' && <TrainerOverview user={user} courses={courses} students={myStudents} />}
       {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
       {active === 'content' && contentCourseId && (
         <div className="space-y-4">
@@ -96,7 +115,7 @@ export function TrainerDashboard() {
           <CourseContentManager courseId={contentCourseId} />
         </div>
       )}
-      {active === 'students' && <TrainerStudents students={students} courses={courses} />}
+      {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
       {active === 'exams' && <TrainerExams courses={courses} />}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
       {active === 'notifications' && <TrainerNotifs courses={courses} />}

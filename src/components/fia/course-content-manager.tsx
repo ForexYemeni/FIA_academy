@@ -628,29 +628,24 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                   onClick={() => document.getElementById('video-upload')?.click()}
                 >
                   {uploadingVideo ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Video className="w-4 h-4 ml-1" />}
-                  {uploadingVideo ? 'جاري الرفع إلى تيليجرام...' : 'اختر فيديو'}
+                  {uploadingVideo ? 'جاري الرفع إلى تيليجرام...' : 'اختر فيديو للرفع'}
                 </Button>
               </div>
               <div>
-                <Label>أو أدخل رابط الفيديو مباشرة</Label>
+                <Label>أو الصق رابط فيديو تيليجرام</Label>
                 <Input
                   value={videoUrl.startsWith('tg://') ? '' : videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://..."
+                  placeholder="https://api.telegram.org/file/bot.../videos/file_123.mp4"
                   dir="ltr"
                   className="mt-1"
                 />
-                {videoUrl && videoUrl.startsWith('tg://') && (
-                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
-                    <Video className="w-3 h-3" /> تم رفع الفيديو عبر تيليجرام (معرّف قديم)
-                    <button onClick={() => setVideoUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
-                  </div>
-                )}
-                {videoUrl && !videoUrl.startsWith('tg://') && (
+                {videoUrl && (
                   <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
                     <Video className="w-3 h-3" /> رابط الفيديو جاهز
-                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-navy underline truncate max-w-[16rem]">{videoUrl.split('/').pop() || 'فتح'}</a>
-                    <button onClick={() => setVideoUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
+                    <button onClick={() => setVideoUrl('')} className="text-red-500 hover:text-red-700">
+                      <X className="w-3 h-3" /> إزالة
+                    </button>
                   </div>
                 )}
               </div>
