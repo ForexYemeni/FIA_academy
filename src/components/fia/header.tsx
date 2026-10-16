@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Menu } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 
-const NAV_LINKS = [
+// Base navigation links (always shown).
+// "الشركاء" and "التراخيص" are injected dynamically based on the admin's
+// site_settings visibility toggles (show_partners / show_licenses).
+const BASE_NAV_LINKS = [
   { href: '#courses', label: 'دوراتنا' },
   { href: '#trainers', label: 'مدربونا' },
   { href: '#team', label: 'المؤسس والفريق' },
@@ -25,8 +28,39 @@ interface HeaderProps {
 
 export function Header({ onLoginClick }: HeaderProps) {
   const [open, setOpen] = useState(false)
+  const [settings, setSettings] = useState<any>({})
   const user = useAuth((s) => s.user)
   const logout = useAuth((s) => s.logout)
+
+  // Pull site settings so the nav reflects the admin's visibility toggles
+  // for partners & licenses in real time.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/site-settings')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setSettings(d || {}) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // Build the final nav link list: insert "شركاؤنا" and "التراخيص" right
+  // after "المؤسس والفريق" so they sit in a sensible visual position.
+  const navLinks = useMemo(() => {
+    const links = [...BASE_NAV_LINKS]
+    const inserts: { href: string; label: string }[] = []
+    if (settings.show_partners === true) {
+      inserts.push({ href: '#partners', label: 'شركاؤنا' })
+    }
+    if (settings.show_licenses === true) {
+      inserts.push({ href: '#licenses', label: 'التراخيص' })
+    }
+    if (inserts.length > 0) {
+      const teamIdx = links.findIndex((l) => l.href === '#team')
+      const insertAt = teamIdx === -1 ? links.length : teamIdx + 1
+      links.splice(insertAt, 0, ...inserts)
+    }
+    return links
+  }, [settings.show_partners, settings.show_licenses])
 
   const goDashboard = () => {
     // Just trigger a re-render by scrolling to top
@@ -52,7 +86,7 @@ export function Header({ onLoginClick }: HeaderProps) {
           </a>
 
           <nav className="hidden lg:flex items-center gap-1">
-            {NAV_LINKS.map((l) => (
+            {navLinks.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
@@ -101,7 +135,7 @@ export function Header({ onLoginClick }: HeaderProps) {
               <SheetContent side="right" className="bg-navy border-gold/20 w-72 p-0">
                 <SheetTitle className="text-white px-4 pt-4">القائمة</SheetTitle>
                 <nav className="flex flex-col gap-1 p-4">
-                  {NAV_LINKS.map((l) => (
+                  {navLinks.map((l) => (
                     <a
                       key={l.href}
                       href={l.href}
