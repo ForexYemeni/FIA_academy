@@ -1628,13 +1628,13 @@ function SettingsTab({ user, updateUser }: any) {
 function StudentCertificates({ user }: any) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewing, setViewing] = useState<any | null>(null)
 
   useEffect(() => {
     if (!user?.name) { setLoading(false); return }
     fetch(`/api/certificates?student_name=${encodeURIComponent(user.name)}`)
       .then((r) => r.json())
       .then((d) => {
-        // Filter only valid certificates ('صالحة')
         const arr = Array.isArray(d) ? d.filter((c: any) => c.status === 'صالحة') : []
         setItems(arr)
       })
@@ -1669,66 +1669,82 @@ function StudentCertificates({ user }: any) {
   }
 
   return (
-    <SectionCard title="شهاداتي" description={`${items.length} شهادة صادرة`}>
-      <div className="grid sm:grid-cols-2 gap-5">
-        {items.map((cert) => (
-          <Card key={cert.id} className="overflow-hidden hover:shadow-xl transition-all group">
-            {/* Top gradient bar */}
-            <div className="h-2 bg-gradient-to-r from-gold via-gold-light to-gold" />
-            {/* Cover-like header */}
-            <div className="bg-gradient-to-br from-navy to-navy-light p-5 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
-              <div className="relative flex items-start justify-between">
-                <div>
-                  <div className="text-[10px] text-gold uppercase tracking-widest mb-1">Future International Academy</div>
-                  <div className="text-xs text-white/70">شهادة إكمال معتمدة</div>
+    <>
+      <SectionCard title="شهاداتي" description={`${items.length} شهادة صادرة`}>
+        <div className="grid sm:grid-cols-2 gap-5">
+          {items.map((cert) => (
+            <Card key={cert.id} className="overflow-hidden hover:shadow-xl transition-all group cursor-pointer" >
+              <div className="h-2 bg-gradient-to-r from-gold via-gold-light to-gold" />
+              <div className="bg-gradient-to-br from-navy to-navy-light p-5 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
+                <div className="relative flex items-start justify-between">
+                  <div>
+                    <div className="text-[10px] text-gold uppercase tracking-widest mb-1">Future International Academy</div>
+                    <div className="text-xs text-white/70">شهادة إكمال معتمدة</div>
+                  </div>
+                  <Award className="w-6 h-6 text-gold" />
                 </div>
-                <Award className="w-6 h-6 text-gold" />
               </div>
-            </div>
-            {/* Body */}
-            <div className="p-5">
-              <p className="text-[10px] text-muted-foreground mb-1">الدورة</p>
-              <h4 className="font-bold text-navy text-sm mb-3 line-clamp-2">{cert.course_title}</h4>
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <div className="text-[10px] text-muted-foreground">رقم الشهادة</div>
-                  <div className="font-mono font-bold text-navy" dir="ltr">{cert.certificate_number}</div>
-                </div>
-                <div className="text-left">
-                  <div className="text-[10px] text-muted-foreground">تاريخ الإصدار</div>
-                  <div className="font-bold text-navy">
-                    {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+              <div className="p-5">
+                <p className="text-[10px] text-muted-foreground mb-1">الدورة</p>
+                <h4 className="font-bold text-navy text-sm mb-3 line-clamp-2">{cert.course_title}</h4>
+                <div className="flex items-center justify-between text-xs">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">رقم الشهادة</div>
+                    <div className="font-mono font-bold text-navy" dir="ltr">{cert.certificate_number}</div>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[10px] text-muted-foreground">تاريخ الإصدار</div>
+                    <div className="font-bold text-navy">
+                      {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                    </div>
                   </div>
                 </div>
+                {cert.has_external_accreditation && cert.external_accreditation_body && (
+                  <div className="mt-3 pt-3 border-t border-border flex items-center gap-1.5 text-[10px] text-gold">
+                    <Award className="w-3 h-3" />
+                    معتمدة من: {cert.external_accreditation_body}
+                  </div>
+                )}
               </div>
-              {cert.has_external_accreditation && cert.external_accreditation_body && (
-                <div className="mt-3 pt-3 border-t border-border flex items-center gap-1.5 text-[10px] text-gold">
-                  <Award className="w-3 h-3" />
-                  معتمدة من: {cert.external_accreditation_body}
-                </div>
-              )}
-            </div>
-            {/* Footer with actions */}
-            <div className="px-5 pb-5 flex gap-2">
-              <a
-                href={`/verify/${cert.certificate_number}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg font-bold text-xs transition-colors"
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> عرض الشهادة
-              </a>
-              <button
-                onClick={() => window.open(`/verify/${cert.certificate_number}`, '_blank')}
-                className="inline-flex items-center justify-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-4 py-2 rounded-lg font-bold text-xs transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> طباعة
+              <div className="px-5 pb-5 flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 bg-navy hover:bg-navy-light"
+                  onClick={() => setViewing(cert)}
+                >
+                  <ExternalLink className="w-3.5 h-3.5 ml-1.5" /> عرض الشهادة
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-gold/30 text-gold hover:bg-gold/10"
+                  onClick={() => setViewing(cert)}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Certificate viewer dialog — opens in-app, no new tab */}
+      <Dialog open={!!viewing} onOpenChange={(o) => { if (!o) setViewing(null) }}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-gold" /> عرض الشهادة
+              </DialogTitle>
+              <button onClick={() => setViewing(null)} className="text-muted-foreground hover:text-navy">
+                <X className="w-5 h-5" />
               </button>
             </div>
-          </Card>
-        ))}
-      </div>
-    </SectionCard>
+          </DialogHeader>
+          {viewing && <CertificateViewer certificate={viewing} onClose={() => setViewing(null)} />}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
