@@ -363,8 +363,8 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
         </div>
       </section>
 
-      {/* VERIFY CERTIFICATE */}
-      <section id="verify" className="py-20 bg-white">
+      {/* VERIFY CERTIFICATE — DISABLED: certificate feature temporarily removed */}
+      {/* <section id="verify" className="py-20 bg-white">
         <div className="container mx-auto px-4 lg:px-6 max-w-3xl">
           <div className="text-center mb-10">
             <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">التحقق من الشهادة</Badge>
@@ -395,7 +395,7 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
             </div>
           </Card>
         </div>
-      </section>
+      </section> */}
 
       {/* CONTACT */}
       <section id="contact" className="py-20 bg-gradient-to-b from-muted/30 to-white">
