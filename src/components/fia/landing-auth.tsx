@@ -51,62 +51,65 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
   const goToCard = (id: string) => { window.location.hash = id }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4 py-8">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo centered */}
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4 py-4">
+      <div className="w-full max-w-sm space-y-4">
+        {/* Logo centered — compact */}
         <div className="text-center">
-          <img src="/fia/logo-fia.png" alt="FIA" className="h-20 w-20 mx-auto rounded-2xl shadow-md object-cover mb-3" />
-          <h2 className="text-2xl font-bold text-[#0A1F44]">
+          <img src="/fia/logo-fia.png" alt="FIA" className="h-16 w-16 mx-auto rounded-xl shadow-md object-cover mb-2" />
+          <h2 className="text-xl font-bold text-[#0A1F44]">
             {mode === 'login' ? 'مرحباً بعودتك' : 'انضم إلى الأكاديمية'}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-0.5">
             {mode === 'login' ? 'ادخل بياناتك للوصول إلى حسابك' : 'أنشئ حسابك للوصول إلى الدورات المعتمدة'}
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+        {/* Tabs — compact */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
           <button onClick={() => setMode('register')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${mode === 'register' ? 'bg-[#0A1F44] text-[#C9A961] shadow-md' : 'text-gray-600'}`}>
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${mode === 'register' ? 'bg-[#0A1F44] text-[#C9A961] shadow-md' : 'text-gray-600'}`}>
             <UserPlus className="w-4 h-4" /> حساب جديد
           </button>
           <button onClick={() => setMode('login')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${mode === 'login' ? 'bg-[#0A1F44] text-[#C9A961] shadow-md' : 'text-gray-600'}`}>
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${mode === 'login' ? 'bg-[#0A1F44] text-[#C9A961] shadow-md' : 'text-gray-600'}`}>
             <User className="w-4 h-4" /> دخول
           </button>
         </div>
 
-        {/* Form */}
-        <div className="space-y-4">
+        {/* Form — compact, h-10 inputs to save vertical space */}
+        <div className="space-y-3">
           {mode === 'register' && (
             <div>
-              <Label htmlFor="name" className="text-[#0A1F44] font-medium text-sm">الاسم الكامل</Label>
-              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: محمد أحمد" className="mt-1.5 h-12 rounded-xl" />
+              <Label htmlFor="name" className="text-[#0A1F44] font-medium text-xs">الاسم الكامل</Label>
+              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: محمد أحمد" className="mt-1 h-10 rounded-lg text-sm" />
             </div>
           )}
           <div>
-            <Label htmlFor="email" className="text-[#0A1F44] font-medium text-sm">البريد الإلكتروني</Label>
-            <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="example@fia.edu" className="mt-1.5 h-12 rounded-xl" dir="ltr" />
+            <Label htmlFor="email" className="text-[#0A1F44] font-medium text-xs">البريد الإلكتروني</Label>
+            <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="example@fia.edu" className="mt-1 h-10 rounded-lg text-sm" dir="ltr" />
           </div>
           {mode === 'register' && (
             <div>
-              <Label htmlFor="phone" className="text-[#0A1F44] font-medium text-sm">رقم الهاتف</Label>
-              <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+967 7XX XXX XXX" className="mt-1.5 h-12 rounded-xl" dir="ltr" />
+              <Label htmlFor="phone" className="text-[#0A1F44] font-medium text-xs">رقم الهاتف</Label>
+              <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+967 7XX XXX XXX" className="mt-1 h-10 rounded-lg text-sm" dir="ltr" />
             </div>
           )}
           <div>
-            <Label htmlFor="password" className="text-[#0A1F44] font-medium text-sm">كلمة المرور</Label>
-            <Input id="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" className="mt-1.5 h-12 rounded-xl" dir="ltr" onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+            <Label htmlFor="password" className="text-[#0A1F44] font-medium text-xs">كلمة المرور</Label>
+            <Input id="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" className="mt-1 h-10 rounded-lg text-sm" dir="ltr" onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
           </div>
-          <Button onClick={submit} disabled={loading} className="w-full bg-[#0A1F44] hover:bg-[#102a63] text-white h-12 text-base font-semibold rounded-xl">
+          <Button onClick={submit} disabled={loading} className="w-full bg-[#0A1F44] hover:bg-[#102a63] text-white h-11 text-sm font-semibold rounded-lg">
             {loading ? 'جاري المعالجة...' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
           </Button>
         </div>
 
         {/* Quick links — trigger hash navigation → QuickLinkCard in page.tsx */}
         <div className="border-t border-gray-100 pt-4">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1">
             {[
+              { id: 'courses', label: 'دوراتنا' },
+              { id: 'trainers', label: 'مدربونا' },
+              { id: 'team', label: 'الفريق' },
               { id: 'about', label: 'من نحن' },
               { id: 'privacy', label: 'الخصوصية' },
               { id: 'terms', label: 'الشروط' },
@@ -115,7 +118,7 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
               { id: 'social', label: 'تابعنا' },
             ].map((link) => (
               <button key={link.id} onClick={() => goToCard(link.id)}
-                className="text-xs text-gray-500 hover:text-[#C9A961] transition-colors py-2 rounded-lg hover:bg-gray-50">
+                className="text-[11px] text-gray-500 hover:text-[#C9A961] transition-colors py-1.5 rounded-lg hover:bg-gray-50">
                 {link.label}
               </button>
             ))}
