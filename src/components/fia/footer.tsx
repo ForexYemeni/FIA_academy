@@ -23,7 +23,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <img src="/fia/logo-fia.png" alt="FIA" className="h-12 w-12 object-cover rounded-lg" />
+              <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-lg" />
               <div>
                 <div className="font-bold text-lg">{academyName}</div>
                 <div className="text-gold text-xs font-semibold tracking-wider">{academyNameEn}</div>
