@@ -43,7 +43,7 @@ export function Header({ onLoginClick }: HeaderProps) {
       <div className="container mx-auto px-4 lg:px-6">
         <div className="flex h-16 items-center justify-between">
           <a href="#home" className="flex items-center gap-2">
-            <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-lg" />
+            <img src="/fia/logo-fia.png" alt="FIA" className="h-8 w-8 object-cover rounded-lg flex-shrink-0" />
             <div className="hidden sm:block">
               <div className="text-white font-bold text-base leading-tight">أكاديمية المستقبل الدولية</div>
               <div className="text-gold text-xs font-semibold tracking-wider">FIA — Future International Academy</div>
