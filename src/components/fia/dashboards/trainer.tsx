@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
-  HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper,
+  HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
+import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -29,6 +30,7 @@ const NAV: NavItem[] = [
   { id: 'forum', label: 'المنتدى', icon: MessageSquare },
   { id: 'blog', label: 'المدونة', icon: Newspaper },
   { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
+  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift },
   { id: 'profile', label: 'ملفي الشخصي', icon: User },
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
@@ -152,6 +154,11 @@ export function TrainerDashboard() {
       {active === 'forum' && <SharedForum user={user} />}
       {active === 'blog' && <SharedBlog />}
       {active === 'faqs' && <SharedFAQ />}
+      {active === 'affiliate' && (
+        <SectionCard title="برنامج العمولة" description="شارك أصدقاءك واكسب عمولة">
+          <AffiliateDashboard />
+        </SectionCard>
+      )}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} refreshProfile={refreshTrainerProfile} />}
       {active === 'notifications' && <TrainerNotifs courses={courses} />}
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}

@@ -160,8 +160,14 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     setMessages((prev) => [...prev, optimistic])
 
     try {
-      const targetId = recipient?.id || ''
-      if (!targetId) { toast.error('اختر مستلم'); return }
+      // Determine the recipient: either explicitly set (new conversation),
+      // or look it up from the active conversation's other_id field
+      let targetId = recipient?.id || ''
+      if (!targetId && activeConvId) {
+        const conv = conversations.find((c) => c.id === activeConvId)
+        if (conv?.other_id) targetId = conv.other_id
+      }
+      if (!targetId) { toast.error('اختر مستلماً من القائمة على اليمين'); return }
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -215,8 +221,8 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
           </DialogHeader>
 
           <div className="flex-1 flex min-h-0">
-            {/* Sidebar — conversations list + new conversation search */}
-            <div className="w-64 border-l border-border overflow-y-auto bg-muted/30 hidden md:flex flex-col">
+            {/* Sidebar — conversations list + new conversation search — always visible */}
+            <div className="w-64 border-l border-border bg-muted/30 flex flex-col flex-shrink-0">
               {/* Search to start new conversation */}
               <div className="p-3 border-b border-border bg-white">
                 <div className="relative">
@@ -224,11 +230,14 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                   <Input
                     value={searchQ}
                     onChange={(e) => searchUsers(e.target.value)}
-                    placeholder="ابحث عن مستخدم لمراسلته..."
+                    placeholder="ابحث عن مستخدم..."
                     className="text-xs pr-8"
                   />
                 </div>
                 {searching && <p className="text-[10px] text-muted-foreground mt-1">جاري البحث...</p>}
+                {searchQ.length >= 2 && !searching && searchResults.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-1">لا توجد نتائج — جرّب اسم مدرب أو متدرب</p>
+                )}
                 {searchResults.length > 0 && (
                   <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
                     {searchResults.map((u) => (
@@ -243,50 +252,62 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-bold text-navy truncate">{u.name}</div>
-                          <div className="text-[9px] text-muted-foreground">{u.email}</div>
+                          <div className="text-[9px] text-muted-foreground truncate">{u.email}</div>
                         </div>
                         {u.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 text-[8px] px-1 py-0">مدرب</Badge>}
                         {u.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 text-[8px] px-1 py-0">متدرب</Badge>}
+                        {u.role === 'founder' && <Badge className="bg-gold/15 text-gold text-[8px] px-1 py-0">مؤسس</Badge>}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
+              {/* Active conversation indicator */}
               {recipient && (
-                <div className="p-3 bg-gold/10 border-b border-gold/20">
-                  <div className="text-xs font-bold text-navy">محادثة جديدة مع</div>
-                  <div className="text-sm text-navy font-medium mt-1">{recipient.name}</div>
+                <div className="p-3 bg-gold/10 border-b border-gold/20 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-navy">محادثة جديدة مع</div>
+                    <div className="text-sm text-navy font-medium mt-0.5">{recipient.name}</div>
+                  </div>
+                  <button onClick={() => { setRecipient(null); setActiveConvId(null); setMessages([]) }} className="text-muted-foreground hover:text-red-500">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               )}
-              {conversations.length === 0 && !recipient ? (
-                <div className="p-6 text-center text-xs text-muted-foreground flex-1 flex items-center justify-center">
-                  لا توجد محادثات بعد — ابحث عن مستخدم في الأعلى لبدء محادثة
-                </div>
-              ) : (
-                conversations.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setRecipient(null); setActiveConvId(c.id) }}
-                    className={`w-full p-3 text-right border-b border-border hover:bg-muted transition-colors ${activeConvId === c.id ? 'bg-gold/10' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-9 h-9">
-                        <AvatarImage src={c.other?.avatar || ''} />
-                        <AvatarFallback className="bg-navy text-gold text-xs">
-                          {c.other?.name?.charAt(0) || '؟'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {c.last_message_body || ''}
+
+              <div className="flex-1 overflow-y-auto">
+                {conversations.length === 0 && !recipient ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    <MessageCircle className="w-10 h-10 mx-auto mb-2 text-muted-foreground/30" />
+                    لا توجد محادثات بعد
+                    <p className="text-[10px] mt-1">ابحث عن مستخدم في الأعلى لبدء محادثة</p>
+                  </div>
+                ) : (
+                  conversations.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setRecipient(null); setActiveConvId(c.id) }}
+                      className={`w-full p-3 text-right border-b border-border hover:bg-muted transition-colors ${activeConvId === c.id && !recipient ? 'bg-gold/10' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-9 h-9">
+                          <AvatarImage src={c.other?.avatar || ''} />
+                          <AvatarFallback className="bg-navy text-gold text-xs">
+                            {c.other?.name?.charAt(0) || '؟'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {c.last_message_body || ''}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                ))
-              )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
 
             {/* Main — messages */}
@@ -328,17 +349,22 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Draft + send */}
+              {/* Draft + send — always enabled; if no recipient, input shows
+                  a placeholder that tells the user to pick someone first */}
               <div className="p-3 border-t border-border flex items-center gap-2 bg-white">
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-                  placeholder="اكتب رسالتك..."
+                  placeholder={recipient ? 'اكتب رسالتك...' : 'اختر مستلماً من القائمة على اليمين لبدء المحادثة...'}
                   className="flex-1"
-                  disabled={sending || !recipient}
+                  disabled={sending || (!recipient && !activeConvId)}
                 />
-                <Button onClick={send} disabled={sending || !draft.trim() || !recipient} className="bg-navy hover:bg-navy-light">
+                <Button
+                  onClick={send}
+                  disabled={sending || !draft.trim() || (!recipient && !activeConvId)}
+                  className="bg-navy hover:bg-navy-light"
+                >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </Button>
               </div>
