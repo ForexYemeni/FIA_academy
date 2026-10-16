@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
@@ -30,20 +30,6 @@ const NAV: NavItem[] = [
   { id: 'settings', label: 'الإعدادات', icon: Settings },
 ]
 
-// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
-// Show only the human-readable text in the UI, but preserve the extra data on save.
-const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
-const splitBio = (raw: string) => {
-  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
-  return i === -1 ? raw : raw.slice(0, i).trimEnd()
-}
-const joinBio = (display: string, original?: string) => {
-  if (!original) return display
-  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
-  if (i === -1) return display
-  return `${display.trimEnd()}\n\n${original.slice(i)}`
-}
-
 export function TrainerDashboard() {
   const [active, setActive] = useState('overview')
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
@@ -55,7 +41,49 @@ export function TrainerDashboard() {
   const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<any | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || ''), specialization: user?.title || '' })
+  // Profile state is seeded from auth-store user; refreshTrainerProfile() below
+  // keeps it in sync with the latest DB record fetched from /api/trainers.
+  const [profile, setProfile] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    title: user?.title || '',
+    specialization: user?.title || '',
+    bio: user?.bio || '',
+    avatar: user?.avatar || '',
+  })
+
+  const refreshTrainerProfile = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const res = await fetch(`/api/trainers?id=${user.id}`)
+      const data = await res.json()
+      if (data && !data.error) {
+        setProfile({
+          name: data.name || '',
+          phone: data.phone || '',
+          title: data.title || '',
+          specialization: data.specialization || data.title || '',
+          bio: data.bio || '',
+          avatar: data.avatar || '',
+        })
+        // Keep auth-store in sync too so other parts of the dashboard reflect
+        // any admin-side edits.
+        updateUser({
+          name: data.name,
+          phone: data.phone,
+          title: data.title,
+          bio: data.bio,
+          avatar: data.avatar,
+        })
+      }
+    } catch {
+      // silent
+    }
+  }, [user?.id, updateUser])
+
+  useEffect(() => {
+    refreshTrainerProfile()
+  }, [refreshTrainerProfile])
 
   const loadCourses = () => {
     fetch('/api/courses').then((r) => r.json()).then((d) => {
@@ -117,7 +145,7 @@ export function TrainerDashboard() {
       )}
       {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
       {active === 'exams' && <TrainerExams courses={courses} />}
-      {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+      {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} refreshProfile={refreshTrainerProfile} />}
       {active === 'notifications' && <TrainerNotifs courses={courses} />}
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
 
@@ -837,20 +865,38 @@ function TrainerExams({ courses }: { courses: any[] }) {
   )
 }
 
-function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
+function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile }: any) {
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
     setLoading(true)
     try {
-      // Update locally — in real app this would also call /api/trainers PUT
-      updateUser({
-        name: profile.name,
-        phone: profile.phone,
-        title: profile.title,
-        bio: joinBio(profile.bio, user?.bio),
+      const res = await fetch('/api/trainers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: profile.name,
+          phone: profile.phone,
+          title: profile.title,
+          specialization: profile.specialization,
+          bio: profile.bio,
+        }),
       })
-      toast.success('تم تحديث الملف الشخصي')
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل التحديث')
+        return
+      }
+      // Sync local auth-store with the saved DB record so other components
+      // (overview header, etc.) reflect the new values immediately.
+      updateUser({
+        name: data.name,
+        phone: data.phone,
+        title: data.title,
+        bio: data.bio,
+      })
+      toast.success('تم تحديث الملف الشخصي بنجاح')
     } catch {
       toast.error('فشل التحديث')
     } finally {
@@ -858,18 +904,32 @@ function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
     }
   }
 
+  const handleAvatarUploaded = async (url: string) => {
+    // The /api/upload/avatar route already persists the URL to the DB.
+    // We just need to keep auth-store + profile state in sync and re-fetch
+    // the canonical record so everything (avatar included) matches the DB.
+    updateUser({ avatar: url })
+    setProfile((p: any) => ({ ...p, avatar: url }))
+    if (refreshProfile) {
+      try { await refreshProfile() } catch { /* silent */ }
+    }
+  }
+
   return (
-    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك">
-      <div className="space-y-6 max-w-2xl">
-        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك — كل التعديلات تُحفظ مباشرة في قاعدة البيانات وتظهر فوراً في حساب الإدارة والصفحة الرئيسية">
+      <div className="space-y-6 max-w-3xl">
+        <div className="flex flex-col items-center gap-4 p-6 bg-gradient-to-br from-navy/5 to-gold/5 rounded-xl border border-gold/20">
           <AvatarUploader
             userId={user.id}
             role="trainer"
-            initialUrl={user?.avatar}
-            name={user?.name}
+            initialUrl={profile.avatar || user?.avatar}
+            name={profile.name}
             size="xl"
-            onUploaded={(url) => updateUser({ avatar: url })}
+            onUploaded={handleAvatarUploaded}
           />
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">صورة المدرب الرسمية — تظهر في حساب الإدارة والصفحة الرئيسية</p>
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -894,12 +954,33 @@ function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
           <Label>المسمى الوظيفي</Label>
           <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
         </div>
-        <div>
-          <Label>النبذة التعريفية</Label>
-          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+
+        {/* Unified professional bio — same field as admin's TrainerDialog */}
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center justify-between mb-1">
+            <Label className="font-bold text-navy">النبذة التعريفية الكاملة</Label>
+            <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
+          </div>
+          <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+            اكتب نبذة واحدة متكاملة واحترافية عن نفسك — تظهر بنفس الصيغة في حساب الإدارة وفي الصفحة الرئيسية عند الضغط على بطاقتك.
+            <br />
+            <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
+          </p>
+          <Textarea
+            value={profile.bio || ''}
+            onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+            rows={12}
+            className="mt-1 min-h-[260px] leading-relaxed focus:ring-gold/40 focus:border-gold/40"
+            placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
+          />
+          <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+            <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
+            <span>{(profile.bio || '').length} حرف</span>
+          </div>
         </div>
+
         <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
-          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
         </Button>
       </div>
     </SectionCard>

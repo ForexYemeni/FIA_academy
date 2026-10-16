@@ -1185,14 +1185,14 @@ function AdminTrainers() {
 
 function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', qualifications: '', achievements: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
+    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   useEffect(() => {
-    setForm(initial || { name: '', title: '', specialization: '', bio: '', qualifications: '', achievements: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
+    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
   }, [initial])
 
   const handleAvatarUpload = async (file: File) => {
@@ -1327,40 +1327,27 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
           </div>
 
-          {/* Professional Bio — النبذة التعريفية */}
-          <div className="border-t border-border pt-3">
-            <Label className="text-xs font-bold text-navy">النبذة التعريفية</Label>
-            <p className="text-[10px] text-muted-foreground mb-2">اكتب نبذة احترافية عن المدرب — تظهر للزوار عند الضغط على المدرب في الصفحة الرئيسية</p>
+          {/* Professional Complete Bio — نبذة تعريفية احترافية واحدة */}
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-xs font-bold text-navy">النبذة التعريفية الكاملة</Label>
+              <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+              اكتب نبذة واحدة متكاملة واحترافية عن المدرب — تظهر بالضبط كما تكتبها هنا في حساب المدرب وفي الصفحة الرئيسية عند الضغط على المدرب.
+              <br />
+              <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ، مثل: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
+            </p>
             <textarea
               value={form.bio || ''}
               onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              className="w-full min-h-[120px] p-3 border border-input rounded-md text-sm leading-relaxed"
-              placeholder="مثال: مدرب و محاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي..."
+              className="w-full min-h-[260px] p-4 border border-input rounded-lg text-sm leading-relaxed bg-background focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/40 transition-all"
+              placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
             />
-          </div>
-
-          {/* Qualifications — المؤهلات العلمية */}
-          <div>
-            <Label className="text-xs font-bold text-navy">المؤهلات العلمية</Label>
-            <p className="text-[10px] text-muted-foreground mb-2">كل مؤهل في سطر منفصل</p>
-            <textarea
-              value={form.qualifications || ''}
-              onChange={(e) => setForm({ ...form, qualifications: e.target.value })}
-              className="w-full min-h-[80px] p-3 border border-input rounded-md text-sm"
-              placeholder={"مثال:\nبكالوريوس آداب وعلوم إنسانية\nماستر حقوق وعلوم سياسية"}
-            />
-          </div>
-
-          {/* Achievements — الإنجازات */}
-          <div>
-            <Label className="text-xs font-bold text-navy">الإنجازات</Label>
-            <p className="text-[10px] text-muted-foreground mb-2">كل إنجاز في سطر منفصل</p>
-            <textarea
-              value={form.achievements || ''}
-              onChange={(e) => setForm({ ...form, achievements: e.target.value })}
-              className="w-full min-h-[80px] p-3 border border-input rounded-md text-sm"
-              placeholder={"مثال:\nمشارك في عدة مؤتمرات دولية\nمؤلف لـ 6 كتب في طبعات دولية"}
-            />
+            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+              <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
+              <span>{(form.bio || '').length} حرف</span>
+            </div>
           </div>
 
           {/* Years experience */}
