@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Users, Star, BookOpen, CheckCircle2, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
+import { CourseReviews } from '@/components/fia/course-reviews'
 
 interface CourseDetailClientProps {
   course: any
@@ -154,6 +155,11 @@ export default function CourseDetailClient({ course }: CourseDetailClientProps) 
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* Public reviews section */}
+        <div className="mt-16">
+          <CourseReviews courseId={course.id} allowAdd={!!user} />
         </div>
       </div>
     </div>
