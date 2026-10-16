@@ -30,6 +30,7 @@ import {
   AdminForum, AdminBlog, AdminContact, AdminFaqs,
 } from './admin-extended'
 import { AdminForumBans } from './shared-community'
+import { CertificateViewer } from '@/components/fia/certificate-viewer'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -1054,13 +1055,17 @@ function AdminCertificates() {
       {previewCert && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>معاينة — {previewCert.certificate_number}</DialogTitle></DialogHeader>
-            <div className="py-2">
-              <a href={`/?verify=${encodeURIComponent(previewCert.certificate_number)}#verify`} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
-                <Button variant="outline" size="sm" className="border-gold/30 text-navy hover:bg-gold/10"><ExternalLink className="w-3.5 h-3.5 ml-1" /> فتح صفحة التحقق</Button>
-              </a>
-              <iframe src={`/api/certificate-pdf?number=${encodeURIComponent(previewCert.certificate_number)}&format=pdf`} className="w-full h-[500px] border-2 border-gold/30 rounded-lg" title="Certificate Preview" />
-            </div>
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-gold" /> معاينة الشهادة — {previewCert.certificate_number}
+                </DialogTitle>
+                <button onClick={() => setPreviewCert(null)} className="text-muted-foreground hover:text-navy">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </DialogHeader>
+            <CertificateViewer certificate={previewCert} onClose={() => setPreviewCert(null)} />
           </DialogContent>
         </Dialog>
       )}
