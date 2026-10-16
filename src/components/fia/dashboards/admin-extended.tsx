@@ -9,13 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SectionCard } from './shell'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Tag, Users, FileText, Star, MessageSquare,
   Newspaper, Mail, HelpCircle, ExternalLink, Clock, CheckCircle2, X,
-  Loader2, Gift, Award, Eye,
+  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight,
 } from 'lucide-react'
 
 // ============================================================================
@@ -653,6 +654,20 @@ export function AdminForum() {
   const [editingCat, setEditingCat] = useState<any | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // NEW: topic viewing + reply + new topic creation
+  const [viewingTopic, setViewingTopic] = useState<any | null>(null)
+  const [posts, setPosts] = useState<any[]>([])
+  const [replyText, setReplyText] = useState('')
+  const [replying, setReplying] = useState(false)
+  const [newTopicOpen, setNewTopicOpen] = useState(false)
+  const [newTopicCat, setNewTopicCat] = useState<string>('')
+  const [newTopicTitle, setNewTopicTitle] = useState('')
+  const [newTopicBody, setNewTopicBody] = useState('')
+  const [savingTopic, setSavingTopic] = useState(false)
+  // NEW: ban a user from inside the topic view
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
+  const [banning, setBanning] = useState(false)
 
   const loadCats = () => fetch('/api/forum-categories').then((r) => r.json()).then((d) => setCats(Array.isArray(d) ? d : []))
   const loadTopics = () => fetch('/api/forum-topics').then((r) => r.json()).then((d) => setTopics(Array.isArray(d) ? d : []))
@@ -668,11 +683,246 @@ export function AdminForum() {
     } finally { setDeleting(false) }
   }
 
+  // NEW: open a topic to view its full body + all replies
+  const openTopic = async (t: any) => {
+    setViewingTopic(t)
+    const res = await fetch(`/api/forum?topic_id=${t.id}`)
+    const data = await res.json()
+    setPosts(Array.isArray(data) ? data : [])
+  }
+
+  // NEW: post a reply as the admin (uses admin's user.id)
+  const submitReply = async (adminUser: any) => {
+    if (!replyText.trim() || !viewingTopic || !adminUser?.id) return
+    setReplying(true)
+    try {
+      const res = await fetch('/api/forum', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic_id: viewingTopic.id, user_id: adminUser.id, body: replyText }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل الإرسال'); return }
+      // Refresh posts (with author profiles)
+      const postsRes = await fetch(`/api/forum?topic_id=${viewingTopic.id}`)
+      const postsData = await postsRes.json()
+      setPosts(Array.isArray(postsData) ? postsData : [])
+      setReplyText('')
+      loadTopics()
+      toast.success('تم نشر ردك')
+    } finally { setReplying(false) }
+  }
+
+  // NEW: create a new topic (admin can post in any category)
+  const submitNewTopic = async (adminUser: any) => {
+    if (!newTopicTitle.trim() || !newTopicCat || !adminUser?.id) {
+      toast.error('الفئة والعنوان مطلوبان'); return
+    }
+    setSavingTopic(true)
+    try {
+      const res = await fetch('/api/forum-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_id: newTopicCat,
+          user_id: adminUser.id,
+          title: newTopicTitle,
+          body: newTopicBody,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل النشر'); return }
+      toast.success('تم نشر الموضوع')
+      setNewTopicOpen(false)
+      setNewTopicTitle(''); setNewTopicBody('')
+      loadTopics()
+      openTopic(data)
+    } finally { setSavingTopic(false) }
+  }
+
+  // NEW: ban a user from inside the topic view
+  const handleBanUser = async (adminUser: any) => {
+    if (!banTarget || !adminUser?.id) return
+    setBanning(true)
+    try {
+      const res = await fetch('/api/forum-bans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          banned_user_id: banTarget.userId,
+          banned_by_user_id: adminUser.id,
+          reason: banReason || 'مخالفة قواعد المنتدى',
+          scope: 'all',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل الحظر'); return }
+      toast.success(`تم حظر ${banTarget.name} من المنتدى`)
+      setBanTarget(null); setBanReason('')
+    } finally { setBanning(false) }
+  }
+
+  const adminUser = (typeof window !== 'undefined') ? (window as any).__fia_auth_user : null
+  // Better: pull admin user from the auth store via the localStorage value
+  // We avoid importing useAuth here (already in admin.tsx); pass via window hack
+  const getAdminUser = () => {
+    try {
+      const stored = localStorage.getItem('fia-auth')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        return parsed?.state?.user || null
+      }
+    } catch {}
+    return null
+  }
+  const currentUser = getAdminUser()
+
+  // NEW: topic detail view (full topic + all replies + reply box)
+  if (viewingTopic) {
+    return (
+      <SectionCard
+        title={viewingTopic.title}
+        description={`${posts.length} رد · ${viewingTopic.replies_count || 0}`}
+        action={
+          <Button variant="outline" onClick={() => setViewingTopic(null)}>
+            <ArrowRight className="w-4 h-4 ml-1" /> رجوع للقائمة
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          {/* Original topic body */}
+          {viewingTopic.body && (
+            <Card className="p-4 border-gold/30 bg-gold/5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Avatar className="w-7 h-7 border border-gold/20">
+                    <AvatarImage src={viewingTopic.author?.avatar || ''} />
+                    <AvatarFallback className="bg-navy text-gold text-xs">
+                      {viewingTopic.author?.name?.charAt(0) || '؟'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-navy">{viewingTopic.author?.name || 'مستخدم'}</span>
+                    {viewingTopic.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+                    {viewingTopic.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+                    {viewingTopic.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+                    {viewingTopic.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+                    {viewingTopic.author?.role === 'leader' && <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">🛡️ قائد</Badge>}
+                    {viewingTopic.author?.role === 'team' && <Badge className="bg-gray-500/15 text-gray-600 border-gray-500/30 text-[10px]">🤝 فريق</Badge>}
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3 inline" /> {new Date(viewingTopic.created_at).toLocaleDateString('ar-EG')}
+                </span>
+              </div>
+              <p className="text-sm text-navy whitespace-pre-wrap leading-relaxed">{viewingTopic.body}</p>
+            </Card>
+          )}
+
+          {/* Replies */}
+          {posts.map((p) => (
+            <Card key={p.id} className={`p-4 ${p.is_solution ? 'border-green-500/40 bg-green-500/5' : ''}`}>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <Avatar className="w-7 h-7 border border-border">
+                    <AvatarImage src={p.author?.avatar || ''} />
+                    <AvatarFallback className="bg-navy text-gold text-xs">
+                      {p.author?.name?.charAt(0) || '؟'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-navy">{p.author?.name || 'مستخدم'}</span>
+                    {p.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+                    {p.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+                    {p.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+                    {p.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3 inline" /> {new Date(p.created_at).toLocaleDateString('ar-EG')}
+                  </span>
+                  {/* Ban button (not on self, not on admins) */}
+                  {currentUser && p.user_id !== currentUser.id && p.author?.role !== 'admin' && (
+                    <button
+                      onClick={() => setBanTarget({ userId: p.user_id, name: p.author?.name || 'مستخدم' })}
+                      className="text-xs text-red-500 hover:bg-red-500/10 px-2 py-1 rounded"
+                      title="حظر من المنتدى"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {p.is_solution && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">✓ حل</Badge>}
+                </div>
+              </div>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{p.body}</p>
+            </Card>
+          ))}
+
+          {/* Reply box */}
+          <Card className="p-4 bg-muted/30">
+            <Label className="mb-2 block">أضف رداً (بصفتك مدير النظام)</Label>
+            <Textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              rows={3}
+              placeholder="اكتب ردك هنا..."
+              dir="rtl"
+              disabled={replying}
+            />
+            <div className="flex justify-end mt-2">
+              <Button onClick={() => submitReply(currentUser)} disabled={replying || !replyText.trim()} className="bg-navy hover:bg-navy-light">
+                {replying ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
+                {replying ? 'جاري الإرسال...' : 'نشر الرد'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        {/* Ban confirmation dialog */}
+        <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o) { setBanTarget(null); setBanReason('') } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <Ban className="w-5 h-5" /> حظر {banTarget?.name} من المنتدى
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                سيتم منع هذا المستخدم من نشر المواضيع والردود في المنتدى. يمكن رفع الحظر لاحقاً من شاشة "حظر المنتدى".
+              </p>
+              <div>
+                <Label>السبب (اختياري)</Label>
+                <Input value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مخالفة قواعد المنتدى" className="mt-1" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setBanTarget(null); setBanReason('') }}>إلغاء</Button>
+              <Button onClick={() => handleBanUser(currentUser)} disabled={banning} className="bg-red-500 hover:bg-red-600">
+                {banning ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Ban className="w-4 h-4 ml-1" />}
+                تأكيد الحظر
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </SectionCard>
+    )
+  }
+
   return (
     <SectionCard title="إدارة المنتدى" description={`${cats.length} فئة · ${topics.length} موضوع`} action={
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <Button size="sm" variant={tab === 'categories' ? 'default' : 'outline'} onClick={() => setTab('categories')} className={tab === 'categories' ? 'bg-navy' : ''}>الفئات</Button>
         <Button size="sm" variant={tab === 'topics' ? 'default' : 'outline'} onClick={() => setTab('topics')} className={tab === 'topics' ? 'bg-navy' : ''}>المواضيع</Button>
+        {tab === 'topics' && (
+          <Button size="sm" className="bg-gold hover:bg-gold-light text-navy ml-2" onClick={() => {
+            if (cats.length === 0) { toast.error('أضف فئة أولاً'); return }
+            setNewTopicCat(cats[0].id)
+            setNewTopicOpen(true)
+          }}>
+            <Plus className="w-3.5 h-3.5 ml-1" /> موضوع جديد
+          </Button>
+        )}
       </div>
     }>
       {tab === 'categories' ? (
@@ -715,34 +965,77 @@ export function AdminForum() {
         </>
       ) : (
         <div className="space-y-3">
-          {topics.length === 0 ? <div className="text-center py-8 text-muted-foreground">لا توجد مواضيع بعد</div> : topics.map((t) => (
-            <Card key={t.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  {t.pinned && <Badge className="bg-gold/15 text-gold border-gold/30 mb-1">📌 مثبت</Badge>}
-                  <h4 className="font-bold text-navy text-sm">{t.title}</h4>
-                  {t.body && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t.body}</p>}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
-                    <span><Eye className="w-3 h-3 inline" /> {t.views || 0}</span>
-                    <span><MessageSquare className="w-3 h-3 inline" /> {t.replies_count || 0}</span>
-                    <span><Clock className="w-3 h-3 inline" /> {t.created_at ? new Date(t.created_at).toLocaleDateString('ar-EG') : ''}</span>
+          {topics.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>لا توجد مواضيع بعد. اضغط "موضوع جديد" لإضافة أول موضوع.</p>
+            </div>
+          ) : topics.map((t) => (
+            <Card key={t.id} className="p-4 hover:shadow-md transition-all">
+              <button onClick={() => openTopic(t)} className="w-full text-right">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    {t.pinned && <Badge className="bg-gold/15 text-gold border-gold/30 mb-1 text-[10px]">📌 مثبت</Badge>}
+                    <h4 className="font-bold text-navy text-sm mb-1">{t.title}</h4>
+                    {t.body && <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
+                      <span><Eye className="w-3 h-3 inline" /> {t.views || 0}</span>
+                      <span><MessageSquare className="w-3 h-3 inline" /> {t.replies_count || 0}</span>
+                      <span><Clock className="w-3 h-3 inline" /> {t.created_at ? new Date(t.created_at).toLocaleDateString('ar-EG') : ''}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openTopic(t) }}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={async (e) => {
+                      e.stopPropagation()
+                      await fetch('/api/forum-topics', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, pinned: !t.pinned }) })
+                      toast.success(t.pinned ? 'تم إلغاء التثبيت' : 'تم التثبيت'); loadTopics()
+                    }}><Award className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={async (e) => {
+                      e.stopPropagation()
+                      await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+                      toast.success('تم حذف الموضوع'); loadTopics()
+                    }}><Trash2 className="w-3.5 h-3.5" /></Button>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    await fetch('/api/forum-topics', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, pinned: !t.pinned }) })
-                    toast.success(t.pinned ? 'تم إلغاء التثبيت' : 'تم التثبيت'); loadTopics()
-                  }}><Award className="w-3.5 h-3.5" /></Button>
-                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={async () => {
-                    await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
-                    toast.success('تم حذف الموضوع'); loadTopics()
-                  }}><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
+              </button>
             </Card>
           ))}
         </div>
       )}
+
+      {/* New topic dialog */}
+      <Dialog open={newTopicOpen} onOpenChange={setNewTopicOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>موضوع جديد</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>الفئة *</Label>
+              <select value={newTopicCat} onChange={(e) => setNewTopicCat(e.target.value)} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+                <option value="">— اختر فئة —</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>العنوان *</Label>
+              <Input value={newTopicTitle} onChange={(e) => setNewTopicTitle(e.target.value)} className="mt-1" placeholder="عنوان جذاب يلخص الموضوع" />
+            </div>
+            <div>
+              <Label>المحتوى</Label>
+              <Textarea value={newTopicBody} onChange={(e) => setNewTopicBody(e.target.value)} rows={8} className="mt-1" placeholder="اكتب محتوى الموضوع هنا..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTopicOpen(false)}>إلغاء</Button>
+            <Button onClick={() => submitNewTopic(currentUser)} disabled={savingTopic} className="bg-navy hover:bg-navy-light">
+              {savingTopic ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
+              نشر الموضوع
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 }
