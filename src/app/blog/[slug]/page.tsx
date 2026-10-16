@@ -7,8 +7,27 @@ import BlogPostClient from './client'
 
 interface Props { params: Promise<{ slug: string }> }
 
+// Decode a slug param — Next.js 16 does not auto-decode URL-encoded path segments,
+// so an Arabic slug like 'مضاد' arrives as '%D9%85%D8%B6%D8%A7%D8%AF' and the DB
+// lookup fails. We decode it (and any double-encoded sequences) before querying.
+function decodeSlug(raw: string): string {
+  let s = raw || ''
+  try {
+    // Decode once
+    let decoded = decodeURIComponent(s)
+    // If still looks URL-encoded, decode again
+    while (decoded !== decodeURIComponent(decoded) && decoded.length < 1000) {
+      decoded = decodeURIComponent(decoded)
+    }
+    return decoded
+  } catch {
+    return s
+  }
+}
+
 export async function generateMetadata({ params }: Props, parent: ResolvingMetadata): Promise<Metadata> {
-  const { slug } = await params
+  const { slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const { data: post } = await supabaseAdmin
     .from('blog_posts')
     .select('title, excerpt, cover, tags')
@@ -53,7 +72,9 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function Page({ params }: Props) {
-  const { slug } = await params
+  const { slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
+
   const { data: post } = await supabaseAdmin
     .from('blog_posts')
     .select('*')
