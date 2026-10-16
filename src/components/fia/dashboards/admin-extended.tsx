@@ -578,7 +578,10 @@ function ExamQuestionDialog({ open, onOpenChange, initial, courseId, onSaved }: 
 }
 
 // ============================================================================
-// 4) REVIEWS — Course reviews moderation
+// 4) REVIEWS — Read-only list of student reviews. NO moderation actions
+//    are exposed to the admin — reviews cannot be deleted, hidden, or
+//    suspended. This is by design: student feedback is sacred and must
+//    flow unfiltered to the academy's leadership.
 // ============================================================================
 export function AdminReviews() {
   const [items, setItems] = useState<any[]>([])
@@ -594,45 +597,105 @@ export function AdminReviews() {
   }, [])
   useEffect(() => { load() }, [courseFilter])
 
-  const updateStatus = async (r: any, newStatus: string) => {
-    await fetch('/api/reviews', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id, status: newStatus }) })
-    toast.success(newStatus === 'نشط' ? 'تم نشر التقييم' : 'تم إخفاء التقييم')
-    load()
-  }
+  // Aggregate stats
+  const total = items.length
+  const avg = total > 0 ? (items.reduce((s, r) => s + (r.rating || 0), 0) / total) : 0
+  const byStar = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: items.filter((r) => r.rating === star).length,
+  }))
 
   return (
-    <SectionCard title="تقييمات المتدربين" description={`${items.length} تقييم`} action={
+    <SectionCard title="تقييمات المتدربين" description={`${total} تقييم · معدل ${avg.toFixed(1)} من 5`} action={
       <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
         <option value="">كل الدورات</option>
         {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
       </select>
     }>
-      {items.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">لا توجد تقييمات بعد</div>
+      {/* Aggregate summary */}
+      {total > 0 && (
+        <Card className="p-5 mb-5 bg-gradient-to-br from-navy/5 to-gold/5 border-gold/20">
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-navy mb-1">{avg.toFixed(1)}</div>
+              <div className="flex justify-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} className={`w-4 h-4 ${s <= Math.round(avg) ? 'fill-gold text-gold' : 'text-gray-300'}`} />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{total} تقييم</p>
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              {byStar.map((d) => {
+                const pct = total > 0 ? (d.count / total) * 100 : 0
+                return (
+                  <div key={d.star} className="flex items-center gap-3 text-xs">
+                    <span className="w-12 flex items-center gap-1">{d.star} <Star className="w-3 h-3 fill-gold text-gold" /></span>
+                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                      <div className="bg-gold h-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-8 text-left text-muted-foreground">{d.count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {total === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <Star className="w-16 h-16 mx-auto mb-3 opacity-30" />
+          <p>لا توجد تقييمات بعد</p>
+          <p className="text-xs mt-2">سيظهر هنا ما يقيّمه المتدربون عن دوراتهم تلقائياً</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {items.map((r) => (
             <Card key={r.id} className="p-4">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="flex">
+              <div className="flex items-start gap-3">
+                {/* Author avatar */}
+                <Avatar className="w-10 h-10 border border-gold/20 flex-shrink-0">
+                  <AvatarImage src={r.author?.avatar || ''} />
+                  <AvatarFallback className="bg-navy text-gold text-sm">
+                    {r.author?.name?.charAt(0) || '؟'}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-bold text-navy text-sm">{r.author?.name || 'متدرب'}</span>
+                    {r.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+                    {r.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+                    {r.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+                    {r.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+                    {r.author?.role === 'leader' && <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">🛡️ قائد</Badge>}
+                    {r.author?.role === 'team' && <Badge className="bg-gray-500/15 text-gray-600 border-gray-500/30 text-[10px]">🤝 فريق</Badge>}
+                    <span className="text-[10px] text-muted-foreground">
+                      · {r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex gap-0.5" dir="ltr">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <Star key={s} className={`w-4 h-4 ${s <= r.rating ? 'fill-gold text-gold' : 'text-gray-300'}`} />
                       ))}
                     </div>
-                    <Badge className={r.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : r.status === 'مخفي' ? 'bg-gray-500/15 text-gray-600 border-gray-500/30' : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'}>
-                      {r.status}
-                    </Badge>
                   </div>
-                  {r.title && <h4 className="font-bold text-navy text-sm">{r.title}</h4>}
-                  <p className="text-sm text-muted-foreground mt-1">{r.body}</p>
-                  <p className="text-xs text-muted-foreground mt-2">المستخدم: {r.user_id}</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {r.status !== 'نشط' && <Button size="sm" variant="outline" className="border-green-500/30 text-green-600 hover:bg-green-500/10" onClick={() => updateStatus(r, 'نشط')}><CheckCircle2 className="w-3.5 h-3.5" /> نشر</Button>}
-                  {r.status === 'نشط' && <Button size="sm" variant="outline" className="border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10" onClick={() => updateStatus(r, 'مخفي')}><Eye className="w-3.5 h-3.5" /> إخفاء</Button>}
-                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => updateStatus(r, 'موقوف')}><X className="w-3.5 h-3.5" /> إيقاف</Button>
+
+                  {r.title && <h4 className="font-bold text-navy text-sm mb-1">{r.title}</h4>}
+                  {r.body && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{r.body}</p>}
+
+                  {/* Show course name when not filtered */}
+                  {!courseFilter && (() => {
+                    const course = courses.find((c) => c.id === r.course_id)
+                    return course ? (
+                      <p className="text-[10px] text-muted-foreground mt-3 pt-2 border-t border-border">
+                        📚 الدورة: <span className="text-navy font-medium">{course.title}</span>
+                      </p>
+                    ) : null
+                  })()}
                 </div>
               </div>
             </Card>
