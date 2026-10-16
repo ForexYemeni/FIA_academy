@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET /api/forum?topic_id=... — list posts in a topic
+// GET /api/forum?topic_id=... — list posts in a topic (with author profiles)
 export async function GET(req: NextRequest) {
   try {
     const topicId = req.nextUrl.searchParams.get('topic_id')
     if (!topicId) return NextResponse.json({ error: 'topic_id required' }, { status: 400 })
 
-    // Increment topic views atomically
-    await supabaseAdmin.rpc('increment_topic_views', { topic_id: topicId }).catch(() => {})
-    // Even if the RPC function doesn't exist, fall back to manual increment
+    // Increment topic views
     const { data: topic } = await supabaseAdmin
       .from('forum_topics')
       .select('views')
@@ -22,23 +20,99 @@ export async function GET(req: NextRequest) {
         .eq('id', topicId)
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: posts, error } = await supabaseAdmin
       .from('forum_posts')
       .select('*')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true })
     if (error) throw error
-    return NextResponse.json(data || [])
+
+    // Enrich with author profiles (batch lookup)
+    const authorIds = Array.from(new Set((posts || []).map((p: any) => p.user_id)))
+    let authorMap: Record<string, any> = {}
+    if (authorIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from('public_profiles')
+        .select('*')
+        .in('user_id', authorIds)
+      for (const p of profiles || []) {
+        authorMap[p.user_id] = p
+      }
+      // For any IDs not cached, fetch individually via the API endpoint
+      // (which also writes the cache for next time)
+      for (const id of authorIds) {
+        if (!authorMap[id]) {
+          // Resolve directly via the same logic in /api/public-profiles
+          // to avoid an extra HTTP call.
+          const { data: userRow } = await supabaseAdmin
+            .from('users')
+            .select('id, name, avatar, role, title')
+            .eq('id', id)
+            .maybeSingle()
+          if (userRow) {
+            authorMap[id] = { user_id: id, name: userRow.name, avatar: userRow.avatar, role: userRow.role, title: userRow.title }
+            // Update cache
+            try {
+              await supabaseAdmin.from('public_profiles').upsert({
+                user_id: id, name: userRow.name, avatar: userRow.avatar,
+                role: userRow.role, title: userRow.title, updated_at: new Date().toISOString()
+              }, { onConflict: 'user_id' })
+            } catch {}
+          } else {
+            const { data: trainer } = await supabaseAdmin
+              .from('trainers')
+              .select('id, name, avatar, title, specialization, password')
+              .eq('id', id)
+              .maybeSingle()
+            if (trainer) {
+              let r = 'trainer'
+              if (trainer.password?.startsWith('__TEAM_MEMBER__')) {
+                const after = trainer.password.substring('__TEAM_MEMBER__:'.length)
+                const sep = after.indexOf('__')
+                if (sep !== -1) r = after.substring(0, sep) || 'team'
+              }
+              authorMap[id] = { user_id: id, name: trainer.name, avatar: trainer.avatar, role: r, title: trainer.title, specialization: trainer.specialization }
+              try {
+                await supabaseAdmin.from('public_profiles').upsert({
+                  user_id: id, name: trainer.name, avatar: trainer.avatar,
+                  role: r, title: trainer.title, specialization: trainer.specialization,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' })
+              } catch {}
+            }
+          }
+        }
+      }
+    }
+
+    const enriched = (posts || []).map((p: any) => ({
+      ...p,
+      author: authorMap[p.user_id] || null,
+    }))
+
+    return NextResponse.json(enriched)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
+// POST — create a post. Checks if the user is banned first.
 export async function POST(req: NextRequest) {
   try {
     const { topic_id, user_id, body } = await req.json()
     if (!topic_id || !user_id || !body) {
       return NextResponse.json({ error: 'الموضوع والمستخدم والنص مطلوبة' }, { status: 400 })
+    }
+
+    // Check ban status
+    const { data: bans } = await supabaseAdmin
+      .from('forum_bans')
+      .select('*')
+      .eq('banned_user_id', user_id)
+    const now = Date.now()
+    const activeBans = (bans || []).filter((b: any) => !b.expires_at || new Date(b.expires_at).getTime() > now)
+    if (activeBans.length > 0) {
+      return NextResponse.json({ error: 'تم حظرك من المنتدى. تواصل مع الإدارة.' }, { status: 403 })
     }
 
     // Insert post
@@ -49,7 +123,7 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
 
-    // Increment replies_count on the topic
+    // Increment replies_count
     const { data: topic } = await supabaseAdmin
       .from('forum_topics')
       .select('replies_count')

@@ -8,7 +8,7 @@ import {
   DollarSign, TrendingUp, Activity, Star, ArrowRight,
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
-  Gift, Newspaper, MessageSquare, HelpCircle,
+  Gift, Newspaper, MessageSquare, HelpCircle, Ban,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -29,6 +29,7 @@ import {
   AdminCoupons, AdminAffiliates, AdminExamQuestions, AdminReviews,
   AdminForum, AdminBlog, AdminContact, AdminFaqs,
 } from './admin-extended'
+import { AdminForumBans } from './shared-community'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -49,6 +50,7 @@ const NAV: NavItem[] = [
   { id: 'founder', label: 'المؤسس والفريق', icon: UserCog },
   { id: 'blog', label: 'المدونة', icon: Newspaper },
   { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+  { id: 'forum-bans', label: 'حظر المنتدى', icon: Ban },
   { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
   { id: 'contact', label: 'صندوق الرسائل', icon: Mail },
   { id: 'site', label: 'إعدادات الموقع', icon: Settings },
@@ -96,6 +98,7 @@ export function AdminDashboard() {
       {active === 'founder' && <AdminFounder user={user} />}
       {active === 'blog' && <AdminBlog />}
       {active === 'forum' && <AdminForum />}
+      {active === 'forum-bans' && <AdminForumBans />}
       {active === 'faqs' && <AdminFaqs />}
       {active === 'contact' && <AdminContact />}
       {active === 'site' && <AdminSite />}

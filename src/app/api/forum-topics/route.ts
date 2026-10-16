@@ -1,12 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Batch-fetch profiles for a list of user IDs
+async function fetchProfiles(userIds: string[]): Promise<Record<string, any>> {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)))
+  if (uniqueIds.length === 0) return {}
+  const { data: cached } = await supabaseAdmin
+    .from('public_profiles')
+    .select('*')
+    .in('user_id', uniqueIds)
+  const map: Record<string, any> = {}
+  for (const p of cached || []) map[p.user_id] = p
+
+  // Resolve any missing ones individually
+  for (const id of uniqueIds) {
+    if (map[id]) continue
+    let profile: any = null
+    const { data: userRow } = await supabaseAdmin
+      .from('users')
+      .select('id, name, avatar, role, title')
+      .eq('id', id)
+      .maybeSingle()
+    if (userRow) {
+      profile = { user_id: id, name: userRow.name, avatar: userRow.avatar, role: userRow.role, title: userRow.title }
+    } else {
+      const { data: trainer } = await supabaseAdmin
+        .from('trainers')
+        .select('id, name, avatar, title, specialization, password')
+        .eq('id', id)
+        .maybeSingle()
+      if (trainer) {
+        let r = 'trainer'
+        if (trainer.password?.startsWith('__TEAM_MEMBER__')) {
+          const after = trainer.password.substring('__TEAM_MEMBER__:'.length)
+          const sep = after.indexOf('__')
+          if (sep !== -1) r = after.substring(0, sep) || 'team'
+        }
+        profile = { user_id: id, name: trainer.name, avatar: trainer.avatar, role: r, title: trainer.title, specialization: trainer.specialization }
+      }
+    }
+    if (profile) {
+      map[id] = profile
+      try {
+        await supabaseAdmin.from('public_profiles').upsert({
+          ...profile, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+      } catch {}
+    }
+  }
+  return map
+}
+
 export async function GET(req: NextRequest) {
   try {
     const categoryId = req.nextUrl.searchParams.get('category_id')
     const slug = req.nextUrl.searchParams.get('slug')
+    const userId = req.nextUrl.searchParams.get('user_id') // filter by author
 
-    // If slug is provided, resolve to category_id
     if (slug && !categoryId) {
       const { data: cat } = await supabaseAdmin
         .from('forum_categories')
@@ -23,9 +73,15 @@ export async function GET(req: NextRequest) {
       .order('pinned', { ascending: false })
       .order('updated_at', { ascending: false })
     if (categoryId) query = query.eq('category_id', categoryId)
-    const { data, error } = await query
+    if (userId) query = query.eq('user_id', userId)
+    const { data: topics, error } = await query
     if (error) throw error
-    return NextResponse.json(data || [])
+
+    // Enrich with author profiles
+    const profiles = await fetchProfiles((topics || []).map((t: any) => t.user_id))
+    const enriched = (topics || []).map((t: any) => ({ ...t, author: profiles[t.user_id] || null }))
+
+    return NextResponse.json(enriched)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -37,6 +93,18 @@ export async function POST(req: NextRequest) {
     if (!category_id || !user_id || !title) {
       return NextResponse.json({ error: 'الفئة والمستخدم والعنوان مطلوبون' }, { status: 400 })
     }
+
+    // Check ban status — banned users can't create topics
+    const { data: bans } = await supabaseAdmin
+      .from('forum_bans')
+      .select('*')
+      .eq('banned_user_id', user_id)
+    const now = Date.now()
+    const activeBans = (bans || []).filter((b: any) => !b.expires_at || new Date(b.expires_at).getTime() > now)
+    if (activeBans.length > 0) {
+      return NextResponse.json({ error: 'تم حظرك من المنتدى. تواصل مع الإدارة.' }, { status: 403 })
+    }
+
     const { data, error } = await supabaseAdmin
       .from('forum_topics')
       .insert({

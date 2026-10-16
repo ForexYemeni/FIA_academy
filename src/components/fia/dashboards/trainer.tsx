@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
-  HelpCircle, UserPlus, X, AlertTriangle,
+  HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -19,12 +19,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
+import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { id: 'courses', label: 'دوراتي التدريبية', icon: BookOpen },
   { id: 'students', label: 'متدربوّ', icon: Users },
   { id: 'exams', label: 'الاختبارات', icon: FileText },
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+  { id: 'blog', label: 'المدونة', icon: Newspaper },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
   { id: 'profile', label: 'ملفي الشخصي', icon: User },
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'settings', label: 'الإعدادات', icon: Settings },
@@ -145,6 +149,9 @@ export function TrainerDashboard() {
       )}
       {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
       {active === 'exams' && <TrainerExams courses={courses} />}
+      {active === 'forum' && <SharedForum user={user} />}
+      {active === 'blog' && <SharedBlog />}
+      {active === 'faqs' && <SharedFAQ />}
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} refreshProfile={refreshTrainerProfile} />}
       {active === 'notifications' && <TrainerNotifs courses={courses} />}
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
