@@ -1,0 +1,1243 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
+     6→  Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
+     7→  HelpCircle, UserPlus, X, AlertTriangle,
+     8→} from 'lucide-react'
+     9→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    10→import { useAuth } from '@/lib/auth-store'
+    11→import { Button } from '@/components/ui/button'
+    12→import { Card } from '@/components/ui/card'
+    13→import { Badge } from '@/components/ui/badge'
+    14→import { Input } from '@/components/ui/input'
+    15→import { Label } from '@/components/ui/label'
+    16→import { Textarea } from '@/components/ui/textarea'
+    17→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+    18→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    19→import { toast } from 'sonner'
+    20→import { CourseContentManager } from '@/components/fia/course-content-manager'
+    21→import { AvatarUploader } from '@/components/fia/avatar-uploader'
+    22→
+    23→const NAV: NavItem[] = [
+    24→  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+    25→  { id: 'courses', label: 'دوراتي التدريبية', icon: BookOpen },
+    26→  { id: 'students', label: 'متدربوّ', icon: Users },
+    27→  { id: 'exams', label: 'الاختبارات', icon: FileText },
+    28→  { id: 'profile', label: 'ملفي الشخصي', icon: User },
+    29→  { id: 'notifications', label: 'الإشعارات', icon: Bell },
+    30→  { id: 'settings', label: 'الإعدادات', icon: Settings },
+    31→]
+    32→
+    33→// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
+    34→// Show only the human-readable text in the UI, but preserve the extra data on save.
+    35→const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
+    36→const splitBio = (raw: string) => {
+    37→  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
+    38→  return i === -1 ? raw : raw.slice(0, i).trimEnd()
+    39→}
+    40→const joinBio = (display: string, original?: string) => {
+    41→  if (!original) return display
+    42→  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
+    43→  if (i === -1) return display
+    44→  return `${display.trimEnd()}\n\n${original.slice(i)}`
+    45→}
+    46→
+    47→export function TrainerDashboard() {
+    48→  const [active, setActive] = useState('overview')
+    49→  const [contentCourseId, setContentCourseId] = useState<string | null>(null)
+    50→  const user = useAuth((s) => s.user)
+    51→  const updateUser = useAuth((s) => s.updateUser)
+    52→  const logout = useAuth((s) => s.logout)
+    53→  const [courses, setCourses] = useState<any[]>([])
+    54→  const [students, setStudents] = useState<any[]>([])
+    55→  const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set())
+    56→  const [editing, setEditing] = useState<any | null>(null)
+    57→  const [isDialogOpen, setIsDialogOpen] = useState(false)
+    58→  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || ''), specialization: user?.title || '' })
+    59→
+    60→  const loadCourses = () => {
+    61→    fetch('/api/courses').then((r) => r.json()).then((d) => {
+    62→      const all = Array.isArray(d) ? d : []
+    63→      // Filter to ONLY this trainer's courses
+    64→      const mine = all.filter((c: any) => c.trainer_id === user?.id)
+    65→      setCourses(mine)
+    66→    }).catch(() => {})
+    67→  }
+    68→  const loadStudents = () => {
+    69→    fetch('/api/students?role=student').then((r) => r.json()).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {})
+    70→  }
+    71→
+    72→  // Fetch enrollments and filter to ONLY students enrolled in this trainer's courses
+    73→  useEffect(() => {
+    74→    if (courses.length === 0) {
+    75→      setEnrolledStudentIds(new Set())
+    76→      return
+    77→    }
+    78→    fetch('/api/enrollments').then((r) => r.json()).then((d) => {
+    79→      const all = Array.isArray(d) ? d : []
+    80→      const courseIds = courses.map((c: any) => c.id)
+    81→      const myEnrollments = all.filter((e: any) => courseIds.includes(e.course_id))
+    82→      const ids = new Set(myEnrollments.map((e: any) => e.user_id))
+    83→      setEnrolledStudentIds(ids)
+    84→    }).catch(() => {})
+    85→  }, [courses])
+    86→
+    87→  // Filtered students — only those enrolled in this trainer's courses
+    88→  const myStudents = students.filter((s: any) => enrolledStudentIds.has(s.id))
+    89→
+    90→  useEffect(() => {
+    91→    loadCourses()
+    92→    loadStudents()
+    93→  }, [user?.id])
+    94→
+    95→  const navigateToContent = (courseId: string) => {
+    96→    setContentCourseId(courseId)
+    97→    setActive('content')
+    98→  }
+    99→
+   100→  return (
+   101→    <DashboardShell
+   102→      nav={NAV}
+   103→      active={active}
+   104→      onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
+   105→      roleLabel="مدرب"
+   106→      roleColor="bg-green-500/15 text-green-600 border-green-500/30"
+   107→    >
+   108→      {active === 'overview' && <TrainerOverview user={user} courses={courses} students={myStudents} />}
+   109→      {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
+   110→      {active === 'content' && contentCourseId && (
+   111→        <div className="space-y-4">
+   112→          <Button variant="ghost" onClick={() => setActive('courses')} className="text-navy hover:bg-navy/5">
+   113→            <ArrowRight className="w-4 h-4 ml-1" /> العودة للدورات
+   114→          </Button>
+   115→          <CourseContentManager courseId={contentCourseId} />
+   116→        </div>
+   117→      )}
+   118→      {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
+   119→      {active === 'exams' && <TrainerExams courses={courses} />}
+   120→      {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+   121→      {active === 'notifications' && <TrainerNotifs courses={courses} />}
+   122→      {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
+   123→
+   124→      {isDialogOpen && (
+   125→        <CourseDialog
+   126→          open={isDialogOpen}
+   127→          onOpenChange={setIsDialogOpen}
+   128→          course={editing}
+   129→          trainerId={user?.id}
+   130→          onSaved={() => {
+   131→            setIsDialogOpen(false)
+   132→            loadCourses()
+   133→          }}
+   134→        />
+   135→      )}
+   136→    </DashboardShell>
+   137→  )
+   138→}
+   139→
+   140→function TrainerOverview({ user, courses, students }: any) {
+   141→  // Compute the real average rating from courses that actually carry a
+   142→  // numeric rating. If no ratings exist yet, fall back to a clear message
+   143→  // instead of a hardcoded fake number.
+   144→  const ratedCourses = (courses || []).filter(
+   145→    (c: any) => typeof c.rating === 'number' && c.rating > 0
+   146→  )
+   147→  const avgRating =
+   148→    ratedCourses.length > 0
+   149→      ? (ratedCourses.reduce((acc, c) => acc + c.rating, 0) / ratedCourses.length).toFixed(1)
+   150→      : 'لا توجد تقييمات بعد'
+   151→
+   152→  // Real "active exams" count: lessons with lesson_type === 'exam' across
+   153→  // the trainer's own courses (same data source as TrainerExams).
+   154→  const [examsCount, setExamsCount] = useState<number>(0)
+   155→  const [examsLoading, setExamsLoading] = useState(false)
+   156→
+   157→  useEffect(() => {
+   158→    let cancelled = false
+   159→    const load = async () => {
+   160→      if (!courses || courses.length === 0) {
+   161→        setExamsCount(0)
+   162→        return
+   163→      }
+   164→      setExamsLoading(true)
+   165→      try {
+   166→        const results = await Promise.all(
+   167→          courses.map(async (c: any) => {
+   168→            try {
+   169→              const res = await fetch(`/api/lessons?course_id=${c.id}`)
+   170→              const data = await res.json()
+   171→              const lessons = Array.isArray(data) ? data : []
+   172→              return lessons.filter((l: any) => l.lesson_type === 'exam').length
+   173→            } catch {
+   174→              return 0
+   175→            }
+   176→          })
+   177→        )
+   178→        if (cancelled) return
+   179→        setExamsCount(results.reduce((a, b) => a + b, 0))
+   180→      } catch {
+   181→        if (!cancelled) setExamsCount(0)
+   182→      } finally {
+   183→        if (!cancelled) setExamsLoading(false)
+   184→      }
+   185→    }
+   186→    load()
+   187→    return () => { cancelled = true }
+   188→  }, [courses])
+   189→
+   190→  return (
+   191→    <div className="space-y-6">
+   192→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   193→        <h2 className="text-2xl font-bold mb-1">مرحباً، {user?.name} 👋</h2>
+   194→        <p className="text-white/80">نظرة عامة على نشاطك التدريبي</p>
+   195→      </div>
+   196→
+   197→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   198→        <StatCard icon={BookOpen} label="الدورات التدريبية" value={courses.length} color="navy" />
+   199→        <StatCard icon={Users} label="إجمالي المتدربين" value={String(students.length)} color="gold" />
+   200→        <StatCard icon={Star} label="متوسط التقييم" value={avgRating} color="green" />
+   201→        <StatCard
+   202→          icon={FileText}
+   203→          label="الاختبارات النشطة"
+   204→          value={examsLoading ? '—' : examsCount}
+   205→          color="blue"
+   206→        />
+   207→      </div>
+   208→
+   209→      <SectionCard title="أحدث الدورات" description="الدورات التي تدرّسها">
+   210→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   211→          {courses.slice(0, 3).map((c: any) => (
+   212→            <Card key={c.id} className="overflow-hidden card-hover">
+   213→              <div className="h-32 bg-navy">
+   214→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   215→              </div>
+   216→              <div className="p-4">
+   217→                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</h3>
+   218→                <div className="text-xs text-muted-foreground">{c.enrolled || 0} متدرب • {c.rating || 0} ⭐</div>
+   219→              </div>
+   220→            </Card>
+   221→          ))}
+   222→        </div>
+   223→      </SectionCard>
+   224→    </div>
+   225→  )
+   226→}
+   227→
+   228→function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: any) {
+   229→  const [deleting, setDeleting] = useState<string | null>(null)
+   230→  // Course currently awaiting delete confirmation. Null means the dialog is closed.
+   231→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   232→
+   233→  const handleDelete = async () => {
+   234→    if (!deleteTarget) return
+   235→    const id = deleteTarget.id
+   236→    setDeleting(id)
+   237→    try {
+   238→      const res = await fetch('/api/courses', {
+   239→        method: 'DELETE',
+   240→        headers: { 'Content-Type': 'application/json' },
+   241→        body: JSON.stringify({ id }),
+   242→      })
+   243→      if (res.ok) {
+   244→        toast.success('تم حذف الدورة')
+   245→        setDeleteTarget(null)
+   246→        onRefresh()
+   247→      } else {
+   248→        const err = await res.json().catch(() => ({}))
+   249→        toast.error(err.error || 'فشل الحذف')
+   250→      }
+   251→    } catch {
+   252→      toast.error('خطأ في الاتصال')
+   253→    } finally {
+   254→      setDeleting(null)
+   255→    }
+   256→  }
+   257→
+   258→  return (
+   259→    <SectionCard
+   260→      title="دوراتي التدريبية"
+   261→      description="إدارة الدورات التي تدرّسها"
+   262→      action={
+   263→        <Button onClick={onAdd} className="bg-navy hover:bg-navy-light">
+   264→          <Plus className="w-4 h-4 ml-1" /> دورة جديدة
+   265→        </Button>
+   266→      }
+   267→    >
+   268→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   269→        {courses.map((c: any) => (
+   270→          <Card key={c.id} className="overflow-hidden card-hover">
+   271→            <div className="h-32 bg-navy relative">
+   272→              {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   273→              <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+   274→            </div>
+   275→            <div className="p-4">
+   276→              <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+   277→              <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   278→                <span>{c.enrolled || 0} متدرب</span>
+   279→                <span>{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}</span>
+   280→              </div>
+   281→              <div className="space-y-2">
+   282→                <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onManageContent(c.id)}>
+   283→                  <FileText className="w-3.5 h-3.5 ml-1" /> إدارة المحتوى
+   284→                </Button>
+   285→                <div className="flex gap-2">
+   286→                  <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(c)}>
+   287→                    <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+   288→                  </Button>
+   289→                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)} disabled={deleting === c.id}>
+   290→                    <Trash2 className="w-3.5 h-3.5" />
+   291→                  </Button>
+   292→                </div>
+   293→              </div>
+   294→            </div>
+   295→          </Card>
+   296→        ))}
+   297→      </div>
+   298→
+   299→      {/* Professional delete-confirmation card */}
+   300→      <Dialog
+   301→        open={!!deleteTarget}
+   302→        onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null) }}
+   303→      >
+   304→        <DialogContent className="sm:max-w-md">
+   305→          <DialogHeader>
+   306→            <DialogTitle className="flex items-center gap-2 text-red-600">
+   307→              <AlertTriangle className="w-5 h-5" />
+   308→              تأكيد الحذف
+   309→            </DialogTitle>
+   310→          </DialogHeader>
+   311→          <div className="py-2 space-y-3">
+   312→            <div className="flex items-start gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+   313→              <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+   314→              <div className="min-w-0">
+   315→                <div className="text-xs text-muted-foreground mb-1">سيتم حذف الدورة التالية:</div>
+   316→                <div className="font-bold text-navy line-clamp-2 break-words">{deleteTarget?.title}</div>
+   317→              </div>
+   318→            </div>
+   319→            <p className="text-sm text-muted-foreground text-center">
+   320→              هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء.
+   321→            </p>
+   322→          </div>
+   323→          <DialogFooter>
+   324→            <Button
+   325→              variant="outline"
+   326→              onClick={() => setDeleteTarget(null)}
+   327→              disabled={!!deleting}
+   328→            >
+   329→              إلغاء
+   330→            </Button>
+   331→            <Button
+   332→              onClick={handleDelete}
+   333→              disabled={!!deleting}
+   334→              className="bg-red-600 hover:bg-red-700 text-white"
+   335→            >
+   336→              {deleting
+   337→                ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحذف...</>
+   338→                : <><Trash2 className="w-4 h-4 ml-1" /> حذف الدورة</>}
+   339→            </Button>
+   340→          </DialogFooter>
+   341→        </DialogContent>
+   342→      </Dialog>
+   343→    </SectionCard>
+   344→  )
+   345→}
+   346→
+   347→function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
+   348→  const [form, setForm] = useState<any>(
+   349→    course || {
+   350→      title: '',
+   351→      short_description: '',
+   352→      description: '',
+   353→      level: 'متوسط',
+   354→      price_type: 'مجانية',
+   355→      price: 0,
+   356→      currency: 'ر.ي',
+   357→      duration_hours: 0,
+   358→      pass_score: 60,
+   359→      cover: '',
+   360→      status: 'منشورة',
+   361→    }
+   362→  )
+   363→  const [saving, setSaving] = useState(false)
+   364→  const [uploadingCover, setUploadingCover] = useState(false)
+   365→
+   366→  // Keep the form in sync with the `course` prop whenever the dialog opens or
+   367→  // the course being edited changes. Without this, a dialog that stays mounted
+   368→  // across course switches would show stale state (and could overwrite the
+   369→  // wrong course's `cover` field).
+   370→  useEffect(() => {
+   371→    if (open) {
+   372→      setForm(
+   373→        course || {
+   374→          title: '',
+   375→          short_description: '',
+   376→          description: '',
+   377→          level: 'متوسط',
+   378→          price_type: 'مجانية',
+   379→          price: 0,
+   380→          currency: 'ر.ي',
+   381→          duration_hours: 0,
+   382→          pass_score: 60,
+   383→          cover: '',
+   384→          status: 'منشورة',
+   385→        }
+   386→      )
+   387→    }
+   388→  }, [open, course])
+   389→
+   390→  const handleUploadCover = async (file: File) => {
+   391→    setUploadingCover(true)
+   392→    try {
+   393→      const fd = new FormData()
+   394→      fd.append('file', file)
+   395→      fd.append('folder', 'courses')
+   396→      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+   397→      const data = await res.json().catch(() => ({}))
+   398→      if (data.url) {
+   399→        // Store the Telegram-hosted URL on form.cover — it is later persisted
+   400→        // to the courses.cover column by the save() call below.
+   401→        setForm((prev: any) => ({ ...prev, cover: data.url }))
+   402→        toast.success('تم رفع صورة الغلاف')
+   403→      } else {
+   404→        toast.error('فشل رفع الصورة: ' + (data.error || ''))
+   405→      }
+   406→    } catch {
+   407→      toast.error('خطأ في الاتصال')
+   408→    } finally {
+   409→      setUploadingCover(false)
+   410→    }
+   411→  }
+   412→
+   413→  const save = async () => {
+   414→    if (!form.title) {
+   415→      toast.error('أدخل عنوان الدورة')
+   416→      return
+   417→    }
+   418→    setSaving(true)
+   419→    try {
+   420→      const slug = form.title.toLowerCase().replace(/\s+/g, '-').slice(0, 80)
+   421→      // Build the payload. Always include `cover` (string URL or null) so the
+   422→      // courses.cover column is updated on every save — even when the trainer
+   423→      // cleared the field.
+   424→      const body: any = {
+   425→        title: form.title,
+   426→        short_description: form.short_description ?? '',
+   427→        description: form.description ?? '',
+   428→        level: form.level,
+   429→        price_type: form.price_type,
+   430→        price: Number(form.price) || 0,
+   431→        currency: form.currency || 'ر.ي',
+   432→        duration_hours: Number(form.duration_hours) || 0,
+   433→        pass_score: Number(form.pass_score) || 60,
+   434→        status: form.status || 'منشورة',
+   435→        cover: form.cover ?? null,
+   436→        slug,
+   437→        trainer_id: trainerId,
+   438→        modules_count: form.modules_count || 0,
+   439→        lessons_count: form.lessons_count || 0,
+   440→      }
+   441→      const res = await fetch('/api/courses', {
+   442→        method: course ? 'PUT' : 'POST',
+   443→        headers: { 'Content-Type': 'application/json' },
+   444→        body: JSON.stringify(course ? { id: course.id, ...body } : body),
+   445→      })
+   446→      if (res.ok) {
+   447→        toast.success(course ? 'تم تحديث الدورة' : 'تم إنشاء الدورة')
+   448→        onSaved()
+   449→      } else {
+   450→        const err = await res.json().catch(() => ({}))
+   451→        toast.error(err.error || 'فشل الحفظ')
+   452→      }
+   453→    } catch {
+   454→      toast.error('خطأ')
+   455→    } finally {
+   456→      setSaving(false)
+   457→    }
+   458→  }
+   459→
+   460→  return (
+   461→    <Dialog open={open} onOpenChange={onOpenChange}>
+   462→      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+   463→        <DialogHeader>
+   464→          <DialogTitle>{course ? 'تعديل الدورة' : 'دورة جديدة'}</DialogTitle>
+   465→        </DialogHeader>
+   466→        <div className="space-y-4 py-4">
+   467→          <div>
+   468→            <Label>عنوان الدورة</Label>
+   469→            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" />
+   470→          </div>
+   471→          <div>
+   472→            <Label>وصف مختصر</Label>
+   473→            <Input value={form.short_description || ''} onChange={(e) => setForm({ ...form, short_description: e.target.value })} className="mt-1" />
+   474→          </div>
+   475→          <div>
+   476→            <Label>الوصف الكامل</Label>
+   477→            <Textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="mt-1" />
+   478→          </div>
+   479→          <div className="grid grid-cols-2 gap-3">
+   480→            <div>
+   481→              <Label>المستوى</Label>
+   482→              <select
+   483→                value={form.level}
+   484→                onChange={(e) => setForm({ ...form, level: e.target.value })}
+   485→                className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
+   486→              >
+   487→                <option value="مبتدئ">مبتدئ</option>
+   488→                <option value="متوسط">متوسط</option>
+   489→                <option value="متقدم">متقدم</option>
+   490→              </select>
+   491→            </div>
+   492→            <div>
+   493→              <Label>السعر</Label>
+   494→              <select
+   495→                value={form.price_type}
+   496→                onChange={(e) => setForm({ ...form, price_type: e.target.value })}
+   497→                className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
+   498→              >
+   499→                <option value="مجانية">مجانية</option>
+   500→                <option value="مدفوعة">مدفوعة</option>
+   501→              </select>
+   502→            </div>
+   503→          </div>
+   504→          {form.price_type === 'مدفوعة' && (
+   505→            <div>
+   506→              <Label>المبلغ</Label>
+   507→              <Input type="number" value={form.price || 0} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" />
+   508→            </div>
+   509→          )}
+   510→          <div className="grid grid-cols-2 gap-3">
+   511→            <div>
+   512→              <Label>عدد الساعات</Label>
+   513→              <Input type="number" value={form.duration_hours || 0} onChange={(e) => setForm({ ...form, duration_hours: parseInt(e.target.value) || 0 })} className="mt-1" dir="ltr" />
+   514→            </div>
+   515→            <div>
+   516→              <Label>درجة النجاح (%)</Label>
+   517→              <Input type="number" value={form.pass_score || 60} onChange={(e) => setForm({ ...form, pass_score: parseInt(e.target.value) || 60 })} className="mt-1" dir="ltr" />
+   518→            </div>
+   519→          </div>
+   520→          <div>
+   521→            <Label>صورة الغلاف</Label>
+   522→            <div className="flex items-center gap-3 mt-1 flex-wrap">
+   523→              {form.cover ? (
+   524→                <div className="relative w-16 h-16 rounded-md overflow-hidden border border-border">
+   525→                  <img src={form.cover} alt="cover" className="w-full h-full object-cover" />
+   526→                  <button
+   527→                    type="button"
+   528→                    onClick={() => setForm({ ...form, cover: '' })}
+   529→                    className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-md p-0.5"
+   530→                    title="إزالة الصورة"
+   531→                  >
+   532→                    <X className="w-3 h-3" />
+   533→                  </button>
+   534→                </div>
+   535→              ) : (
+   536→                <div className="w-16 h-16 rounded-md border border-dashed border-border bg-muted/30 flex items-center justify-center text-muted-foreground/40">
+   537→                  <FileUp className="w-5 h-5" />
+   538→                </div>
+   539→              )}
+   540→              <label className="cursor-pointer">
+   541→                <Button
+   542→                  variant="outline"
+   543→                  type="button"
+   544→                  disabled={uploadingCover}
+   545→                  onClick={() => document.getElementById('cover-upload')?.click()}
+   546→                >
+   547→                  {uploadingCover ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileUp className="w-4 h-4 ml-1" />}
+   548→                  {uploadingCover ? 'جاري الرفع...' : form.cover ? 'تغيير الصورة' : 'رفع صورة'}
+   549→                </Button>
+   550→                <input
+   551→                  id="cover-upload"
+   552→                  type="file"
+   553→                  accept="image/*"
+   554→                  className="hidden"
+   555→                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadCover(f); e.target.value = '' }}
+   556→                />
+   557→              </label>
+   558→            </div>
+   559→          </div>
+   560→        </div>
+   561→        <DialogFooter>
+   562→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   563→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+   564→            {saving ? 'جاري الحفظ...' : 'حفظ'}
+   565→          </Button>
+   566→        </DialogFooter>
+   567→      </DialogContent>
+   568→    </Dialog>
+   569→  )
+   570→}
+   571→
+   572→function TrainerStudents({ students, courses }: any) {
+   573→  const [enrollments, setEnrollments] = useState<any[]>([])
+   574→  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false)
+   575→
+   576→  useEffect(() => {
+   577→    fetch('/api/enrollments').then((r) => r.json()).then((d) => {
+   578→      const all = Array.isArray(d) ? d : []
+   579→      // Filter to ONLY enrollments in this trainer's courses
+   580→      const trainerCourseIds = courses.map((c: any) => c.id)
+   581→      const mine = all.filter((e: any) => trainerCourseIds.includes(e.course_id))
+   582→      setEnrollments(mine)
+   583→      setEnrollmentsLoaded(true)
+   584→    }).catch(() => setEnrollmentsLoaded(true))
+   585→  }, [courses])
+   586→
+   587→  // Helper: get all enrollments for a student
+   588→  const studentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
+   589→
+   590→  // Filter students to ONLY those enrolled in at least one of this trainer's courses.
+   591→  // The `enrollments` state is already scoped to the trainer's course IDs, so its
+   592→  // user_id values are exactly the students we want to show.
+   593→  const enrolledStudentIds = new Set(enrollments.map((e: any) => e.user_id))
+   594→  const filteredStudents = students.filter((s: any) => enrolledStudentIds.has(s.id))
+   595→
+   596→  return (
+   597→    <SectionCard title="متدربوّ" description={`${filteredStudents.length} متدرب${filteredStudents.length === 1 ? '' : 'ين'}`}>
+   598→      {courses.length === 0 ? (
+   599→        <div className="text-center py-12">
+   600→          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+   601→          <p className="text-muted-foreground">لا يوجد متدربون — أنشئ دورة أولاً</p>
+   602→        </div>
+   603→      ) : !enrollmentsLoaded ? (
+   604→        <div className="text-center py-12">
+   605→          <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
+   606→          <p className="text-muted-foreground">جاري تحميل المتدربين...</p>
+   607→        </div>
+   608→      ) : filteredStudents.length === 0 ? (
+   609→        <div className="text-center py-12">
+   610→          <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   611→          <p className="text-muted-foreground">لا يوجد متدربون في دوراتك بعد</p>
+   612→        </div>
+   613→      ) : (
+   614→        <div className="space-y-4">
+   615→          {filteredStudents.map((s: any) => {
+   616→            const studentEnrs = studentEnrollments(s.id)
+   617→            return (
+   618→              <Card key={s.id} className="overflow-hidden">
+   619→                <div className="p-4 bg-muted/30 border-b border-border">
+   620→                  <div className="flex items-center gap-4">
+   621→                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gold/30 bg-navy flex items-center justify-center text-gold font-bold text-lg flex-shrink-0">
+   622→                      {s.avatar ? (
+   623→                        <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+   624→                      ) : (
+   625→                        s.name?.charAt(0)
+   626→                      )}
+   627→                    </div>
+   628→                    <div className="flex-1 min-w-0">
+   629→                      <div className="font-bold text-navy">{s.name}</div>
+   630→                      <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+   631→                        <span dir="ltr">{s.email}</span>
+   632→                        {s.phone && <span dir="ltr">{s.phone}</span>}
+   633→                        <span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+   634→                      </div>
+   635→                    </div>
+   636→                    <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">
+   637→                      {studentEnrs.length} دورة
+   638→                    </Badge>
+   639→                  </div>
+   640→                </div>
+   641→                <div className="p-4">
+   642→                  {studentEnrs.length === 0 ? (
+   643→                    <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة بعد</p>
+   644→                  ) : (
+   645→                    <div className="space-y-2">
+   646→                      {studentEnrs.map((e) => {
+   647→                        const course = courses?.find((c: any) => c.id === e.course_id)
+   648→                        if (!course) return null
+   649→                        const isFree = course.price_type === 'مجانية' || course.price === 0
+   650→                        return (
+   651→                          <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+   652→                            <div className="flex items-center gap-3 min-w-0">
+   653→                              <div className="w-10 h-10 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
+   654→                                <BookOpen className="w-5 h-5 text-gold" />
+   655→                              </div>
+   656→                              <div className="min-w-0">
+   657→                                <div className="font-medium text-navy text-sm truncate">{course.title}</div>
+   658→                                <div className="text-xs text-muted-foreground">
+   659→                                  {course.lessons_count || 0} درس
+   660→                                </div>
+   661→                              </div>
+   662→                            </div>
+   663→                            <div className="flex items-center gap-2 flex-shrink-0">
+   664→                              <Badge className={isFree ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
+   665→                                {isFree ? 'مجانية' : 'مدفوعة'}
+   666→                              </Badge>
+   667→                              <Badge variant="outline" className={
+   668→                                e.status === 'completed' ? 'border-green-500/30 text-green-600'
+   669→                                : e.payment_status === 'pending' ? 'border-yellow-500/30 text-yellow-600'
+   670→                                : 'border-blue-500/30 text-blue-600'
+   671→                              }>
+   672→                                {e.status === 'completed' ? 'مكتملة' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   673→                              </Badge>
+   674→                            </div>
+   675→                          </div>
+   676→                        )
+   677→                      })}
+   678→                    </div>
+   679→                  )}
+   680→                </div>
+   681→              </Card>
+   682→            )
+   683→          })}
+   684→        </div>
+   685→      )}
+   686→    </SectionCard>
+   687→  )
+   688→}
+   689→
+   690→function TrainerExams({ courses }: { courses: any[] }) {
+   691→  const [loading, setLoading] = useState(true)
+   692→  const [exams, setExams] = useState<any[]>([])
+   693→
+   694→  useEffect(() => {
+   695→    let cancelled = false
+   696→    const loadExams = async () => {
+   697→      if (!courses || courses.length === 0) {
+   698→        setExams([])
+   699→        setLoading(false)
+   700→        return
+   701→      }
+   702→      setLoading(true)
+   703→      try {
+   704→        // Fetch lessons for each course in parallel
+   705→        const results = await Promise.all(
+   706→          courses.map(async (c) => {
+   707→            try {
+   708→              const res = await fetch(`/api/lessons?course_id=${c.id}`)
+   709→              const data = await res.json()
+   710→              const lessons = Array.isArray(data) ? data : []
+   711→              // Filter exam-type lessons only
+   712→              return lessons
+   713→                .filter((l: any) => l.lesson_type === 'exam')
+   714→                .map((l: any) => {
+   715→                  // Parse question count from content JSON
+   716→                  let questions: any[] = []
+   717→                  if (l.content) {
+   718→                    try {
+   719→                      const parsed = JSON.parse(l.content)
+   720→                      if (Array.isArray(parsed)) questions = parsed
+   721→                    } catch {}
+   722→                  }
+   723→                  return {
+   724→                    ...l,
+   725→                    course_id: c.id,
+   726→                    course_title: c.title,
+   727→                    course_pass_score: c.pass_score,
+   728→                    questions_count: questions.length,
+   729→                    questions,
+   730→                  }
+   731→                })
+   732→            } catch {
+   733→              return []
+   734→            }
+   735→          })
+   736→        )
+   737→        if (cancelled) return
+   738→        const flat = results.flat()
+   739→        setExams(flat)
+   740→      } catch {
+   741→        if (!cancelled) setExams([])
+   742→      } finally {
+   743→        if (!cancelled) setLoading(false)
+   744→      }
+   745→    }
+   746→    loadExams()
+   747→    return () => { cancelled = true }
+   748→  }, [courses])
+   749→
+   750→  const totalQuestions = exams.reduce((acc, e) => acc + (e.questions_count || 0), 0)
+   751→  const totalCoursesWithExams = new Set(exams.map((e) => e.course_id)).size
+   752→
+   753→  return (
+   754→    <div className="space-y-6">
+   755→      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+   756→        <StatCard icon={FileText} label="الاختبارات" value={exams.length} color="blue" />
+   757→        <StatCard icon={HelpCircle} label="إجمالي الأسئلة" value={totalQuestions} color="navy" />
+   758→        <StatCard icon={BookOpen} label="دورات بها اختبارات" value={totalCoursesWithExams} color="gold" />
+   759→      </div>
+   760→
+   761→      <SectionCard
+   762→        title="الاختبارات"
+   763→        description="الاختبارات المستندة إلى محتوى دوراتك التدريبية"
+   764→      >
+   765→        {loading ? (
+   766→          <div className="text-center py-12">
+   767→            <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+   768→            <p className="text-muted-foreground text-sm">جاري تحميل الاختبارات...</p>
+   769→          </div>
+   770→        ) : exams.length === 0 ? (
+   771→          <div className="text-center py-12">
+   772→            <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   773→            <p className="text-muted-foreground mb-2">لا توجد اختبارات بعد</p>
+   774→            <p className="text-xs text-muted-foreground">
+   775→              أنشئ دروساً من نوع "اختبار" في محتوى دوراتك لتظهر هنا
+   776→            </p>
+   777→          </div>
+   778→        ) : (
+   779→          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   780→            {exams.map((exam) => (
+   781→              <Card key={exam.id} className="overflow-hidden card-hover">
+   782→                <div className="p-4 border-b border-border bg-purple-500/5">
+   783→                  <div className="flex items-start justify-between gap-2 mb-2">
+   784→                    <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 flex-shrink-0">
+   785→                      <HelpCircle className="w-3 h-3 ml-1" /> اختبار
+   786→                    </Badge>
+   787→                    <Badge variant="outline" className="text-xs flex-shrink-0">
+   788→                      {exam.questions_count} سؤال
+   789→                    </Badge>
+   790→                  </div>
+   791→                  <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2">{exam.title}</h3>
+   792→                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+   793→                    <BookOpen className="w-3 h-3" />
+   794→                    <span className="truncate">{exam.course_title}</span>
+   795→                  </div>
+   796→                </div>
+   797→                <div className="p-4 space-y-2">
+   798→                  <div className="flex items-center justify-between text-xs">
+   799→                    <span className="text-muted-foreground">درجة النجاح</span>
+   800→                    <Badge variant="outline" className="text-xs">
+   801→                      {exam.course_pass_score || 60}%
+   802→                    </Badge>
+   803→                  </div>
+   804→                  <div className="flex items-center justify-between text-xs">
+   805→                    <span className="text-muted-foreground">المدة</span>
+   806→                    <span className="text-navy font-medium">
+   807→                      {exam.duration_minutes ? `${exam.duration_minutes} دقيقة` : 'غير محدد'}
+   808→                    </span>
+   809→                  </div>
+   810→                  {exam.is_preview && (
+   811→                    <Badge variant="outline" className="text-xs w-full justify-center mt-2">
+   812→                      <Eye className="w-3 h-3 ml-1" /> معاينة مجانية
+   813→                    </Badge>
+   814→                  )}
+   815→                </div>
+   816→              </Card>
+   817→            ))}
+   818→          </div>
+   819→        )}
+   820→      </SectionCard>
+   821→    </div>
+   822→  )
+   823→}
+   824→
+   825→function TrainerProfile({ profile, setProfile, user, updateUser }: any) {
+   826→  const [loading, setLoading] = useState(false)
+   827→
+   828→  const save = async () => {
+   829→    setLoading(true)
+   830→    try {
+   831→      // Update locally — in real app this would also call /api/trainers PUT
+   832→      updateUser({
+   833→        name: profile.name,
+   834→        phone: profile.phone,
+   835→        title: profile.title,
+   836→        bio: joinBio(profile.bio, user?.bio),
+   837→      })
+   838→      toast.success('تم تحديث الملف الشخصي')
+   839→    } catch {
+   840→      toast.error('فشل التحديث')
+   841→    } finally {
+   842→      setLoading(false)
+   843→    }
+   844→  }
+   845→
+   846→  return (
+   847→    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك">
+   848→      <div className="space-y-6 max-w-2xl">
+   849→        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+   850→          <AvatarUploader
+   851→            userId={user.id}
+   852→            role="trainer"
+   853→            initialUrl={user?.avatar}
+   854→            name={user?.name}
+   855→            size="xl"
+   856→            onUploaded={(url) => updateUser({ avatar: url })}
+   857→          />
+   858→        </div>
+   859→
+   860→        <div className="grid sm:grid-cols-2 gap-4">
+   861→          <div>
+   862→            <Label>الاسم الكامل</Label>
+   863→            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+   864→          </div>
+   865→          <div>
+   866→            <Label>التخصص</Label>
+   867→            <Input value={profile.specialization} onChange={(e) => setProfile({ ...profile, specialization: e.target.value })} className="mt-1" />
+   868→          </div>
+   869→          <div>
+   870→            <Label>البريد الإلكتروني</Label>
+   871→            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
+   872→          </div>
+   873→          <div>
+   874→            <Label>الهاتف</Label>
+   875→            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
+   876→          </div>
+   877→        </div>
+   878→        <div>
+   879→          <Label>المسمى الوظيفي</Label>
+   880→          <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+   881→        </div>
+   882→        <div>
+   883→          <Label>النبذة التعريفية</Label>
+   884→          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+   885→        </div>
+   886→        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
+   887→          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+   888→        </Button>
+   889→      </div>
+   890→    </SectionCard>
+   891→  )
+   892→}
+   893→
+   894→function TrainerAccountSettings({ user, updateUser, logout }: any) {
+   895→  const [currentPassword, setCurrentPassword] = useState('')
+   896→  const [newEmail, setNewEmail] = useState('')
+   897→  const [newPassword, setNewPassword] = useState('')
+   898→  const [confirmPassword, setConfirmPassword] = useState('')
+   899→  const [showCurrent, setShowCurrent] = useState(false)
+   900→  const [showNew, setShowNew] = useState(false)
+   901→  const [loading, setLoading] = useState(false)
+   902→
+   903→  const save = async () => {
+   904→    if (!currentPassword) {
+   905→      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+   906→      return
+   907→    }
+   908→    if (newPassword && newPassword !== confirmPassword) {
+   909→      toast.error('كلمتا المرور الجديدتان غير متطابقتين')
+   910→      return
+   911→    }
+   912→    if (newPassword && newPassword.length < 6) {
+   913→      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+   914→      return
+   915→    }
+   916→    if (!newEmail && !newPassword) {
+   917→      toast.error('لا توجد تغييرات للحفظ')
+   918→      return
+   919→    }
+   920→    setLoading(true)
+   921→    try {
+   922→      const res = await fetch('/api/auth/change-credentials', {
+   923→        method: 'POST',
+   924→        headers: { 'Content-Type': 'application/json' },
+   925→        body: JSON.stringify({
+   926→          userId: user.id,
+   927→          currentEmail: user.email,
+   928→          currentPassword,
+   929→          newEmail: newEmail || undefined,
+   930→          newPassword: newPassword || undefined,
+   931→          role: 'trainer',
+   932→        }),
+   933→      })
+   934→      const data = await res.json()
+   935→      if (!res.ok) {
+   936→        toast.error(data.error || 'فشل التحديث')
+   937→        return
+   938→      }
+   939→      toast.success('تم تحديث بيانات الدخول بنجاح')
+   940→      updateUser({
+   941→        email: newEmail || user.email,
+   942→        password: newPassword || user.password,
+   943→      })
+   944→      setCurrentPassword('')
+   945→      setNewEmail('')
+   946→      setNewPassword('')
+   947→      setConfirmPassword('')
+   948→      if (newEmail) {
+   949→        setTimeout(() => {
+   950→          logout()
+   951→          toast.info('تم تحديث البريد. يرجى تسجيل الدخول بالبيانات الجديدة')
+   952→        }, 2000)
+   953→      }
+   954→    } catch {
+   955→      toast.error('خطأ في الاتصال')
+   956→    } finally {
+   957→      setLoading(false)
+   958→    }
+   959→  }
+   960→
+   961→  return (
+   962→    <SectionCard title="الحساب والأمان" description="تغيير البريد الإلكتروني وكلمة المرور">
+   963→      <div className="space-y-5 max-w-2xl">
+   964→        {/* Current account info */}
+   965→        <div className="bg-muted/30 p-4 rounded-lg border border-border">
+   966→          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
+   967→          <div className="flex items-center gap-3">
+   968→            <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+   969→              {user?.name?.charAt(0)}
+   970→            </div>
+   971→            <div>
+   972→              <div className="font-bold text-navy">{user?.name}</div>
+   973→              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+   974→            </div>
+   975→          </div>
+   976→        </div>
+   977→
+   978→        {/* Security verification */}
+   979→        <div>
+   980→          <Label className="text-navy font-semibold">كلمة المرور الحالية *</Label>
+   981→          <div className="relative mt-1">
+   982→            <Input
+   983→              type={showCurrent ? 'text' : 'password'}
+   984→              value={currentPassword}
+   985→              onChange={(e) => setCurrentPassword(e.target.value)}
+   986→              placeholder="••••••••"
+   987→              dir="ltr"
+   988→            />
+   989→            <button
+   990→              type="button"
+   991→              onClick={() => setShowCurrent(!showCurrent)}
+   992→              className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+   993→            >
+   994→              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+   995→            </button>
+   996→          </div>
+   997→          <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
+   998→        </div>
+   999→
+  1000→        {/* New email */}
+  1001→        <div className="border-t border-border pt-4">
+  1002→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1003→            <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
+  1004→          </h3>
+  1005→          <div>
+  1006→            <Label>البريد الجديد</Label>
+  1007→            <Input
+  1008→              type="email"
+  1009→              value={newEmail}
+  1010→              onChange={(e) => setNewEmail(e.target.value)}
+  1011→              placeholder={user?.email || 'example@fia.edu'}
+  1012→              dir="ltr"
+  1013→              className="mt-1"
+  1014→            />
+  1015→            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+  1016→          </div>
+  1017→        </div>
+  1018→
+  1019→        {/* New password */}
+  1020→        <div className="border-t border-border pt-4">
+  1021→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1022→            <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
+  1023→          </h3>
+  1024→          <div className="space-y-3">
+  1025→            <div>
+  1026→              <Label>كلمة المرور الجديدة</Label>
+  1027→              <div className="relative mt-1">
+  1028→                <Input
+  1029→                  type={showNew ? 'text' : 'password'}
+  1030→                  value={newPassword}
+  1031→                  onChange={(e) => setNewPassword(e.target.value)}
+  1032→                  placeholder="••••••••"
+  1033→                  dir="ltr"
+  1034→                />
+  1035→                <button
+  1036→                  type="button"
+  1037→                  onClick={() => setShowNew(!showNew)}
+  1038→                  className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1039→                >
+  1040→                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1041→                </button>
+  1042→              </div>
+  1043→            </div>
+  1044→            <div>
+  1045→              <Label>تأكيد كلمة المرور</Label>
+  1046→              <Input
+  1047→                type="password"
+  1048→                value={confirmPassword}
+  1049→                onChange={(e) => setConfirmPassword(e.target.value)}
+  1050→                placeholder="••••••••"
+  1051→                dir="ltr"
+  1052→                className="mt-1"
+  1053→              />
+  1054→              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+  1055→                <p className="text-xs text-red-500 mt-1">كلمتا المرور غير متطابقتين</p>
+  1056→              )}
+  1057→              {newPassword && confirmPassword && newPassword === confirmPassword && (
+  1058→                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+  1059→                  <CheckCircle2 className="w-3 h-3" /> كلمتا المرور متطابقتان
+  1060→                </p>
+  1061→              )}
+  1062→            </div>
+  1063→            <p className="text-xs text-muted-foreground">اتركها فارغاً إذا لم ترد تغيير كلمة المرور</p>
+  1064→          </div>
+  1065→        </div>
+  1066→
+  1067→        <Button onClick={save} disabled={loading || !currentPassword} className="bg-navy hover:bg-navy-light">
+  1068→          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
+  1069→        </Button>
+  1070→      </div>
+  1071→    </SectionCard>
+  1072→  )
+  1073→}
+  1074→
+  1075→function TrainerNotifs({ courses }: { courses: any[] }) {
+  1076→  const [loading, setLoading] = useState(true)
+  1077→  const [notifs, setNotifs] = useState<any[]>([])
+  1078→
+  1079→  useEffect(() => {
+  1080→    let cancelled = false
+  1081→    const loadNotifs = async () => {
+  1082→      if (!courses || courses.length === 0) {
+  1083→        setNotifs([])
+  1084→        setLoading(false)
+  1085→        return
+  1086→      }
+  1087→      setLoading(true)
+  1088→      try {
+  1089→        const courseIds = courses.map((c) => c.id)
+  1090→        const courseById = new Map(courses.map((c) => [c.id, c]))
+  1091→
+  1092→        // Fetch enrollments for all courses (we'll filter on the client)
+  1093→        const [enrRes, stuRes] = await Promise.all([
+  1094→          fetch('/api/enrollments'),
+  1095→          fetch('/api/students?role=student'),
+  1096→        ])
+  1097→        const [enrollments, students] = await Promise.all([enrRes.json(), stuRes.json()])
+  1098→
+  1099→        if (cancelled) return
+  1100→
+  1101→        const enrList = Array.isArray(enrollments) ? enrollments : []
+  1102→        const stuList = Array.isArray(students) ? students : []
+  1103→        const studentById = new Map(stuList.map((s: any) => [s.id, s]))
+  1104→
+  1105→        // Only enrollments for this trainer's courses
+  1106→        const mine = enrList.filter((e: any) => courseIds.includes(e.course_id))
+  1107→
+  1108→        // Sort by enrolled_at desc
+  1109→        mine.sort((a: any, b: any) => {
+  1110→          const aT = a.enrolled_at ? new Date(a.enrolled_at).getTime() : 0
+  1111→          const bT = b.enrolled_at ? new Date(b.enrolled_at).getTime() : 0
+  1112→          return bT - aT
+  1113→        })
+  1114→
+  1115→        // Build notification objects — newest 25
+  1116→        const built = mine.slice(0, 25).map((e: any) => {
+  1117→          const student = studentById.get(e.user_id)
+  1118→          const course = courseById.get(e.course_id)
+  1119→          const isFree = !e.amount_paid || e.amount_paid === 0
+  1120→          return {
+  1121→            id: e.id,
+  1122→            type: 'enrollment',
+  1123→            studentName: student?.name || 'متدرب',
+  1124→            studentAvatar: student?.avatar,
+  1125→            courseTitle: course?.title || 'دورة',
+  1126→            enrolledAt: e.enrolled_at,
+  1127→            isFree,
+  1128→            amountPaid: e.amount_paid,
+  1129→            currency: e.currency,
+  1130→            paymentStatus: e.payment_status,
+  1131→          }
+  1132→        })
+  1133→
+  1134→        if (!cancelled) setNotifs(built)
+  1135→      } catch {
+  1136→        if (!cancelled) setNotifs([])
+  1137→      } finally {
+  1138→        if (!cancelled) setLoading(false)
+  1139→      }
+  1140→    }
+  1141→    loadNotifs()
+  1142→    return () => { cancelled = true }
+  1143→  }, [courses])
+  1144→
+  1145→  const formatRelativeTime = (iso: string | null | undefined) => {
+  1146→    if (!iso) return ''
+  1147→    try {
+  1148→      const date = new Date(iso)
+  1149→      const diffMs = Date.now() - date.getTime()
+  1150→      const diffMin = Math.floor(diffMs / 60000)
+  1151→      if (diffMin < 1) return 'الآن'
+  1152→      if (diffMin < 60) return `منذ ${diffMin} دقيقة`
+  1153→      const diffHr = Math.floor(diffMin / 60)
+  1154→      if (diffHr < 24) return `منذ ${diffHr} ساعة`
+  1155→      const diffDay = Math.floor(diffHr / 24)
+  1156→      if (diffDay < 30) return `منذ ${diffDay} يوم`
+  1157→      return date.toLocaleDateString('ar-EG')
+  1158→    } catch {
+  1159→      return ''
+  1160→    }
+  1161→  }
+  1162→
+  1163→  return (
+  1164→    <SectionCard
+  1165→      title="الإشعارات"
+  1166→      description="آخر التسجيلات في دوراتك التدريبية"
+  1167→    >
+  1168→      {loading ? (
+  1169→        <div className="text-center py-12">
+  1170→          <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+  1171→          <p className="text-muted-foreground text-sm">جاري تحميل الإشعارات...</p>
+  1172→        </div>
+  1173→      ) : notifs.length === 0 ? (
+  1174→        <div className="text-center py-12">
+  1175→          <Bell className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+  1176→          <p className="text-muted-foreground">لا توجد إشعارات</p>
+  1177→          <p className="text-xs text-muted-foreground mt-1">
+  1178→            ستظهر هنا إشعارات التسجيل الجديدة في دوراتك
+  1179→          </p>
+  1180→        </div>
+  1181→      ) : (
+  1182→        <div className="space-y-3">
+  1183→          {notifs.map((n) => (
+  1184→            <div
+  1185→              key={n.id}
+  1186→              className="p-4 bg-gold/5 border border-gold/20 rounded-lg flex items-start gap-3"
+  1187→            >
+  1188→              <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center text-gold font-bold flex-shrink-0 border border-gold/30 overflow-hidden">
+  1189→                {n.studentAvatar ? (
+  1190→                  <img src={n.studentAvatar} alt={n.studentName} className="w-full h-full object-cover" />
+  1191→                ) : (
+  1192→                  <UserPlus className="w-5 h-5" />
+  1193→                )}
+  1194→              </div>
+  1195→              <div className="flex-1 min-w-0">
+  1196→                <div className="font-semibold text-navy text-sm">
+  1197→                  متدرب جديد في دورتك
+  1198→                </div>
+  1199→                <div className="text-xs text-muted-foreground mt-1">
+  1200→                  <span className="font-medium text-navy">{n.studentName}</span>
+  1201→                  {' '}انضم إلى{' '}
+  1202→                  <span className="font-medium text-navy">{n.courseTitle}</span>
+  1203→                </div>
+  1204→                <div className="flex items-center gap-2 mt-2 flex-wrap">
+  1205→                  <Badge
+  1206→                    className={
+  1207→                      n.isFree
+  1208→                        ? 'bg-green-500/15 text-green-600 border-green-500/30 text-xs'
+  1209→                        : 'bg-gold/15 text-gold border-gold/30 text-xs'
+  1210→                    }
+  1211→                  >
+  1212→                    {n.isFree ? 'مجانية' : `${(n.amountPaid || 0).toLocaleString()} ${n.currency || 'ر.ي'}`}
+  1213→                  </Badge>
+  1214→                  {n.paymentStatus === 'pending' && (
+  1215→                    <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 text-xs">
+  1216→                      بانتظار الدفع
+  1217→                    </Badge>
+  1218→                  )}
+  1219→                  {n.enrolledAt && (
+  1220→                    <span className="text-xs text-muted-foreground">
+  1221→                      {formatRelativeTime(n.enrolledAt)}
+  1222→                    </span>
+  1223→                  )}
+  1224→                </div>
+  1225→              </div>
+  1226→            </div>
+  1227→          ))}
+  1228→        </div>
+  1229→      )}
+  1230→    </SectionCard>
+  1231→  )
+  1232→}
+  1233→
+  1234→function TrainerSettings() {
+  1235→  return (
+  1236→    <SectionCard title="الإعدادات" description="إعدادات حسابك">
+  1237→      <div className="space-y-6 max-w-2xl">
+  1238→        <Button variant="outline">تغيير كلمة المرور</Button>
+  1239→      </div>
+  1240→    </SectionCard>
+  1241→  )
+  1242→}
+  1243→
