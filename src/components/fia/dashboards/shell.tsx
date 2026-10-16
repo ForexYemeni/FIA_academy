@@ -40,7 +40,7 @@ export function DashboardShell({
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-gold/20">
         <div className="flex items-center gap-2">
-          <img src="/fia/logo-official.png" alt="FIA" className="h-10 w-auto object-contain" />
+          <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-lg" />
           <div>
             <div className="text-white font-bold text-sm">أكاديمية المستقبل الدولية</div>
             <div className="text-gold text-xs">FIA Dashboard</div>

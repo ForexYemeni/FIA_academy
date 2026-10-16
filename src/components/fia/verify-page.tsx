@@ -252,7 +252,7 @@ function CertificateDisplay({ result }: { result: VerifyResult }) {
             {/* Logo top-right */}
             <div className="absolute top-6 right-6 md:top-8 md:right-8">
               <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: '#FFFFFF', border: '2px solid #C9A961', padding: '6px' }}>
-                <img src="/fia/logo-official.png" alt="FIA Logo" className="h-16 w-16 md:h-20 md:w-20 object-contain" />
+                <img src="/fia/logo-fia.png" alt="FIA Logo" className="h-16 w-16 md:h-20 md:w-20 object-cover rounded-lg" />
               </div>
             </div>
 
