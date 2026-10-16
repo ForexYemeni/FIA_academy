@@ -408,6 +408,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
       name: name.trim(),
       title: title.trim() || null,
       role,
+      password: password || undefined, // Pass actual password to API
       specialization: parsed.specialization,
       bio: parsed.bio,
       vision: parsed.vision,
