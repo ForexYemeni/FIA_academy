@@ -257,6 +257,22 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
         toast.success(editing ? 'تم تحديث الدرس' : 'تمت إضافة الدرس')
         setLessonDialog(null)
         loadModules()
+
+        // Publish lesson/exam to Telegram channel (non-blocking)
+        if (!editing) {
+          const lessonTypeLabels: Record<string, string> = { video: 'فيديو', text: 'نص', exam: 'اختبار', pdf: 'PDF' }
+          const typeLabel = lessonTypeLabels[data.lesson_type] || 'درس'
+          fetch('/api/telegram-publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              course_id: courseId,
+              action: 'lesson',
+              lesson_title: data.title,
+              lesson_type: typeLabel,
+            }),
+          }).catch(() => {})
+        }
       } else {
         const result = await res.json().catch(() => ({}))
         toast.error(result.error || 'فشل الحفظ')

@@ -370,14 +370,52 @@ async function sendPhotoWithCaption(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
-    const { course_id, action } = (body || {}) as {
+    const { course_id, action, lesson_title, lesson_type } = (body || {}) as {
       course_id?: string
-      action?: 'create' | 'update'
+      action?: string
+      lesson_title?: string
+      lesson_type?: string
     }
 
     if (!course_id) {
       return NextResponse.json({ error: 'course_id مطلوب' }, { status: 400 })
     }
+
+    // Handle lesson/exam publishing
+    if (action === 'lesson' && lesson_title) {
+      const { token, channelId } = await getBotSettings()
+      if (!token || !channelId) {
+        return NextResponse.json({ error: 'إعدادات تيليجرام غير مُهيأة' }, { status: 500 })
+      }
+
+      // Fetch course title for context
+      const { data: course } = await supabaseAdmin
+        .from('courses')
+        .select('title')
+        .eq('id', course_id)
+        .maybeSingle()
+
+      const courseTitle = course?.title || 'دورة'
+      const message = `📚 ${escapeHtml(lesson_type)} جديد في دورة: <b>${escapeHtml(courseTitle)}</b>\n\n📖 العنوان: <b>${escapeHtml(lesson_title)}</b>\n\n✅ سجل الآن في منصة FIA\n🔗 ${REGISTRATION_LINK}`
+
+      const sendRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: channelId,
+          text: message,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      })
+      const sendData = await sendRes.json()
+      if (!sendData.ok) {
+        return NextResponse.json({ error: sendData.description || 'فشل الإرسال' }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, message_id: sendData.result.message_id })
+    }
+
+    // Handle course create/update publishing
     const finalAction: 'create' | 'update' = action === 'update' ? 'update' : 'create'
 
     // 1) Fetch the course (by course_id) directly from the database
