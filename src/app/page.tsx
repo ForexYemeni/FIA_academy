@@ -23,7 +23,7 @@ export default function Home() {
 
     const checkHash = () => {
       const h = window.location.hash.replace('#', '')
-      if (['about', 'privacy', 'terms', 'refund', 'support', 'social', 'courses', 'trainers', 'team'].includes(h)) {
+      if (['about', 'privacy', 'terms', 'refund', 'support', 'social', 'courses', 'trainers', 'team', 'partners', 'licenses'].includes(h)) {
         setActiveCard(h)
       } else {
         setActiveCard(null)

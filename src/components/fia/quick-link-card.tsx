@@ -5,20 +5,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
   BookOpen, GraduationCap, UserCog, Crown, ChevronLeft, X, Star, Briefcase, Phone, Linkedin,
+  Building2, ExternalLink, CheckCircle2,
 } from 'lucide-react'
 
 export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | null; onClose: () => void; settings: any }) {
   const [courses, setCourses] = useState<any[]>([])
   const [trainers, setTrainers] = useState<any[]>([])
   const [team, setTeam] = useState<any[]>([])
+  const [partners, setPartners] = useState<any[]>([])
+  const [licenses, setLicenses] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState<any | null>(null)
   const [selectedTrainer, setSelectedTrainer] = useState<any | null>(null)
 
   useEffect(() => {
     if (cardId === 'courses') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
-    if (cardId === 'trainers') fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'trainers') {
+      fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    }
     if (cardId === 'team') fetch('/api/team').then((r) => r.json()).then((d) => setTeam(Array.isArray(d) ? d : [])).catch(() => {})
-    if (cardId === 'trainers') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'partners') fetch('/api/partners').then((r) => r.json()).then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {})
+    if (cardId === 'licenses') fetch('/api/licenses').then((r) => r.json()).then((d) => setLicenses(Array.isArray(d) ? d : [])).catch(() => {})
   }, [cardId])
 
   // Reset selection when card changes
@@ -36,6 +43,8 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
     refund: { title: 'سياسة الاسترداد', icon: RefreshCw },
     support: { title: 'الدعم والمساعدة', icon: LifeBuoy },
     social: { title: 'تابعنا', icon: Users },
+    partners: { title: 'شركاؤنا', icon: Building2 },
+    licenses: { title: 'التراخيص والاعتمادات', icon: Shield },
   }
 
   const m = meta[cardId]
@@ -355,6 +364,140 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
               </div>
             )
           })}
+        </div>
+      )
+    }
+
+    // === PARTNERS — professional cards mirroring admin's design ===
+    if (cardId === 'partners') {
+      // Respect the admin's visibility toggle — if disabled, show a clear message
+      if (settings.show_partners !== true) {
+        return (
+          <div className="text-center py-8">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500">قسم الشركاء غير مُفعّل من الإدارة حالياً</p>
+          </div>
+        )
+      }
+      // Only show 'نشط' partners on the public site
+      const active = partners.filter((p) => p.status === 'نشط')
+      if (active.length === 0) {
+        return (
+          <div className="text-center py-8">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500">لا يوجد شركاء بعد. سيتم عرض الشركاء هنا فور إضافتهم من حساب الإدارة.</p>
+          </div>
+        )
+      }
+      return (
+        <div className="space-y-3">
+          {active.map((p) => (
+            <div key={p.id} className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-l from-[#0A1F44] to-[#102a63] text-white">
+              <div className="w-14 h-14 rounded-2xl bg-[#C9A961]/20 flex items-center justify-center text-3xl flex-shrink-0">
+                {p.logo || '🤝'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-bold text-white text-sm">{p.name}</h4>
+                  <span className="inline-flex items-center gap-1 text-[9px] bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> شراكة فعّالة
+                  </span>
+                </div>
+                {p.description && <p className="text-white/60 text-xs leading-relaxed">{p.description}</p>}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {p.since && (
+                    <span className="inline-flex items-center gap-1 text-[10px] bg-white/10 text-[#C9A961] border border-[#C9A961]/30 px-2 py-0.5 rounded-full">
+                      ★ شريك منذ {p.since}
+                    </span>
+                  )}
+                  {p.website && (
+                    <a
+                      href={p.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[10px] text-[#C9A961] hover:text-white transition-colors"
+                      dir="ltr"
+                    >
+                      <ExternalLink className="w-3 h-3" /> زيارة الموقع
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // === LICENSES — professional cards mirroring admin's design ===
+    if (cardId === 'licenses') {
+      if (settings.show_licenses !== true) {
+        return (
+          <div className="text-center py-8">
+            <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500">قسم التراخيص غير مُفعّل من الإدارة حالياً</p>
+          </div>
+        )
+      }
+      // Only show 'ساري' licenses on the public site
+      const active = licenses.filter((l) => l.status === 'ساري')
+      if (active.length === 0) {
+        return (
+          <div className="text-center py-8">
+            <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500">لا توجد تراخيص بعد. سيتم عرض التراخيص هنا فور إضافتها من حساب الإدارة.</p>
+          </div>
+        )
+      }
+      return (
+        <div className="space-y-3">
+          {active.map((l) => (
+            <div key={l.id} className="p-4 rounded-xl bg-gray-50 border-2 border-[#C9A961]/20">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-5 h-5 text-[#C9A961]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-[#0A1F44] text-sm leading-tight">{l.issuing_body}</h4>
+                    {l.type && <p className="text-[#C9A961] text-xs font-semibold mt-0.5">{l.type}</p>}
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[9px] bg-green-500/15 text-green-700 border border-green-500/30 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> ساري
+                </span>
+              </div>
+
+              {l.number && (
+                <div className="flex items-center justify-between bg-white rounded-lg p-2 mb-2 border border-gray-100">
+                  <span className="text-[10px] text-gray-500">رقم الترخيص</span>
+                  <span className="font-mono text-[#0A1F44] font-bold text-xs" dir="ltr">{l.number}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500 pt-2 border-t border-gray-100">
+                {l.issued_at && (
+                  <span>إصدار: <span dir="ltr" className="font-medium text-[#0A1F44]">{l.issued_at}</span></span>
+                )}
+                {l.expires_at && (
+                  <span>ينتهي: <span dir="ltr" className="font-medium text-[#0A1F44]">{l.expires_at}</span></span>
+                )}
+              </div>
+
+              {l.verification_url && (
+                <a
+                  href={l.verification_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-[#0A1F44] hover:bg-[#102a63] text-[#C9A961] px-4 py-2 rounded-lg text-xs font-medium transition-colors"
+                >
+                  <Shield className="w-4 h-4" />
+                  تحقق من صحة الترخيص
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          ))}
         </div>
       )
     }
