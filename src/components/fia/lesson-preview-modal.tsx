@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
-  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy,
+  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -127,6 +127,71 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
 
 // ============== Video Player (HTML5 protected) ==============
 function VideoPlayer({ url }: { url?: string }) {
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Resolve Telegram message links (https://t.me/c/CHANNEL_ID/MSG_ID) to direct file URLs
+  useEffect(() => {
+    if (!url) return
+
+    // If it's already a direct file URL (api.telegram.org/file/...), use it directly
+    if (url.startsWith('https://api.telegram.org/file/')) {
+      setResolvedUrl(url)
+      return
+    }
+
+    // If it's a Telegram message link (https://t.me/c/CHANNEL_ID/MSG_ID)
+    // We need to resolve it via the bot API
+    if (url.startsWith('https://t.me/') || url.startsWith('http://t.me/')) {
+      setLoading(true)
+      // Extract channel_id and message_id from URL
+      // Format: https://t.me/c/4391183203/64 → channel_id = -1004391183203, message_id = 64
+      const match = url.match(/t\.me\/c\/(\d+)\/(\d+)/)
+      if (match) {
+        const channelId = `-100${match[1]}`
+        const messageId = match[2]
+        // Call our API to resolve the Telegram message to a direct file URL
+        fetch(`/api/telegram-file?channel_id=${channelId}&message_id=${messageId}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.url) {
+              setResolvedUrl(data.url)
+            } else {
+              setError(data.error || 'فشل في جلب الفيديو من تيليجرام')
+            }
+          })
+          .catch(() => setError('خطأ في الاتصال'))
+          .finally(() => setLoading(false))
+      } else {
+        setError('رابط تيليجرام غير صالح')
+        setLoading(false)
+      }
+      return
+    }
+
+    // tg:// file ID (old format) — try to resolve
+    if (url.startsWith('tg://')) {
+      const fileId = url.substring(5)
+      setLoading(true)
+      fetch(`/api/telegram-file?file_id=${encodeURIComponent(fileId)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.url) {
+            setResolvedUrl(data.url)
+          } else {
+            setError('فشل في جلب الفيديو من تيليجرام')
+          }
+        })
+        .catch(() => setError('خطأ في الاتصال'))
+        .finally(() => setLoading(false))
+      return
+    }
+
+    // Regular URL — use directly
+    setResolvedUrl(url)
+  }, [url])
+
   if (!url) {
     return (
       <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
@@ -136,14 +201,30 @@ function VideoPlayer({ url }: { url?: string }) {
     )
   }
 
-  // If it's a Telegram file URL, we can't directly play it
-  if (url.startsWith('tg://')) {
+  if (loading) {
     return (
       <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
-        <Video className="w-12 h-12 text-red-500 mx-auto mb-3" />
-        <p className="text-muted-foreground mb-2">تم رفع هذا الفيديو إلى تيليجرام</p>
-        <p className="text-xs text-muted-foreground" dir="ltr">File ID: {url.substring(5)}</p>
-        <p className="text-xs text-muted-foreground mt-2">سيتم ربط الفيديو عبر رابط مباشر لاحقاً</p>
+        <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+        <p className="text-muted-foreground">جاري جلب الفيديو من تيليجرام...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+        <p className="text-muted-foreground">{error}</p>
+        <p className="text-xs text-muted-foreground mt-2" dir="ltr">{url}</p>
+      </div>
+    )
+  }
+
+  if (!resolvedUrl) {
+    return (
+      <div className="text-center py-12 bg-muted/30 rounded-lg border border-border">
+        <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
+        <p className="text-muted-foreground">جاري تحميل الفيديو...</p>
       </div>
     )
   }
@@ -157,7 +238,7 @@ function VideoPlayer({ url }: { url?: string }) {
         className="w-full h-auto max-h-[480px]"
         onContextMenu={(e) => e.preventDefault()}
       >
-        <source src={url} type="video/mp4" />
+        <source src={resolvedUrl} type="video/mp4" />
         متصفحك لا يدعم تشغيل الفيديو
       </video>
       <style jsx>{`
