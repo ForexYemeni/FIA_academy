@@ -50,6 +50,51 @@ const joinBio = (display: string, original?: string) => {
   return `${display.trimEnd()}\n\n${original.slice(i)}`
 }
 
+// Returns a normalized status info object for an enrollment's payment_status.
+// payment_status can be one of: 'pending' | 'confirmed' | 'completed' | 'free'.
+// - 'pending'    -> student paid, waiting for admin approval (yellow)
+// - 'confirmed'  -> admin approved the payment, course in progress (green)
+// - 'completed'  -> payment confirmed AND course finished (green)
+// - 'free'       -> free enrollment (blue)
+export function getPaymentStatusInfo(paymentStatus: string | undefined | null): {
+  label: string
+  badgeClass: string
+} {
+  switch (paymentStatus) {
+    case 'completed':
+      return { label: 'مكتمل', badgeClass: 'bg-green-500 text-white' }
+    case 'confirmed':
+      return { label: 'تم تأكيد الدفع', badgeClass: 'bg-green-500 text-white' }
+    case 'free':
+      return { label: 'مجانية', badgeClass: 'bg-blue-500 text-white' }
+    case 'pending':
+    default:
+      return { label: 'بانتظار تأكيد الدفع', badgeClass: 'bg-yellow-500 text-white' }
+  }
+}
+
+// Returns a status info object for a raw payment record's `status` field
+// (used in the Payments section). Raw status can be: 'مكتمل' | 'completed' |
+// 'قيد الانتظار' | 'pending' | 'بانتظار' | 'ملغي' | 'failed' | 'فشل' | etc.
+export function getPaymentRecordStatusInfo(status: string | undefined | null): {
+  label: string
+  badgeClass: string
+} {
+  const s = (status || '').trim()
+  const norm = s.toLowerCase()
+  if (s === 'مكتمل' || norm === 'completed' || norm === 'paid' || norm === 'confirmed') {
+    return { label: s || 'مكتمل', badgeClass: 'bg-green-500/15 text-green-600 border-green-500/30' }
+  }
+  if (s === 'ملغي' || norm === 'failed' || s === 'فشل' || norm === 'cancelled' || norm === 'canceled') {
+    return { label: s || 'فشل', badgeClass: 'bg-red-500/15 text-red-600 border-red-500/30' }
+  }
+  if (s === 'قيد الانتظار' || s === 'بانتظار' || norm === 'pending' || s === '') {
+    return { label: s || 'بانتظار', badgeClass: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' }
+  }
+  // Unknown status — show as neutral
+  return { label: s, badgeClass: 'bg-muted text-muted-foreground border-border' }
+}
+
 export function StudentDashboard() {
   const [active, setActive] = useState('overview')
   const [viewingCourse, setViewingCourse] = useState<any | null>(null)
@@ -98,11 +143,11 @@ export function StudentDashboard() {
           {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
           {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
-          {active === 'exams' && <Exams />}
+          {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
           {active === 'results' && <Results />}
           {/* DISABLED: certificate feature temporarily removed — will be re-enabled when design+prompt provided */}
           {/* {active === 'certificates' && <Certificates certificates={certificates} />} */}
-          {active === 'payments' && <Payments payments={payments} />}
+          {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
           {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
           {active === 'notifications' && <Notifications />}
           {active === 'settings' && <SettingsTab />}
@@ -219,12 +264,8 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
               <div className="h-32 bg-navy relative">
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
                 <div className="absolute top-2 right-2">
-                  <Badge className={
-                    (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'bg-green-500 text-white'
-                    : c.enrollment.payment_status === 'pending' ? 'bg-yellow-500 text-white'
-                    : 'bg-blue-500 text-white'
-                  }>
-                    {(c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? 'مكتملة' : c.enrollment.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                  <Badge className={getPaymentStatusInfo(c.enrollment.payment_status).badgeClass}>
+                    {getPaymentStatusInfo(c.enrollment.payment_status).label}
                   </Badge>
                 </div>
               </div>
@@ -239,7 +280,7 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
                   <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
                     بانتظار تأكيد الدفع
                   </Button>
-                ) : (c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل') ? (
+                ) : c.enrollment.payment_status === 'completed' ? (
                   <div className="space-y-2">
                     <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
@@ -597,81 +638,137 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
   )
 }
 
-function Exams() {
-  const exams = [
-    { name: 'اختبار BLS الأساسي', course: 'BLS & ACLS', score: 85, status: 'ناجح', date: '2025-09-12' },
-    { name: 'مكافحة العدوى - الوحدة 1', course: 'Infection Control', score: 0, status: 'لم يُجرَب', date: null },
-    { name: 'أساسيات التمريض', course: 'Nursing Fundamentals', score: 0, status: 'متاح', date: null },
-  ]
+function Exams({ userId, courses }: any) {
+  const [exams, setExams] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!userId) {
+        setLoading(false)
+        return
+      }
+      try {
+        // 1. Fetch the student's enrollments (only their own).
+        const enrRes = await fetch(`/api/enrollments?user_id=${userId}`)
+        const enrollments = await enrRes.json()
+        const validEnrollments: any[] = Array.isArray(enrollments) ? enrollments : []
+
+        // 2. For each enrolled course, fetch its lessons and filter exam-type lessons.
+        //    Only show exams for courses the student actually has access to
+        //    (i.e., payment_status is NOT 'pending').
+        const accessible = validEnrollments.filter(
+          (e: any) => e.payment_status !== 'pending'
+        )
+
+        const results = await Promise.all(
+          accessible.map(async (e: any) => {
+            try {
+              const lessonsRes = await fetch(`/api/lessons?course_id=${e.course_id}`)
+              const lessons = await lessonsRes.json()
+              const allLessons: any[] = Array.isArray(lessons) ? lessons : []
+              const examLessons = allLessons.filter(
+                (l: any) => l.lesson_type === 'exam'
+              )
+              const courseTitle =
+                courses?.find((c: any) => c.id === e.course_id)?.title || null
+              return examLessons.map((l: any) => ({
+                id: l.id,
+                name: l.title || 'اختبار بدون اسم',
+                course_id: e.course_id,
+                course_title: courseTitle,
+                enrollment_id: e.id,
+                duration_minutes: l.duration_minutes || 0,
+              }))
+            } catch {
+              return []
+            }
+          })
+        )
+
+        if (cancelled) return
+        setExams(results.flat())
+      } catch {
+        if (!cancelled) setExams([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [userId, courses])
+
   return (
-    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك">
-      <div className="space-y-3">
-        {exams.map((e, i) => (
-          <div key={i} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
-            <div>
-              <div className="font-semibold text-navy text-sm">{e.name}</div>
-              <div className="text-xs text-muted-foreground mt-1">{e.course}</div>
-            </div>
-            <div className="flex items-center gap-3">
-              {e.score > 0 ? (
-                <>
-                  <div className="text-right">
-                    <div className="font-bold text-navy">{e.score}%</div>
-                    <div className="text-xs text-green-600">{e.status}</div>
-                  </div>
-                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30">{e.status}</Badge>
-                </>
-              ) : (
-                <Button size="sm" className="bg-navy hover:bg-navy-light">ابدأ الاختبار</Button>
-              )}
-            </div>
+    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك في دوراتك المسجّلة">
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+          <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
+        </div>
+      ) : exams.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+            <FileText className="w-10 h-10 text-muted-foreground/50" />
           </div>
-        ))}
-      </div>
+          <p className="text-base font-semibold text-navy mb-1">لا توجد اختبارات متاحة لك حالياً</p>
+          <p className="text-xs text-muted-foreground">
+            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {exams.map((exam: any, i: number) => (
+            <div
+              key={exam.id || i}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-4 h-4 text-navy" />
+                  </div>
+                  <div className="font-semibold text-navy text-sm">{exam.name}</div>
+                </div>
+                <div className="text-xs text-muted-foreground mr-11 flex flex-wrap items-center gap-x-2">
+                  {exam.course_title && <span>{exam.course_title}</span>}
+                  {exam.duration_minutes ? <span>• {exam.duration_minutes} دقيقة</span> : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button size="sm" className="bg-navy hover:bg-navy-light">
+                  ابدأ الاختبار
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </SectionCard>
   )
 }
 
 function Results() {
-  const results = [
-    { exam: 'BLS الأساسي', score: 85, total: 100, status: 'ناجح', date: '2025-09-12' },
-    { exam: 'مكافحة العدوى', score: 92, total: 100, status: 'ناجح', date: '2025-09-20' },
-    { exam: 'ACLS المتقدم', score: 55, total: 100, status: 'راسب', date: '2025-09-25' },
-  ]
+  // NOTE: Exam results are not currently stored in a dedicated table — the
+  // platform doesn't persist a per-student score for each exam yet. Once that
+  // backend exists, this component should fetch and render the real results.
+  // For now we show a professional empty state so students aren't shown fake
+  // placeholder data.
   return (
-    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">الاختبار</th>
-              <th className="py-3 px-2">النتيجة</th>
-              <th className="py-3 px-2">النسبة</th>
-              <th className="py-3 px-2">الحالة</th>
-              <th className="py-3 px-2">التاريخ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, i) => (
-              <tr key={i} className="border-b border-border">
-                <td className="py-3 px-2 font-medium text-navy">{r.exam}</td>
-                <td className="py-3 px-2">{r.score}/{r.total}</td>
-                <td className="py-3 px-2">
-                  <div className="flex items-center gap-2">
-                    <Progress value={r.score} className="w-16 h-2" />
-                    <span>{r.score}%</span>
-                  </div>
-                </td>
-                <td className="py-3 px-2">
-                  <Badge className={r.status === 'ناجح' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
-                    {r.status}
-                  </Badge>
-                </td>
-                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{r.date}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات التي أتممتها">
+      <div className="text-center py-16">
+        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+          <TrendingUp className="w-10 h-10 text-muted-foreground/50" />
+        </div>
+        <p className="text-base font-semibold text-navy mb-1">
+          لا توجد نتائج بعد — لم تقم بأي اختبار بعد
+        </p>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          عند إكمالك لأحد الاختبارات في دوراتك المسجّلة، ستظهر نتيجتك وتفاصيلها هنا مع
+          النسبة المئوية وحالة النجاح أو الرسوب.
+        </p>
       </div>
     </SectionCard>
   )
@@ -779,38 +876,112 @@ function Certificates({ certificates }: any) {
   )
 }
 
-function Payments({ payments }: any) {
-  const myPayments = payments.length > 0 ? payments : [
-    { id: '1', amount: 35000, currency: 'ر.ي', method: 'جيب', status: 'مكتمل', reference: 'JB-7842', date: '2025-09-10' }
-  ]
+function Payments({ payments, userId, courses }: any) {
+  // Filter by the current user's id so we never display someone else's payments.
+  const myPayments = (payments || []).filter((p: any) => p.user_id === userId)
+  // Sort by date DESC (most recent first) for display
+  const sortedPayments = [...myPayments].sort((a: any, b: any) => {
+    const da = a.date ? new Date(a.date).getTime() : 0
+    const db = b.date ? new Date(b.date).getTime() : 0
+    return db - da
+  })
+
+  const getCourseTitle = (courseId: string | null | undefined) => {
+    if (!courseId) return null
+    return courses?.find((c: any) => c.id === courseId)?.title || null
+  }
+
+  const fmtAmount = (p: any) => {
+    const amt = typeof p.amount === 'number' ? p.amount : Number(p.amount) || 0
+    return amt.toLocaleString('en-US')
+  }
+
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return null
+    try {
+      return new Date(d).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    } catch {
+      return null
+    }
+  }
+
+  // Strip the trailing "| PROOF: https://..." suffix from a reference so we
+  // show the user-friendly reference number (e.g., "JB-123456789") in the UI.
+  const cleanReference = (ref: string | null | undefined) => {
+    if (!ref) return null
+    return ref.replace(/\s*\|\s*PROOF:.*$/i, '').trim() || null
+  }
+
   return (
-    <SectionCard title="مدفوعاتي" description="سجل المعاملات المالية">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">المبلغ</th>
-              <th className="py-3 px-2">الطريقة</th>
-              <th className="py-3 px-2">المرجع</th>
-              <th className="py-3 px-2">الحالة</th>
-              <th className="py-3 px-2">التاريخ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {myPayments.map((p: any, i: number) => (
-              <tr key={i} className="border-b border-border">
-                <td className="py-3 px-2 font-bold text-navy">{p.amount.toLocaleString()} {p.currency || 'ر.ي'}</td>
-                <td className="py-3 px-2">{p.method || '-'}</td>
-                <td className="py-3 px-2 font-mono" dir="ltr">{p.reference || '-'}</td>
-                <td className="py-3 px-2">
-                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30">{p.status}</Badge>
-                </td>
-                <td className="py-3 px-2 text-muted-foreground" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
+      {sortedPayments.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+            <CreditCard className="w-10 h-10 text-muted-foreground/50" />
+          </div>
+          <p className="text-base font-semibold text-navy mb-1">لا توجد مدفوعات بعد</p>
+          <p className="text-xs text-muted-foreground">
+            عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedPayments.map((p: any) => {
+            const statusInfo = getPaymentRecordStatusInfo(p.status)
+            const courseTitle = getCourseTitle(p.course_id)
+            const ref = cleanReference(p.reference)
+            const dateStr = fmtDate(p.date)
+            return (
+              <Card key={p.id} className="p-0 overflow-hidden border-border card-hover">
+                {/* Amount header — large bold */}
+                <div className="bg-gradient-to-br from-navy to-navy-light p-4 text-white">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] text-gold/80 font-semibold mb-0.5">المبلغ</div>
+                      <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
+                        {fmtAmount(p)} <span className="text-base font-bold text-gold">{p.currency || 'ر.ي'}</span>
+                      </div>
+                    </div>
+                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>
+                      {statusInfo.label}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Details body */}
+                <div className="p-4 space-y-3">
+                  {courseTitle && (
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-0.5">الدورة</div>
+                      <div className="text-sm font-semibold text-navy line-clamp-2">{courseTitle}</div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-0.5">طريقة الدفع</div>
+                      <div className="text-sm font-medium text-navy">{p.method || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground mb-0.5">التاريخ</div>
+                      <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
+                    <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref || '-'}</div>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </SectionCard>
   )
 }
