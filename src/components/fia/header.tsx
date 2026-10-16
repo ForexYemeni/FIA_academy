@@ -8,14 +8,12 @@ import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 
 const NAV_LINKS = [
-  { href: '#home', label: 'الرئيسية' },
   { href: '#about', label: 'من نحن' },
-  { href: '#courses', label: 'الدورات' },
-  { href: '#trainers', label: 'المدربون' },
-  { href: '#partners', label: 'الشركاء' },
-  { href: '#licenses', label: 'التراخيص' },
-  { href: '#verify', label: 'التحقق من الشهادات' },
-  { href: '#contact', label: 'تواصل معنا' },
+  { href: '#privacy', label: 'سياسة الخصوصية' },
+  { href: '#terms', label: 'شروط الاستخدام' },
+  { href: '#refund', label: 'سياسة الاسترداد' },
+  { href: '#support', label: 'الدعم والمساعدة' },
+  { href: '#social', label: 'تابعنا' },
 ]
 
 interface HeaderProps {
