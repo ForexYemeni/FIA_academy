@@ -40,3 +40,73 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+// PUT — admin: update payment status (approve / reject / etc.)
+// When the admin approves a payment (status = 'مكتمل'), we also update
+// ALL duplicate payment rows for the same user+course to the same status
+// — this fixes the legacy duplicate-row issue where the admin approved
+// one row but the student's enrollment was reading from another (un-updated)
+// row. The student's enrollment viewer reads via /api/enrollments which
+// already deduplicates, but we still want all duplicate rows to reflect
+// the approved status for consistency.
+export async function PUT(req: NextRequest) {
+  try {
+    const { id, status, ...otherUpdates } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    if (!status) return NextResponse.json({ error: 'status required' }, { status: 400 })
+
+    // 1) Update the targeted payment row
+    const updates: any = { status, ...otherUpdates }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('payments')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (updateError) throw updateError
+
+    // 2) If this is an approval, also update duplicate rows for same
+    //    user+course so the student's enrollment reflects the new status.
+    if (updated?.user_id && updated?.course_id) {
+      try {
+        await supabaseAdmin
+          .from('payments')
+          .update({ status })
+          .eq('user_id', updated.user_id)
+          .eq('course_id', updated.course_id)
+          .neq('id', id)
+      } catch {}
+    }
+
+    // 3) Send notification to the student about the decision
+    if (updated?.user_id) {
+      try {
+        const isApproved = status === 'مكتمل' || status === 'completed' || status === 'paid'
+        const isRejected = status === 'ملغي' || status === 'cancelled' || status === 'failed'
+        if (isApproved || isRejected) {
+          // Lookup course title
+          const { data: course } = await supabaseAdmin
+            .from('courses')
+            .select('title')
+            .eq('id', updated.course_id)
+            .maybeSingle()
+          const courseTitle = course?.title || 'دورة'
+          await supabaseAdmin.from('notifications').insert({
+            user_id: updated.user_id,
+            type: 'payment',
+            title: isApproved ? 'تم تأكيد الدفع' : 'تم رفض الدفع',
+            body: isApproved
+              ? `تم تأكيد دفعك لدورة "${courseTitle}". يمكنك الآن الوصول إلى محتوى الدورة.`
+              : `للأسف لم يتم قبول دفعك لدورة "${courseTitle}". يرجى التواصل مع الإدارة لمزيد من التفاصيل.`,
+            link: '/',
+          })
+        }
+      } catch {}
+    }
+
+    return NextResponse.json(updated)
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}

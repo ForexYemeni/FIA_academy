@@ -574,31 +574,29 @@ function AdminPayments() {
   useEffect(() => { load() }, [])
 
   const updateStatus = async (id: string, status: string) => {
-    await fetch('/api/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
-    // If approving payment, also update any duplicate enrollment rows
-    // for the same user+course to the same status — this fixes the
-    // duplicate-row issue where the admin approved one row but the
-    // student's enrollment was reading from the other (un-updated) row.
-    if (status === 'مكتمل') {
-      try {
-        // Find the payment we just updated to get user_id + course_id
-        const updated = items.find(p => p.id === id)
-        if (updated?.user_id && updated?.course_id) {
-          // Find ALL other payment rows for the same user+course
-          const duplicates = items.filter(p => p.user_id === updated.user_id && p.course_id === updated.course_id && p.id !== id)
-          for (const dup of duplicates) {
-            await fetch('/api/payments', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: dup.id, status }),
-            })
-          }
-        }
-      } catch {}
+    // The /api/payments PUT handler now:
+    //   1) Updates the targeted payment row
+    //   2) Updates ALL duplicate rows for the same user+course to the
+    //      same status (legacy dedupe fix)
+    //   3) Sends a notification to the student
+    // So we only need to make ONE call here.
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل تحديث حالة الدفع')
+        return
+      }
+      toast.success(status === 'مكتمل' ? 'تم قبول الدفع — تم تفعيل الدورة للمتدرب' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
+      load()
+      setSelectedPayment(null)
+    } catch {
+      toast.error('خطأ في الاتصال')
     }
-    toast.success(status === 'مكتمل' ? 'تم قبول الدفع' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
-    load()
-    setSelectedPayment(null)
   }
 
   const filtered = items.filter(p => {
@@ -619,6 +617,17 @@ function AdminPayments() {
 
   // Get course for payment
   const getCourse = (courseId: string) => courses.find(c => c.id === courseId)
+
+  // Determine currency to display — prefer the course's currency
+  // (source of truth) over the payment's stored currency, since
+  // older payment rows may have defaulted to 'ر.ي' for USD courses.
+  const getCurrency = (p: any) => {
+    if (p?.course_id) {
+      const course = getCourse(p.course_id)
+      if (course?.currency) return course.currency
+    }
+    return p?.currency || 'ر.ي'
+  }
 
   return (
     <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
@@ -641,7 +650,7 @@ function AdminPayments() {
             <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-bold text-navy text-sm">{p.amount?.toLocaleString()} {p.currency || 'ر.ي'}</span>
+                  <span className="font-bold text-navy text-sm">{p.amount?.toLocaleString()} {getCurrency(p)}</span>
                   <Badge className={
                     p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
                     : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
@@ -687,7 +696,7 @@ function AdminPayments() {
             <div className="space-y-4 py-4">
               <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
                 <span className="text-sm font-semibold text-navy">المبلغ:</span>
-                <span className="text-xl font-extrabold text-gold">{selectedPayment.amount?.toLocaleString()} {selectedPayment.currency || 'ر.ي'}</span>
+                <span className="text-xl font-extrabold text-gold">{selectedPayment.amount?.toLocaleString()} {getCurrency(selectedPayment)}</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>

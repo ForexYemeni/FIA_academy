@@ -1,0 +1,1778 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, FileText, Award, CreditCard,
+     6→  User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
+     7→  Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
+     8→  Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
+     9→} from 'lucide-react'
+    10→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    11→import { useAuth } from '@/lib/auth-store'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Card } from '@/components/ui/card'
+    14→import { Badge } from '@/components/ui/badge'
+    15→import { Input } from '@/components/ui/input'
+    16→import { Label } from '@/components/ui/label'
+    17→import { Textarea } from '@/components/ui/textarea'
+    18→import { Progress } from '@/components/ui/progress'
+    19→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    20→import {
+    21→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    22→} from '@/components/ui/dialog'
+    23→import { toast } from 'sonner'
+    24→import { AvatarUploader } from '@/components/fia/avatar-uploader'
+    25→import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
+    26→import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
+    27→import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
+    28→import { CertificateRequest } from '@/components/fia/certificate-request'
+    29→import { CertificateViewer } from '@/components/fia/certificate-viewer'
+    30→
+    31→const NAV: NavItem[] = [
+    32→  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+    33→  { id: 'courses', label: 'دوراتي', icon: BookOpen },
+    34→  { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
+    35→  { id: 'exams', label: 'اختباراتي', icon: FileText },
+    36→  { id: 'results', label: 'نتائجي', icon: TrendingUp },
+    37→  { id: 'certificates', label: 'شهاداتي', icon: Award },
+    38→  { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
+    39→  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+    40→  { id: 'blog', label: 'المدونة', icon: Newspaper },
+    41→  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
+    42→  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift },
+    43→  { id: 'profile', label: 'ملفي الشخصي', icon: User },
+    44→  { id: 'notifications', label: 'الإشعارات', icon: Bell },
+    45→  { id: 'settings', label: 'الإعدادات', icon: Settings },
+    46→]
+    47→
+    48→// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
+    49→// Show only the human-readable text in the UI, but preserve the extra data on save.
+    50→const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
+    51→const splitBio = (raw: string) => {
+    52→  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
+    53→  return i === -1 ? raw : raw.slice(0, i).trimEnd()
+    54→}
+    55→const joinBio = (display: string, original?: string) => {
+    56→  if (!original) return display
+    57→  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
+    58→  if (i === -1) return display
+    59→  return `${display.trimEnd()}\n\n${original.slice(i)}`
+    60→}
+    61→
+    62→// Returns a normalized status info object for an enrollment's payment_status.
+    63→// payment_status can be one of: 'pending' | 'confirmed' | 'completed' | 'free'.
+    64→// - 'pending'    -> student paid, waiting for admin approval (yellow)
+    65→// - 'confirmed'  -> admin approved the payment, course in progress (green)
+    66→// - 'completed'  -> payment confirmed AND course finished (green)
+    67→// - 'free'       -> free enrollment (blue)
+    68→export function getPaymentStatusInfo(paymentStatus: string | undefined | null): {
+    69→  label: string
+    70→  badgeClass: string
+    71→} {
+    72→  switch (paymentStatus) {
+    73→    case 'completed':
+    74→      return { label: 'مكتمل', badgeClass: 'bg-green-500 text-white' }
+    75→    case 'confirmed':
+    76→      return { label: 'تم تأكيد الدفع', badgeClass: 'bg-green-500 text-white' }
+    77→    case 'free':
+    78→      return { label: 'مجانية', badgeClass: 'bg-blue-500 text-white' }
+    79→    case 'pending':
+    80→    default:
+    81→      return { label: 'بانتظار تأكيد الدفع', badgeClass: 'bg-yellow-500 text-white' }
+    82→  }
+    83→}
+    84→
+    85→// Returns a status info object for a raw payment record's `status` field
+    86→// (used in the Payments section). Raw status can be: 'مكتمل' | 'completed' |
+    87→// 'قيد الانتظار' | 'pending' | 'بانتظار' | 'ملغي' | 'failed' | 'فشل' | etc.
+    88→export function getPaymentRecordStatusInfo(status: string | undefined | null): {
+    89→  label: string
+    90→  badgeClass: string
+    91→} {
+    92→  const s = (status || '').trim()
+    93→  const norm = s.toLowerCase()
+    94→  if (s === 'مكتمل' || norm === 'completed' || norm === 'paid' || norm === 'confirmed') {
+    95→    return { label: s || 'مكتمل', badgeClass: 'bg-green-500/15 text-green-600 border-green-500/30' }
+    96→  }
+    97→  if (s === 'ملغي' || norm === 'failed' || s === 'فشل' || norm === 'cancelled' || norm === 'canceled') {
+    98→    return { label: s || 'فشل', badgeClass: 'bg-red-500/15 text-red-600 border-red-500/30' }
+    99→  }
+   100→  if (s === 'قيد الانتظار' || s === 'بانتظار' || norm === 'pending' || s === '') {
+   101→    return { label: s || 'بانتظار', badgeClass: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' }
+   102→  }
+   103→  // Unknown status — show as neutral
+   104→  return { label: s, badgeClass: 'bg-muted text-muted-foreground border-border' }
+   105→}
+   106→
+   107→export function StudentDashboard() {
+   108→  const [active, setActive] = useState('overview')
+   109→  const [viewingCourse, setViewingCourse] = useState<any | null>(null)
+   110→  const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
+   111→  const user = useAuth((s) => s.user)
+   112→  const updateUser = useAuth((s) => s.updateUser)
+   113→  const [courses, setCourses] = useState<any[]>([])
+   114→  const [certificates, setCertificates] = useState<any[]>([])
+   115→  const [payments, setPayments] = useState<any[]>([])
+   116→  const [enrollments, setEnrollments] = useState<any[]>([])
+   117→  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || '') })
+   118→
+   119→  const loadEnrollments = () => {
+   120→    if (!user?.id) return
+   121→    fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
+   122→  }
+   123→
+   124→  useEffect(() => {
+   125→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+   126→    fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+   127→    fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+   128→    loadEnrollments()
+   129→  }, [user?.id])
+   130→
+   131→  // Real-time: when admin updates a course (e.g. changes price_type
+   132→  // from مدفوعة to مجانية or vice versa), refresh the courses list
+   133→  // immediately so the student sees the updated price/status.
+   134→  useEffect(() => {
+   135→    let channel: any
+   136→    try {
+   137→      channel = supabasePublic
+   138→        .channel('courses-realtime')
+   139→        .on('postgres_changes',
+   140→          { event: 'UPDATE', schema: 'public', table: 'courses' },
+   141→          () => {
+   142→            fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+   143→          }
+   144→        )
+   145→        .subscribe()
+   146→    } catch {}
+   147→    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+   148→  }, [])
+   149→
+   150→  const onEnrolled = () => {
+   151→    loadEnrollments()
+   152→  }
+   153→
+   154→  return (
+   155→    <DashboardShell
+   156→      nav={NAV}
+   157→      active={active}
+   158→      onNavigate={(id) => { setActive(id); if (id !== 'course-view') setViewingCourse(null) }}
+   159→      roleLabel="متدرب"
+   160→      roleColor="bg-blue-500/15 text-blue-600 border-blue-500/30"
+   161→    >
+   162→      {active === 'course-view' && viewingCourse ? (
+   163→        <StudentCourseViewer
+   164→          course={viewingCourse}
+   165→          enrollment={viewingEnrollment}
+   166→          onBack={() => { setViewingCourse(null); setActive('courses'); loadEnrollments() }}
+   167→        />
+   168→      ) : null}
+   169→      {active !== 'course-view' && (
+   170→        <>
+   171→          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
+   172→          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
+   173→          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
+   174→          {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
+   175→          {active === 'results' && <Results />}
+   176→          {active === 'certificates' && <StudentCertificates user={user} />}
+   177→          {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
+   178→          {active === 'forum' && <SharedForum user={user} />}
+   179→          {active === 'blog' && <SharedBlog />}
+   180→          {active === 'faqs' && <SharedFAQ />}
+   181→          {active === 'affiliate' && (
+   182→            <SectionCard title="برنامج العمولة" description="شارك أصدقاءك واكسب عمولة">
+   183→              <AffiliateDashboard />
+   184→            </SectionCard>
+   185→          )}
+   186→          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+   187→          {active === 'notifications' && <Notifications userId={user?.id} enrollments={enrollments} courses={courses} />}
+   188→          {active === 'settings' && <SettingsTab user={user} updateUser={updateUser} />}
+   189→        </>
+   190→      )}
+   191→    </DashboardShell>
+   192→  )
+   193→}
+   194→
+   195→function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
+   196→  return (
+   197→    <div className="space-y-6">
+   198→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   199→        <h2 className="text-2xl font-bold mb-1">أهلاً، {user?.name} 👋</h2>
+   200→        <p className="text-white/80">إليك ملخّص نشاطك في أكاديمية المستقبل الدولية</p>
+   201→      </div>
+   202→
+   203→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   204→        <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
+   205→        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
+   206→        <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
+   207→        <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
+   208→      </div>
+   209→
+   210→      <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
+   211→        <div className="space-y-4">
+   212→          {enrollments && enrollments.length > 0 ? (
+   213→            enrollments.slice(0, 3).map((e: any) => {
+   214→              const c = courses.find((x:any) => x.id === e.course_id)
+   215→              if (!c) return null
+   216→              return (
+   217→                <div key={e.id} className="space-y-2">
+   218→                  <div className="flex items-center justify-between">
+   219→                    <div className="font-medium text-navy text-sm">{c.title}</div>
+   220→                    <span className="text-xs text-muted-foreground">{e.progress || 0}%</span>
+   221→                  </div>
+   222→                  <Progress value={e.progress || 0} className="h-2" />
+   223→                </div>
+   224→              )
+   225→            })
+   226→          ) : (
+   227→            <div className="text-center py-6 text-muted-foreground text-sm">لا توجد دورات مسجّلة بعد — تصفّح الدورات المتاحة</div>
+   228→          )}
+   229→        </div>
+   230→      </SectionCard>
+   231→
+   232→      <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات">
+   233→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   234→          {courses.slice(0, 3).map((c: any) => (
+   235→            <Card key={c.id} className="p-4 card-hover">
+   236→              <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden">
+   237→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   238→              </div>
+   239→              <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
+   240→              <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
+   241→              <Button size="sm" className="w-full bg-navy hover:bg-navy-light" onClick={() => onViewCourse?.(c)}>عرض الدورة</Button>
+   242→            </Card>
+   243→          ))}
+   244→        </div>
+   245→      </SectionCard>
+   246→    </div>
+   247→  )
+   248→}
+   249→
+   250→function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
+   251→  const [requesting, setRequesting] = useState<string | null>(null)
+   252→
+   253→  const requestCertificate = async (course: any) => {
+   254→    setRequesting(course.id)
+   255→    try {
+   256→      const res = await fetch('/api/certificate-requests', {
+   257→        method: 'POST',
+   258→        headers: { 'Content-Type': 'application/json' },
+   259→        body: JSON.stringify({
+   260→          user_id: course.enrollment.user_id,
+   261→          course_id: course.id,
+   262→          student_name: studentName || course.enrollment.user_id || 'متدرب',
+   263→          course_title: course.title,
+   264→          fee: 0,
+   265→        }),
+   266→      })
+   267→      const data = await res.json()
+   268→      if (res.ok) {
+   269→        toast.success('تم إرسال طلب الشهادة! سيتم مراجعته من قبل المدرب والإدارة')
+   270→      } else {
+   271→        toast.error(data.error || 'فشل الطلب')
+   272→      }
+   273→    } catch {
+   274→      toast.error('خطأ في الاتصال')
+   275→    } finally {
+   276→      setRequesting(null)
+   277→    }
+   278→  }
+   279→
+   280→  const enrolled = (enrollments || [])
+   281→    .map((e: any) => {
+   282→      const course = courses.find((c: any) => c.id === e.course_id)
+   283→      return course ? { ...course, enrollment: e } : null
+   284→    })
+   285→    .filter(Boolean)
+   286→
+   287→  return (
+   288→    <SectionCard title="دوراتي المسجّلة" description={`${enrolled.length} دورة`}>
+   289→      {enrolled.length === 0 ? (
+   290→        <div className="text-center py-12">
+   291→          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   292→          <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
+   293→          <p className="text-xs text-muted-foreground mb-4">تصفّح الدورات المتاحة في قسم "استكشاف الدورات"</p>
+   294→        </div>
+   295→      ) : (
+   296→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   297→          {enrolled.map((c: any) => (
+   298→            <Card key={c.id} className="overflow-hidden card-hover">
+   299→              <div className="h-32 bg-navy relative">
+   300→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   301→                <div className="absolute top-2 right-2">
+   302→                  <Badge className={getPaymentStatusInfo(c.enrollment.payment_status).badgeClass}>
+   303→                    {getPaymentStatusInfo(c.enrollment.payment_status).label}
+   304→                  </Badge>
+   305→                </div>
+   306→              </div>
+   307→              <div className="p-4">
+   308→                <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+   309→                <Progress value={c.enrollment.progress || 0} className="h-2 mb-2" />
+   310→                <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   311→                  <span>{c.enrollment.progress || 0}% مكتمل</span>
+   312→                  <span>{c.duration_hours} ساعة</span>
+   313→                </div>
+   314→                {c.enrollment.payment_status === 'pending' ? (
+   315→                  <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
+   316→                    بانتظار تأكيد الدفع
+   317→                  </Button>
+   318→                ) : c.enrollment.payment_status === 'completed' ? (
+   319→                  <div className="space-y-2">
+   320→                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
+   321→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
+   322→                    </Button>
+   323→                    <div className="grid grid-cols-2 gap-2">
+   324→                      <Button
+   325→                        size="sm"
+   326→                        variant="outline"
+   327→                        className="border-navy/30 text-navy hover:bg-navy/5"
+   328→                        onClick={() => onContinue(c, c.enrollment)}
+   329→                      >
+   330→                        <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
+   331→                      </Button>
+   332→                      {/* DISABLED: certificate request button removed — will be re-enabled when design+prompt provided */}
+   333→                      {/* <Button
+   334→                        size="sm"
+   335→                        className="bg-gold hover:bg-gold-light text-navy"
+   336→                        disabled={requesting === c.id}
+   337→                        onClick={() => requestCertificate(c)}
+   338→                      >
+   339→                        {requesting === c.id ? (
+   340→                          <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري...</>
+   341→                        ) : (
+   342→                          <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
+   343→                        )}
+   344→                      </Button> */}
+   345→                    </div>
+   346→                  </div>
+   347→                ) : (
+   348→                  <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>
+   349→                    متابعة التعلّم
+   350→                  </Button>
+   351→                )}
+   352→              </div>
+   353→            </Card>
+   354→          ))}
+   355→        </div>
+   356→      )}
+   357→    </SectionCard>
+   358→  )
+   359→}
+   360→
+   361→function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
+   362→  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+   363→  const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
+   364→  const [enrolling, setEnrolling] = useState<string | null>(null)
+   365→
+   366→  useEffect(() => {
+   367→    fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
+   368→  }, [])
+   369→
+   370→  const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
+   371→
+   372→  const enrollFree = async (course: any) => {
+   373→    // Double-check client-side before calling API
+   374→    if (isEnrolled(course.id)) {
+   375→      toast.info('أنت مسجّل في هذه الدورة')
+   376→      return
+   377→    }
+   378→    setEnrolling(course.id)
+   379→    try {
+   380→      const res = await fetch('/api/enrollments', {
+   381→        method: 'POST',
+   382→        headers: { 'Content-Type': 'application/json' },
+   383→        body: JSON.stringify({ user_id: userId, course_id: course.id, payment_status: 'free' }),
+   384→      })
+   385→      const data = await res.json()
+   386→      if (data.already_enrolled) {
+   387→        toast.info('أنت مسجّل في هذه الدورة')
+   388→      } else if (res.ok) {
+   389→        toast.success(`تم التسجيل في دورة: ${course.title}`)
+   390→        onEnrolled()
+   391→      } else toast.error('فشل التسجيل')
+   392→    } catch {
+   393→      toast.error('خطأ')
+   394→    } finally {
+   395→      setEnrolling(null)
+   396→    }
+   397→  }
+   398→
+   399→  const enrollPaid = async (course: any, method: any, reference: string, proofUrl?: string | null, couponCode?: string) => {
+   400→    if (isEnrolled(course.id)) { toast.info('أنت مسجّل في هذه الدورة'); return }
+   401→    setEnrolling(course.id)
+   402→    try {
+   403→      let fullReference = proofUrl ? (reference + ' | PROOF: ' + proofUrl) : reference
+   404→      // If coupon was applied, validate it server-side and get discounted price
+   405→      let finalAmount = course.price
+   406→      if (couponCode) {
+   407→        try {
+   408→          const couponRes = await fetch(`/api/coupons?code=${encodeURIComponent(couponCode.toUpperCase())}`)
+   409→          const couponData = await couponRes.json()
+   410→          if (couponData.valid && couponData.coupon) {
+   411→            const c = couponData.coupon
+   412→            finalAmount = c.discount_type === 'percentage'
+   413→              ? Math.max(0, course.price - Math.round((course.price * c.discount_value) / 100))
+   414→              : Math.max(0, course.price - c.discount_value)
+   415→            // Add coupon info to the reference
+   416→            fullReference = fullReference + ' | COUPON:' + couponCode
+   417→          }
+   418→        } catch {}
+   419→      }
+   420→      const res = await fetch('/api/enrollments', {
+   421→        method: 'POST',
+   422→        headers: { 'Content-Type': 'application/json' },
+   423→        body: JSON.stringify({
+   424→          user_id: userId, course_id: course.id, payment_status: 'pending',
+   425→          amount_paid: finalAmount, payment_method: method.name, payment_reference: fullReference,
+   426→        }),
+   427→      })
+   428→      const data = await res.json()
+   429→      if (data.already_enrolled) { toast.info('أنت مسجّل في هذه الدورة') }
+   430→      else if (res.ok) {
+   431→        toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
+   432→        onEnrolled(); setPayDialog(null)
+   433→      } else toast.error('فشل التسجيل')
+   434→    } catch { toast.error('خطأ') }
+   435→    finally { setEnrolling(null) }
+   436→  }
+   437→
+   438→  return (
+   439→    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة">
+   440→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   441→        {courses.map((c: any) => {
+   442→          const enrolled = isEnrolled(c.id)
+   443→          const isFree = c.price_type === 'مجانية' || c.price === 0
+   444→          return (
+   445→            <Card key={c.id} className="overflow-hidden card-hover">
+   446→              <div className="h-32 bg-navy relative">
+   447→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   448→                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+   449→                {isFree ? (
+   450→                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية</Badge>
+   451→                ) : (
+   452→                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة</Badge>
+   453→                )}
+   454→              </div>
+   455→              <div className="p-4">
+   456→                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+   457→                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
+   458→                <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+   459→                  <span className="flex items-center gap-1">
+   460→                    <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
+   461→                  </span>
+   462→                  <span className="font-bold text-navy">
+   463→                    {isFree ? <span className="text-green-600">مجانية</span> : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}
+   464→                  </span>
+   465→                </div>
+   466→                {enrolled ? (
+   467→                  <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 bg-green-500/5">
+   468→                    <CheckCircle2 className="w-4 h-4 ml-1" /> مسجّل
+   469→                  </Button>
+   470→                ) : isFree ? (
+   471→                  <Button
+   472→                    size="sm"
+   473→                    className="w-full bg-green-600 hover:bg-green-700"
+   474→                    onClick={() => enrollFree(c)}
+   475→                    disabled={enrolling === c.id}
+   476→                  >
+   477→                    {enrolling === c.id ? 'جاري التسجيل...' : 'سجّل الآن'}
+   478→                  </Button>
+   479→                ) : (
+   480→                  <Button
+   481→                    size="sm"
+   482→                    className="w-full bg-gold hover:bg-gold-light text-navy"
+   483→                    onClick={() => setPayDialog({ course: c, open: true })}
+   484→                  >
+   485→                    <Lock className="w-3.5 h-3.5 ml-1" /> اشترك الآن
+   486→                  </Button>
+   487→                )}
+   488→              </div>
+   489→            </Card>
+   490→          )
+   491→        })}
+   492→      </div>
+   493→
+   494→      {payDialog?.open && (
+   495→        <PaymentDialog
+   496→          course={payDialog.course}
+   497→          methods={paymentMethods}
+   498→          open={payDialog.open}
+   499→          onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
+   500→          onPay={(method: any, reference: string, proofUrl?: string | null, couponCode?: string) => enrollPaid(payDialog.course, method, reference, proofUrl, couponCode)}
+   501→          loading={enrolling === payDialog.course.id}
+   502→        />
+   503→      )}
+   504→    </SectionCard>
+   505→  )
+   506→}
+   507→
+   508→function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: any) {
+   509→  const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
+   510→  const [reference, setReference] = useState('')
+   511→  const [proofUrl, setProofUrl] = useState<string | null>(null)
+   512→  const [uploadingProof, setUploadingProof] = useState(false)
+   513→  const [couponCode, setCouponCode] = useState('')
+   514→  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null)
+   515→  const [validatingCoupon, setValidatingCoupon] = useState(false)
+   516→  const [couponError, setCouponError] = useState('')
+   517→
+   518→  const originalPrice = course.price || 0
+   519→  const discount = appliedCoupon
+   520→    ? appliedCoupon.discount_type === 'percentage'
+   521→      ? Math.round((originalPrice * (appliedCoupon.discount_value || 0)) / 100)
+   522→      : (appliedCoupon.discount_value || 0)
+   523→    : 0
+   524→  const finalPrice = Math.max(0, originalPrice - discount)
+   525→
+   526→  const validateCoupon = async () => {
+   527→    if (!couponCode.trim()) { setCouponError(''); setAppliedCoupon(null); return }
+   528→    setValidatingCoupon(true)
+   529→    setCouponError('')
+   530→    try {
+   531→      const res = await fetch(`/api/coupons?code=${encodeURIComponent(couponCode.trim().toUpperCase())}`)
+   532→      const data = await res.json()
+   533→      if (data.valid && data.coupon) {
+   534→        if (data.coupon.course_id && data.coupon.course_id !== course.id) {
+   535→          setCouponError('غير صالح لهذه الدورة')
+   536→          setAppliedCoupon(null)
+   537→          return
+   538→        }
+   539→        setAppliedCoupon(data.coupon)
+   540→      } else {
+   541→        setCouponError(data.message || 'كوبون غير صالح')
+   542→        setAppliedCoupon(null)
+   543→      }
+   544→    } catch {
+   545→      setCouponError('فشل التحقق')
+   546→      setAppliedCoupon(null)
+   547→    } finally {
+   548→      setValidatingCoupon(false)
+   549→    }
+   550→  }
+   551→
+   552→  const handleProofUpload = async (file: File) => {
+   553→    setUploadingProof(true)
+   554→    try {
+   555→      const reader = new FileReader()
+   556→      reader.onload = (e) => {
+   557→        const img = new Image()
+   558→        img.onload = () => {
+   559→          const maxW = 1024, maxH = 1024
+   560→          let { width, height } = img
+   561→          if (width > maxW) { height = (height * maxW) / width; width = maxW }
+   562→          if (height > maxH) { width = (width * maxH) / height; height = maxH }
+   563→          const canvas = document.createElement('canvas')
+   564→          canvas.width = width; canvas.height = height
+   565→          const ctx = canvas.getContext('2d')!
+   566→          ctx.drawImage(img, 0, 0, width, height)
+   567→          canvas.toBlob(async (blob) => {
+   568→            if (!blob) { setUploadingProof(false); return }
+   569→            const fd = new FormData()
+   570→            fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
+   571→            fd.append('folder', 'payment-proofs')
+   572→            const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+   573→            const data = await res.json()
+   574→            if (data.url) { setProofUrl(data.url); toast.success('تم رفع إثبات الدفع') }
+   575→            else { toast.error('فشل رفع الصورة') }
+   576→            setUploadingProof(false)
+   577→          }, 'image/jpeg', 0.85)
+   578→        }
+   579→        img.src = e.target?.result as string
+   580→      }
+   581→      reader.readAsDataURL(file)
+   582→    } catch { toast.error('خطأ في الرفع'); setUploadingProof(false) }
+   583→  }
+   584→
+   585→  return (
+   586→    <Dialog open={open} onOpenChange={onOpenChange}>
+   587→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+   588→        <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50" title="إغلاق">
+   589→          <X className="w-4 h-4 text-muted-foreground" />
+   590→        </button>
+   591→        <DialogHeader><DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle></DialogHeader>
+   592→        <div className="space-y-4 py-4">
+   593→          {/* Price with coupon */}
+   594→          <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg space-y-2">
+   595→            {appliedCoupon && discount > 0 ? (
+   596→              <>
+   597→                <div className="flex items-center justify-between text-sm">
+   598→                  <span className="text-muted-foreground line-through">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+   599→                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">-{discount.toLocaleString()}</Badge>
+   600→                </div>
+   601→                <div className="flex items-center justify-between">
+   602→                  <span className="text-sm font-semibold text-navy">المبلغ النهائي:</span>
+   603→                  <span className="text-xl font-extrabold text-gold">{finalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+   604→                </div>
+   605→              </>
+   606→            ) : (
+   607→              <div className="flex items-center justify-between">
+   608→                <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
+   609→                <span className="text-xl font-extrabold text-gold">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+   610→              </div>
+   611→            )}
+   612→          </div>
+   613→          {/* Coupon input */}
+   614→          <div>
+   615→            <Label className="text-navy text-xs">كوبون خصم (اختياري)</Label>
+   616→            <div className="flex gap-2 mt-1">
+   617→              <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(null); setCouponError('') }} placeholder="FIA-XXXX" dir="ltr" className="font-mono text-sm" />
+   618→              <Button variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()} className="flex-shrink-0 text-xs">
+   619→                {validatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'تطبيق'}
+   620→              </Button>
+   621→            </div>
+   622→            {couponError && <p className="text-[10px] text-red-500 mt-1">{couponError}</p>}
+   623→            {appliedCoupon && (
+   624→              <div className="mt-2 flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg p-2">
+   625→                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+   626→                <span className="text-xs text-green-700 font-bold">{appliedCoupon.code}</span>
+   627→                <span className="text-xs text-muted-foreground">{appliedCoupon.discount_type === 'percentage' ? `${appliedCoupon.discount_value}%` : `${appliedCoupon.discount_value} ر.ي`} خصم</span>
+   628→                <button onClick={() => { setAppliedCoupon(null); setCouponCode('') }} className="text-red-500 text-xs mr-auto">إزالة</button>
+   629→              </div>
+   630→            )}
+   631→          </div>
+   632→          {/* Payment methods */}
+   633→          <div>
+   634→            <Label className="text-navy">اختر طريقة الدفع</Label>
+   635→            <div className="grid grid-cols-2 gap-2 mt-2">
+   636→              {methods.map((m: any) => (
+   637→                <button key={m.id} onClick={() => setSelectedMethod(m)} className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${selectedMethod?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:border-muted'}`}>
+   638→                  <span className="text-2xl">{m.icon}</span>
+   639→                  <div className="text-right"><div className="font-bold text-navy text-sm">{m.name}</div>{m.wallet_id && <div className="text-xs text-muted-foreground font-mono" dir="ltr">{m.wallet_id}</div>}</div>
+   640→                </button>
+   641→              ))}
+   642→            </div>
+   643→          </div>
+   644→          {selectedMethod && (
+   645→            <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
+   646→              <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
+   647→              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم ارفع صورة الإيصال.'}</p>
+   648→            </div>
+   649→          )}
+   650→          <div>
+   651→            <Label htmlFor="ref">رقم المعاملة / المرجع</Label>
+   652→            <Input id="ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="مثال: JB-123456789" dir="ltr" className="mt-1" />
+   653→          </div>
+   654→          <div>
+   655→            <Label className="text-navy">رفع صورة إثبات الدفع (إيصال)</Label>
+   656→            <input type="file" accept="image/*" className="hidden" id="proof-upload" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProofUpload(f) }} />
+   657→            <div className="mt-1 flex items-center gap-3">
+   658→              {proofUrl ? (
+   659→                <div className="flex items-center gap-2 flex-1">
+   660→                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-md border-2 border-green-500/30" />
+   661→                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تم رفع الإيصال</div>
+   662→                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs">إزالة</button>
+   663→                </div>
+   664→              ) : (
+   665→                <Button type="button" variant="outline" disabled={uploadingProof} className="flex-1" onClick={() => document.getElementById('proof-upload')?.click()}>
+   666→                  {uploadingProof ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</> : <><FileUp className="w-4 h-4 ml-1" /> اختر صورة الإيصال</>}
+   667→                </Button>
+   668→              )}
+   669→            </div>
+   670→          </div>
+   671→        </div>
+   672→        <DialogFooter>
+   673→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   674→          <Button className="bg-navy hover:bg-navy-light" disabled={loading || !selectedMethod || !reference.trim() || !proofUrl} onClick={() => onPay(selectedMethod, reference, proofUrl, appliedCoupon?.code)}>
+   675→            {loading ? 'جاري المعالجة...' : `تأكيد الاشتراك${finalPrice < originalPrice ? ` (${finalPrice.toLocaleString()} ${course.currency || 'ر.ي'})` : ''}`}
+   676→          </Button>
+   677→        </DialogFooter>
+   678→      </DialogContent>
+   679→    </Dialog>
+   680→  )
+   681→}
+   682→
+   683→function Exams({ userId, courses }: any) {
+   684→  const [exams, setExams] = useState<any[]>([])
+   685→  const [loading, setLoading] = useState(true)
+   686→
+   687→  useEffect(() => {
+   688→    let cancelled = false
+   689→    const load = async () => {
+   690→      if (!userId) {
+   691→        setLoading(false)
+   692→        return
+   693→      }
+   694→      try {
+   695→        // 1. Fetch the student's enrollments (only their own).
+   696→        const enrRes = await fetch(`/api/enrollments?user_id=${userId}`)
+   697→        const enrollments = await enrRes.json()
+   698→        const validEnrollments: any[] = Array.isArray(enrollments) ? enrollments : []
+   699→
+   700→        // 2. For each enrolled course, fetch its lessons and filter exam-type lessons.
+   701→        //    Only show exams for courses the student actually has access to
+   702→        //    (i.e., payment_status is NOT 'pending').
+   703→        const accessible = validEnrollments.filter(
+   704→          (e: any) => e.payment_status !== 'pending'
+   705→        )
+   706→
+   707→        const results = await Promise.all(
+   708→          accessible.map(async (e: any) => {
+   709→            try {
+   710→              const lessonsRes = await fetch(`/api/lessons?course_id=${e.course_id}`)
+   711→              const lessons = await lessonsRes.json()
+   712→              const allLessons: any[] = Array.isArray(lessons) ? lessons : []
+   713→              const examLessons = allLessons.filter(
+   714→                (l: any) => l.lesson_type === 'exam'
+   715→              )
+   716→              const courseTitle =
+   717→                courses?.find((c: any) => c.id === e.course_id)?.title || null
+   718→              return examLessons.map((l: any) => ({
+   719→                id: l.id,
+   720→                name: l.title || 'اختبار بدون اسم',
+   721→                course_id: e.course_id,
+   722→                course_title: courseTitle,
+   723→                enrollment_id: e.id,
+   724→                duration_minutes: l.duration_minutes || 0,
+   725→              }))
+   726→            } catch {
+   727→              return []
+   728→            }
+   729→          })
+   730→        )
+   731→
+   732→        if (cancelled) return
+   733→        setExams(results.flat())
+   734→      } catch {
+   735→        if (!cancelled) setExams([])
+   736→      } finally {
+   737→        if (!cancelled) setLoading(false)
+   738→      }
+   739→    }
+   740→    load()
+   741→    return () => {
+   742→      cancelled = true
+   743→    }
+   744→  }, [userId, courses])
+   745→
+   746→  return (
+   747→    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك في دوراتك المسجّلة">
+   748→      {loading ? (
+   749→        <div className="flex flex-col items-center justify-center py-12 gap-3">
+   750→          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+   751→          <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
+   752→        </div>
+   753→      ) : exams.length === 0 ? (
+   754→        <div className="text-center py-16">
+   755→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+   756→            <FileText className="w-10 h-10 text-muted-foreground/50" />
+   757→          </div>
+   758→          <p className="text-base font-semibold text-navy mb-1">لا توجد اختبارات متاحة لك حالياً</p>
+   759→          <p className="text-xs text-muted-foreground">
+   760→            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة.
+   761→          </p>
+   762→        </div>
+   763→      ) : (
+   764→        <div className="space-y-3">
+   765→          {exams.map((exam: any, i: number) => (
+   766→            <div
+   767→              key={exam.id || i}
+   768→              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border"
+   769→            >
+   770→              <div className="min-w-0">
+   771→                <div className="flex items-center gap-2 mb-1">
+   772→                  <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center flex-shrink-0">
+   773→                    <FileText className="w-4 h-4 text-navy" />
+   774→                  </div>
+   775→                  <div className="font-semibold text-navy text-sm">{exam.name}</div>
+   776→                </div>
+   777→                <div className="text-xs text-muted-foreground mr-11 flex flex-wrap items-center gap-x-2">
+   778→                  {exam.course_title && <span>{exam.course_title}</span>}
+   779→                  {exam.duration_minutes ? <span>• {exam.duration_minutes} دقيقة</span> : null}
+   780→                </div>
+   781→              </div>
+   782→              <div className="flex items-center gap-2 flex-shrink-0">
+   783→                <Button size="sm" className="bg-navy hover:bg-navy-light">
+   784→                  ابدأ الاختبار
+   785→                </Button>
+   786→              </div>
+   787→            </div>
+   788→          ))}
+   789→        </div>
+   790→      )}
+   791→    </SectionCard>
+   792→  )
+   793→}
+   794→
+   795→function Results() {
+   796→  // NOTE: Exam results are not currently stored in a dedicated table — the
+   797→  // platform doesn't persist a per-student score for each exam yet. Once that
+   798→  // backend exists, this component should fetch and render the real results.
+   799→  // For now we show a professional empty state so students aren't shown fake
+   800→  // placeholder data.
+   801→  return (
+   802→    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات التي أتممتها">
+   803→      <div className="text-center py-16">
+   804→        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+   805→          <TrendingUp className="w-10 h-10 text-muted-foreground/50" />
+   806→        </div>
+   807→        <p className="text-base font-semibold text-navy mb-1">
+   808→          لا توجد نتائج بعد — لم تقم بأي اختبار بعد
+   809→        </p>
+   810→        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+   811→          عند إكمالك لأحد الاختبارات في دوراتك المسجّلة، ستظهر نتيجتك وتفاصيلها هنا مع
+   812→          النسبة المئوية وحالة النجاح أو الرسوب.
+   813→        </p>
+   814→      </div>
+   815→    </SectionCard>
+   816→  )
+   817→}
+   818→
+   819→function Certificates({ certificates }: any) {
+   820→  const myCerts = certificates.length > 0 ? certificates : []
+   821→  const [downloading, setDownloading] = useState<string | null>(null)
+   822→  const [copiedCert, setCopiedCert] = useState<string | null>(null)
+   823→
+   824→  const handleDownload = (cert: any) => {
+   825→    setDownloading(cert.id)
+   826→    // Open PDF in new tab (browser will download or preview)
+   827→    window.open(`/api/certificate-pdf?number=${encodeURIComponent(cert.certificate_number)}&format=pdf`, '_blank')
+   828→    setTimeout(() => setDownloading(null), 2000)
+   829→  }
+   830→
+   831→  const handleCopyCode = (cert: any, e: React.MouseEvent) => {
+   832→    e.stopPropagation()
+   833→    navigator.clipboard.writeText(cert.certificate_number)
+   834→    setCopiedCert(cert.id)
+   835→    toast.success('تم نسخ كود الشهادة', { description: cert.certificate_number })
+   836→    setTimeout(() => setCopiedCert(null), 2000)
+   837→  }
+   838→
+   839→  const handleShare = (cert: any, e: React.MouseEvent) => {
+   840→    e.stopPropagation()
+   841→    const url = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+   842→    if (navigator.share) {
+   843→      navigator.share({
+   844→        title: 'شهادة معتمدة - أكاديمية المستقبل الدولية',
+   845→        text: `شهادة ${cert.student_name || ''} - ${cert.course_title || ''}`,
+   846→        url,
+   847→      }).catch(() => {})
+   848→    } else {
+   849→      navigator.clipboard.writeText(url)
+   850→      toast.success('تم نسخ رابط الشهادة')
+   851→    }
+   852→  }
+   853→
+   854→  return (
+   855→    <SectionCard title="شهاداتي" description="الشهادات التي حصلت عليها">
+   856→      {myCerts.length === 0 ? (
+   857→        <div className="text-center py-12">
+   858→          <Award className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   859→          <p className="text-muted-foreground mb-2">لا توجد شهادات بعد</p>
+   860→          <p className="text-xs text-muted-foreground">أنهِ دورة بنجاح للحصول على شهادة معتمدة</p>
+   861→        </div>
+   862→      ) : (
+   863→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   864→          {myCerts.map((c: any) => (
+   865→            <Card key={c.id} className="overflow-hidden card-hover border-2 border-gold/20">
+   866→              <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden cursor-pointer" onClick={() => handleDownload(c)}>
+   867→                <img
+   868→                  src={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`}
+   869→                  alt={c.course_title || 'certificate'}
+   870→                  className="w-full h-full object-cover"
+   871→                  loading="lazy"
+   872→                />
+   873→              </div>
+   874→              <div className="p-4">
+   875→                <div className="flex items-center gap-2 mb-2">
+   876→                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center">
+   877→                    <Award className="w-5 h-5 text-gold" />
+   878→                  </div>
+   879→                  <div className="flex-1 min-w-0">
+   880→                    <div className="font-bold text-navy text-sm line-clamp-1">{c.course_title || 'دورة'}</div>
+   881→                  </div>
+   882→                </div>
+   883→                {/* Certificate code card — copyable & prominent */}
+   884→                <div className="bg-gradient-to-br from-navy to-navy-light rounded-lg p-3 mb-3 border border-gold/30">
+   885→                  <div className="text-[10px] text-gold/80 font-semibold mb-1">كود الشهادة (قابل للنسخ)</div>
+   886→                  <div className="flex items-center gap-2">
+   887→                    <div className="flex-1 text-white font-mono text-sm md:text-base font-bold tracking-wide truncate" dir="ltr">{c.certificate_number}</div>
+   888→                    <button
+   889→                      onClick={(e) => handleCopyCode(c, e)}
+   890→                      className="flex-shrink-0 w-7 h-7 rounded-md bg-gold hover:bg-gold-light text-navy flex items-center justify-center transition-colors"
+   891→                      title="نسخ الكود"
+   892→                    >
+   893→                      {copiedCert === c.id ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-3.5 h-3.5" />}
+   894→                    </button>
+   895→                  </div>
+   896→                  <button
+   897→                    onClick={(e) => handleShare(c, e)}
+   898→                    className="mt-2 w-full text-[10px] text-gold/70 hover:text-gold flex items-center justify-center gap-1 py-1 rounded transition-colors"
+   899→                  >
+   900→                    <Share2 className="w-3 h-3" /> مشاركة الشهادة
+   901→                  </button>
+   902→                </div>
+   903→                <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
+   904→                <div className="flex gap-2">
+   905→                  <Button size="sm" className="flex-1 bg-navy hover:bg-navy-light" onClick={() => handleDownload(c)} disabled={downloading === c.id}>
+   906→                    <Download className="w-3.5 h-3.5 ml-1" /> PDF
+   907→                  </Button>
+   908→                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`, '_blank')}>
+   909→                    صورة
+   910→                  </Button>
+   911→                </div>
+   912→              </div>
+   913→            </Card>
+   914→          ))}
+   915→        </div>
+   916→      )}
+   917→    </SectionCard>
+   918→  )
+   919→}
+   920→
+   921→function Payments({ payments, userId, courses }: any) {
+   922→  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
+   923→  // Filter by the current user's id so we never display someone else's payments.
+   924→  const myPayments = (payments || []).filter((p: any) => p.user_id === userId)
+   925→  // Sort by date DESC (most recent first) for display
+   926→  const sortedPayments = [...myPayments].sort((a: any, b: any) => {
+   927→    const da = a.date ? new Date(a.date).getTime() : 0
+   928→    const db = b.date ? new Date(b.date).getTime() : 0
+   929→    return db - da
+   930→  })
+   931→
+   932→  const getCourseTitle = (courseId: string | null | undefined) => {
+   933→    if (!courseId) return null
+   934→    return courses?.find((c: any) => c.id === courseId)?.title || null
+   935→  }
+   936→
+   937→  const fmtAmount = (p: any) => {
+   938→    const amt = typeof p.amount === 'number' ? p.amount : Number(p.amount) || 0
+   939→    return amt.toLocaleString('en-US')
+   940→  }
+   941→
+   942→  const fmtDate = (d: string | null | undefined) => {
+   943→    if (!d) return null
+   944→    try {
+   945→      return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+   946→    } catch { return null }
+   947→  }
+   948→
+   949→  const cleanReference = (ref: string | null | undefined) => {
+   950→    if (!ref) return null
+   951→    return ref.replace(/\s*\|\s*PROOF:.*$/i, '').trim() || null
+   952→  }
+   953→
+   954→  const getProofUrl = (p: any): string | null => {
+   955→    const ref = p?.reference
+   956→    if (!ref) return null
+   957→    const match = String(ref).match(/PROOF:\s*(\S+)/i)
+   958→    return match ? match[1] : null
+   959→  }
+   960→
+   961→  return (
+   962→    <>
+   963→    <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
+   964→      {sortedPayments.length === 0 ? (
+   965→        <div className="text-center py-16">
+   966→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+   967→            <CreditCard className="w-10 h-10 text-muted-foreground/50" />
+   968→          </div>
+   969→          <p className="text-base font-semibold text-navy mb-1">لا توجد مدفوعات بعد</p>
+   970→          <p className="text-xs text-muted-foreground">عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.</p>
+   971→        </div>
+   972→      ) : (
+   973→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   974→          {sortedPayments.map((p: any) => {
+   975→            const statusInfo = getPaymentRecordStatusInfo(p.status)
+   976→            const courseTitle = getCourseTitle(p.course_id)
+   977→            const ref = cleanReference(p.reference)
+   978→            const dateStr = fmtDate(p.date)
+   979→            const proofUrl = getProofUrl(p)
+   980→            return (
+   981→              <Card key={p.id} className="p-0 overflow-hidden border-border card-hover">
+   982→                {/* Amount header */}
+   983→                <div className="bg-gradient-to-br from-navy to-navy-light p-4 text-white">
+   984→                  <div className="flex items-start justify-between gap-2">
+   985→                    <div className="min-w-0">
+   986→                      <div className="text-[11px] text-gold/80 font-semibold mb-0.5">المبلغ</div>
+   987→                      <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
+   988→                        {fmtAmount(p)} <span className="text-base font-bold text-gold">{p.currency || 'ر.ي'}</span>
+   989→                      </div>
+   990→                    </div>
+   991→                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>
+   992→                  </div>
+   993→                </div>
+   994→
+   995→                {/* Receipt thumbnail — opens in-app viewer */}
+   996→                {proofUrl && (
+   997→                  <button
+   998→                    type="button"
+   999→                    onClick={() => setViewingReceipt(proofUrl)}
+  1000→                    className="relative block w-full h-36 bg-muted/40 group cursor-pointer"
+  1001→                    title="اضغط لعرض الإيصال"
+  1002→                  >
+  1003→                    <img src={proofUrl} alt="إيصال الدفع" className="w-full h-full object-cover" loading="lazy" />
+  1004→                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/50 transition-colors flex items-center justify-center">
+  1005→                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5">
+  1006→                        <FileUp className="w-4 h-4" /> عرض الإيصال
+  1007→                      </span>
+  1008→                    </div>
+  1009→                  </button>
+  1010→                )}
+  1011→
+  1012→                {/* Details body */}
+  1013→                <div className="p-4 space-y-3">
+  1014→                  {courseTitle && (
+  1015→                    <div>
+  1016→                      <div className="text-[11px] text-muted-foreground mb-0.5">الدورة</div>
+  1017→                      <div className="text-sm font-semibold text-navy line-clamp-2">{courseTitle}</div>
+  1018→                    </div>
+  1019→                  )}
+  1020→                  <div className="grid grid-cols-2 gap-3">
+  1021→                    <div>
+  1022→                      <div className="text-[11px] text-muted-foreground mb-0.5">طريقة الدفع</div>
+  1023→                      <div className="text-sm font-medium text-navy">{p.method || '-'}</div>
+  1024→                    </div>
+  1025→                    <div>
+  1026→                      <div className="text-[11px] text-muted-foreground mb-0.5">التاريخ</div>
+  1027→                      <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
+  1028→                    </div>
+  1029→                  </div>
+  1030→                  {ref && (
+  1031→                    <div>
+  1032→                      <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
+  1033→                      <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref}</div>
+  1034→                    </div>
+  1035→                  )}
+  1036→                </div>
+  1037→              </Card>
+  1038→            )
+  1039→          })}
+  1040→        </div>
+  1041→      )}
+  1042→    </SectionCard>
+  1043→
+  1044→    {/* In-app receipt viewer — professional lightbox */}
+  1045→    <Dialog open={!!viewingReceipt} onOpenChange={(o) => { if (!o) setViewingReceipt(null) }}>
+  1046→      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+  1047→        <DialogHeader className="p-4 border-b border-border">
+  1048→          <DialogTitle className="text-navy text-lg flex items-center gap-2">
+  1049→            <FileUp className="w-5 h-5 text-green-600" /> إيصال الدفع
+  1050→          </DialogTitle>
+  1051→        </DialogHeader>
+  1052→        <div className="p-4 bg-muted/10">
+  1053→          {viewingReceipt && (
+  1054→            <div className="relative w-full flex items-center justify-center">
+  1055→              <img
+  1056→                src={viewingReceipt}
+  1057→                alt="إيصال الدفع"
+  1058→                className="max-w-full max-h-[60vh] rounded-lg border border-border shadow-lg object-contain"
+  1059→              />
+  1060→            </div>
+  1061→          )}
+  1062→        </div>
+  1063→      </DialogContent>
+  1064→    </Dialog>
+  1065→    </>
+  1066→  )
+  1067→}
+  1068→
+  1069→function Profile({ profile, setProfile, user, updateUser }: any) {
+  1070→  const [loading, setLoading] = useState(false)
+  1071→
+  1072→  const save = async () => {
+  1073→    setLoading(true)
+  1074→    try {
+  1075→      // Update locally — in real app, would call /api/students PUT
+  1076→      updateUser({
+  1077→        name: profile.name,
+  1078→        phone: profile.phone,
+  1079→        title: profile.title,
+  1080→        bio: joinBio(profile.bio, user?.bio),
+  1081→      })
+  1082→      toast.success('تم تحديث الملف الشخصي')
+  1083→    } catch {
+  1084→      toast.error('فشل التحديث')
+  1085→    } finally {
+  1086→      setLoading(false)
+  1087→    }
+  1088→  }
+  1089→
+  1090→  return (
+  1091→    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك الشخصية">
+  1092→      <div className="space-y-6 max-w-2xl">
+  1093→        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+  1094→          <AvatarUploader
+  1095→            userId={user.id}
+  1096→            role="student"
+  1097→            initialUrl={user?.avatar}
+  1098→            name={user?.name}
+  1099→            size="xl"
+  1100→            onUploaded={(url) => updateUser({ avatar: url })}
+  1101→          />
+  1102→        </div>
+  1103→
+  1104→        <div className="grid sm:grid-cols-2 gap-4">
+  1105→          <div>
+  1106→            <Label className="text-navy">الاسم الكامل</Label>
+  1107→            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+  1108→          </div>
+  1109→          <div>
+  1110→            <Label className="text-navy">البريد الإلكتروني</Label>
+  1111→            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
+  1112→          </div>
+  1113→          <div>
+  1114→            <Label className="text-navy">رقم الهاتف</Label>
+  1115→            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
+  1116→          </div>
+  1117→          <div>
+  1118→            <Label className="text-navy">التخصص</Label>
+  1119→            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+  1120→          </div>
+  1121→        </div>
+  1122→        <div>
+  1123→          <Label className="text-navy">نبذة تعريفية</Label>
+  1124→          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+  1125→        </div>
+  1126→        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
+  1127→          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+  1128→        </Button>
+  1129→      </div>
+  1130→    </SectionCard>
+  1131→  )
+  1132→}
+  1133→
+  1134→function Notifications({ userId, enrollments, courses }: any) {
+  1135→  const [notifs, setNotifs] = useState<any[]>([])
+  1136→  const [loading, setLoading] = useState(true)
+  1137→
+  1138→  useEffect(() => {
+  1139→    let cancelled = false
+  1140→    const load = async () => {
+  1141→      try {
+  1142→        const items: any[] = []
+  1143→
+  1144→        // 1. Enrollment-based notifications (from the enrollments prop).
+  1145→        //    Each enrollment already encodes a payment_status that we map to a
+  1146→        //    human-readable notification.
+  1147→        const enrList: any[] = Array.isArray(enrollments) ? enrollments : []
+  1148→        const courseMap = new Map<string, any>(
+  1149→          (Array.isArray(courses) ? courses : []).map((c: any) => [c.id, c])
+  1150→        )
+  1151→
+  1152→        const fmtTime = (iso?: string | null) => {
+  1153→          if (!iso) return null
+  1154→          try {
+  1155→            return new Date(iso).toLocaleDateString('ar-EG', {
+  1156→              year: 'numeric',
+  1157→              month: 'long',
+  1158→              day: 'numeric',
+  1159→            })
+  1160→          } catch {
+  1161→            return null
+  1162→          }
+  1163→        }
+  1164→
+  1165→        for (const e of enrList) {
+  1166→          const c = courseMap.get(e.course_id)
+  1167→          const title = c?.title || 'دورة'
+  1168→          const ts = fmtTime(e.enrolled_at || (e as any).date)
+  1169→          const status = e.payment_status
+  1170→          if (status === 'pending') {
+  1171→            items.push({
+  1172→              id: `enr-pending-${e.id}`,
+  1173→              icon: Clock,
+  1174→              iconBg: 'bg-yellow-500/15 text-yellow-600',
+  1175→              title: 'بانتظار تأكيد الدفع',
+  1176→              desc: `طلبك للتسجيل في دورة "${title}" قيد المراجعة من قبل الإدارة`,
+  1177→              time: ts,
+  1178→            })
+  1179→          } else if (status === 'confirmed') {
+  1180→            items.push({
+  1181→              id: `enr-confirmed-${e.id}`,
+  1182→              icon: CheckCircle2,
+  1183→              iconBg: 'bg-green-500/15 text-green-600',
+  1184→              title: 'تم تأكيد التسجيل',
+  1185→              desc: `تم تأكيد تسجيلك في دورة "${title}". يمكنك الآن متابعة الدروس`,
+  1186→              time: ts,
+  1187→            })
+  1188→          } else if (status === 'completed') {
+  1189→            items.push({
+  1190→              id: `enr-completed-${e.id}`,
+  1191→              icon: Award,
+  1192→              iconBg: 'bg-gold/15 text-gold',
+  1193→              title: 'أكملت الدورة',
+  1194→              desc: `تهانينا! لقد أكملت دورة "${title}" بنجاح`,
+  1195→              time: ts,
+  1196→            })
+  1197→          } else if (status === 'free') {
+  1198→            items.push({
+  1199→              id: `enr-free-${e.id}`,
+  1200→              icon: BookOpen,
+  1201→              iconBg: 'bg-blue-500/15 text-blue-600',
+  1202→              title: 'تسجيل مجاني',
+  1203→              desc: `تم تسجيلك مجاناً في دورة "${title}". ابدأ التعلّم الآن`,
+  1204→              time: ts,
+  1205→            })
+  1206→          }
+  1207→        }
+  1208→
+  1209→        // 2. "New lesson added" notifications: compare each enrolled course's
+  1210→        //    lessons_count against a baseline we keep in localStorage. On the
+  1211→        //    first visit there's no baseline, so we just initialize it without
+  1212→        //    showing any "new lesson" notification.
+  1213→        const baselineKey = `fia_lesson_baseline_${userId || 'guest'}`
+  1214→        let baseline: Record<string, number> = {}
+  1215→        try {
+  1216→          const stored = localStorage.getItem(baselineKey)
+  1217→          if (stored) baseline = JSON.parse(stored) || {}
+  1218→        } catch {}
+  1219→
+  1220→        const newBaseline: Record<string, number> = { ...baseline }
+  1221→        // Only check lessons_count for courses the student has access to
+  1222→        // (payment_status !== 'pending').
+  1223→        const accessible = enrList.filter((e: any) => e.payment_status !== 'pending')
+  1224→        for (const e of accessible) {
+  1225→          const c = courseMap.get(e.course_id)
+  1226→          if (!c) continue
+  1227→          const current = Number(c.lessons_count || 0)
+  1228→          const prev = baseline[e.course_id] ?? null
+  1229→          newBaseline[e.course_id] = current
+  1230→          if (prev !== null && current > prev) {
+  1231→            items.push({
+  1232→              id: `new-lesson-${e.course_id}-${current}`,
+  1233→              icon: FileText,
+  1234→              iconBg: 'bg-purple-500/15 text-purple-600',
+  1235→              title: 'درس جديد',
+  1236→              desc: `تمت إضافة ${current - prev} درس جديد في دورة "${c.title}"`,
+  1237→              time: 'مؤخراً',
+  1238→            })
+  1239→          }
+  1240→        }
+  1241→
+  1242→        // Persist the new baseline so future visits can detect new lessons.
+  1243→        try {
+  1244→          localStorage.setItem(baselineKey, JSON.stringify(newBaseline))
+  1245→        } catch {}
+  1246→
+  1247→        if (!cancelled) setNotifs(items)
+  1248→      } catch {
+  1249→        if (!cancelled) setNotifs([])
+  1250→      } finally {
+  1251→        if (!cancelled) setLoading(false)
+  1252→      }
+  1253→    }
+  1254→    load()
+  1255→    return () => { cancelled = true }
+  1256→  }, [userId, enrollments, courses])
+  1257→
+  1258→  return (
+  1259→    <SectionCard title="الإشعارات" description="آخر التحديثات والتنبيهات">
+  1260→      {loading ? (
+  1261→        <div className="flex flex-col items-center justify-center py-12 gap-3">
+  1262→          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+  1263→          <p className="text-sm text-muted-foreground">جاري تحميل الإشعارات...</p>
+  1264→        </div>
+  1265→      ) : notifs.length === 0 ? (
+  1266→        <div className="text-center py-16">
+  1267→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+  1268→            <Bell className="w-10 h-10 text-muted-foreground/50" />
+  1269→          </div>
+  1270→          <p className="text-base font-semibold text-navy mb-1">لا توجد إشعارات</p>
+  1271→          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+  1272→            ستظهر هنا تنبيهات عند تأكيد تسجيلك في الدورات أو عند إضافة دروس جديدة.
+  1273→          </p>
+  1274→        </div>
+  1275→      ) : (
+  1276→        <div className="space-y-3">
+  1277→          {notifs.map((n) => {
+  1278→            const Icon = n.icon
+  1279→            return (
+  1280→              <div
+  1281→                key={n.id}
+  1282→                className="p-4 rounded-lg border border-border bg-gold/5 flex items-start gap-3"
+  1283→              >
+  1284→                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${n.iconBg}`}>
+  1285→                  <Icon className="w-5 h-5" />
+  1286→                </div>
+  1287→                <div className="flex-1 min-w-0">
+  1288→                  <div className="font-semibold text-navy text-sm">{n.title}</div>
+  1289→                  <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+  1290→                </div>
+  1291→                {n.time && (
+  1292→                  <div className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap" dir="rtl">
+  1293→                    {n.time}
+  1294→                  </div>
+  1295→                )}
+  1296→              </div>
+  1297→            )
+  1298→          })}
+  1299→        </div>
+  1300→      )}
+  1301→    </SectionCard>
+  1302→  )
+  1303→}
+  1304→
+  1305→function SettingsTab({ user, updateUser }: any) {
+  1306→  // Email change state — uses /api/auth/change-credentials
+  1307→  const [newEmail, setNewEmail] = useState('')
+  1308→  const [emailPwd, setEmailPwd] = useState('')
+  1309→  const [showEmailPwd, setShowEmailPwd] = useState(false)
+  1310→  const [emailLoading, setEmailLoading] = useState(false)
+  1311→
+  1312→  // Password change state — uses /api/auth/change-credentials
+  1313→  const [currentPwd, setCurrentPwd] = useState('')
+  1314→  const [newPwd, setNewPwd] = useState('')
+  1315→  const [confirmPwd, setConfirmPwd] = useState('')
+  1316→  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+  1317→  const [showNewPwd, setShowNewPwd] = useState(false)
+  1318→  const [pwdLoading, setPwdLoading] = useState(false)
+  1319→
+  1320→  // Phone change state — uses /api/students PUT
+  1321→  const [phone, setPhone] = useState(user?.phone || '')
+  1322→  const [phoneLoading, setPhoneLoading] = useState(false)
+  1323→
+  1324→  // Email notification preference — persisted to localStorage (real toggle,
+  1325→  // not fake) so the choice survives across sessions. Default is OFF ("متوقف").
+  1326→  const [emailNotif, setEmailNotif] = useState(false)
+  1327→
+  1328→  useEffect(() => {
+  1329→    try {
+  1330→      const stored = localStorage.getItem(`fia_settings_${user?.id || 'guest'}`)
+  1331→      if (stored) {
+  1332→        const parsed = JSON.parse(stored)
+  1333→        if (typeof parsed.emailNotif === 'boolean') setEmailNotif(parsed.emailNotif)
+  1334→      }
+  1335→    } catch {}
+  1336→  }, [user?.id])
+  1337→
+  1338→  const saveEmailNotif = (val: boolean) => {
+  1339→    setEmailNotif(val)
+  1340→    try {
+  1341→      const key = `fia_settings_${user?.id || 'guest'}`
+  1342→      const stored = localStorage.getItem(key)
+  1343→      const obj = stored ? JSON.parse(stored) : {}
+  1344→      obj.emailNotif = val
+  1345→      localStorage.setItem(key, JSON.stringify(obj))
+  1346→    } catch {}
+  1347→    toast.success(val ? 'تم تفعيل إشعارات البريد' : 'تم إيقاف إشعارات البريد')
+  1348→  }
+  1349→
+  1350→  // ====== Handlers ======
+  1351→  const saveEmail = async () => {
+  1352→    if (!newEmail) {
+  1353→      toast.error('أدخل البريد الجديد')
+  1354→      return
+  1355→    }
+  1356→    if (!emailPwd) {
+  1357→      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+  1358→      return
+  1359→    }
+  1360→    if (newEmail === user?.email) {
+  1361→      toast.error('البريد الجديد مطابق للبريد الحالي')
+  1362→      return
+  1363→    }
+  1364→    setEmailLoading(true)
+  1365→    try {
+  1366→      const res = await fetch('/api/auth/change-credentials', {
+  1367→        method: 'POST',
+  1368→        headers: { 'Content-Type': 'application/json' },
+  1369→        body: JSON.stringify({
+  1370→          userId: user.id,
+  1371→          currentEmail: user.email,
+  1372→          currentPassword: emailPwd,
+  1373→          newEmail,
+  1374→          role: 'student',
+  1375→        }),
+  1376→      })
+  1377→      const data = await res.json()
+  1378→      if (!res.ok) {
+  1379→        toast.error(data.error || 'فشل تحديث البريد')
+  1380→        return
+  1381→      }
+  1382→      toast.success('تم تحديث البريد. يرجى تسجيل الدخول بالبريد الجديد')
+  1383→      // Update local state so the user sees the new email immediately
+  1384→      updateUser({ email: newEmail })
+  1385→      setNewEmail('')
+  1386→      setEmailPwd('')
+  1387→    } catch {
+  1388→      toast.error('خطأ في الاتصال')
+  1389→    } finally {
+  1390→      setEmailLoading(false)
+  1391→    }
+  1392→  }
+  1393→
+  1394→  const savePassword = async () => {
+  1395→    if (!currentPwd) {
+  1396→      toast.error('أدخل كلمة المرور الحالية')
+  1397→      return
+  1398→    }
+  1399→    if (!newPwd) {
+  1400→      toast.error('أدخل كلمة المرور الجديدة')
+  1401→      return
+  1402→    }
+  1403→    if (newPwd.length < 6) {
+  1404→      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+  1405→      return
+  1406→    }
+  1407→    if (newPwd !== confirmPwd) {
+  1408→      toast.error('كلمتا المرور غير متطابقتين')
+  1409→      return
+  1410→    }
+  1411→    setPwdLoading(true)
+  1412→    try {
+  1413→      const res = await fetch('/api/auth/change-credentials', {
+  1414→        method: 'POST',
+  1415→        headers: { 'Content-Type': 'application/json' },
+  1416→        body: JSON.stringify({
+  1417→          userId: user.id,
+  1418→          currentEmail: user.email,
+  1419→          currentPassword: currentPwd,
+  1420→          newPassword: newPwd,
+  1421→          role: 'student',
+  1422→        }),
+  1423→      })
+  1424→      const data = await res.json()
+  1425→      if (!res.ok) {
+  1426→        toast.error(data.error || 'فشل تغيير كلمة المرور')
+  1427→        return
+  1428→      }
+  1429→      toast.success('تم تغيير كلمة المرور بنجاح')
+  1430→      setCurrentPwd('')
+  1431→      setNewPwd('')
+  1432→      setConfirmPwd('')
+  1433→    } catch {
+  1434→      toast.error('خطأ في الاتصال')
+  1435→    } finally {
+  1436→      setPwdLoading(false)
+  1437→    }
+  1438→  }
+  1439→
+  1440→  const savePhone = async () => {
+  1441→    if (!phone) {
+  1442→      toast.error('أدخل رقم الهاتف')
+  1443→      return
+  1444→    }
+  1445→    setPhoneLoading(true)
+  1446→    try {
+  1447→      const res = await fetch('/api/students', {
+  1448→        method: 'PUT',
+  1449→        headers: { 'Content-Type': 'application/json' },
+  1450→        body: JSON.stringify({ id: user.id, phone }),
+  1451→      })
+  1452→      const data = await res.json()
+  1453→      if (!res.ok) {
+  1454→        toast.error(data.error || 'فشل تحديث رقم الهاتف')
+  1455→        return
+  1456→      }
+  1457→      updateUser({ phone })
+  1458→      toast.success('تم تحديث رقم الهاتف')
+  1459→    } catch {
+  1460→      toast.error('خطأ في الاتصال')
+  1461→    } finally {
+  1462→      setPhoneLoading(false)
+  1463→    }
+  1464→  }
+  1465→
+  1466→  return (
+  1467→    <SectionCard title="الإعدادات" description="إدارة حسابك وتفضيلاتك">
+  1468→      <div className="space-y-6 max-w-2xl">
+  1469→        {/* Account header */}
+  1470→        <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
+  1471→          <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+  1472→            {user?.name?.charAt(0)}
+  1473→          </div>
+  1474→          <div className="min-w-0">
+  1475→            <div className="font-bold text-navy">{user?.name}</div>
+  1476→            <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+  1477→          </div>
+  1478→        </div>
+  1479→
+  1480→        {/* ===== Account section ===== */}
+  1481→        <div>
+  1482→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1483→            <User className="w-4 h-4 text-gold" /> الحساب
+  1484→          </h3>
+  1485→
+  1486→          <div className="space-y-4">
+  1487→            {/* Change email */}
+  1488→            <div className="p-4 rounded-lg border border-border bg-white">
+  1489→              <div className="flex items-center gap-2 mb-3">
+  1490→                <Mail className="w-4 h-4 text-navy" />
+  1491→                <div className="font-semibold text-navy text-sm">تغيير البريد الإلكتروني</div>
+  1492→              </div>
+  1493→              <div className="space-y-2">
+  1494→                <Input
+  1495→                  type="email"
+  1496→                  value={newEmail}
+  1497→                  onChange={(e) => setNewEmail(e.target.value)}
+  1498→                  placeholder={user?.email || 'example@fia.edu'}
+  1499→                  dir="ltr"
+  1500→                />
+  1501→                <div className="relative">
+  1502→                  <Input
+  1503→                    type={showEmailPwd ? 'text' : 'password'}
+  1504→                    value={emailPwd}
+  1505→                    onChange={(e) => setEmailPwd(e.target.value)}
+  1506→                    placeholder="كلمة المرور الحالية للتأكيد"
+  1507→                    dir="ltr"
+  1508→                    className="pr-3 pl-9"
+  1509→                  />
+  1510→                  <button
+  1511→                    type="button"
+  1512→                    onClick={() => setShowEmailPwd(!showEmailPwd)}
+  1513→                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1514→                  >
+  1515→                    {showEmailPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1516→                  </button>
+  1517→                </div>
+  1518→                <Button
+  1519→                  onClick={saveEmail}
+  1520→                  disabled={emailLoading || !newEmail || !emailPwd}
+  1521→                  className="w-full bg-navy hover:bg-navy-light"
+  1522→                >
+  1523→                  {emailLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ البريد'}
+  1524→                </Button>
+  1525→              </div>
+  1526→            </div>
+  1527→
+  1528→            {/* Change password */}
+  1529→            <div className="p-4 rounded-lg border border-border bg-white">
+  1530→              <div className="flex items-center gap-2 mb-3">
+  1531→                <Lock className="w-4 h-4 text-navy" />
+  1532→                <div className="font-semibold text-navy text-sm">تغيير كلمة المرور</div>
+  1533→              </div>
+  1534→              <div className="space-y-2">
+  1535→                <div className="relative">
+  1536→                  <Input
+  1537→                    type={showCurrentPwd ? 'text' : 'password'}
+  1538→                    value={currentPwd}
+  1539→                    onChange={(e) => setCurrentPwd(e.target.value)}
+  1540→                    placeholder="كلمة المرور الحالية"
+  1541→                    dir="ltr"
+  1542→                    className="pr-3 pl-9"
+  1543→                  />
+  1544→                  <button
+  1545→                    type="button"
+  1546→                    onClick={() => setShowCurrentPwd(!showCurrentPwd)}
+  1547→                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1548→                  >
+  1549→                    {showCurrentPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1550→                  </button>
+  1551→                </div>
+  1552→                <div className="relative">
+  1553→                  <Input
+  1554→                    type={showNewPwd ? 'text' : 'password'}
+  1555→                    value={newPwd}
+  1556→                    onChange={(e) => setNewPwd(e.target.value)}
+  1557→                    placeholder="كلمة المرور الجديدة"
+  1558→                    dir="ltr"
+  1559→                    className="pr-3 pl-9"
+  1560→                  />
+  1561→                  <button
+  1562→                    type="button"
+  1563→                    onClick={() => setShowNewPwd(!showNewPwd)}
+  1564→                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
+  1565→                  >
+  1566→                    {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1567→                  </button>
+  1568→                </div>
+  1569→                <Input
+  1570→                  type="password"
+  1571→                  value={confirmPwd}
+  1572→                  onChange={(e) => setConfirmPwd(e.target.value)}
+  1573→                  placeholder="تأكيد كلمة المرور الجديدة"
+  1574→                  dir="ltr"
+  1575→                />
+  1576→                {newPwd && confirmPwd && newPwd !== confirmPwd && (
+  1577→                  <p className="text-xs text-red-500">كلمتا المرور غير متطابقتين</p>
+  1578→                )}
+  1579→                {newPwd && confirmPwd && newPwd === confirmPwd && (
+  1580→                  <p className="text-xs text-green-600 flex items-center gap-1">
+  1581→                    <CheckCircle2 className="w-3 h-3" /> كلمتا المرور متطابقتان
+  1582→                  </p>
+  1583→                )}
+  1584→                <Button
+  1585→                  onClick={savePassword}
+  1586→                  disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd || newPwd !== confirmPwd}
+  1587→                  className="w-full bg-navy hover:bg-navy-light"
+  1588→                >
+  1589→                  {pwdLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ كلمة المرور'}
+  1590→                </Button>
+  1591→              </div>
+  1592→            </div>
+  1593→
+  1594→            {/* Change phone number */}
+  1595→            <div className="p-4 rounded-lg border border-border bg-white">
+  1596→              <div className="flex items-center gap-2 mb-3">
+  1597→                <User className="w-4 h-4 text-navy" />
+  1598→                <div className="font-semibold text-navy text-sm">تغيير رقم الهاتف</div>
+  1599→              </div>
+  1600→              <div className="space-y-2">
+  1601→                <Input
+  1602→                  type="tel"
+  1603→                  value={phone}
+  1604→                  onChange={(e) => setPhone(e.target.value)}
+  1605→                  placeholder="رقم الهاتف الجديد"
+  1606→                  dir="ltr"
+  1607→                />
+  1608→                <Button
+  1609→                  onClick={savePhone}
+  1610→                  disabled={phoneLoading || !phone || phone === user?.phone}
+  1611→                  className="w-full bg-navy hover:bg-navy-light"
+  1612→                >
+  1613→                  {phoneLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ الهاتف'}
+  1614→                </Button>
+  1615→              </div>
+  1616→            </div>
+  1617→          </div>
+  1618→        </div>
+  1619→
+  1620→        {/* ===== Notification preferences ===== */}
+  1621→        <div>
+  1622→          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
+  1623→            <Bell className="w-4 h-4 text-gold" /> تفضيلات الإشعارات
+  1624→          </h3>
+  1625→          <div className="p-4 rounded-lg border border-border bg-white flex items-center justify-between">
+  1626→            <div>
+  1627→              <div className="font-medium text-navy text-sm">إشعارات البريد الإلكتروني</div>
+  1628→              <div className="text-xs text-muted-foreground mt-0.5">
+  1629→                تنبيهات حول تأكيد التسجيل والمدفوعات والدروس الجديدة
+  1630→              </div>
+  1631→            </div>
+  1632→            <div className="flex items-center gap-2">
+  1633→              <span className={`text-xs font-semibold ${emailNotif ? 'text-green-600' : 'text-muted-foreground'}`}>
+  1634→                {emailNotif ? 'مفعّل' : 'متوقف'}
+  1635→              </span>
+  1636→              <button
+  1637→                onClick={() => saveEmailNotif(!emailNotif)}
+  1638→                className={`relative w-11 h-6 rounded-full transition-colors ${emailNotif ? 'bg-green-500' : 'bg-muted'}`}
+  1639→                title={emailNotif ? 'إيقاف' : 'تفعيل'}
+  1640→              >
+  1641→                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${emailNotif ? 'right-0.5' : 'right-5'}`} />
+  1642→              </button>
+  1643→            </div>
+  1644→          </div>
+  1645→        </div>
+  1646→      </div>
+  1647→    </SectionCard>
+  1648→  )
+  1649→}
+  1650→
+  1651→// ============================================================================
+  1652→// StudentCertificates — shows certificates issued to this student by the admin
+  1653→// (or by themselves after passing exams / requesting them after course completion).
+  1654→// ============================================================================
+  1655→function StudentCertificates({ user }: any) {
+  1656→  const [items, setItems] = useState<any[]>([])
+  1657→  const [loading, setLoading] = useState(true)
+  1658→  const [viewing, setViewing] = useState<any | null>(null)
+  1659→
+  1660→  useEffect(() => {
+  1661→    if (!user?.name) { setLoading(false); return }
+  1662→    fetch(`/api/certificates?student_name=${encodeURIComponent(user.name)}`)
+  1663→      .then((r) => r.json())
+  1664→      .then((d) => {
+  1665→        const arr = Array.isArray(d) ? d.filter((c: any) => c.status === 'صالحة') : []
+  1666→        setItems(arr)
+  1667→      })
+  1668→      .catch(() => {})
+  1669→      .finally(() => setLoading(false))
+  1670→  }, [user?.name])
+  1671→
+  1672→  if (loading) {
+  1673→    return (
+  1674→      <SectionCard title="شهاداتي" description="الشهادات الصادرة لك">
+  1675→        <div className="text-center py-12">
+  1676→          <Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" />
+  1677→        </div>
+  1678→      </SectionCard>
+  1679→    )
+  1680→  }
+  1681→
+  1682→  if (items.length === 0) {
+  1683→    return (
+  1684→      <SectionCard title="شهاداتي" description="الشهادات الصادرة لك">
+  1685→        <div className="text-center py-16">
+  1686→          <div className="w-20 h-20 mx-auto rounded-full bg-gold/10 flex items-center justify-center mb-4">
+  1687→            <Award className="w-10 h-10 text-gold/50" />
+  1688→          </div>
+  1689→          <h3 className="font-bold text-navy mb-2">لا توجد شهادات صادرة بعد</h3>
+  1690→          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+  1691→            تكمل دورتك بنسبة 100% ثم اطلب شهادتك من داخل الدورة. ستظهر هنا فور إصدارها من الإدارة.
+  1692→          </p>
+  1693→        </div>
+  1694→      </SectionCard>
+  1695→    )
+  1696→  }
+  1697→
+  1698→  return (
+  1699→    <>
+  1700→      <SectionCard title="شهاداتي" description={`${items.length} شهادة صادرة`}>
+  1701→        <div className="grid sm:grid-cols-2 gap-5">
+  1702→          {items.map((cert) => (
+  1703→            <Card key={cert.id} className="overflow-hidden hover:shadow-xl transition-all group cursor-pointer" >
+  1704→              <div className="h-2 bg-gradient-to-r from-gold via-gold-light to-gold" />
+  1705→              <div className="bg-gradient-to-br from-navy to-navy-light p-5 text-white relative overflow-hidden">
+  1706→                <div className="absolute top-0 right-0 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
+  1707→                <div className="relative flex items-start justify-between">
+  1708→                  <div>
+  1709→                    <div className="text-[10px] text-gold uppercase tracking-widest mb-1">Future International Academy</div>
+  1710→                    <div className="text-xs text-white/70">شهادة إكمال معتمدة</div>
+  1711→                  </div>
+  1712→                  <Award className="w-6 h-6 text-gold" />
+  1713→                </div>
+  1714→              </div>
+  1715→              <div className="p-5">
+  1716→                <p className="text-[10px] text-muted-foreground mb-1">الدورة</p>
+  1717→                <h4 className="font-bold text-navy text-sm mb-3 line-clamp-2">{cert.course_title}</h4>
+  1718→                <div className="flex items-center justify-between text-xs">
+  1719→                  <div>
+  1720→                    <div className="text-[10px] text-muted-foreground">رقم الشهادة</div>
+  1721→                    <div className="font-mono font-bold text-navy" dir="ltr">{cert.certificate_number}</div>
+  1722→                  </div>
+  1723→                  <div className="text-left">
+  1724→                    <div className="text-[10px] text-muted-foreground">تاريخ الإصدار</div>
+  1725→                    <div className="font-bold text-navy">
+  1726→                      {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+  1727→                    </div>
+  1728→                  </div>
+  1729→                </div>
+  1730→                {cert.has_external_accreditation && cert.external_accreditation_body && (
+  1731→                  <div className="mt-3 pt-3 border-t border-border flex items-center gap-1.5 text-[10px] text-gold">
+  1732→                    <Award className="w-3 h-3" />
+  1733→                    معتمدة من: {cert.external_accreditation_body}
+  1734→                  </div>
+  1735→                )}
+  1736→              </div>
+  1737→              <div className="px-5 pb-5 flex gap-2">
+  1738→                <Button
+  1739→                  size="sm"
+  1740→                  className="flex-1 bg-navy hover:bg-navy-light"
+  1741→                  onClick={() => setViewing(cert)}
+  1742→                >
+  1743→                  <ExternalLink className="w-3.5 h-3.5 ml-1.5" /> عرض الشهادة
+  1744→                </Button>
+  1745→                <Button
+  1746→                  size="sm"
+  1747→                  variant="outline"
+  1748→                  className="border-gold/30 text-gold hover:bg-gold/10"
+  1749→                  onClick={() => setViewing(cert)}
+  1750→                >
+  1751→                  <Download className="w-3.5 h-3.5" />
+  1752→                </Button>
+  1753→              </div>
+  1754→            </Card>
+  1755→          ))}
+  1756→        </div>
+  1757→      </SectionCard>
+  1758→
+  1759→      {/* Certificate viewer dialog — opens in-app, no new tab */}
+  1760→      <Dialog open={!!viewing} onOpenChange={(o) => { if (!o) setViewing(null) }}>
+  1761→        <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
+  1762→          <DialogHeader>
+  1763→            <div className="flex items-center justify-between">
+  1764→              <DialogTitle className="flex items-center gap-2">
+  1765→                <Award className="w-5 h-5 text-gold" /> عرض الشهادة
+  1766→              </DialogTitle>
+  1767→              <button onClick={() => setViewing(null)} className="text-muted-foreground hover:text-navy">
+  1768→                <X className="w-5 h-5" />
+  1769→              </button>
+  1770→            </div>
+  1771→          </DialogHeader>
+  1772→          {viewing && <CertificateViewer certificate={viewing} onClose={() => setViewing(null)} />}
+  1773→        </DialogContent>
+  1774→      </Dialog>
+  1775→    </>
+  1776→  )
+  1777→}
+  1778→

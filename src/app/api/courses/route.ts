@@ -1,6 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Modules and lessons are stored INLINE in the course's `description`
+// field, after a `===FIA_MODULES===` separator. This is a legacy format
+// inherited from the early single-table schema.
+//
+// When the course-dialog (or any other client) updates the course, the
+// description it sends is just the user-visible text portion — the
+// modules JSON is stripped from the form (so it doesn't appear in the
+// textarea). If we naively overwrote `description` with that value, we
+// would LOSE all modules and lessons.
+//
+// This PUT handler therefore:
+//   1) Fetches the existing course description
+//   2) Parses out the modules JSON portion (after `===FIA_MODULES===`)
+//   3) Re-appends it to the new description before saving
+//   4) Recomputes modules_count + lessons_count from the modules JSON
+//      (so the body can't accidentally zero them out)
+
+const MODULES_SEPARATOR = '\n\n===FIA_MODULES===\n'
+
+function parseCourseContent(description: string | null | undefined): { description: string; modules: any[] } {
+  if (!description) return { description: '', modules: [] }
+  const idx = description.indexOf(MODULES_SEPARATOR)
+  if (idx === -1) return { description, modules: [] }
+  const desc = description.substring(0, idx)
+  const jsonStr = description.substring(idx + MODULES_SEPARATOR.length)
+  try {
+    const modules = JSON.parse(jsonStr)
+    if (Array.isArray(modules)) return { description: desc, modules }
+  } catch {}
+  return { description, modules: [] }
+}
+
+function serializeCourseContent(description: string, modules: any[]): string {
+  if (!modules || modules.length === 0) return description || ''
+  return `${description || ''}${MODULES_SEPARATOR}${JSON.stringify(modules)}`
+}
+
+function countModulesAndLessons(modules: any[]): { modules_count: number; lessons_count: number } {
+  const modulesCount = modules.length
+  const lessonsCount = modules.reduce((acc, m) => acc + ((m.lessons as any[]) || []).length, 0)
+  return { modules_count: modulesCount, lessons_count: lessonsCount }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const slug = req.nextUrl.searchParams.get('slug')
@@ -42,7 +85,67 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { id, ...updates } = await req.json()
+    const { id, description, ...otherUpdates } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    const updates: any = { ...otherUpdates }
+
+    // === PRESERVE MODULES JSON WHEN DESCRIPTION IS UPDATED ===
+    // The client sends only the user-visible description text. If the
+    // existing course has modules stored inline after
+    // `===FIA_MODULES===`, we MUST re-append that modules JSON to the
+    // new description — otherwise we would silently delete all
+    // modules and lessons.
+    if (description !== undefined) {
+      // Fetch existing course to read its current description (which
+      // may contain the modules JSON).
+      const { data: existing, error: fetchError } = await supabaseAdmin
+        .from('courses')
+        .select('description')
+        .eq('id', id)
+        .maybeSingle()
+      if (fetchError) throw fetchError
+
+      const existingDescription = existing?.description || ''
+      const { modules } = parseCourseContent(existingDescription)
+
+      // If the new description from the client does NOT contain the
+      // modules separator, but the existing description DOES have
+      // modules, we re-append the modules JSON to preserve them.
+      let newDescription: string
+      if (modules.length > 0 && typeof description === 'string' && !description.includes('===FIA_MODULES===')) {
+        newDescription = serializeCourseContent(description, modules)
+      } else {
+        // Either no modules exist, or the client explicitly sent a
+        // description that already contains the modules separator —
+        // trust the client in that case.
+        newDescription = description
+      }
+      updates.description = newDescription
+
+      // Recompute modules_count + lessons_count from the preserved
+      // modules so the body can't accidentally zero them out.
+      const counts = countModulesAndLessons(modules)
+      updates.modules_count = counts.modules_count
+      updates.lessons_count = counts.lessons_count
+    } else {
+      // No description update — but still strip modules_count and
+      // lessons_count from the body if they were set to 0 (which the
+      // CourseDialog does), to avoid zeroing them out accidentally.
+      if (otherUpdates.modules_count === 0 || otherUpdates.lessons_count === 0) {
+        // Lookup existing modules to recompute
+        const { data: existing } = await supabaseAdmin
+          .from('courses')
+          .select('description')
+          .eq('id', id)
+          .maybeSingle()
+        const { modules } = parseCourseContent(existing?.description)
+        const counts = countModulesAndLessons(modules)
+        updates.modules_count = counts.modules_count
+        updates.lessons_count = counts.lessons_count
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('courses')
       .update(updates)
