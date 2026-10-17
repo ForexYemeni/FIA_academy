@@ -661,15 +661,33 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
           const isOpenable = enr && !isPendingPayment
           const isFree = c.price_type === 'مجانية' || c.price === 0
           const isPaidNotEnrolled = !enr && !isFree
-          // Original (struck-through) price — only show if it's greater
-          // than the current/discounted price AND > 0.
-          const originalPrice = Number(c.original_price) || 0
-          const currentPrice = Number(c.price) || 0
-          const hasDiscount = !isFree && originalPrice > currentPrice && currentPrice > 0
+          // === Offer price logic ===
+          // - offer_price (if > 0) takes priority — it's the special
+          //   promotional price for this course.
+          // - If offer_price = 0, fall back to the regular course.price.
+          // - The "struck through" original is whichever is bigger:
+          //   original_price (the was-price) or the regular price
+          //   (when offer_price < price).
+          const originalPriceField = Number(c.original_price) || 0
+          const regularPrice = Number(c.price) || 0
+          const offerPrice = Number(c.offer_price) || 0
+          // displayPrice = the price the student actually pays
+          const displayPrice = offerPrice > 0 ? offerPrice : regularPrice
+          // strikePrice = the price that gets struck through (the "was" price)
+          // Pick the LARGER of original_price and regular price as the
+          // "was" price, so the user sees the biggest possible discount.
+          const strikePrice = Math.max(originalPriceField, regularPrice, offerPrice)
+          const hasDiscount = !isFree && strikePrice > displayPrice && displayPrice > 0
+          // Offer flag — is this course currently in an offer period?
+          const hasOffer = !isFree && (c.offer_type === 'limited_time' || c.offer_type === 'featured')
+          const offerPct = hasDiscount
+            ? Math.round((1 - displayPrice / strikePrice) * 100)
+            : 0
           return (
             <Card
               key={c.id}
               className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${
+                hasOffer ? 'ring-2 ring-gold/50' :
                 isOpenable ? 'ring-2 ring-green-500/30'
                 : isPendingPayment ? 'ring-2 ring-yellow-500/40'
                 : isPaidNotEnrolled ? 'ring-1 ring-gold/40'
@@ -688,31 +706,46 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                 {!isFree && (
                   <div className="absolute bottom-2 right-2 left-2 flex flex-col items-center justify-center text-center">
                     {hasDiscount ? (
-                      <div className="flex items-baseline gap-2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
-                        <span className="text-xs line-through text-red-300 font-bold" dir="ltr">
-                          {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                      <div className={`flex items-baseline gap-2 rounded-lg px-3 py-1.5 border shadow-lg ${
+                        hasOffer
+                          ? 'bg-gradient-to-r from-red-600 to-red-800 border-red-300/30'
+                          : 'bg-white/10 backdrop-blur-md border-white/20'
+                      }`}>
+                        <span className="text-xs line-through text-white/70 font-bold" dir="ltr">
+                          {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
-                        <span className="text-xl font-extrabold text-gold" dir="ltr">
-                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        <span className={`text-xl font-extrabold ${hasOffer ? 'text-gold' : 'text-gold'}`} dir="ltr">
+                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </div>
                     ) : (
                       <div className="bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
                         <span className="text-xl font-extrabold text-gold" dir="ltr">
-                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </div>
                     )}
                     {hasDiscount && (
-                      <div className="mt-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                        {Math.round((1 - currentPrice / originalPrice) * 100)}% خصم
+                      <div className={`mt-1 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow ${
+                        hasOffer ? 'bg-yellow-400 text-navy' : 'bg-red-500'
+                      }`}>
+                        {offerPct}% خصم{hasOffer ? ' — عرض خاص' : ''}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Status badge in top-left */}
-                {isOpenable ? (
+                {/* Status / offer badge in top-left */}
+                {hasOffer ? (
+                  <Badge className={`absolute top-2 left-2 flex items-center gap-1 backdrop-blur-sm ${
+                    c.offer_type === 'limited_time'
+                      ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse'
+                      : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'
+                  }`}>
+                    {c.offer_type === 'limited_time' ? <Clock className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+                    {c.offer_type === 'limited_time' ? '⏰ لمدة محدودة' : '⭐ مميزة'}
+                  </Badge>
+                ) : isOpenable ? (
                   <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1 backdrop-blur-sm">
                     <CheckCircle2 className="w-3 h-3" /> مسجّل — اضغط للفتح
                   </Badge>
@@ -727,6 +760,12 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                 )}
               </div>
               <div className="p-4">
+                {/* Offer headline (if set) */}
+                {hasOffer && c.offer_headline && (
+                  <div className={`text-xs font-bold mb-1 truncate ${c.offer_type === 'limited_time' ? 'text-red-600' : 'text-gold'}`}>
+                    {c.offer_type === 'limited_time' ? '⏰' : '⭐'} {c.offer_headline}
+                  </div>
+                )}
                 <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
                 <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
@@ -737,13 +776,13 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                     {isFree ? <span className="text-green-600">مجانية</span> : hasDiscount ? (
                       <span>
                         <span className="line-through text-red-500 text-[10px]" dir="ltr">
-                          {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                          {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>{' '}
                         <span className="text-green-600" dir="ltr">
-                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </span>
-                    ) : `${currentPrice.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                    ) : `${displayPrice.toLocaleString()} ${c.currency || 'ر.ي'}`}
                   </span>
                 </div>
                 <div className="text-[10px] text-muted-foreground/80 text-center">
