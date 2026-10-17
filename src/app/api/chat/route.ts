@@ -121,9 +121,13 @@ export async function POST(req: NextRequest) {
       .single()
     if (msgErr) throw msgErr
 
+    // Attach sender's profile to the message so the client doesn't
+    // need a separate lookup — the name/avatar/role are embedded.
+    const senderProfile = await resolveProfile(sender_id)
+    const msgWithSender = { ...msg, sender: senderProfile }
+
     // Create a notification for the recipient
     try {
-      const senderProfile = await resolveProfile(sender_id)
       await supabaseAdmin.from('notifications').insert({
         user_id: recipient_id,
         type: 'message',
@@ -133,7 +137,7 @@ export async function POST(req: NextRequest) {
       })
     } catch {}
 
-    return NextResponse.json({ conversation_id: conversationId, message: msg })
+    return NextResponse.json({ conversation_id: conversationId, message: msgWithSender })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

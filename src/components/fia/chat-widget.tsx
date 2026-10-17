@@ -109,7 +109,21 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
       channel = supabasePublic.channel('chat:' + activeConvId)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${activeConvId}` },
           (payload: any) => {
-            setMessages((prev) => prev.some((m) => m.id === payload.new.id) ? prev : [...prev, payload.new])
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === payload.new.id)) return prev
+              // If the incoming message has no sender profile (realtime
+              // payloads only have raw row data), build one from the
+              // known recipient/conversation data so the name shows.
+              const msg = payload.new
+              if (!msg.sender) {
+                msg.sender = recipient
+                  ? { user_id: recipient.id, name: recipient.name, avatar: recipient.avatar, role: recipient.role }
+                  : (activeConv?.other
+                    ? { user_id: activeConv.other.user_id || activeConv.other_id, name: activeConv.other.name, avatar: activeConv.other.avatar, role: activeConv.other.role }
+                    : null)
+              }
+              return [...prev, msg]
+            })
             if (payload.new.sender_id !== user?.id) {
               fetch('/api/chat', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: activeConvId, user_id: user?.id }) }).catch(() => {})
             }
