@@ -9,43 +9,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers,
+  GraduationCap, Layers, Briefcase,
 } from 'lucide-react'
 
-const CATEGORIES = [
-  // طبية
-  'الطب الباطني', 'طب الطوارئ', 'الجراحة العامة', 'التخدير والإنعاش',
-  'أمراض القلب', 'الأمراض الصدرية', 'أمراض الكلى', 'أمراض الجهاز الهضمي',
-  'الطب النفسي', 'طب الأطفال', 'النساء والولادة', 'الجلدية',
-  'العيون', 'أنف وأذن وحنجرة', 'الأشعة', 'المخبرات الطبية',
-  'التمريض', 'الإنعاش القلبي الرئوي (BLS/ACLS)',
-  'مكافحة العدوى', 'صحة الأم والطفل', 'الصيدلة السريرية',
-  'التغذية العلاجية', 'العلاج الطبيعي', 'الأسنان',
-  'الأمراض المزمنة', 'الصحة العامة', 'الطب الشرعي',
-  'إدارة المنشآت الصحية', 'التعليم الطبي المستمر',
-  // فنية
-  'المختبرات الطبية', 'التشريح المرضي', 'بنك الدم',
-  'الأجهزة الطبية', 'تقنية المعلومات الصحية',
-  'السجلات الطبية الإلكترونية', 'ترميز الفواتير الطبية',
-  // مهنية وتقنية
-  'إدارة الأعمال', 'إدارة المشاريع', 'التسويق', 'المبيعات',
-  'الموارد البشرية', 'المحاسبة', 'الخدمات المالية',
-  'تقنية المعلومات (IT)', 'الأمن السيبراني', 'تحليل البيانات',
-  'البرمجة', 'تصميم المواقع', 'التصميم الجرافيكي',
-  'إدارة الجودة', 'السلامة المهنية', 'الصحة والسلامة المهنية',
-  'التدريب والتطوير', 'اللغات', 'اللغة الإنجليزية',
-  'القيادة والإدارة', 'خدمة العملاء', 'الإنتاج الصناعي',
-  'الميكانيكا', 'الكهرباء', 'السباكة', 'التبريد والتكييف',
-  'اللحام', 'السيارات', 'الزراعة', 'التصوير الفوتوغرافي',
-  'الطبخ وإدارة المطاعم', 'السياحة والفندقة',
-  // عام
-  'تخصصات أخرى',
+// Category groups — top-level dropdown
+const CATEGORY_GROUPS = [
+  { value: 'طبي', label: 'طبي', roles: ['طبيب عام', 'أخصائي بااطنة', 'جراح', 'طبيب طوارئ', 'طبيب تخدير', 'طبيب أطفال', 'طبيب نساء وولادة', 'طبيب جلدية', 'طبيب عيون', 'طبيب أنف وأذن وحنجرة', 'طبيب أشعة', 'طبيب نفسي', 'طبيب أسنان', 'طبيب شرعي'] },
+  { value: 'تمريض', label: 'تمريض', roles: ['ممرض/ة عام', 'ممرض رعاية مركزة', 'ممرض طوارئ', 'ممرض عمليات', 'ممرض أطفال', 'ممرض نساء وولادة', 'ممرض صحة عامة', 'ممرض تمريض منزلي'] },
+  { value: 'مختبرات', label: 'مختبرات', roles: ['فني مختبر', 'أخصائي تحاليل', 'فني تشريح مرضي', 'فني بنك دم', 'أخصائي ميكروبيولوجي'] },
+  { value: 'صيدلة', label: 'صيدلة', roles: ['صيدلي', 'فني صيدلة', 'أخصائي صيدلة سريرية'] },
+  { value: 'إنعاش وطوارئ', label: 'إنعاش وطوارئ', roles: ['فني إنعاش', 'مختص BLS', 'مختص ACLS', 'مسعف', 'فني إسعاف'] },
+  { value: 'صحة عامة', label: 'صحة عامة', roles: ['أخصائي صحة عامة', 'مفتش صحي', 'أخصائي مكافحة عدوى', 'أخصائي التغذية', 'أخصائي صحة الأم والطفل'] },
+  { value: 'علاج طبيعي', label: 'علاج طبيعي', roles: ['أخصائي علاج طبيعي', 'فني علاج طبيعي'] },
+  { value: 'إدارة صحية', label: 'إدارة صحية', roles: ['مدير مستشفى', 'مدير مركز صحي', 'مسؤول جودة', 'مسؤول سجلات طبية', 'محاسب طبي'] },
+  { value: 'أجهزة طبية', label: 'أجهزة طبية', roles: ['فني أشعة', 'فني تخطيط قلب', 'فني نظارات طبية', 'مهندس أجهزة طبية'] },
+  { value: 'تعليم طبي', label: 'تعليم طبي مستمر', roles: ['محاضر', 'مدرب طبي', 'مقيّم'] },
+  { value: 'إدارة الأعمال', label: 'إدارة الأعمال', roles: ['مدير عام', 'مدير مشاريع', 'مدير موارد بشرية', 'محاسب', 'محلل أعمال'] },
+  { value: 'تقنية', label: 'تقنية', roles: ['مبرمج', 'محلل بيانات', 'مهندس شبكات', 'أخصائي أمن سيبراني', 'مصمم مواقع', 'مصمم جرافيك'] },
+  { value: 'تسويق ومبيعات', label: 'تسويق ومبيعات', roles: ['أخصائي تسويق', 'مندوب مبيعات', 'مدير مبيعات', 'أخصائي علاقات عامة'] },
+  { value: 'مهني وحرفي', label: 'مهني وحرفي', roles: ['فني كهرباء', 'فني ميكانيكا', 'فني تبريد', 'فني لحام', 'فني سباكة', 'فني سيارات', 'أخصائي سلامة مهنية'] },
+  { value: 'خدمات', label: 'خدمات', roles: ['أخصائي خدمة عملاء', 'موظف استقبال', 'دليل سياحي', 'طاهٍ', 'مدير مطعم'] },
+  { value: 'لغات', label: 'لغات', roles: ['مدرس إنجليزية', 'مدرس عربي', 'مترجم'] },
+  { value: 'أخرى', label: 'أخرى', roles: ['عام'] },
 ]
 
 const LEVELS = [
-  { value: 'مبتدئ', label: 'مبتدئ', desc: 'للمبتدئين بدون خبرة سابقة' },
-  { value: 'متوسط', label: 'متوسط', desc: 'يتطلب معرفة أساسية' },
-  { value: 'متقدم', label: 'متقدم', desc: 'للممارسين ذوي الخبرة' },
+  { value: 'مبتدئ', label: 'مبتدئ — للمبتدئين بدون خبرة' },
+  { value: 'متوسط', label: 'متوسط — يتطلب معرفة أساسية' },
+  { value: 'متقدم', label: 'متقدم — للممارسين ذوي الخبرة' },
 ]
 
 const CURRENCIES = ['ر.ي', 'ر.س', '$', '€']
@@ -53,7 +44,8 @@ const CURRENCIES = ['ر.ي', 'ر.س', '$', '€']
 export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
   const [form, setForm] = useState<any>(
     course || {
-      title: '', short_description: '', description: '', category: '', specialization: '',
+      title: '', short_description: '', description: '',
+      category: '', specialization: '',
       level: 'متوسط', price_type: 'مجانية', price: 0, currency: 'ر.ي',
       duration_hours: 0, pass_score: 60, cover: '', status: 'منشورة',
     }
@@ -63,11 +55,15 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
 
   useEffect(() => {
     setForm(course || {
-      title: '', short_description: '', description: '', category: '', specialization: '',
+      title: '', short_description: '', description: '',
+      category: '', specialization: '',
       level: 'متوسط', price_type: 'مجانية', price: 0, currency: 'ر.ي',
       duration_hours: 0, pass_score: 60, cover: '', status: 'منشورة',
     })
   }, [course, open])
+
+  // Get roles for the currently selected category
+  const currentRoles = CATEGORY_GROUPS.find(g => g.value === form.category)?.roles || []
 
   const handleUploadCover = async (file: File) => {
     setUploadingCover(true)
@@ -100,7 +96,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
         short_description: form.short_description ?? '',
         description: form.description ?? '',
         category: form.category || null,
-        specialization: form.specialization || null,
+        specialization: form.specialization || form.category || null,
         level: form.level,
         price_type: form.price_type,
         price: Number(form.price) || 0,
@@ -133,7 +129,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     }
   }
 
-  // Custom select component — professional looking
+  // Custom select — clean, professional, with chevron
   const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
     <div>
       <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -175,7 +171,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             </div>
             <div>
               <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان الدورة *</Label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+              <Input value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })}
                 className="h-10 text-sm" placeholder="مثال: أساسيات علم الأدوية" />
             </div>
             <div>
@@ -190,25 +186,38 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             </div>
           </div>
 
-          {/* === Section 2: Category & Level === */}
+          {/* === Section 2: Category (group) + Specialization (role) === */}
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="التخصص"
               value={form.category || ''}
-              onChange={(v: string) => setForm({ ...form, category: v })}
-              options={[{ value: '', label: '— اختر التخصص —' }, ...CATEGORIES.map(c => ({ value: c, label: c }))]}
+              onChange={(v: string) => setForm({ ...form, category: v, specialization: '' })}
+              options={[{ value: '', label: '— اختر التخصص —' }, ...CATEGORY_GROUPS.map(g => ({ value: g.value, label: g.label }))]}
               icon={Tag}
             />
             <Select
-              label="المستوى"
-              value={form.level}
-              onChange={(v: string) => setForm({ ...form, level: v })}
-              options={LEVELS.map(l => ({ value: l.value, label: `${l.label} — ${l.desc}` }))}
-              icon={Layers}
+              label="المسمى الوظيفي"
+              value={form.specialization || ''}
+              onChange={(v: string) => setForm({ ...form, specialization: v })}
+              options={
+                currentRoles.length > 0
+                  ? [{ value: '', label: '— اختر المسمى —' }, ...currentRoles.map(r => ({ value: r, label: r }))]
+                  : [{ value: '', label: '— اختر التخصص أولاً —' }]
+              }
+              icon={Briefcase}
             />
           </div>
 
-          {/* === Section 3: Pricing === */}
+          {/* === Section 3: Level === */}
+          <Select
+            label="المستوى"
+            value={form.level || 'متوسط'}
+            onChange={(v: string) => setForm({ ...form, level: v })}
+            options={LEVELS.map(l => ({ value: l.value, label: l.label }))}
+            icon={Layers}
+          />
+
+          {/* === Section 4: Pricing === */}
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
               <DollarSign className="w-3.5 h-3.5 text-gold" /> التسعير
@@ -216,7 +225,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             <div className="grid grid-cols-2 gap-3">
               <Select
                 label="النوع"
-                value={form.price_type}
+                value={form.price_type || 'مجانية'}
                 onChange={(v: string) => setForm({ ...form, price_type: v })}
                 options={[{ value: 'مجانية', label: 'مجانية' }, { value: 'مدفوعة', label: 'مدفوعة' }]}
               />
@@ -236,7 +245,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             )}
           </div>
 
-          {/* === Section 4: Settings === */}
+          {/* === Section 5: Settings === */}
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
               <Settings className="w-3.5 h-3.5 text-gold" /> الإعدادات
@@ -261,7 +270,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             />
           </div>
 
-          {/* === Section 5: Cover Image === */}
+          {/* === Section 6: Cover Image === */}
           <div>
             <Label className="text-xs font-bold text-navy mb-1.5 flex items-center gap-1.5">
               <ImageIcon className="w-3.5 h-3.5 text-gold" /> صورة الغلاف
