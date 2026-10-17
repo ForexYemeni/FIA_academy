@@ -132,19 +132,42 @@ export function NotificationsBell() {
     } catch {}
     // 2) In-app professional toast with per-type styling.
     try { showNotificationToast(n) } catch {}
-    // 3) Browser native notification (OS-level popup). Only fires
-    // if the user previously granted permission via the opt-in card.
+    // 3) External browser notification via Service Worker.
+    //    Service Worker showNotification is MORE RELIABLE than
+    //    new Notification() — it works on mobile Chrome, Android,
+    //    desktop, and even when the tab is in the background. It
+    //    also gives us proper click handling + vibration.
     try {
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const payload = { type: 'SHOW_NOTIFICATION', title: n.title, body: n.body, link: n.link, tag: n.id }
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        // Send to the active SW
+        navigator.serviceWorker.controller.postMessage(payload)
+      } else if ('serviceWorker' in navigator) {
+        // SW registered but not controlling yet — register + send
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.active?.postMessage(payload)
+          // Also try direct registration.showNotification as a fallback
+          try {
+            reg.showNotification(n.title, {
+              body: n.body || '',
+              icon: '/fia/logo-fia.png',
+              badge: '/fia/favicon.svg',
+              tag: n.id,
+              data: { link: n.link || '/' },
+              dir: 'rtl',
+              lang: 'ar',
+            } as any)
+          } catch {}
+        })
+      } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        // Fallback: classic Notification API (works on desktop only)
         const notif = new Notification(n.title, {
           body: n.body || '',
           icon: '/fia/logo-fia.png',
-          badge: '/fia/favicon.svg',
           tag: n.id,
           dir: 'rtl',
           lang: 'ar',
         })
-        // Click on the OS notification → navigate to the link + focus
         notif.onclick = () => {
           window.focus()
           if (n.link) window.location.href = n.link

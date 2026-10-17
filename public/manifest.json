@@ -7,10 +7,12 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "fullscreen"],
   "orientation": "portrait",
   "background_color": "#FBF7EC",
   "theme_color": "#0A1F44",
   "categories": ["education", "medical", "health"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/fia/logo-fia.png",

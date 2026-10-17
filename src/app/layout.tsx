@@ -48,7 +48,23 @@ const SW_REGISTER = `
   if (typeof window === 'undefined') return
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js').catch(function () {})
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(function (reg) {
+          // Force the new SW to take over immediately (so push events
+          // work on first session without requiring a page reload).
+          if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING')
+        })
+        .catch(function (err) {
+          console.warn('SW registration failed:', err)
+        })
+    })
+    // When a new SW takes over, reload the page once so the user
+    // gets the latest version.
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!window.__fiaReloaded) {
+        window.__fiaReloaded = true
+        window.location.reload()
+      }
     })
   }
   // Affiliate tracking — capture ?ref= on first visit and stash in localStorage
