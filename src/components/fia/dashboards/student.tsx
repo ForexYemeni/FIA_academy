@@ -592,6 +592,38 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                 const unitLabel = c.offer_duration_unit === 'hours' ? 'ساعة' :
                   c.offer_duration_unit === 'days' ? 'يوم' :
                   c.offer_duration_unit === 'weeks' ? 'أسبوع' : 'شهر'
+
+                // === Remaining time for limited-time offers ===
+                // Use the course's updated_at as the offer start time
+                // (the trainer saves the course when setting the offer).
+                // Compute the expiry = updated_at + duration, then
+                // remaining = expiry - now. If remaining ≤ 0, the
+                // offer has expired — don't show this card.
+                const offerStart = c.updated_at || c.created_at
+                let remainingMs: number | null = null
+                let expired = false
+                if (isLimited && offerStart && Number(c.offer_duration_value) > 0) {
+                  const start = new Date(offerStart).getTime()
+                  const dur = Number(c.offer_duration_value)
+                  const unitMs = c.offer_duration_unit === 'hours' ? 3600000 :
+                    c.offer_duration_unit === 'days' ? 86400000 :
+                    c.offer_duration_unit === 'weeks' ? 604800000 : 2592000000
+                  const expiry = start + dur * unitMs
+                  remainingMs = expiry - Date.now()
+                  if (remainingMs <= 0) expired = true
+                }
+                if (expired) return null
+                // Format remaining time as "X ساعة Y دقيقة" or "X يوم Y ساعة"
+                const fmtRemaining = (ms: number) => {
+                  const totalSec = Math.floor(ms / 1000)
+                  const days = Math.floor(totalSec / 86400)
+                  const hours = Math.floor((totalSec % 86400) / 3600)
+                  const mins = Math.floor((totalSec % 3600) / 60)
+                  if (days > 0) return `${days} يوم ${hours} ساعة`
+                  if (hours > 0) return `${hours} ساعة ${mins} دقيقة`
+                  if (mins > 0) return `${mins} دقيقة`
+                  return 'تنتهي قريباً'
+                }
                 return (
                   <Card
                     key={c.id}
@@ -607,8 +639,14 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                         {isLimited ? <Clock className="w-3.5 h-3.5" /> : <Star className="w-3.5 h-3.5" />}
                         <span className="text-xs font-extrabold">{isLimited ? '⏰ لمدة محدودة' : '⭐ مميزة'}</span>
                       </div>
-                      {/* Duration chip */}
-                      {Number(c.offer_duration_value) > 0 && (
+                      {/* Remaining time chip for limited-time offers */}
+                      {isLimited && remainingMs !== null && (
+                        <div className="absolute bottom-2 right-2 bg-white text-red-600 text-[10px] font-extrabold px-2 py-1 rounded-md shadow-md border border-red-500/30 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {fmtRemaining(remainingMs)}
+                        </div>
+                      )}
+                      {/* For featured (not limited), show duration chip */}
+                      {!isLimited && Number(c.offer_duration_value) > 0 && (
                         <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-navy text-[10px] font-bold px-2 py-0.5 rounded-md" dir="ltr">
                           {c.offer_duration_value} {unitLabel}
                         </div>
@@ -827,16 +865,34 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
   const [autoCouponApplied, setAutoCouponApplied] = useState(false)
 
   // The "official" price (struck through) — only shown if it's greater
-  // than the current course price. This is the trainer's listed
-  // was-price. The student sees the current `course.price` as the
-  // final price, with `original_price` struck through in red.
-  const originalPrice = Number(course.price) || 0
+  // === PRICING LOGIC FOR PAYMENT ===
+  // - `course.price` = the regular course price (shown when no offer)
+  // - `course.original_price` = the "was" price (struck through)
+  // - `course.offer_price` = the special promotional offer price (if
+  //   the course is currently in an offer period — limited_time or
+  //   featured). When set and > 0, this is what the student pays.
+  // - `course.auto_coupon_code` = coupon that's auto-applied at
+  //   checkout (if the student hasn't already used it on another
+  //   course)
+  // The student is charged `finalPrice` below, which is the offer
+  // price (or regular price if no offer) minus any coupon discount.
+  const regularPrice = Number(course.price) || 0
+  const offerPrice = Number(course.offer_price) || 0
   const officialPrice = Number(course.original_price) || 0
-  const hasOriginalStrikethrough = officialPrice > originalPrice && originalPrice > 0
+  // The "base price" is what the student pays BEFORE any coupon.
+  // If there's an offer_price, use it; otherwise fall back to the
+  // regular course.price.
+  const basePrice = offerPrice > 0 ? offerPrice : regularPrice
+  // The struck-through "was" price — pick the larger of official_price
+  // and regular_price so the student sees the biggest discount.
+  const strikePrice = Math.max(officialPrice, regularPrice, offerPrice)
+  const hasStrikethrough = strikePrice > basePrice && basePrice > 0
+  // For backward compat, alias to old variable names used elsewhere.
+  const originalPrice = basePrice
 
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === 'percentage'
-      ? Math.round((originalPrice * (appliedCoupon.discount_value || 0)) / 100)
+      ? Math.round((basePrice * (appliedCoupon.discount_value || 0)) / 100)
       : (appliedCoupon.discount_value || 0)
     : 0
   const finalPrice = Math.max(0, originalPrice - discount)
@@ -987,12 +1043,12 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
           {/* Price with optional strikethrough + coupon discount */}
           <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg space-y-2">
             {/* Case 1: coupon applied — show the post-coupon price
-                with the pre-coupon price struck through. */}
+                with the pre-coupon (strikePrice) struck through. */}
             {appliedCoupon && discount > 0 ? (
               <>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground line-through text-red-500" dir="ltr">
-                    {originalPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
                   </span>
                   <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">
                     -{discount.toLocaleString()} {course.currency || 'ر.ي'}
@@ -1003,25 +1059,28 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
                   <span className="text-xl font-extrabold text-gold" dir="ltr">{finalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
                 </div>
               </>
-            ) : hasOriginalStrikethrough ? (
-              /* Case 2: no coupon applied, but the trainer set an
-                 original_price > current price. Show the trainer's
-                 strikethrough + the current discounted price. */
+            ) : hasStrikethrough ? (
+              /* Case 2: no coupon applied, but there's a strike price
+                 (original_price OR regular price > offer_price). Show
+                 strikePrice struck through + the actual charged price
+                 (basePrice = offer_price or regular price). */
               <>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">السعر الرسمي:</span>
                   <span className="line-through text-red-500 font-bold" dir="ltr">
-                    {officialPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-navy">السعر بعد الخصم:</span>
+                  <span className="text-sm font-semibold text-navy">
+                    {offerPrice > 0 ? 'سعر العرض:' : 'السعر بعد الخصم:'}
+                  </span>
                   <div className="flex flex-col items-end">
                     <span className="text-xl font-extrabold text-green-600" dir="ltr">
-                      {originalPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                      {basePrice.toLocaleString()} {course.currency || 'ر.ي'}
                     </span>
                     <span className="text-[10px] text-green-600 font-bold">
-                      وفّر {(officialPrice - originalPrice).toLocaleString()} {course.currency || 'ر.ي'}
+                      وفّر {(strikePrice - basePrice).toLocaleString()} {course.currency || 'ر.ي'}
                     </span>
                   </div>
                 </div>
@@ -1030,7 +1089,7 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
               /* Case 3: no discount at all. */
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
-                <span className="text-xl font-extrabold text-gold" dir="ltr">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                <span className="text-xl font-extrabold text-gold" dir="ltr">{basePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
               </div>
             )}
           </div>
