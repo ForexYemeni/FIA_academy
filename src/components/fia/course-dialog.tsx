@@ -281,26 +281,52 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                 <button
                   type="button"
                   onClick={() => setDescExpanded((v) => !v)}
-                  className="text-[10px] text-navy hover:text-gold flex items-center gap-1 transition-colors"
+                  className="text-[10px] text-navy hover:text-gold flex items-center gap-1 transition-colors font-semibold"
                 >
                   {descExpanded ? (
-                    <><ChevronUp className="w-3 h-3" /> طي</>
+                    <><ChevronUp className="w-3 h-3" /> طي الإخفاء</>
                   ) : (
-                    <><ChevronDown className="w-3 h-3" /> توسيع</>
+                    <><ChevronDown className="w-3 h-3" /> توسيع للتحرير</>
                   )}
                 </button>
               </div>
-              <Textarea
-                value={form.description || ''}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={descExpanded ? 8 : 2}
-                className={`text-sm resize-none transition-all ${descExpanded ? '' : 'min-h-[60px]'}`}
-                placeholder={descExpanded ? 'وصف تفصيلي لمحتوى الدورة...' : 'اضغط "توسيع" لكتابة وصف تفصيلي...'}
-              />
-              {!descExpanded && form.description && form.description.length > 80 && (
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  {form.description.length} حرف — اضغط توسيع لعرض/تعديل النص الكامل
-                </div>
+              {descExpanded ? (
+                <>
+                  <Textarea
+                    value={form.description || ''}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={8}
+                    className="text-sm resize-y"
+                    placeholder="وصف تفصيلي لمحتوى الدورة..."
+                  />
+                  {form.description && (
+                    <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
+                      <span>{form.description.length} حرف</span>
+                      <button
+                        type="button"
+                        onClick={() => setDescExpanded(false)}
+                        className="text-navy hover:text-gold font-semibold"
+                      >
+                        ✓ تم — اطوِ الإخفاء
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded(true)}
+                  className="w-full text-right p-2 rounded-md border border-dashed border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gold/30 transition-all text-xs text-muted-foreground min-h-[40px] flex items-center justify-between"
+                >
+                  <span>
+                    {form.description
+                      ? form.description.length > 60
+                        ? `${form.description.substring(0, 60)}… (${form.description.length} حرف)`
+                        : form.description
+                      : 'لا يوجد وصف بعد — اضغط للتوسيع والكتابة'}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-gold flex-shrink-0" />
+                </button>
               )}
             </div>
           </div>
