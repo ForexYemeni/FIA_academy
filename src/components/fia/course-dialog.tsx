@@ -54,11 +54,43 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
   const [uploadingCover, setUploadingCover] = useState(false)
 
   useEffect(() => {
-    setForm(course || {
+    // When loading a course for editing, strip any HTML tags from
+    // the description/short_description fields — old courses may have
+    // been saved with HTML from the previous SimpleDialog which
+    // looked ugly in the textarea.
+    const stripHtml = (html: string | null | undefined): string => {
+      if (!html) return ''
+      // If it doesn't contain HTML tags, return as-is
+      if (!/<[a-z][\s\S]*>/i.test(html)) return html
+      // Strip HTML tags, decode common entities
+      return html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }
+
+    setForm(course ? {
+      ...course,
+      description: stripHtml(course.description),
+      short_description: stripHtml(course.short_description),
+      // Keep numeric fields as strings so the input is fully editable
+      // (no parseInt bouncing back to defaults while typing)
+      pass_score: String(course.pass_score ?? 60),
+      duration_hours: String(course.duration_hours ?? 0),
+      price: String(course.price ?? 0),
+    } : {
       title: '', short_description: '', description: '',
       category: '', specialization: '',
-      level: 'متوسط', price_type: 'مجانية', price: 0, currency: 'ر.ي',
-      duration_hours: 0, pass_score: 60, cover: '', status: 'منشورة',
+      level: 'متوسط', price_type: 'مجانية', price: '0', currency: 'ر.ي',
+      duration_hours: '', pass_score: '', cover: '', status: 'منشورة',
     })
   }, [course, open])
 
@@ -239,7 +271,8 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             {form.price_type === 'مدفوعة' && (
               <div>
                 <Label className="text-xs font-bold text-navy mb-1.5 block">المبلغ</Label>
-                <Input type="number" value={form.price || ''} onChange={(e) => setForm({ ...form, price: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                <Input type="number" value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
                   className="h-10 text-sm" dir="ltr" placeholder="0" />
               </div>
             )}
@@ -253,12 +286,14 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-bold text-navy mb-1.5 block">عدد الساعات</Label>
-                <Input type="number" value={form.duration_hours || ''} onChange={(e) => setForm({ ...form, duration_hours: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                <Input type="number" value={form.duration_hours}
+                  onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
                   className="h-10 text-sm" dir="ltr" placeholder="0" />
               </div>
               <div>
                 <Label className="text-xs font-bold text-navy mb-1.5 block">درجة النجاح (%)</Label>
-                <Input type="number" value={form.pass_score || ''} onChange={(e) => setForm({ ...form, pass_score: e.target.value === '' ? 60 : parseInt(e.target.value) || 60 })}
+                <Input type="number" value={form.pass_score}
+                  onChange={(e) => setForm({ ...form, pass_score: e.target.value })}
                   className="h-10 text-sm" dir="ltr" placeholder="60" />
               </div>
             </div>
