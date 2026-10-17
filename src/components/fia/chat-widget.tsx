@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth-store'
 import { supabasePublic } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
-  MessageSquare, Send, ArrowRight, Loader2, Search, X, MessageCircle,
+  MessageSquare, Send, Loader2, Search, X, MessageCircle, Users, Phone, Video,
 } from 'lucide-react'
 
 export function ChatWidget({ initialRecipientId, initialRecipientName }: { initialRecipientId?: string; initialRecipientName?: string }) {
@@ -142,7 +142,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
         const conv = conversations.find((c) => c.id === activeConvId)
         if (conv?.other_id) targetId = conv.other_id
       }
-      if (!targetId) { toast.error('اختر مستلماً من القائمة على اليمين'); return }
+      if (!targetId) { toast.error('اختر مستلماً'); return }
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,6 +165,11 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
 
   if (!user) return null
 
+  // Get active conversation info
+  const activeConv = conversations.find((c) => c.id === activeConvId)
+  const otherName = recipient?.name || activeConv?.other?.name || 'مستخدم'
+  const otherAvatar = activeConv?.other?.avatar || null
+
   return (
     <>
       {/* Floating action button */}
@@ -182,72 +187,89 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col p-0 gap-0">
-          {/* Header — clean, single row */}
-          <DialogHeader className="p-4 bg-gradient-to-l from-navy to-navy-light text-white border-b border-gold/20 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-base flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-gold" />
-                الرسائل
-              </DialogTitle>
-              <button onClick={() => setOpen(false)} className="text-white/60 hover:text-white transition-colors p-1">
-                <X className="w-5 h-5" />
+        <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+          {/* === HEADER === */}
+          <DialogHeader className="p-0 flex-shrink-0">
+            <div className="bg-gradient-to-l from-navy to-navy-light px-5 py-3 flex items-center justify-between border-b border-gold/20">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <DialogTitle className="text-white text-base font-bold">الرسائل</DialogTitle>
+                  <p className="text-white/50 text-[10px]">محادثاتك مع المدربين والمتدربين</p>
+                </div>
+              </div>
+              <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+                <X className="w-4 h-4" />
               </button>
             </div>
           </DialogHeader>
 
-          {/* Main body — two columns */}
-          <div className="flex-1 flex min-h-0">
-            {/* === Left sidebar: search + conversations === */}
-            <div className="w-64 border-l border-border bg-gray-50 flex flex-col flex-shrink-0">
-              {/* Search bar */}
-              <div className="p-3 border-b border-border bg-white">
+          {/* === MAIN BODY === */}
+          <div className="flex-1 flex min-h-0" style={{ height: '70vh' }}>
+
+            {/* ===== SIDEBAR ===== */}
+            <div className="w-72 border-l border-gray-200 bg-white flex flex-col flex-shrink-0">
+              {/* Search */}
+              <div className="p-3 border-b border-gray-100">
                 <div className="relative">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
                     value={searchQ}
                     onChange={(e) => searchUsers(e.target.value)}
-                    placeholder="ابحث عن مستخدم..."
-                    className="text-xs pr-9 bg-gray-50 border-gray-200 focus:bg-white"
+                    placeholder="ابحث عن مستخدم لبدء محادثة..."
+                    className="text-sm pr-10 h-10 bg-gray-50 border-gray-200 focus:bg-white rounded-lg"
                   />
                 </div>
-                {searching && <p className="text-[10px] text-gray-400 mt-1.5">جاري البحث...</p>}
+                {searching && <p className="text-[10px] text-gray-400 mt-2 px-1">جاري البحث...</p>}
                 {searchQ.length >= 2 && !searching && searchResults.length === 0 && (
-                  <p className="text-[10px] text-gray-400 mt-1.5">لا توجد نتائج</p>
+                  <p className="text-[10px] text-gray-400 mt-2 px-1">لا توجد نتائج — جرّب اسماً آخر</p>
                 )}
+
+                {/* Search results */}
                 {searchResults.length > 0 && (
-                  <div className="mt-2 space-y-1 max-h-44 overflow-y-auto">
+                  <div className="mt-3 space-y-1 max-h-52 overflow-y-auto">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide px-1 mb-1">نتائج البحث</p>
                     {searchResults.map((u) => (
                       <button
                         key={u.id}
                         onClick={() => startConversationWith(u)}
-                        className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 text-right transition-colors"
+                        className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 text-right transition-colors"
                       >
-                        <Avatar className="w-8 h-8 flex-shrink-0">
-                          <AvatarImage src={u.avatar || ''} />
-                          <AvatarFallback className="bg-navy text-gold text-[10px]">{u.name?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-navy truncate">{u.name}</div>
-                          <div className="text-[9px] text-gray-400 truncate">{u.email}</div>
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={u.avatar || ''} />
+                            <AvatarFallback className="bg-navy text-gold text-sm font-bold">{u.name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
                         </div>
-                        {u.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 text-[8px] px-1 py-0">مدرب</Badge>}
-                        {u.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 text-[8px] px-1 py-0">متدرب</Badge>}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold text-navy truncate">{u.name}</div>
+                          <div className="text-[10px] text-gray-400 truncate">{u.email}</div>
+                        </div>
+                        {u.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[9px] px-1.5 py-0">مدرب</Badge>}
+                        {u.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[9px] px-1.5 py-0">متدرب</Badge>}
+                        {u.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[9px] px-1.5 py-0">مؤسس</Badge>}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Active conversation indicator */}
+              {/* New conversation indicator */}
               {recipient && (
-                <div className="p-2.5 bg-gold/10 border-b border-gold/20 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold text-gold uppercase tracking-wide">محادثة جديدة</div>
-                    <div className="text-sm text-navy font-semibold truncate">{recipient.name}</div>
+                <div className="p-3 bg-gold/10 border-b border-gold/20 flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar className="w-8 h-8 flex-shrink-0">
+                      <AvatarFallback className="bg-navy text-gold text-xs">{recipient.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-gold font-bold">محادثة جديدة</div>
+                      <div className="text-sm text-navy font-semibold truncate">{recipient.name}</div>
+                    </div>
                   </div>
-                  <button onClick={() => { setRecipient(null); setActiveConvId(null); setMessages([]) }} className="text-gray-400 hover:text-red-500 flex-shrink-0">
-                    <X className="w-4 h-4" />
+                  <button onClick={() => { setRecipient(null); setActiveConvId(null); setMessages([]) }} className="w-7 h-7 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
@@ -255,89 +277,133 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
               {/* Conversations list */}
               <div className="flex-1 overflow-y-auto">
                 {conversations.length === 0 && !recipient ? (
-                  <div className="p-6 text-center text-xs text-gray-400">
-                    <MessageCircle className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                    <p>لا توجد محادثات بعد</p>
-                    <p className="text-[10px] mt-1">ابحث عن مستخدم في الأعلى</p>
+                  <div className="p-8 text-center">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                      <MessageCircle className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <p className="text-sm font-bold text-navy mb-1">لا توجد محادثات</p>
+                    <p className="text-xs text-gray-400">ابحث عن مستخدم في الأعلى لبدء محادثة جديدة</p>
                   </div>
                 ) : (
-                  conversations.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => { setRecipient(null); setActiveConvId(c.id) }}
-                      className={`w-full p-3 text-right border-b border-gray-100 hover:bg-white transition-colors ${activeConvId === c.id && !recipient ? 'bg-gold/10' : ''}`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="relative flex-shrink-0">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={c.other?.avatar || ''} />
-                            <AvatarFallback className="bg-navy text-gold text-xs">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
-                          </Avatar>
-                          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
+                  conversations.map((c) => {
+                    const isActive = activeConvId === c.id && !recipient
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => { setRecipient(null); setActiveConvId(c.id) }}
+                        className={`w-full p-3 text-right border-b border-gray-50 transition-colors ${isActive ? 'bg-gold/10 border-r-2 border-r-gold' : 'hover:bg-gray-50'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="w-11 h-11">
+                              <AvatarImage src={c.other?.avatar || ''} />
+                              <AvatarFallback className="bg-navy text-gold text-sm font-bold">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
+                            </Avatar>
+                            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</span>
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">
+                                {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 truncate">{c.last_message_body || 'لا توجد رسائل'}</p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
-                          <div className="text-[10px] text-gray-400 truncate">{c.last_message_body || '—'}</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    )
+                  })
                 )}
               </div>
             </div>
 
-            {/* === Right: chat area === */}
+            {/* ===== CHAT AREA ===== */}
             <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+
               {/* Chat header */}
               {(recipient || activeConvId) && (
-                <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center gap-3 flex-shrink-0">
-                  <Avatar className="w-9 h-9">
-                    {recipient ? (
-                      <AvatarFallback className="bg-navy text-gold text-xs">{recipient.name.charAt(0)}</AvatarFallback>
-                    ) : (
-                      <>
-                        <AvatarImage src={conversations.find((c) => c.id === activeConvId)?.other?.avatar || ''} />
-                        <AvatarFallback className="bg-navy text-gold text-xs">{conversations.find((c) => c.id === activeConvId)?.other?.name?.charAt(0) || '؟'}</AvatarFallback>
-                      </>
-                    )}
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-navy">{recipient?.name || conversations.find((c) => c.id === activeConvId)?.other?.name || 'مستخدم'}</div>
-                    <div className="text-[10px] text-green-500">● متصل</div>
+                <div className="px-4 py-3 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10">
+                      {recipient ? (
+                        <AvatarFallback className="bg-navy text-gold text-sm font-bold">{recipient.name.charAt(0)}</AvatarFallback>
+                      ) : (
+                        <>
+                          <AvatarImage src={otherAvatar || ''} />
+                          <AvatarFallback className="bg-navy text-gold text-sm font-bold">{otherName.charAt(0)}</AvatarFallback>
+                        </>
+                      )}
+                    </Avatar>
+                    <div>
+                      <div className="text-sm font-bold text-navy">{otherName}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        <span className="text-[10px] text-green-600 font-medium">متصل الآن</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors">
+                      <Phone className="w-4 h-4" />
+                    </button>
+                    <button className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors">
+                      <Video className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* Messages area */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
-                   style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10,31,68,0.03) 1px, transparent 0)', backgroundSize: '24px 24px' }}>
+              {/* Messages */}
+              <div
+                className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10,31,68,0.03) 1px, transparent 0)', backgroundSize: '28px 28px' }}
+              >
                 {!recipient && !activeConvId ? (
                   <div className="h-full flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 rounded-full bg-navy/5 flex items-center justify-center mb-4">
-                      <MessageCircle className="w-10 h-10 text-navy/20" />
+                    <div className="w-24 h-24 rounded-full bg-navy/5 flex items-center justify-center mb-4">
+                      <MessageCircle className="w-12 h-12 text-navy/15" />
                     </div>
-                    <p className="text-sm text-gray-400 font-medium">اختر محادثة من القائمة</p>
-                    <p className="text-xs text-gray-300 mt-1">أو ابحث عن مستخدم لبدء محادثة جديدة</p>
+                    <h3 className="text-lg font-bold text-navy mb-1">ابدأ المحادثة</h3>
+                    <p className="text-sm text-gray-400 max-w-xs">
+                      اختر محادثة من القائمة على اليمين، أو ابحث عن مستخدم جديد لبدء محادثة معه
+                    </p>
                   </div>
                 ) : loading ? (
-                  <div className="text-center py-8"><Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" /></div>
+                  <div className="h-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-navy" />
+                  </div>
                 ) : messages.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-gray-400">ابدأ المحادثة — أرسل أول رسالة</div>
+                  <div className="h-full flex flex-col items-center justify-center text-center">
+                    <div className="w-20 h-20 rounded-full bg-navy/5 flex items-center justify-center mb-3">
+                      <Send className="w-10 h-10 text-navy/15" />
+                    </div>
+                    <p className="text-sm font-bold text-navy mb-1">ابدأ المحادثة</p>
+                    <p className="text-xs text-gray-400">أرسل أول رسالة إلى {otherName}</p>
+                  </div>
                 ) : (
                   messages.map((m) => {
                     const isMine = m.sender_id === user?.id
                     return (
                       <div key={m.id} className={`flex ${isMine ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`max-w-[75%] ${isMine ? 'order-2' : ''}`}>
-                          <div className={`px-3.5 py-2 rounded-2xl ${
-                            isMine
-                              ? 'bg-navy text-white rounded-br-md'
-                              : 'bg-white text-navy border border-gray-200 rounded-bl-md shadow-sm'
-                          }`}>
-                            <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
-                          </div>
-                          <div className={`text-[9px] text-gray-400 mt-0.5 ${isMine ? 'text-left pr-1' : 'text-right pl-1'}`}>
-                            {m.created_at ? new Date(m.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        <div className={`flex items-end gap-2 max-w-[75%] ${isMine ? 'flex-row' : 'flex-row-reverse'}`}>
+                          {!isMine && (
+                            <Avatar className="w-7 h-7 flex-shrink-0">
+                              <AvatarImage src={m.sender?.avatar || ''} />
+                              <AvatarFallback className="bg-navy text-gold text-[10px] font-bold">{m.sender?.name?.charAt(0) || '؟'}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div>
+                            <div className={`px-4 py-2.5 rounded-2xl ${
+                              isMine
+                                ? 'bg-navy text-white rounded-bl-md'
+                                : 'bg-white text-navy border border-gray-200 rounded-br-md shadow-sm'
+                            }`}>
+                              <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
+                            </div>
+                            <div className={`text-[9px] text-gray-400 mt-0.5 ${isMine ? 'text-left' : 'text-right'}`}>
+                              {m.created_at ? new Date(m.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -353,17 +419,17 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-                  placeholder={recipient || activeConvId ? 'اكتب رسالتك...' : 'اختر محادثة أو مستخدم أولًا...'}
-                  className="flex-1 bg-gray-50 border-gray-200 rounded-full"
+                  placeholder={recipient || activeConvId ? 'اكتب رسالتك...' : 'اختر محادثة أولاً...'}
+                  className="flex-1 bg-gray-50 border-gray-200 rounded-full h-11 text-sm"
                   disabled={sending || (!recipient && !activeConvId)}
                 />
-                <Button
+                <button
                   onClick={send}
                   disabled={sending || !draft.trim() || (!recipient && !activeConvId)}
-                  className="bg-navy hover:bg-navy-light rounded-full w-10 h-10 p-0 flex-shrink-0"
+                  className="w-11 h-11 rounded-full bg-navy hover:bg-navy-light text-gold flex items-center justify-center flex-shrink-0 disabled:opacity-30 transition-all"
                 >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
+                  {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </button>
               </div>
             </div>
           </div>
