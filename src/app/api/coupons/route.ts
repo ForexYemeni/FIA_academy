@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code')
+    const userId = req.nextUrl.searchParams.get('user_id')
+
     if (code) {
       // Look up a specific coupon by code (used during checkout)
       const { data, error } = await supabaseAdmin
@@ -22,6 +24,34 @@ export async function GET(req: NextRequest) {
       if (data.max_uses !== null && data.used_count >= data.max_uses) {
         return NextResponse.json({ valid: false, message: 'تم استخدام الكوبون للحد الأقصى' })
       }
+
+      // ===== Per-user usage restriction =====
+      // A student can only use a coupon for ONE course from their
+      // account. Once they've used it, they cannot reuse it on
+      // another course. We check the `coupon_usages` table.
+      if (userId) {
+        try {
+          const { data: usage } = await supabaseAdmin
+            .from('coupon_usages')
+            .select('id, course_id')
+            .eq('coupon_code', code)
+            .eq('user_id', userId)
+            .maybeSingle()
+          if (usage) {
+            return NextResponse.json({
+              valid: false,
+              message: `لقد استخدمت هذا الكوبون مسبقاً في دورة أخرى من حسابك. كل متدرب يمكنه استخدام الكوبون مرة واحدة فقط.`,
+              already_used: true,
+              used_course_id: usage.course_id,
+            })
+          }
+        } catch {
+          // coupon_usages table might not exist yet (pre-migration).
+          // Fall through to the valid response — the migration will
+          // enforce the restriction once applied.
+        }
+      }
+
       return NextResponse.json({ valid: true, coupon: data })
     }
     // List all coupons (admin view)

@@ -153,16 +153,18 @@ export async function POST(req: NextRequest) {
     // didn't pass a currency, we use the course's currency rather than
     // defaulting to 'ر.ي' (which is wrong for USD courses).
     let currency = body.currency
-    if (!currency) {
+    let coursePrice = body.amount_paid || 0
+    if (!currency || !coursePrice) {
       try {
         const { data: courseRow } = await supabaseAdmin
           .from('courses')
-          .select('currency')
+          .select('currency, price')
           .eq('id', body.course_id)
           .maybeSingle()
-        currency = courseRow?.currency || 'ر.ي'
+        if (!currency) currency = courseRow?.currency || 'ر.ي'
+        if (!coursePrice) coursePrice = courseRow?.price || 0
       } catch {
-        currency = 'ر.ي'
+        if (!currency) currency = 'ر.ي'
       }
     }
 
@@ -182,6 +184,32 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // ===== Record coupon usage (per-user restriction) =====
+    // If a coupon was applied to this enrollment, record it in the
+    // `coupon_usages` table so the student can't reuse the same
+    // coupon on another course from their account.
+    const appliedCouponMatch = body.payment_reference?.match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+    const appliedCouponCode = appliedCouponMatch ? appliedCouponMatch[1].toUpperCase() : null
+    if (appliedCouponCode && body.user_id && body.course_id) {
+      try {
+        await supabaseAdmin
+          .from('coupon_usages')
+          .insert({
+            coupon_code: appliedCouponCode,
+            user_id: body.user_id,
+            course_id: body.course_id,
+            payment_id: data?.id,
+            // The discount = original course price − amount the student paid.
+            discount_amount: Math.max(0, (coursePrice || 0) - (body.amount_paid || 0)),
+          })
+      } catch {
+        // coupon_usages table might not exist yet (pre-migration).
+        // Fail silently — the enrollment still succeeded; we just
+        // can't enforce the per-user restriction until the
+        // migration is applied.
+      }
+    }
 
     // Send notifications — to the user + to all admins
     try {
