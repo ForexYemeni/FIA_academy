@@ -43,11 +43,30 @@ export async function GET(req: NextRequest) {
       const uniqueOtherIds = Array.from(new Set(otherIds))
       let otherMap: Record<string, any> = {}
       if (uniqueOtherIds.length > 0) {
+        // Try public_profiles cache first
         const { data: profiles } = await supabaseAdmin
           .from('public_profiles')
           .select('*')
           .in('user_id', uniqueOtherIds)
         for (const p of profiles || []) otherMap[p.user_id] = p
+
+        // For any IDs not in the cache, resolve directly from
+        // users/trainers tables and write back to cache
+        for (const id of uniqueOtherIds) {
+          if (otherMap[id]) continue
+          const profile = await resolveProfile(id)
+          if (profile) {
+            otherMap[id] = profile
+            try {
+              await supabaseAdmin.from('public_profiles').upsert({
+                user_id: id, name: profile.name, avatar: profile.avatar,
+                role: profile.role, title: profile.title,
+                specialization: profile.specialization,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'user_id' })
+            } catch {}
+          }
+        }
       }
       return NextResponse.json((data || []).map((c: any) => {
         const otherId = c.participant_1 === userId ? c.participant_2 : c.participant_1
