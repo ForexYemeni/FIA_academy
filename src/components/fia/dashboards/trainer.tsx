@@ -21,6 +21,7 @@ import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
+import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -164,7 +165,7 @@ export function TrainerDashboard() {
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
 
       {isDialogOpen && (
-        <CourseDialog
+        <ProCourseDialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
           course={editing}
