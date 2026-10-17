@@ -114,10 +114,48 @@ export function AdminDashboard() {
 // ============== Admin Content Viewer (all courses + lessons) ==============
 function AdminContent({ contentCourseId, setContentCourseId }: any) {
   const [courses, setCourses] = useState<any[]>([])
+  const [enrollmentsByCourse, setEnrollmentsByCourse] = useState<Record<string, number>>({})
 
+  // Load courses + ALL enrollments (no user filter) so we can show the
+  // real enrolled-students count per course. The legacy `c.enrolled`
+  // column is never updated when a student enrolls, so we have to
+  // compute the count from the payments/enrollments table.
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    Promise.all([
+      fetch('/api/courses').then((r) => r.json()).catch(() => []),
+      fetch('/api/enrollments').then((r) => r.json()).catch(() => []),
+    ]).then(([c, e]: any) => {
+      setCourses(Array.isArray(c) ? c : [])
+      const list: any[] = Array.isArray(e) ? e : []
+      // Count active enrollments — only those that have real access:
+      //   payment_status in ['free', 'confirmed', 'completed']
+      // Skip 'pending' (payment not yet approved) and any
+      // cancelled/failed enrollments.
+      const counts: Record<string, number> = {}
+      for (const enr of list) {
+        if (!enr?.course_id) continue
+        const ps = enr.payment_status
+        // Defensive: accept the canonical normalized values, AND
+        // the raw status 'مكتمل'/'completed' as a fallback (in case
+        // the toEnrollment normalization in the API missed an edge
+        // case, the count should still reflect reality).
+        const rawStatus = (enr.status || '').trim()
+        const isApproved =
+          ps === 'free' ||
+          ps === 'confirmed' ||
+          ps === 'completed' ||
+          rawStatus === 'مكتمل' ||
+          rawStatus === 'completed' ||
+          rawStatus === 'paid'
+        if (!isApproved) continue
+        counts[enr.course_id] = (counts[enr.course_id] || 0) + 1
+      }
+      setEnrollmentsByCourse(counts)
+    })
   }, [])
+
+  // Helper to get actual enrolled count for a course
+  const enrolledCount = (courseId: string) => enrollmentsByCourse[courseId] || 0
 
   if (contentCourseId) {
     return (
@@ -164,8 +202,11 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
                     <span>{c.lessons_count || 0} درس</span>
                     <span>{c.duration_hours || 0} ساعة</span>
                   </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    {c.enrolled || 0} متدرب مسجّل
+                  <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-navy/10 text-navy font-bold text-[10px]">
+                      {enrolledCount(c.id)}
+                    </span>
+                    <span>متدرب مسجّل فعلياً</span>
                   </div>
                   <Button
                     size="sm"

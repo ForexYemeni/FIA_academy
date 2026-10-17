@@ -169,9 +169,32 @@ export function StudentDashboard() {
       ) : null}
       {active !== 'course-view' && (
         <>
-          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
+          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => {
+            // === SAFETY CHECK: never open a paid course the student hasn't paid for ===
+            const enr = enrollments.find((e:any)=>e.course_id===c.id)
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            if (!enr) {
+              // Not enrolled at all — route to BrowseCourses
+              toast.info(isFree ? 'سجّل في الدورة مجاناً من قسم "استكشاف الدورات"' : 'اشترك في الدورة من قسم "استكشاف الدورات"')
+              setActive('browse')
+              return
+            }
+            if (enr.payment_status === 'pending') {
+              toast.info('هذه الدورة مدفوعة وبانتظار تأكيد الإدارة للدفع. سيتم تفعيلها قريباً.')
+              return
+            }
+            setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
+          }} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
-          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
+          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} onViewCourse={(c) => {
+            // Same safety check — only open if enrolled and not pending
+            const enr = enrollments.find((e:any)=>e.course_id===c.id)
+            if (!enr || enr.payment_status === 'pending') {
+              toast.info('لا يمكن فتح الدورة قبل إتمام التسجيل/الدفع')
+              return
+            }
+            setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
+          }} />}
           {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
           {active === 'results' && <Results />}
           {active === 'certificates' && <StudentCertificates user={user} />}
@@ -194,6 +217,29 @@ export function StudentDashboard() {
 }
 
 function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
+  // Helper: determine if a course can be opened by the student.
+  // Returns { canOpen, reason, enrollment } so the UI can decide what
+  // to do when the user clicks "عرض الدورة".
+  // - Free + not enrolled  -> should auto-enroll then open
+  // - Paid + not enrolled  -> must open payment dialog
+  // - Paid + enrolled pending -> cannot open (waiting admin approval)
+  // - Enrolled (free/confirmed/completed) -> can open
+  const getCourseAccess = (c: any) => {
+    const enr = enrollments?.find((e: any) => e.course_id === c.id)
+    const isFree = c.price_type === 'مجانية' || c.price === 0
+    if (enr) {
+      if (enr.payment_status === 'pending') {
+        return { canOpen: false, reason: 'بانتظار تأكيد الدفع', enrollment: enr }
+      }
+      // free | confirmed | completed -> can open
+      return { canOpen: true, reason: '', enrollment: enr }
+    }
+    if (isFree) {
+      return { canOpen: false, reason: 'free-not-enrolled', enrollment: null }
+    }
+    return { canOpen: false, reason: 'paid-not-enrolled', enrollment: null }
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
@@ -230,18 +276,49 @@ function Overview({ user, courses, certificates, enrollments, onViewCourse }: an
         </div>
       </SectionCard>
 
-      <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات">
+      <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات — اضغط للتسجيل أو فتح الدورة">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.slice(0, 3).map((c: any) => (
-            <Card key={c.id} className="p-4 card-hover">
-              <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden">
-                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-              </div>
-              <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
-              <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
-              <Button size="sm" className="w-full bg-navy hover:bg-navy-light" onClick={() => onViewCourse?.(c)}>عرض الدورة</Button>
-            </Card>
-          ))}
+          {courses.slice(0, 3).map((c: any) => {
+            const access = getCourseAccess(c)
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            // Decide button label + action based on access state
+            let btnLabel = 'عرض الدورة'
+            let btnAction: () => void = () => onViewCourse?.(c)
+            let btnClass = 'w-full bg-navy hover:bg-navy-light'
+            if (access.enrollment?.payment_status === 'pending') {
+              btnLabel = 'بانتظار تأكيد الدفع'
+              btnClass = 'w-full bg-yellow-500/20 text-yellow-700 border border-yellow-500/30 cursor-not-allowed'
+              btnAction = () => toast.info('سيتم تفعيل الدورة بعد تأكيد الإدارة للدفع')
+            } else if (access.reason === 'free-not-enrolled') {
+              btnLabel = 'سجّل الآن — مجانية'
+              btnClass = 'w-full bg-green-600 hover:bg-green-700 text-white'
+              // Will be handled by parent (BrowseCourses logic) — for now, just route to "browse"
+              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" للتسجيل') }
+            } else if (access.reason === 'paid-not-enrolled') {
+              btnLabel = 'اشترك الآن'
+              btnClass = 'w-full bg-gold hover:bg-gold-light text-navy'
+              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" لإتمام الدفع') }
+            } else if (access.canOpen) {
+              btnLabel = 'عرض الدورة'
+              btnClass = 'w-full bg-navy hover:bg-navy-light'
+              btnAction = () => onViewCourse?.(c)
+            }
+            return (
+              <Card key={c.id} className="p-4 card-hover">
+                <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden relative">
+                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+                  <Badge className={`absolute top-2 left-2 ${isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}`}>
+                    {isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                  </Badge>
+                </div>
+                <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
+                <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
+                <Button size="sm" className={btnClass} onClick={btnAction} disabled={access.enrollment?.payment_status === 'pending'}>
+                  {btnLabel}
+                </Button>
+              </Card>
+            )
+          })}
         </div>
       </SectionCard>
     </div>
@@ -370,6 +447,26 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
 
   const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
 
+  // Helper: determine if a course can be OPENED by the student.
+  // CRITICAL: A paid course must NOT open just because the student
+  // uploaded a payment proof. The course only opens after admin
+  // confirms the payment (payment_status === 'confirmed' or 'completed').
+  // - Not enrolled + free  → can enroll then open (caller handles)
+  // - Not enrolled + paid  → must open payment dialog
+  // - Enrolled + pending   → CANNOT open (waiting admin approval)
+  // - Enrolled + free/confirmed/completed → can open
+  const getAccess = (c: any) => {
+    const enr = enrollments?.find((e: any) => e.course_id === c.id)
+    const isFree = c.price_type === 'مجانية' || c.price === 0
+    if (!enr) {
+      return { state: isFree ? 'free-not-enrolled' : 'paid-not-enrolled', enrollment: null }
+    }
+    if (enr.payment_status === 'pending') {
+      return { state: 'pending', enrollment: enr }
+    }
+    return { state: 'can-open', enrollment: enr }
+  }
+
   const enrollFree = async (course: any) => {
     // Double-check client-side before calling API
     if (isEnrolled(course.id)) {
@@ -406,13 +503,20 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
   }
 
   // Clicking the entire card triggers the appropriate action:
-  // - If already enrolled → open the course viewer immediately
-  // - If free            → auto-enroll then open the course viewer
-  // - If paid            → open the payment dialog (course opens after admin approval)
+  // - If enrolled + payment confirmed → open the course viewer immediately
+  // - If enrolled + payment PENDING   → show toast (waiting admin approval)
+  // - If free + not enrolled          → auto-enroll then open the course viewer
+  // - If paid + not enrolled          → open the payment dialog (course opens AFTER admin approval)
   const handleCardClick = (c: any) => {
-    const enrolled = isEnrolled(c.id)
+    const enr = enrollments?.find((e: any) => e.course_id === c.id)
     const isFree = c.price_type === 'مجانية' || c.price === 0
-    if (enrolled) {
+    if (enr) {
+      // SAFETY: even if enrolled, don't open if payment is pending
+      if (enr.payment_status === 'pending') {
+        toast.info('بانتظار تأكيد الإدارة للدفع — سيتم تفعيل الدورة قريباً')
+        return
+      }
+      // free | confirmed | completed → safe to open
       onViewCourse?.(c)
     } else if (isFree) {
       enrollFree(c)
@@ -465,21 +569,32 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
     <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة — اضغط على الدورة لفتحها">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {courses.map((c: any) => {
-          const enrolled = isEnrolled(c.id)
+          const enr = enrollments?.find((e: any) => e.course_id === c.id)
+          const isPendingPayment = enr?.payment_status === 'pending'
+          const isOpenable = enr && !isPendingPayment
           const isFree = c.price_type === 'مجانية' || c.price === 0
-          const isPaidNotEnrolled = !enrolled && !isFree
+          const isPaidNotEnrolled = !enr && !isFree
           return (
             <Card
               key={c.id}
-              className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${enrolled ? 'ring-2 ring-green-500/30' : isPaidNotEnrolled ? 'ring-1 ring-gold/40' : ''}`}
+              className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${
+                isOpenable ? 'ring-2 ring-green-500/30'
+                : isPendingPayment ? 'ring-2 ring-yellow-500/40'
+                : isPaidNotEnrolled ? 'ring-1 ring-gold/40'
+                : ''
+              }`}
               onClick={() => handleCardClick(c)}
             >
               <div className="h-32 bg-navy relative">
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
                 <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
-                {enrolled ? (
+                {isOpenable ? (
                   <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> مسجّل
+                    <CheckCircle2 className="w-3 h-3" /> مسجّل — اضغط للفتح
+                  </Badge>
+                ) : isPendingPayment ? (
+                  <Badge className="absolute top-2 left-2 bg-yellow-500 text-navy flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> بانتظار الدفع
                   </Badge>
                 ) : isFree ? (
                   <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية — اضغط للفتح</Badge>
@@ -499,11 +614,13 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                   </span>
                 </div>
                 <div className="text-[10px] text-muted-foreground/80 text-center">
-                  {enrolled
+                  {isOpenable
                     ? '↵ اضغط لفتح الدورة'
-                    : isFree
-                      ? '↵ اضغط للتسجيل والفتح فوراً'
-                      : '↵ اضغط لإكمال الاشتراك'}
+                    : isPendingPayment
+                      ? '↵ اضغط لمعرفة الحالة'
+                      : isFree
+                        ? '↵ اضغط للتسجيل والفتح فوراً'
+                        : '↵ اضغط لإكمال الاشتراك'}
                 </div>
               </div>
             </Card>

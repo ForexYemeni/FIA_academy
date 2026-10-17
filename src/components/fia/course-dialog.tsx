@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers, Briefcase,
+  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
 // Category groups — top-level dropdown
@@ -52,6 +52,9 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
   )
   const [saving, setSaving] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  // Collapsible description state — defaults to collapsed so the
+  // dialog stays compact, expands when the user wants to write more.
+  const [descExpanded, setDescExpanded] = useState(false)
 
   useEffect(() => {
     // When loading a course for editing, strip any HTML tags from
@@ -163,7 +166,11 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
       })
       if (res.ok) {
         toast.success(course ? 'تم تحديث الدورة' : 'تم إنشاء الدورة')
-        onSaved()
+        // Call onSaved first (refreshes the parent's data), then
+        // close the dialog so the user doesn't have to scroll up
+        // to find the close button.
+        onSaved?.()
+        onOpenChange(false)
       } else {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error || 'فشل الحفظ')
@@ -226,9 +233,32 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                 className="h-10 text-sm" placeholder="جملة واحدة تلخص الدورة" />
             </div>
             <div>
-              <Label className="text-xs font-bold text-navy mb-1.5 block">الوصف الكامل</Label>
-              <Textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={3} className="text-sm resize-none" placeholder="وصف تفصيلي لمحتوى الدورة..." />
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-xs font-bold text-navy block">الوصف الكامل</Label>
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="text-[10px] text-navy hover:text-gold flex items-center gap-1 transition-colors"
+                >
+                  {descExpanded ? (
+                    <><ChevronUp className="w-3 h-3" /> طي</>
+                  ) : (
+                    <><ChevronDown className="w-3 h-3" /> توسيع</>
+                  )}
+                </button>
+              </div>
+              <Textarea
+                value={form.description || ''}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={descExpanded ? 8 : 2}
+                className={`text-sm resize-none transition-all ${descExpanded ? '' : 'min-h-[60px]'}`}
+                placeholder={descExpanded ? 'وصف تفصيلي لمحتوى الدورة...' : 'اضغط "توسيع" لكتابة وصف تفصيلي...'}
+              />
+              {!descExpanded && form.description && form.description.length > 80 && (
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {form.description.length} حرف — اضغط توسيع لعرض/تعديل النص الكامل
+                </div>
+              )}
             </div>
           </div>
 
