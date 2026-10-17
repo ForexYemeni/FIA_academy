@@ -163,6 +163,25 @@ export async function PUT(req: NextRequest) {
   }
 }
 
+// DELETE — delete an entire conversation (and all its messages via CASCADE)
+export async function DELETE(req: NextRequest) {
+  try {
+    const { conversation_id } = await req.json()
+    if (!conversation_id) {
+      return NextResponse.json({ error: 'conversation_id required' }, { status: 400 })
+    }
+    // Delete the conversation — messages cascade-delete via FK constraint
+    const { error } = await supabaseAdmin
+      .from('chat_conversations')
+      .delete()
+      .eq('id', conversation_id)
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
 async function resolveProfile(userId: string): Promise<any | null> {
   const { data: u } = await supabaseAdmin.from('users').select('id, name, avatar, role').eq('id', userId).maybeSingle()
   if (u) return { user_id: userId, name: u.name, avatar: u.avatar, role: u.role }
