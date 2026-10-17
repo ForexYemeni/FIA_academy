@@ -31,19 +31,24 @@ function getCtx(): AudioContext | null {
   return _audioCtx
 }
 
-// Play a single sine wave note at the given frequency + duration.
-function playTone(ctx: AudioContext, freq: number, startTime: number, duration: number, gainValue = 0.18, type: OscillatorType = 'sine') {
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.type = type
-  osc.frequency.value = freq
-  gain.gain.setValueAtTime(0, startTime)
-  gain.gain.linearRampToValueAtTime(gainValue, startTime + 0.02) // 20ms attack
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration) // exponential decay
-  osc.connect(gain)
-  gain.connect(ctx.destination)
-  osc.start(startTime)
-  osc.stop(startTime + duration + 0.05)
+// Play a single tone at the given frequency + duration.
+// Default gain is 0.5 (LOUD) — previous 0.18 was inaudible on most
+// systems in real-world testing. The user explicitly opted into
+// sound notifications, so we err on the side of audible.
+function playTone(ctx: AudioContext, freq: number, startTime: number, duration: number, gainValue = 0.5, type: OscillatorType = 'triangle') {
+  try {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = type
+    osc.frequency.value = freq
+    gain.gain.setValueAtTime(0, startTime)
+    gain.gain.linearRampToValueAtTime(gainValue, startTime + 0.015) // 15ms attack
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration) // exponential decay
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(startTime)
+    osc.stop(startTime + duration + 0.05)
+  } catch {}
 }
 
 export type SoundType =
@@ -52,55 +57,60 @@ export type SoundType =
 
 // Compose a short tune per sound type. Each tune is an array of
 // { freq, duration, gain } — played in sequence.
+// Gains are deliberately LOUD (0.5-0.7) so the tones cut through
+// any background noise. Lower values (0.18) were inaudible on most
+// systems in real-world testing.
 const TUNES: Record<SoundType, { freq: number, dur: number, gain?: number, type?: OscillatorType }[]> = {
-  // Default gentle 2-tone chime (E5 → A5)
+  // Default gentle 2-tone chime (E5 → A5) — louder + triangle wave
+  // for a more piercing ring
   default: [
-    { freq: 659.25, dur: 0.18 }, // E5
-    { freq: 880.00, dur: 0.28 }, // A5
+    { freq: 659.25, dur: 0.20, gain: 0.5, type: 'triangle' as OscillatorType }, // E5
+    { freq: 880.00, dur: 0.35, gain: 0.6, type: 'triangle' as OscillatorType }, // A5
   ],
-  // Rising major arpeggio (C → E → G → C)
+  // Rising major arpeggio (C → E → G → C) — bold + triumph
   success: [
-    { freq: 523.25, dur: 0.12 }, // C5
-    { freq: 659.25, dur: 0.12 }, // E5
-    { freq: 783.99, dur: 0.12 }, // G5
-    { freq: 1046.50, dur: 0.32, gain: 0.22 }, // C6
+    { freq: 523.25, dur: 0.15, gain: 0.5, type: 'triangle' as OscillatorType }, // C5
+    { freq: 659.25, dur: 0.15, gain: 0.5, type: 'triangle' as OscillatorType }, // E5
+    { freq: 783.99, dur: 0.15, gain: 0.5, type: 'triangle' as OscillatorType }, // G5
+    { freq: 1046.50, dur: 0.40, gain: 0.65, type: 'triangle' as OscillatorType }, // C6
   ],
-  // Low buzz — descending minor (G3 → F3 → Eb3)
+  // Low buzz — descending minor (G3 → F3) — kept square for
+  // harshness but louder
   error: [
-    { freq: 196.00, dur: 0.20, type: 'square' as OscillatorType, gain: 0.15 }, // G3
-    { freq: 174.61, dur: 0.30, type: 'square' as OscillatorType, gain: 0.15 }, // F3
+    { freq: 196.00, dur: 0.22, type: 'square' as OscillatorType, gain: 0.4 },
+    { freq: 174.61, dur: 0.32, type: 'square' as OscillatorType, gain: 0.4 },
   ],
-  // Coin-chime — 3 quick high notes (E6 → E6 → B6)
+  // Coin-chime — 3 quick high notes (E6 → E6 → B6) — very piercing
   payment: [
-    { freq: 1318.51, dur: 0.07 }, // E6
-    { freq: 1318.51, dur: 0.07 }, // E6
-    { freq: 1975.53, dur: 0.20, gain: 0.22 }, // B6
+    { freq: 1318.51, dur: 0.09, gain: 0.55, type: 'triangle' as OscillatorType }, // E6
+    { freq: 1318.51, dur: 0.09, gain: 0.55, type: 'triangle' as OscillatorType }, // E6
+    { freq: 1975.53, dur: 0.25, gain: 0.65, type: 'triangle' as OscillatorType }, // B6
   ],
-  // Soft bell (one mellow note)
+  // Soft bell — one mellow note (louder though)
   message: [
-    { freq: 880.00, dur: 0.30, gain: 0.12 },
+    { freq: 880.00, dur: 0.40, gain: 0.4, type: 'sine' as OscillatorType },
   ],
-  // Triumphant fanfare (C5 → G5 → C6 hold)
+  // Triumphant fanfare (C5 → G5 → C6 hold) — bold
   certificate: [
-    { freq: 523.25, dur: 0.14 }, // C5
-    { freq: 659.25, dur: 0.14 }, // E5
-    { freq: 783.99, dur: 0.14 }, // G5
-    { freq: 1046.50, dur: 0.40, gain: 0.22 }, // C6
-    { freq: 1318.51, dur: 0.40, gain: 0.22 }, // E6 — adds harmony
+    { freq: 523.25, dur: 0.16, gain: 0.55, type: 'triangle' as OscillatorType }, // C5
+    { freq: 659.25, dur: 0.16, gain: 0.55, type: 'triangle' as OscillatorType }, // E5
+    { freq: 783.99, dur: 0.16, gain: 0.55, type: 'triangle' as OscillatorType }, // G5
+    { freq: 1046.50, dur: 0.45, gain: 0.65, type: 'triangle' as OscillatorType }, // C6
+    { freq: 1318.51, dur: 0.45, gain: 0.65, type: 'triangle' as OscillatorType }, // E6
   ],
   // Welcoming chord (G major arpeggio)
   enrollment: [
-    { freq: 392.00, dur: 0.14 }, // G4
-    { freq: 493.88, dur: 0.14 }, // B4
-    { freq: 587.33, dur: 0.14 }, // D5
-    { freq: 783.99, dur: 0.32, gain: 0.22 }, // G5
+    { freq: 392.00, dur: 0.16, gain: 0.5, type: 'triangle' as OscillatorType }, // G4
+    { freq: 493.88, dur: 0.16, gain: 0.5, type: 'triangle' as OscillatorType }, // B4
+    { freq: 587.33, dur: 0.16, gain: 0.5, type: 'triangle' as OscillatorType }, // D5
+    { freq: 783.99, dur: 0.40, gain: 0.65, type: 'triangle' as OscillatorType }, // G5
   ],
-  // Warning siren — two alternating tones
+  // Warning siren — two alternating tones, LOUD
   danger: [
-    { freq: 440.00, dur: 0.18, type: 'sawtooth' as OscillatorType, gain: 0.16 },
-    { freq: 220.00, dur: 0.18, type: 'sawtooth' as OscillatorType, gain: 0.16 },
-    { freq: 440.00, dur: 0.18, type: 'sawtooth' as OscillatorType, gain: 0.16 },
-    { freq: 220.00, dur: 0.30, type: 'sawtooth' as OscillatorType, gain: 0.16 },
+    { freq: 440.00, dur: 0.22, type: 'sawtooth' as OscillatorType, gain: 0.5 },
+    { freq: 220.00, dur: 0.22, type: 'sawtooth' as OscillatorType, gain: 0.5 },
+    { freq: 440.00, dur: 0.22, type: 'sawtooth' as OscillatorType, gain: 0.5 },
+    { freq: 220.00, dur: 0.35, type: 'sawtooth' as OscillatorType, gain: 0.5 },
   ],
 }
 
@@ -137,7 +147,8 @@ export function playSound(type: SoundType = 'default'): boolean {
   const tune = TUNES[type] || TUNES.default
   let t = ctx.currentTime
   for (const note of tune) {
-    playTone(ctx, note.freq, t, note.dur, note.gain ?? 0.18, note.type ?? 'sine')
+    // Default to 0.5 gain + triangle wave for audibility
+    playTone(ctx, note.freq, t, note.dur, note.gain ?? 0.5, note.type ?? 'triangle')
     t += note.dur * 0.75 // 25% gap between notes
   }
   return true
