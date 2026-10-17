@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-store'
 import { supabasePublic } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
-  Send, Loader2, Search, X, MessageCircle, ArrowRight, Users,
+  Send, Loader2, Search, X, MessageCircle, ArrowRight, Users, Trash2,
 } from 'lucide-react'
 
 export function ChatWidget({ initialRecipientId, initialRecipientName }: { initialRecipientId?: string; initialRecipientName?: string }) {
@@ -67,6 +67,23 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     setActiveConvId(null)
     setMessages([])
     setTimeout(() => searchRef.current?.focus(), 200)
+  }
+
+  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('هل تريد حذف هذه المحادثة بالكامل؟ لا يمكن التراجع.')) return
+    try {
+      await fetch('/api/chat', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: convId }),
+      })
+      setConversations((prev) => prev.filter((c) => c.id !== convId))
+      if (activeConvId === convId) goBack()
+      toast.success('تم حذف المحادثة')
+    } catch {
+      toast.error('فشل الحذف')
+    }
   }
 
   const loadConversations = useCallback(() => {
@@ -252,22 +269,27 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                   <div className="p-3">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide px-2 mb-2">المحادثات الأخيرة</p>
                     {conversations.map((c) => (
-                      <button key={c.id} onClick={() => openExistingConversation(c)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 text-right transition-colors mb-1">
-                        <div className="relative flex-shrink-0">
-                          <Avatar className="w-11 h-11">
-                            <AvatarImage src={c.other?.avatar || ''} />
-                            <AvatarFallback className="bg-navy text-gold text-sm font-bold">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
-                          </Avatar>
-                          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
-                          <div className="text-[10px] text-gray-400 truncate">{c.last_message_body || 'لا توجد رسائل'}</div>
-                        </div>
-                        <span className="text-[9px] text-gray-400 flex-shrink-0">
-                          {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
-                        </span>
-                      </button>
+                      <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 text-right transition-colors mb-1 group">
+                        <button onClick={() => openExistingConversation(c)} className="flex items-center gap-3 flex-1 min-w-0 text-right">
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="w-11 h-11">
+                              <AvatarImage src={c.other?.avatar || ''} />
+                              <AvatarFallback className="bg-navy text-gold text-sm font-bold">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
+                            </Avatar>
+                            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
+                            <div className="text-[10px] text-gray-400 truncate">{c.last_message_body || 'لا توجد رسائل'}</div>
+                          </div>
+                          <span className="text-[9px] text-gray-400 flex-shrink-0">
+                            {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </button>
+                        <button onClick={(e) => deleteConversation(c.id, e)} className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" title="حذف المحادثة">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -287,9 +309,9 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
           ) : (
             // ==================== VIEW 2: CHAT CONVERSATION ====================
             <>
-              {/* Chat header — different design from search view */}
+              {/* Chat header — with delete + close buttons */}
               <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-                <button onClick={goBack} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0">
+                <button onClick={goBack} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0" title="رجوع">
                   <ArrowRight className="w-4 h-4 text-navy" />
                 </button>
                 <Avatar className="w-10 h-10 flex-shrink-0">
@@ -306,6 +328,18 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                     )}
                   </div>
                 </div>
+                {activeConvId && (
+                  <button
+                    onClick={(e) => deleteConversation(activeConvId, e)}
+                    className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 transition-colors"
+                    title="حذف المحادثة"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button onClick={() => setOpen(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors" title="إغلاق">
+                  <X className="w-4 h-4 text-navy" />
+                </button>
               </div>
 
               {/* Messages */}
