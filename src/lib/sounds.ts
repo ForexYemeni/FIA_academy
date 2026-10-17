@@ -123,16 +123,44 @@ export const NOTIFICATION_TYPE_TO_SOUND: Record<string, SoundType> = {
   system: 'default',
 }
 
-export function playSound(type: SoundType = 'default') {
-  if (_muted) return
+export function playSound(type: SoundType = 'default'): boolean {
+  if (_muted) return false
   const ctx = getCtx()
-  if (!ctx) return
+  if (!ctx) return false
+  // Try to resume the context in case it's still suspended
+  if (ctx.state === 'suspended') {
+    try { ctx.resume() } catch {}
+  }
+  // If still suspended, the browser hasn't unlocked audio yet —
+  // don't even try to play (would just throw a warning).
+  if (ctx.state !== 'running') return false
   const tune = TUNES[type] || TUNES.default
   let t = ctx.currentTime
   for (const note of tune) {
     playTone(ctx, note.freq, t, note.dur, note.gain ?? 0.18, note.type ?? 'sine')
     t += note.dur * 0.75 // 25% gap between notes
   }
+  return true
+}
+
+// Returns true if audio is currently unlocked + ready to play.
+// Used by the bell to show the right hint UI.
+export function isAudioReady(): boolean {
+  if (typeof window === 'undefined') return false
+  const ctx = getCtx()
+  if (!ctx) return false
+  return ctx.state === 'running'
+}
+
+// Forcibly try to unlock audio. Returns true if successful.
+export function tryUnlockAudio(): boolean {
+  if (typeof window === 'undefined') return false
+  const ctx = getCtx()
+  if (!ctx) return false
+  if (ctx.state === 'suspended') {
+    try { ctx.resume() } catch {}
+  }
+  return ctx.state === 'running'
 }
 
 export function playSoundForNotification(notificationType: string) {

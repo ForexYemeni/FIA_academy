@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import {
   Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users,
   AlertCircle, Award, Mail, Newspaper, Trophy, GraduationCap,
-  Volume2, VolumeX, X, BellRing,
+  Volume2, VolumeX, X, BellRing, Play, Loader2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
-import { playSoundForNotification, unlockAudio, isMuted, setMuted } from '@/lib/sounds'
+import { playSoundForNotification, unlockAudio, isMuted, setMuted, tryUnlockAudio, isAudioReady } from '@/lib/sounds'
 import { showNotificationToast } from '@/lib/notification-toast'
 
 const TYPE_ICON: Record<string, any> = {
@@ -92,7 +92,10 @@ export function NotificationsBell() {
 
   // Initialize muted state + audio unlock + notification permission
   useEffect(() => {
-    setMutedState(isMuted())
+    // IMPORTANT: always reset the mute state on session start so the
+    // user doesn't get stuck muted from a previous session.
+    setMuted(false)
+    setMutedState(false)
     if (typeof Notification !== 'undefined') {
       setNotifPerm(Notification.permission)
     }
@@ -100,8 +103,8 @@ export function NotificationsBell() {
     // critical for iOS Safari + most desktop browsers. We attach to
     // multiple events to be sure we catch a gesture.
     const unlock = () => {
-      unlockAudio()
-      setAudioUnlocked(true)
+      const ok = tryUnlockAudio()
+      setAudioUnlocked(ok)
       // Remove all the gesture handlers once we've unlocked.
       document.removeEventListener('click', unlock)
       document.removeEventListener('touchstart', unlock)
@@ -122,10 +125,11 @@ export function NotificationsBell() {
   // the polling fallback, so the experience is identical.
   const announceNotification = (n: any) => {
     // 1) Sound — each type has a distinct professional tone.
-    // We attempt this even if audio wasn't explicitly unlocked;
-    // some browsers (Chrome desktop) will play it anyway as long
-    // as the user has interacted with the page once.
-    try { playSoundForNotification(n.type) } catch {}
+    // Try to unlock audio first (in case it's still suspended).
+    try {
+      tryUnlockAudio()
+      playSoundForNotification(n.type)
+    } catch {}
     // 2) In-app professional toast with per-type styling.
     try { showNotificationToast(n) } catch {}
     // 3) Browser native notification (OS-level popup). Only fires
@@ -148,6 +152,77 @@ export function NotificationsBell() {
         }
       }
     } catch {}
+  }
+
+  // === TEST NOTIFICATION BUTTON ===
+  // Sends a test notification to the current user via the API. The
+  // notification is inserted into the DB, which fires:
+  //   - Supabase Realtime INSERT event (instant delivery)
+  //   - Polling fallback detects the new ID (within 15s)
+  // Either path triggers announceNotification() → sound + toast +
+  // browser notification. This lets the user verify the entire
+  // pipeline works end-to-end.
+  const [testing, setTesting] = useState(false)
+  const sendTestNotification = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!user?.id) {
+      toast.error('يجب تسجيل الدخول أولاً')
+      return
+    }
+    setTesting(true)
+    // Unlock audio right now (this click counts as a user gesture)
+    tryUnlockAudio()
+    setAudioUnlocked(true)
+    try {
+      // 1) Send the test notification via API
+      const res = await fetch('/api/notifications/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل إرسال الإشعار')
+        return
+      }
+      // 2) Immediately fire the announcement locally (so the user
+      //    doesn't have to wait for Realtime/polling). This proves
+      //    that sound + toast + browser notification all work.
+      const testNotif = {
+        id: data.id || `test-${Date.now()}`,
+        type: 'system',
+        title: '🔔 اختبار الإشعارات',
+        body: 'تم استلام هذا الإشعار بنجاح! إن كنت تراه + تسمع النغمة، فالنظام يعمل بشكل صحيح.',
+        link: '/',
+      }
+      announceNotification(testNotif)
+      // 3) Also reload notifications to pick up the new row
+      setTimeout(load, 200)
+      toast.success('تم إرسال إشعار الاختبار')
+    } catch (err) {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  // === TEST SOUND ONLY BUTTON ===
+  // Just plays a tone — no DB write, no toast. Useful for isolating
+  // whether sound works at all (vs. the rest of the pipeline).
+  const testSoundOnly = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Force-unlock audio + try to play
+    const unlocked = tryUnlockAudio()
+    setAudioUnlocked(unlocked)
+    // Use the 'default' chime
+    import('@/lib/sounds').then(({ playSound }) => {
+      const played = playSound('default')
+      if (played) {
+        toast.success('تم تشغيل الصوت ✓')
+      } else {
+        toast.error('لم يُشغّل الصوت — انقر في أي مكان بالصفحة أولاً ثم حاول مرة أخرى')
+      }
+    })
   }
 
   const toggleMute = (e: React.MouseEvent) => {
@@ -462,6 +537,35 @@ export function NotificationsBell() {
               ✓ تعليم الكل كمقروء
             </button>
           )}
+
+          {/* === Diagnostic / Test buttons ===
+              Lets the user verify that:
+                1) The browser supports the Web Audio API (test sound)
+                2) The full notification pipeline works end-to-end
+                 (test notification — inserts to DB, fires Realtime +
+                 polling, plays sound + toast + browser notif)
+          */}
+          <div className="flex gap-2 p-2 border-t border-gray-100 bg-gradient-to-r from-navy/5 to-gold/5">
+            <button
+              onClick={testSoundOnly}
+              className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-navy py-2 px-2 rounded-lg bg-white border border-navy/20 hover:bg-navy/5 transition-colors"
+              title="اختبر الصوت فقط"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> اختبار الصوت
+            </button>
+            <button
+              onClick={sendTestNotification}
+              disabled={testing}
+              className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white py-2 px-2 rounded-lg bg-gradient-to-r from-navy to-navy-light hover:opacity-90 transition-opacity disabled:opacity-50"
+              title="اختبر الإشعار الكامل (صوت + toast + browser notification)"
+            >
+              {testing ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري...</>
+              ) : (
+                <><Play className="w-3.5 h-3.5" /> اختبار الإشعار</>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>
