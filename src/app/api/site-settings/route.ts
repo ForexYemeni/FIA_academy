@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { verifyPassword, hashPassword } from '@/lib/auth-server'
 
 // Default settings (returned if table is empty)
 const DEFAULTS = {
@@ -113,8 +114,19 @@ export async function PUT(req: NextRequest) {
       if (uErr || !u) {
         return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
       }
-      if (String(u.password || '') !== String(password)) {
+      // Use verifyPassword so both bcrypt-hashed AND legacy plain-text
+      // passwords work correctly. The previous plaintext compare was
+      // broken because the register endpoint stores bcrypt hashes.
+      const { valid, needsRehash } = await verifyPassword(String(password), String(u.password || ''))
+      if (!valid) {
         return NextResponse.json({ error: 'كلمة المرور غير صحيحة — لا يمكن تغيير إعدادات تيليجرام' }, { status: 403 })
+      }
+      // Silently rehash legacy plain-text passwords so future checks are secure
+      if (needsRehash) {
+        try {
+          const newHash = await hashPassword(String(password))
+          await supabaseAdmin.from('users').update({ password: newHash }).eq('id', u.id)
+        } catch {}
       }
     }
 

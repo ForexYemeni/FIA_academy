@@ -205,9 +205,8 @@ export function NotificationsBell() {
   if (!user) return null
 
   return (
-    <div className="relative" ref={ref}>
-      {/* Single bell button — mute toggle is inside the dropdown header
-          so the bell stays clean and uncluttered. */}
+    <div className="relative flex-shrink-0" ref={ref}>
+      {/* Single bell button — mute toggle is inside the dropdown header */}
       <button
         onClick={() => { setOpen(!open); if (!open) load() }}
         className="relative w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
@@ -222,24 +221,32 @@ export function NotificationsBell() {
         )}
       </button>
 
-      {/* Dropdown panel — positioned right-aligned under the bell */}
+      {/* Dropdown panel — right-aligned, fixed width, won't push layout */}
       {open && (
         <>
-          {/* Invisible backdrop so outside clicks close the panel */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-auto right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Invisible backdrop — closes panel on outside click.
+              Fixed positioning so it doesn't disrupt the document flow. */}
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden"
+            style={{ animation: 'fiaBellSlide 0.18s ease-out' }}
+          >
             {/* Header — navy gradient with title + actions */}
             <div className="flex items-center justify-between p-3 bg-gradient-to-r from-navy to-navy-light text-white">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-gold" />
+              <div className="flex items-center gap-2 min-w-0">
+                <Bell className="w-4 h-4 text-gold flex-shrink-0" />
                 <h4 className="font-bold text-sm">الإشعارات</h4>
                 {unreadCount > 0 && (
-                  <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
                     {unreadCount} غير مقروء
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 flex-shrink-0">
                 {/* Mute toggle */}
                 <button
                   onClick={toggleMute}
@@ -252,10 +259,10 @@ export function NotificationsBell() {
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllRead}
-                    className="text-[10px] text-gold hover:underline px-1.5 py-1"
+                    className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
                     title="تعليم الكل كمقروء"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
                   </button>
                 )}
                 {/* Close */}
@@ -336,3 +343,4 @@ export function NotificationsBell() {
     </div>
   )
 }
+

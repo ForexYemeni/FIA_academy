@@ -2021,6 +2021,12 @@ function AdminAccount({ user, updateUser, logout }: any) {
   const [dzSection, setDzSection] = useState('')
   const [dzSectionOpen, setDzSectionOpen] = useState(false)
   const [dzSectionLoading, setDzSectionLoading] = useState(false)
+  // Orphan cleanup preview state
+  const [orphanPreviewOpen, setOrphanPreviewOpen] = useState(false)
+  const [orphanPreviewLoading, setOrphanPreviewLoading] = useState(false)
+  const [orphanCleanupLoading, setOrphanCleanupLoading] = useState(false)
+  const [orphanPreview, setOrphanPreview] = useState<{ table: string; label: string; count: number }[]>([])
+  const [orphanTotal, setOrphanTotal] = useState(0)
 
 // Arabic labels for each Danger Zone section (used in the
 // confirmation dialog so the user sees what they're wiping in Arabic).
@@ -2325,46 +2331,153 @@ const DZ_SECTION_LABELS: Record<string, string> = {
             </Button>
           </div>
 
-          {/* Cleanup orphaned payments (button) */}
+          {/* Cleanup ALL orphans (button + modal preview) */}
           <div className="border-t border-red-500/30 pt-3">
             <div className="flex items-center gap-2 mb-1">
               <Brush className="w-4 h-4 text-orange-500" />
               <h4 className="font-bold text-orange-600 text-sm">تنظيف السجلات اليتيمة</h4>
             </div>
             <p className="text-xs text-muted-foreground mb-2">
-              يحذف المدفوعات وطلبات الشهادات التي بحوزتها course_id أو user_id لم يعد موجوداً (نادر، لكن يحدث بعد حذف دورة).
+              يحذف كل السجلات التي بحوزتها course_id أو user_id لم يعد موجوداً — مدفوعات، تقييمات، مواضيع منتدى، ردود، تقدّم، إحالات عمولة، استخدامات كوبونات، نتائج اختبارات.
             </p>
             <Button
               variant="outline"
               onClick={async () => {
-                if (!confirm('سيتم حذف جميع المدفوعات اليتيمة نهائياً. متابعة؟')) return
-                setDzSectionLoading(true)
+                setOrphanPreviewLoading(true)
+                setOrphanPreviewOpen(true)
                 try {
-                  const res = await fetch('/api/admin/cleanup-orphans', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: user.id }),
-                  })
+                  const res = await fetch('/api/admin/cleanup-orphans')
                   const data = await res.json()
-                  if (res.ok) {
-                    toast.success(`تم حذف ${data.deleted_payments || 0} سجل يتيم${data.deleted_certificate_requests ? ` (منها ${data.deleted_certificate_requests} طلب شهادة)` : ''}`)
+                  if (res.ok && data.preview) {
+                    setOrphanPreview(data.preview)
+                    setOrphanTotal(data.total_orphans || 0)
                   } else {
-                    toast.error(data.error || 'فشل التنظيف')
+                    toast.error('فشل تحميل المعاينة')
+                    setOrphanPreviewOpen(false)
                   }
                 } catch {
                   toast.error('خطأ في الاتصال')
+                  setOrphanPreviewOpen(false)
                 } finally {
-                  setDzSectionLoading(false)
+                  setOrphanPreviewLoading(false)
                 }
               }}
               className="border-orange-500/40 text-orange-600 hover:bg-orange-500/10"
             >
-              <Brush className="w-4 h-4 ml-1" /> تنظيف المدفوعات اليتيمة
+              <Brush className="w-4 h-4 ml-1" /> معاينة وتنظيف اليتامى
             </Button>
           </div>
         </div>
       </div>
     </div>
+
+    {/* ===== Orphan cleanup preview confirmation dialog ===== */}
+    <Dialog open={orphanPreviewOpen} onOpenChange={(o) => { if (!o && !orphanCleanupLoading && !orphanPreviewLoading) setOrphanPreviewOpen(false) }}>
+      <DialogContent className="sm:max-w-md" showCloseButton={!orphanCleanupLoading && !orphanPreviewLoading}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <Brush className="w-5 h-5" />
+            تنظيف السجلات اليتيمة
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          {/* Loading spinner */}
+          {orphanPreviewLoading ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              <div className="w-8 h-8 mx-auto mb-2 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+              جاري فحص قاعدة البيانات...
+            </div>
+          ) : orphanTotal === 0 ? (
+            /* Empty state — no orphans found */
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-green-500/15 flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7 text-green-600" />
+              </div>
+              <p className="text-sm font-bold text-navy mb-1">✓ قاعدة البيانات نظيفة</p>
+              <p className="text-xs text-muted-foreground">لا توجد سجلات يتيمة — كل شيء على ما يرام.</p>
+            </div>
+          ) : (
+            /* Found orphans — show breakdown */
+            <>
+              <div className="flex items-start gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-orange-700">
+                    تم العثور على {orphanTotal} سجل يتيم
+                  </p>
+                  <p className="text-xs text-orange-600/80 mt-0.5">
+                    هذه السجلات تشير إلى دورات/مستخدمين محذوفين. سيتم حذفها نهائياً.
+                  </p>
+                </div>
+              </div>
+              {/* Per-table breakdown */}
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {orphanPreview.filter((p: any) => p.count > 0).map((p: any) => (
+                  <div key={p.table} className="flex items-center justify-between p-2 bg-muted/30 rounded-md border border-border">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-md bg-orange-500/15 flex items-center justify-center">
+                        <Trash2 className="w-3.5 h-3.5 text-orange-600" />
+                      </div>
+                      <span className="text-sm text-navy font-medium">{p.label}</span>
+                    </div>
+                    <Badge className="bg-orange-500/15 text-orange-700 border-orange-500/30 font-bold">
+                      {p.count}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Action buttons */}
+          {orphanTotal > 0 && !orphanCleanupLoading && (
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                onClick={() => setOrphanPreviewOpen(false)}
+                className="flex-1"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={async () => {
+                  setOrphanCleanupLoading(true)
+                  try {
+                    const res = await fetch('/api/admin/cleanup-orphans', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ user_id: user.id }),
+                    })
+                    const data = await res.json()
+                    if (res.ok) {
+                      toast.success(`تم حذف ${data.total_deleted || 0} سجل يتيم بنجاح`)
+                      setOrphanPreviewOpen(false)
+                      setOrphanPreview([])
+                      setOrphanTotal(0)
+                    } else {
+                      toast.error(data.error || 'فشل التنظيف')
+                    }
+                  } catch {
+                    toast.error('خطأ في الاتصال')
+                  } finally {
+                    setOrphanCleanupLoading(false)
+                  }
+                }}
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <Brush className="w-4 h-4 ml-1" /> حذف {orphanTotal} سجل يتيم
+              </Button>
+            </div>
+          )}
+          {orphanCleanupLoading && (
+            <div className="flex items-center justify-center p-3 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+              جاري التنظيف...
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
 
     {/* ===== Selective section wipe confirmation ===== */}
     <PasswordConfirmDialog
