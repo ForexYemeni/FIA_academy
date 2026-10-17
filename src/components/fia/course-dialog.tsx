@@ -60,10 +60,22 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     // looked ugly in the textarea.
     const stripHtml = (html: string | null | undefined): string => {
       if (!html) return ''
+      let text = html
+      // Strip the legacy ===FIA_MODULES=== JSON that was stored in the
+      // description field (old course format stored modules inline).
+      const modulesIdx = text.indexOf('===FIA_MODULES===')
+      if (modulesIdx !== -1) {
+        text = text.substring(0, modulesIdx)
+      }
+      // Also strip the legacy ===FIA_EXTRA=== marker
+      const extraIdx = text.indexOf('===FIA_EXTRA===')
+      if (extraIdx !== -1) {
+        text = text.substring(0, extraIdx)
+      }
       // If it doesn't contain HTML tags, return as-is
-      if (!/<[a-z][\s\S]*>/i.test(html)) return html
+      if (!/<[a-z][\s\S]*>/i.test(text)) return text.trim()
       // Strip HTML tags, decode common entities
-      return html
+      return text
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n')
         .replace(/<\/div>/gi, '\n')

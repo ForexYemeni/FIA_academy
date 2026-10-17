@@ -144,6 +144,11 @@ export async function POST(req: NextRequest) {
 
     const isFree = body.payment_status === 'free' || !body.amount_paid || body.amount_paid === 0
 
+    // For paid courses, set status to 'قيد الانتظار' (pending) so the admin
+    // sees it in their payments inbox and can approve/reject. For free
+    // courses, set status to 'مكتمل' (completed) immediately.
+    const initialStatus = isFree ? 'مكتمل' : 'قيد الانتظار'
+
     const { data, error } = await supabaseAdmin
       .from('payments')
       .insert({
@@ -152,7 +157,7 @@ export async function POST(req: NextRequest) {
         amount: body.amount_paid || 0,
         currency: body.currency || 'ر.ي',
         method: body.payment_method || (isFree ? 'free' : null),
-        status: 'active',  // enrollment is active
+        status: initialStatus,
         reference: body.payment_reference || (isFree ? 'FREE' : null),
         date: new Date().toISOString(),
       })
