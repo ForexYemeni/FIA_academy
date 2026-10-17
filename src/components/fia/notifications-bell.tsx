@@ -114,12 +114,42 @@ export function NotificationsBell() {
 
   const load = () => {
     if (!user?.id) return
-    setLoading(true)
     fetch(`/api/notifications?user_id=${user.id}`)
       .then((r) => r.json())
-      .then((d) => { setItems(Array.isArray(d) ? d : []) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .then((d) => {
+        const newItems = Array.isArray(d) ? d : []
+        // Detect new notifications since the last load by comparing
+        // unread counts. If unread went UP, that means a new
+        // notification arrived — play sound + show toast + browser
+        // notification. This is a fallback for when Supabase Realtime
+        // isn't reachable.
+        setItems((prev) => {
+          const prevUnread = prev.filter(n => !n.read_at).length
+          const newUnread = newItems.filter(n => !n.read_at).length
+          if (newUnread > prevUnread && prev.length > 0) {
+            // Find the newly-arrived notifications (those that aren't
+            // in prev) and announce them.
+            const prevIds = new Set(prev.map(n => n.id))
+            const fresh = newItems.filter(n => !prevIds.has(n.id))
+            for (const n of fresh) {
+              playSoundForNotification(n.type)
+              toast(n.title, { description: n.body, duration: 5000 })
+              try {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                  new Notification(n.title, {
+                    body: n.body || '',
+                    icon: '/fia/logo-fia.png',
+                    tag: n.id,
+                  })
+                }
+              } catch {}
+            }
+          }
+          return newItems
+        })
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -145,6 +175,16 @@ export function NotificationsBell() {
             playSoundForNotification(n.type)
             // Pop a toast notification too (uses the sonner library).
             toast(n.title, { description: n.body, duration: 5000 })
+            // Browser native notification (if user granted permission)
+            try {
+              if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                new Notification(n.title, {
+                  body: n.body || '',
+                  icon: '/fia/logo-fia.png',
+                  tag: n.id,
+                })
+              }
+            } catch {}
           }
         )
         .subscribe()
@@ -221,126 +261,118 @@ export function NotificationsBell() {
         )}
       </button>
 
-      {/* Dropdown panel — right-aligned, fixed width, won't push layout */}
+      {/* Dropdown panel — anchored to LEFT edge of bell so it extends
+          RIGHT (toward screen center). Correct for RTL layouts where
+          the bell sits on the left side of the navbar. */}
       {open && (
-        <>
-          {/* Invisible backdrop — closes panel on outside click.
-              Fixed positioning so it doesn't disrupt the document flow. */}
-          <div
-            className="fixed inset-0 z-40 bg-transparent"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden"
-            style={{ animation: 'fiaBellSlide 0.18s ease-out' }}
-          >
-            {/* Header — navy gradient with title + actions */}
-            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-navy to-navy-light text-white">
-              <div className="flex items-center gap-2 min-w-0">
-                <Bell className="w-4 h-4 text-gold flex-shrink-0" />
-                <h4 className="font-bold text-sm">الإشعارات</h4>
-                {unreadCount > 0 && (
-                  <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
-                    {unreadCount} غير مقروء
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                {/* Mute toggle */}
-                <button
-                  onClick={toggleMute}
-                  className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
-                  title={muted ? 'تفعيل الأصوات' : 'كتم الأصوات'}
-                >
-                  {muted ? <VolumeX className="w-3.5 h-3.5 text-white/60" /> : <Volume2 className="w-3.5 h-3.5 text-gold" />}
-                </button>
-                {/* Mark all as read */}
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllRead}
-                    className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
-                    title="تعليم الكل كمقروء"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
-                  </button>
-                )}
-                {/* Close */}
-                <button
-                  onClick={() => setOpen(false)}
-                  className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
-                  title="إغلاق"
-                >
-                  <X className="w-3.5 h-3.5 text-white/80" />
-                </button>
-              </div>
-            </div>
-
-            {/* Body — scrollable notifications list */}
-            <div className="max-h-[60vh] overflow-y-auto">
-              {loading && items.length === 0 ? (
-                <div className="p-10 text-center text-xs text-muted-foreground">
-                  <div className="w-8 h-8 mx-auto mb-2 border-2 border-navy/20 border-t-navy rounded-full animate-spin" />
-                  جاري تحميل الإشعارات...
-                </div>
-              ) : items.length === 0 ? (
-                <div className="p-10 text-center">
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-muted/50 flex items-center justify-center">
-                    <Bell className="w-7 h-7 text-muted-foreground/40" />
-                  </div>
-                  <p className="text-sm font-semibold text-navy mb-1">لا توجد إشعارات</p>
-                  <p className="text-xs text-muted-foreground">ستظهر هنا التنبيهات الجديدة فور وصولها</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {items.map((n) => {
-                    const Icon = TYPE_ICON[n.type] || AlertCircle
-                    const color = TYPE_COLOR[n.type] || 'bg-muted text-muted-foreground'
-                    const label = TYPE_LABEL[n.type] || 'إشعار'
-                    const isUnread = !n.read_at
-                    return (
-                      <button
-                        key={n.id}
-                        onClick={() => markOneRead(n)}
-                        className={`w-full text-right p-3 hover:bg-muted/40 transition-colors flex items-start gap-3 ${isUnread ? 'bg-gold/5' : ''}`}
-                      >
-                        {/* Icon */}
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">{label}</span>
-                            <span className="text-[10px] text-muted-foreground/70">•</span>
-                            <span className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
-                              <Clock className="w-2.5 h-2.5" /> {fmtRelative(n.created_at)}
-                            </span>
-                            {isUnread && <div className="w-2 h-2 bg-gold rounded-full flex-shrink-0 mr-auto" title="غير مقروء" />}
-                          </div>
-                          <h5 className="text-xs font-bold text-navy line-clamp-1 leading-snug mb-0.5">{n.title}</h5>
-                          {n.body && <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">{n.body}</p>}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+        <div
+          className="absolute left-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden"
+          style={{ animation: 'fiaBellSlide 0.18s ease-out' }}
+        >
+          {/* Header — navy gradient with title + actions */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-navy to-navy-light text-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bell className="w-4 h-4 text-gold flex-shrink-0" />
+              <h4 className="font-bold text-sm">الإشعارات</h4>
+              {unreadCount > 0 && (
+                <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                  {unreadCount} غير مقروء
+                </span>
               )}
             </div>
-
-            {/* Footer — link to mark all read */}
-            {items.length > 0 && unreadCount > 0 && (
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              {/* Mute toggle */}
               <button
-                onClick={markAllRead}
-                className="w-full p-2.5 text-center text-xs text-navy font-semibold hover:bg-muted/40 transition-colors border-t border-gray-100 bg-muted/20"
+                onClick={toggleMute}
+                className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
+                title={muted ? 'تفعيل الأصوات' : 'كتم الأصوات'}
               >
-                ✓ تعليم الكل كمقروء
+                {muted ? <VolumeX className="w-3.5 h-3.5 text-white/60" /> : <Volume2 className="w-3.5 h-3.5 text-gold" />}
               </button>
+              {/* Mark all as read */}
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
+                  title="تعليم الكل كمقروء"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
+                </button>
+              )}
+              {/* Close */}
+              <button
+                onClick={() => setOpen(false)}
+                className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
+                title="إغلاق"
+              >
+                <X className="w-3.5 h-3.5 text-white/80" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body — scrollable notifications list */}
+          <div className="max-h-[60vh] overflow-y-auto">
+            {loading && items.length === 0 ? (
+              <div className="p-10 text-center text-xs text-muted-foreground">
+                <div className="w-8 h-8 mx-auto mb-2 border-2 border-navy/20 border-t-navy rounded-full animate-spin" />
+                جاري تحميل الإشعارات...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="p-10 text-center">
+                <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Bell className="w-7 h-7 text-muted-foreground/40" />
+                </div>
+                <p className="text-sm font-semibold text-navy mb-1">لا توجد إشعارات</p>
+                <p className="text-xs text-muted-foreground">ستظهر هنا التنبيهات الجديدة فور وصولها</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {items.map((n) => {
+                  const Icon = TYPE_ICON[n.type] || AlertCircle
+                  const color = TYPE_COLOR[n.type] || 'bg-muted text-muted-foreground'
+                  const label = TYPE_LABEL[n.type] || 'إشعار'
+                  const isUnread = !n.read_at
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => markOneRead(n)}
+                      className={`w-full text-right p-3 hover:bg-muted/40 transition-colors flex items-start gap-3 ${isUnread ? 'bg-gold/5' : ''}`}
+                    >
+                      {/* Icon */}
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">{label}</span>
+                          <span className="text-[10px] text-muted-foreground/70">•</span>
+                          <span className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" /> {fmtRelative(n.created_at)}
+                          </span>
+                          {isUnread && <div className="w-2 h-2 bg-gold rounded-full flex-shrink-0 mr-auto" title="غير مقروء" />}
+                        </div>
+                        <h5 className="text-xs font-bold text-navy line-clamp-1 leading-snug mb-0.5">{n.title}</h5>
+                        {n.body && <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">{n.body}</p>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             )}
           </div>
-        </>
+
+          {/* Footer — link to mark all read */}
+          {items.length > 0 && unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              className="w-full p-2.5 text-center text-xs text-navy font-semibold hover:bg-muted/40 transition-colors border-t border-gray-100 bg-muted/20"
+            >
+              ✓ تعليم الكل كمقروء
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
 }
-

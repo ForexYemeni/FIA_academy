@@ -9,6 +9,7 @@ import { Menu, LogOut, Bell } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { NotificationsBell } from '@/components/fia/notifications-bell'
+import { NotificationOptInPrompt } from '@/components/fia/notification-opt-in-prompt'
 import { ChatWidget } from '@/components/fia/chat-widget'
 
 export interface NavItem {
@@ -189,6 +190,11 @@ export function DashboardShell({
 
         {/* Floating chat widget — available in every dashboard */}
         <ChatWidget />
+
+        {/* One-time opt-in prompt for sound + browser notifications.
+            Shown on first dashboard load only (skipped if the user
+            previously approved or dismissed). */}
+        <NotificationOptInPrompt />
       </div>
     </div>
   )

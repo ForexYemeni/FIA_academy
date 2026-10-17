@@ -265,3 +265,16 @@ video.fia-video::-internal-media-controls-overlay-cast-button { display: none; }
 .notifications-bell-container {
   isolation: isolate;
 }
+
+/* Bell ring animation for opt-in prompt */
+@keyframes swing {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-15deg); }
+  40% { transform: rotate(15deg); }
+  60% { transform: rotate(-10deg); }
+  80% { transform: rotate(10deg); }
+}
+.animate-swing {
+  animation: swing 1.5s ease-in-out infinite;
+  transform-origin: top center;
+}
