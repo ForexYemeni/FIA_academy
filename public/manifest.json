@@ -14,25 +14,21 @@
   "categories": ["education", "medical", "health"],
   "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/fia/logo-fia.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/fia/logo-fia.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/fia/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/fia/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/fia/icon-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/fia/icon-256-maskable.png", "sizes": "256x256", "type": "image/png", "purpose": "maskable" },
+    { "src": "/fia/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "/fia/icon-384-maskable.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable" },
+    { "src": "/fia/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/fia/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
     {
       "name": "الدورات",
       "short_name": "دورات",
       "url": "/#courses",
-      "icons": [{ "src": "/fia/logo-fia.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/fia/icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "المنتدى",
