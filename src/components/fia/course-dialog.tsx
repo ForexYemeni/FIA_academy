@@ -178,7 +178,33 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     if (!form.title) { toast.error('أدخل عنوان الدورة'); return }
     setSaving(true)
     try {
-      const slug = form.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\u0600-\u06FFa-z0-9-]/g, '').slice(0, 80) || 'course-' + Date.now()
+      // === SLUG GENERATION ===
+      // Slugs MUST be ASCII-only (Arabic chars get URL-encoded by the
+      // browser and break Next.js routing — see migration 006).
+      // We strip everything that isn't a-z, 0-9, or hyphen. Then we
+      // append a short timestamp suffix so two courses with similar
+      // titles (e.g. "دورة طب" / "دورة طب ٢") don't collide on the
+      // unique `slug` constraint.
+      const asciiPart = form.title
+        .toLowerCase()
+        // Replace whitespace with hyphens
+        .replace(/\s+/g, '-')
+        // Strip anything that's NOT a-z, 0-9, or hyphen (Arabic chars
+        // and all punctuation get removed)
+        .replace(/[^a-z0-9-]/g, '')
+        // Collapse multiple hyphens
+        .replace(/-+/g, '-')
+        // Trim leading/trailing hyphens
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 60)  // leave room for the suffix
+      // Always append a short timestamp suffix to guarantee uniqueness.
+      // Even if two courses have identical ASCII-transliterations,
+      // the suffix differs.
+      const slugSuffix = Date.now().toString(36).slice(-6).toUpperCase()
+      const slug = asciiPart
+        ? `${asciiPart}-${slugSuffix}`
+        : `course-${slugSuffix}`
+
       const body: any = {
         title: form.title,
         short_description: form.short_description ?? '',
