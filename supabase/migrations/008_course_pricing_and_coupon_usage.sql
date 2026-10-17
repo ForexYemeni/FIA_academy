@@ -1,6 +1,8 @@
 -- ===========================================================================
 -- FIA Academy — Per-course original price + auto coupon + per-user coupon usage
--- Safe to run multiple times (uses IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+-- Safe to run multiple times (uses IF NOT EXISTS where supported).
+-- NOTE: PostgreSQL does NOT support `CREATE POLICY IF NOT EXISTS`, so we
+-- use DROP+CREATE for the policy.
 -- ===========================================================================
 
 -- 1) Add original_price + auto_coupon_code to courses ---------------------
@@ -28,9 +30,18 @@ CREATE TABLE IF NOT EXISTS coupon_usages (
 );
 
 ALTER TABLE coupon_usages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_all_coupon_usages"
+
+-- PostgreSQL doesn't support CREATE POLICY IF NOT EXISTS — use DROP+CREATE.
+DROP POLICY IF EXISTS "allow_all_coupon_usages" ON coupon_usages;
+CREATE POLICY "allow_all_coupon_usages"
   ON coupon_usages FOR ALL USING (true) WITH CHECK (true);
 
--- Helpful index for the per-user lookup
+-- Helpful indexes for the per-user lookup
 CREATE INDEX IF NOT EXISTS idx_coupon_usages_user ON coupon_usages (user_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_usages_code ON coupon_usages (coupon_code);
+
+-- Force PostgREST to refresh its schema cache (so the new columns are
+-- visible to the API immediately, without having to wait for the cache
+-- to expire).
+NOTIFY pgrst, 'reload schema';
+
