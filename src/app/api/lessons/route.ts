@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { tgLessonCreated } from '@/lib/telegram'
 
 // Lessons are stored inside modules (which are stored as JSON in the course's description field).
 // The /api/modules endpoint handles the full course content. This endpoint provides
@@ -131,6 +132,11 @@ export async function POST(req: NextRequest) {
 
     modules[modIdx].lessons.push(newLesson)
     await saveCourseModules(courseId, description, modules)
+
+    // Publish to Telegram — every new lesson is announced on the channel
+    try {
+      await tgLessonCreated(courseId, body.title, body.lesson_type || 'text')
+    } catch {}
 
     return NextResponse.json(newLesson)
   } catch (e: any) {

@@ -4,6 +4,9 @@ import {
   notifyCertificateRequested, notifyTrainerApprovedCertificate,
   notifyCertificateApproved, notifyCertificateRejected,
 } from '@/lib/notifications'
+import {
+  tgCertRequested, tgCertIssued, tgCertRejected as tgReject,
+} from '@/lib/telegram'
 
 // Certificate requests stored in the `payments` table creatively:
 // - amount = certificate fee
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
     // Send notification — student + admins + course trainer
     try {
       await notifyCertificateRequested(user_id, course_id)
+      await tgCertRequested(user_id, course_id)
     } catch {}
 
     const request = parseRequest(data.reference, data)
@@ -244,14 +248,19 @@ export async function PUT(req: NextRequest) {
 
     // Send notifications based on the action taken
     try {
-      if (action === 'trainer_approve' && request.user_id) {
-        await notifyTrainerApprovedCertificate(request.user_id, request.course_id)
-      } else if (action === 'admin_approve' && request.user_id) {
-        await notifyCertificateApproved(request.user_id, request.course_id)
-      } else if (action === 'issue' && request.user_id) {
-        await notifyCertificateApproved(request.user_id, request.course_id)
-      } else if (action === 'reject' && request.user_id) {
-        await notifyCertificateRejected(request.user_id, request.course_id)
+      const cid = request.course_id || ''
+      const uid = request.user_id
+      if (action === 'trainer_approve' && uid) {
+        await notifyTrainerApprovedCertificate(uid, cid)
+      } else if (action === 'admin_approve' && uid) {
+        await notifyCertificateApproved(uid, cid)
+        await tgCertIssued(uid, cid, newCertNumber || '')
+      } else if (action === 'issue' && uid) {
+        await notifyCertificateApproved(uid, cid)
+        await tgCertIssued(uid, cid, newCertNumber || '')
+      } else if (action === 'reject' && uid) {
+        await notifyCertificateRejected(uid, cid)
+        await tgReject(uid, cid)
       }
     } catch {}
 

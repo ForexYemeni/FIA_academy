@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { hashPassword, signToken } from '@/lib/auth-server'
 import { notifyUserRegistered } from '@/lib/notifications'
+import { tgUserRegistered } from '@/lib/telegram'
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
     // Send welcome + admin notifications (non-fatal if it fails)
     try {
       await notifyUserRegistered(data.id, data.name, 'student')
+    } catch {}
+    // Also post to the Telegram channel so admins see new signups
+    try {
+      await tgUserRegistered(data.id, data.name, 'student')
     } catch {}
 
     const user = {

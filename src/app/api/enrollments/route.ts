@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import {
   notifyFreeEnrollment, notifyPaymentRequest, notifyCourseCompleted,
 } from '@/lib/notifications'
+import { tgEnrollmentFree, tgPaymentRequest as tgPayReq, tgCourseCompleted as tgComp } from '@/lib/telegram'
 
 // We store enrollments in the existing `payments` table creatively.
 // - amount = 0 means FREE enrollment
@@ -219,9 +220,11 @@ export async function POST(req: NextRequest) {
     try {
       if (isFree) {
         await notifyFreeEnrollment(body.user_id, body.course_id)
+        await tgEnrollmentFree(body.user_id, body.course_id)
       } else {
         // Paid enrollment: payment is pending admin approval
         await notifyPaymentRequest(body.user_id, body.course_id, body.amount_paid || coursePrice, currency)
+        await tgPayReq(body.user_id, body.course_id, body.amount_paid || coursePrice, currency, body.payment_method)
       }
     } catch {}
 
@@ -286,6 +289,7 @@ export async function PUT(req: NextRequest) {
     if (updates.progress === 100 && prevProgress < 100 && data?.user_id && data?.course_id) {
       try {
         await notifyCourseCompleted(data.user_id, data.course_id)
+        await tgComp(data.user_id, data.course_id)
       } catch {}
     }
 

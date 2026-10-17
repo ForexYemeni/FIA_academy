@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyContactMessage } from '@/lib/notifications'
+import { tgContactReceived } from '@/lib/telegram'
 
 export async function GET() {
   try {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     // Notify admins about the new contact message
     try {
       await notifyContactMessage(name, subject)
+      await tgContactReceived(name, subject)
     } catch {}
     return NextResponse.json({ success: true, id: data.id })
   } catch (e: any) {

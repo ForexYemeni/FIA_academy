@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { tgCourseCreated, tgCourseUpdated, tgCourseDeleted } from '@/lib/telegram'
 
 // Modules and lessons are stored INLINE in the course's `description`
 // field, after a `===FIA_MODULES===` separator. This is a legacy format
@@ -106,6 +107,12 @@ export async function POST(req: NextRequest) {
       break
     }
     if (error) throw error
+
+    // Publish to Telegram — every new course gets announced on the channel.
+    try {
+      await tgCourseCreated(data.id)
+    } catch {}
+
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -175,13 +182,19 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // === DEFENSIVE WRITE for new columns (original_price, auto_coupon_code) ===
-    // These columns were added by migration 008. If the migration
+    // === DEFENSIVE WRITE for new columns (original_price, auto_coupon_code,
+    //     offer_type, offer_duration_value, offer_duration_unit, offer_price,
+    //     offer_headline) ===
+    // These columns were added by migrations 008 + 009. If the migration
     // hasn't been applied yet, OR if PostgREST's schema cache hasn't
     // refreshed, the update will fail with a "column not found" error.
     // We try WITH the new fields first; on column-error, retry without
     // them so the rest of the course can still be saved.
-    const NEW_COLUMNS = ['original_price', 'auto_coupon_code']
+    const NEW_COLUMNS = [
+      'original_price', 'auto_coupon_code',
+      'offer_type', 'offer_duration_value', 'offer_duration_unit',
+      'offer_price', 'offer_headline',
+    ]
     const hasNewColumns = NEW_COLUMNS.some((c) => c in updates)
     let data: any = null
     let error: any = null
@@ -221,6 +234,13 @@ export async function PUT(req: NextRequest) {
     }
 
     if (error) throw error
+
+    // Publish update notice to Telegram — every meaningful course update
+    // is mirrored on the channel.
+    try {
+      await tgCourseUpdated(id)
+    } catch {}
+
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -270,9 +290,22 @@ export async function DELETE(req: NextRequest) {
     await cascade('lesson_progress', 'course_id')
     await cascade('course_progress', 'course_id')
 
-    // 8) Finally delete the course itself
+    // 8) Fetch the course title BEFORE deleting (for the Telegram notification)
+    let courseTitle = 'دورة'
+    try {
+      const { data: cRow } = await supabaseAdmin.from('courses').select('title').eq('id', id).maybeSingle()
+      if (cRow?.title) courseTitle = cRow.title
+    } catch {}
+
+    // 9) Finally delete the course itself
     const { error } = await supabaseAdmin.from('courses').delete().eq('id', id)
     if (error) throw error
+
+    // 10) Publish deletion notice to Telegram
+    try {
+      await tgCourseDeleted(courseTitle)
+    } catch {}
+
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

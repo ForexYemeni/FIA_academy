@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyReviewSubmitted } from '@/lib/notifications'
+import { tgReviewSubmitted } from '@/lib/telegram'
 
 export async function GET(req: NextRequest) {
   try {
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
     // Notify the course trainer + admins about the new review
     try {
       await notifyReviewSubmitted(user_id, course_id, rating)
+      await tgReviewSubmitted(user_id, course_id, rating)
     } catch {}
     return NextResponse.json(data)
   } catch (e: any) {

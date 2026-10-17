@@ -9,6 +9,7 @@ import {
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
+  Eraser, Brush,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -2016,6 +2017,28 @@ function AdminAccount({ user, updateUser, logout }: any) {
   const [dzPassword, setDzPassword] = useState('')
   const [showDzPassword, setShowDzPassword] = useState(false)
   const [dzLoading, setDzLoading] = useState(false)
+  // Selective section wipe state
+  const [dzSection, setDzSection] = useState('')
+  const [dzSectionOpen, setDzSectionOpen] = useState(false)
+  const [dzSectionLoading, setDzSectionLoading] = useState(false)
+
+// Arabic labels for each Danger Zone section (used in the
+// confirmation dialog so the user sees what they're wiping in Arabic).
+const DZ_SECTION_LABELS: Record<string, string> = {
+  courses: 'الدورات',
+  trainers: 'المدربون',
+  students: 'المتدربون',
+  payments: 'المدفوعات والتسجيلات',
+  certificates: 'الشهادات',
+  reviews: 'التقييمات',
+  coupons: 'الكوبونات',
+  blog: 'منشورات المدوّنة',
+  forum: 'مواضيع المنتدى',
+  contact: 'رسائل التواصل',
+  payment_methods: 'طرق الدفع',
+  team: 'أعضاء الفريق',
+  notifications: 'الإشعارات',
+}
 
   const save = async () => {
     if (!currentPassword) {
@@ -2243,7 +2266,7 @@ function AdminAccount({ user, updateUser, logout }: any) {
       </div>
 
       {/* Body */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-4">
         <p className="text-sm text-navy">
           سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
         </p>
@@ -2257,8 +2280,126 @@ function AdminAccount({ user, updateUser, logout }: any) {
         >
           <Trash2 className="w-4 h-4 ml-1" /> حذف جميع البيانات
         </Button>
+
+        {/* ===== Selective section wipe ===== */}
+        <div className="border-t border-red-500/30 pt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Eraser className="w-4 h-4 text-red-500" />
+            <h4 className="font-bold text-red-600 text-sm">حذف قسم محدد</h4>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            احذف قسماً واحداً فقط بدلاً من مسح كل شيء. مفيد للتنظيف المُستهدف.
+          </p>
+
+          {/* Select dropdown */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <select
+              value={dzSection}
+              onChange={(e) => setDzSection(e.target.value)}
+              disabled={dzSectionLoading}
+              className="flex-1 h-10 px-3 text-sm border border-red-500/30 rounded-md bg-white"
+            >
+              <option value="">— اختر القسم —</option>
+              <option value="courses">📚 الدورات (وكافة تبعاتها)</option>
+              <option value="trainers">👨‍⚕️ المدربون</option>
+              <option value="students">🎓 المتدربون</option>
+              <option value="payments">💳 المدفوعات + التسجيلات</option>
+              <option value="certificates">📜 الشهادات</option>
+              <option value="reviews">⭐ التقييمات</option>
+              <option value="coupons">🎟️ الكوبونات</option>
+              <option value="blog">📰 منشورات المدوّنة</option>
+              <option value="forum">💬 مواضيع المنتدى</option>
+              <option value="contact">📧 رسائل التواصل</option>
+              <option value="payment_methods">🏦 طرق الدفع</option>
+              <option value="team">👥 أعضاء الفريق</option>
+              <option value="notifications">🔔 الإشعارات</option>
+            </select>
+            <Button
+              variant="outline"
+              disabled={!dzSection || dzSectionLoading}
+              onClick={() => setDzSectionOpen(true)}
+              className="border-red-500/40 text-red-600 hover:bg-red-500/10"
+            >
+              {dzSectionLoading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Trash2 className="w-4 h-4 ml-1" />}
+              حذف القسم
+            </Button>
+          </div>
+
+          {/* Cleanup orphaned payments (button) */}
+          <div className="border-t border-red-500/30 pt-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Brush className="w-4 h-4 text-orange-500" />
+              <h4 className="font-bold text-orange-600 text-sm">تنظيف السجلات اليتيمة</h4>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              يحذف المدفوعات وطلبات الشهادات التي بحوزتها course_id أو user_id لم يعد موجوداً (نادر، لكن يحدث بعد حذف دورة).
+            </p>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!confirm('سيتم حذف جميع المدفوعات اليتيمة نهائياً. متابعة؟')) return
+                setDzSectionLoading(true)
+                try {
+                  const res = await fetch('/api/admin/cleanup-orphans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: user.id }),
+                  })
+                  const data = await res.json()
+                  if (res.ok) {
+                    toast.success(`تم حذف ${data.deleted_payments || 0} سجل يتيم${data.deleted_certificate_requests ? ` (منها ${data.deleted_certificate_requests} طلب شهادة)` : ''}`)
+                  } else {
+                    toast.error(data.error || 'فشل التنظيف')
+                  }
+                } catch {
+                  toast.error('خطأ في الاتصال')
+                } finally {
+                  setDzSectionLoading(false)
+                }
+              }}
+              className="border-orange-500/40 text-orange-600 hover:bg-orange-500/10"
+            >
+              <Brush className="w-4 h-4 ml-1" /> تنظيف المدفوعات اليتيمة
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
+
+    {/* ===== Selective section wipe confirmation ===== */}
+    <PasswordConfirmDialog
+      open={dzSectionOpen}
+      onOpenChange={(o) => { if (!o && !dzSectionLoading) setDzSectionOpen(false) }}
+      title={`حذف قسم: ${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}`}
+      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً. أدخل كلمة مرورك للتأكيد.`}
+      itemLabel="القسم المراد حذفه:"
+      itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
+      confirmLabel="حذف القسم نهائياً"
+      onConfirm={async () => {
+        if (!dzSection) return
+        setDzSectionLoading(true)
+        try {
+          const res = await fetch('/api/admin/danger-zone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ section: dzSection, user_id: user.id }),
+          })
+          const data = await res.json()
+          if (res.ok) {
+            toast.success(`تم حذف ${data.deleted || 0} سجل من قسم "${data.section}"`)
+            setDzSectionOpen(false)
+            setDzSection('')
+          } else {
+            toast.error(data.error || 'فشل الحذف')
+          }
+        } catch {
+          toast.error('خطأ في الاتصال')
+        } finally {
+          setDzSectionLoading(false)
+        }
+      }}
+      loading={dzSectionLoading}
+    />
 
     {/* ===== Danger Zone confirmation dialog ===== */}
     <Dialog open={dzOpen} onOpenChange={(o) => { if (!o) closeDzDialog(); else setDzOpen(true) }}>

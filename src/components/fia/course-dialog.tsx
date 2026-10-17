@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp,
+  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift,
 } from 'lucide-react'
 
 // Category groups — top-level dropdown
@@ -48,6 +48,8 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
       category: '', specialization: '',
       level: 'متوسط', price_type: 'مجانية', price: 0, original_price: 0, currency: 'ر.ي',
       auto_coupon_code: '',
+      offer_type: 'none', offer_duration_value: 0, offer_duration_unit: 'days',
+      offer_price: 0, offer_headline: '',
       duration_hours: 0, pass_score: 60, cover: '', status: 'منشورة',
     }
   )
@@ -108,11 +110,18 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
       price: String(course.price ?? 0),
       original_price: String(course.original_price ?? 0),
       auto_coupon_code: course.auto_coupon_code || '',
+      offer_type: course.offer_type || 'none',
+      offer_duration_value: String(course.offer_duration_value ?? 0),
+      offer_duration_unit: course.offer_duration_unit || 'days',
+      offer_price: String(course.offer_price ?? 0),
+      offer_headline: course.offer_headline || '',
     } : {
       title: '', short_description: '', description: '',
       category: '', specialization: '',
       level: 'متوسط', price_type: 'مجانية', price: '0', original_price: '0', currency: 'ر.ي',
       auto_coupon_code: '',
+      offer_type: 'none', offer_duration_value: '0', offer_duration_unit: 'days',
+      offer_price: '0', offer_headline: '',
       duration_hours: '', pass_score: '', cover: '', status: 'منشورة',
     })
   }, [course, open])
@@ -217,6 +226,12 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
         original_price: Number(form.original_price) || 0,
         currency: form.currency || 'ر.ي',
         auto_coupon_code: form.auto_coupon_code?.trim() || null,
+        // Promotional offer fields
+        offer_type: form.offer_type || 'none',
+        offer_duration_value: Number(form.offer_duration_value) || 0,
+        offer_duration_unit: form.offer_duration_unit || 'days',
+        offer_price: Number(form.offer_price) || 0,
+        offer_headline: form.offer_headline?.trim() || null,
         duration_hours: Number(form.duration_hours) || 0,
         pass_score: Number(form.pass_score) || 60,
         status: form.status || 'منشورة',
@@ -489,6 +504,83 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                     </>
                   )}
                 </div>
+              </>
+            )}
+          </div>
+
+          {/* === Section 4b: Promotional Offer === */}
+          <div className="p-4 bg-gradient-to-br from-gold/10 to-gold/5 rounded-xl border-2 border-gold/30 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
+              <Gift className="w-3.5 h-3.5 text-gold" /> عرض ترويجي (اختياري)
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              اجعل دورتك مميزة — تظهر بشارة احترافية للمتدربين في صفحة الاستكشاف.
+            </p>
+            <Select
+              label="نوع العرض"
+              value={form.offer_type || 'none'}
+              onChange={(v: string) => setForm({ ...form, offer_type: v })}
+              options={[
+                { value: 'none', label: '— لا عرض —' },
+                { value: 'limited_time', label: '⏰ لمدة محدودة' },
+                { value: 'featured', label: '⭐ دورة مميزة' },
+              ]}
+            />
+            {form.offer_type && form.offer_type !== 'none' && (
+              <>
+                <div>
+                  <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان جذّاب للعرض</Label>
+                  <Input
+                    value={form.offer_headline || ''}
+                    onChange={(e) => setForm({ ...form, offer_headline: e.target.value })}
+                    placeholder="مثال: عرض خاص لمدة محدودة — سجّل الآن!"
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">مدة العرض</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" value={form.offer_duration_value}
+                        onChange={(e) => setForm({ ...form, offer_duration_value: e.target.value })}
+                        className="h-10 text-sm w-20" dir="ltr" placeholder="5" />
+                      <select
+                        value={form.offer_duration_unit || 'days'}
+                        onChange={(e) => setForm({ ...form, offer_duration_unit: e.target.value })}
+                        className="flex-1 h-10 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50"
+                      >
+                        <option value="hours">ساعات</option>
+                        <option value="days">أيام</option>
+                        <option value="weeks">أسابيع</option>
+                        <option value="months">أشهر</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">سعر العرض الترويجي</Label>
+                    <Input type="number" value={form.offer_price}
+                      onChange={(e) => setForm({ ...form, offer_price: e.target.value })}
+                      className="h-10 text-sm" dir="ltr" placeholder="0 = استخدم السعر الافتراضي" />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      اترك 0 لاستخدام السعر الافتراضي للدورة
+                    </p>
+                  </div>
+                </div>
+                {/* Live preview of the offer badge */}
+                {form.offer_headline && (
+                  <div className="bg-navy text-white p-3 rounded-lg flex items-center gap-2">
+                    {form.offer_type === 'limited_time' ? '⏰' : '⭐'}
+                    <div className="flex-1">
+                      <div className="text-xs text-gold font-bold">عرض خاص</div>
+                      <div className="text-sm">{form.offer_headline}</div>
+                    </div>
+                    {Number(form.offer_duration_value) > 0 && (
+                      <div className="text-xs bg-gold/20 px-2 py-1 rounded-md" dir="ltr">
+                        {form.offer_duration_value} {form.offer_duration_unit === 'hours' ? 'ساعة' : form.offer_duration_unit === 'days' ? 'يوم' : form.offer_duration_unit === 'weeks' ? 'أسبوع' : 'شهر'}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
