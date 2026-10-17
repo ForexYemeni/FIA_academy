@@ -148,6 +148,41 @@ export function StudentCourseViewer({
     )
   }
 
+  // ============================================================
+  // ACCESS CONTROL — defensive double-check on the client side.
+  // Even if a buggy navigation route lets the user land here, we
+  // block rendering of paid course content unless:
+  //   (a) the student is enrolled, AND
+  //   (b) the enrollment's payment_status is NOT 'pending'
+  //       (i.e., it must be 'free' | 'confirmed' | 'completed').
+  // For free courses, the student must have an enrollment too
+  // (auto-enrollment happens when they click the card).
+  // ============================================================
+  const isFree = course?.price_type === 'مجانية' || course?.price === 0
+  const payStatus = enrollment?.payment_status
+  const hasAccess = enrollment && payStatus && payStatus !== 'pending'
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-fia-gradient rounded-2xl p-8 text-white text-center">
+          <Lock className="w-16 h-16 mx-auto mb-4 text-gold" />
+          <h2 className="text-2xl font-bold mb-2">هذه الدورة محمية</h2>
+          <p className="text-white/80 mb-6">
+            {enrollment && payStatus === 'pending'
+              ? 'تم استلام إثبات الدفع، بانتظار موافقة الإدارة. سيتم تفعيل الدورة فور تأكيد الدفع.'
+              : isFree
+                ? 'اضغط على زر "سجّل الآن" للتسجيل المجاني ثم فتح الدورة.'
+                : 'يجب إكمال عملية الدفع أولاً لفتح هذه الدورة.'}
+          </p>
+          <Button variant="outline" onClick={onBack} className="bg-white/10 text-white border-white/30 hover:bg-white/20">
+            <ArrowRight className="w-4 h-4 ml-1" /> العودة
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* Course header */}
