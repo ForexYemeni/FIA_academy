@@ -1426,6 +1426,8 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
 export function AdminContact() {
   const [items, setItems] = useState<any[]>([])
   const [selected, setSelected] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => fetch('/api/contact').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
@@ -1434,6 +1436,31 @@ export function AdminContact() {
     await fetch('/api/contact', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id, status: newStatus }) })
     load()
     if (selected?.id === m.id) setSelected({ ...m, status: newStatus })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      })
+      if (res.ok) {
+        toast.success('تم حذف الرسالة')
+        if (selected?.id === deleteTarget.id) setSelected(null)
+        setDeleteTarget(null)
+        load()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل الحذف')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -1447,27 +1474,40 @@ export function AdminContact() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             {items.map((m) => (
-              <button
+              <div
                 key={m.id}
-                onClick={() => {
-                  setSelected(m)
-                  if (m.status === 'جديد') updateStatus(m, 'مقروء')
-                }}
-                className={`w-full text-right p-3 rounded-lg border transition-all ${selected?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:bg-muted/50'}`}
+                className={`group relative p-3 rounded-lg border transition-all ${selected?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:bg-muted/50'}`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-sm font-bold ${m.status === 'جديد' ? 'text-navy' : 'text-muted-foreground'}`}>{m.name}</span>
-                  <Badge className={
-                    m.status === 'جديد' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' :
-                    m.status === 'مقروء' ? 'bg-gray-500/15 text-gray-600 border-gray-500/30' :
-                    m.status === 'مُجاب' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
-                    'bg-muted text-muted-foreground'
-                  }>{m.status}</Badge>
-                </div>
-                <div className="text-xs text-muted-foreground" dir="ltr">{m.email}</div>
-                {m.subject && <div className="text-xs text-muted-foreground mt-1 truncate">{m.subject}</div>}
-                <div className="text-xs text-muted-foreground mt-1">{new Date(m.created_at).toLocaleDateString('ar-EG')}</div>
-              </button>
+                <button
+                  onClick={() => {
+                    setSelected(m)
+                    if (m.status === 'جديد') updateStatus(m, 'مقروء')
+                  }}
+                  className="w-full text-right"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-bold ${m.status === 'جديد' ? 'text-navy' : 'text-muted-foreground'}`}>{m.name}</span>
+                    <Badge className={
+                      m.status === 'جديد' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' :
+                      m.status === 'مقروء' ? 'bg-gray-500/15 text-gray-600 border-gray-500/30' :
+                      m.status === 'مُجاب' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
+                      'bg-muted text-muted-foreground'
+                    }>{m.status}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground" dir="ltr">{m.email}</div>
+                  {m.subject && <div className="text-xs text-muted-foreground mt-1 truncate">{m.subject}</div>}
+                  <div className="text-xs text-muted-foreground mt-1">{new Date(m.created_at).toLocaleDateString('ar-EG')}</div>
+                </button>
+                {/* Per-row delete button — appears on hover */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(m) }}
+                  title="حذف الرسالة"
+                  className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-md border border-red-500/30 bg-white hover:bg-red-500/10 flex items-center justify-center text-red-500"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
           </div>
           {selected && (
@@ -1477,7 +1517,13 @@ export function AdminContact() {
                   <h4 className="font-bold text-navy">{selected.name}</h4>
                   <a href={`mailto:${selected.email}`} className="text-xs text-gold" dir="ltr">{selected.email}</a>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setSelected(null)}><X className="w-4 h-4" /></Button>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setDeleteTarget(selected)} title="حذف هذه الرسالة"
+                    className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setSelected(null)}><X className="w-4 h-4" /></Button>
+                </div>
               </div>
               {selected.subject && <h5 className="font-bold text-navy text-sm mb-2">{selected.subject}</h5>}
               <div className="bg-muted/30 rounded p-3 text-sm text-gray-700 leading-relaxed mb-4">{selected.message}</div>
@@ -1492,6 +1538,16 @@ export function AdminContact() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title="حذف الرسالة"
+        message={`سيتم حذف الرسالة من "${deleteTarget?.name || ''}" نهائياً. هذا الإجراء لا يمكن التراجع عنه.`}
+        confirmLabel="حذف"
+        onConfirm={confirmDelete}
+        loading={deleting}
+      />
     </SectionCard>
   )
 }

@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import { TeamEditor } from '@/components/fia/team-editor'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import {
   AdminCoupons, AdminAffiliates, AdminExamQuestions, AdminReviews,
   AdminForum, AdminBlog, AdminContact, AdminFaqs,
@@ -226,7 +227,17 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
 }
 
 function AdminOverview() {
-  const [stats, setStats] = useState({ courses: 0, trainers: 0, students: 0, payments: 0, totalRevenue: 0, pendingPayments: 0, completedEnrollments: 0, activeEnrollments: 0 })
+  const [stats, setStats] = useState({
+    courses: 0, trainers: 0, students: 0, payments: 0,
+    pendingPayments: 0, completedEnrollments: 0, activeEnrollments: 0,
+    // Revenue grouped by currency. Each entry: { currency, total, count, paid_count, pending_count, pending_total }
+    revenueByCurrency: [] as any[],
+  })
+
+  // Get the course lookup map so we can resolve a payment's currency
+  // from the course (source of truth) when the payment row itself
+  // has the wrong/missing currency (legacy rows default to 'ر.ي').
+  const [courses, setCourses] = useState<any[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -236,31 +247,64 @@ function AdminOverview() {
       fetch('/api/payments').then((r) => r.json()),
       fetch('/api/enrollments').then((r) => r.json()),
     ]).then(([c, t, s, p, e]) => {
-      const courses = Array.isArray(c) ? c : []
+      const coursesArr = Array.isArray(c) ? c : []
       const trainers = Array.isArray(t) ? t : []
       const students = Array.isArray(s) ? s : []
       const payments = Array.isArray(p) ? p : []
       const enrollments = Array.isArray(e) ? e : []
 
-      // Calculate REAL revenue from completed payments only
-      const completedPayments = payments.filter(p => p.status === 'مكتمل')
-      const totalRevenue = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
-      const pendingPayments = payments.filter(p => p.status === 'قيد الانتظار').length
-      const completedEnrollments = enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length
-      const activeEnrollments = enrollments.filter(e => e.status === 'active').length
+      setCourses(coursesArr)
+
+      // Build a course-id → course map for currency resolution
+      const courseMap = new Map<string, any>()
+      for (const c of coursesArr) courseMap.set(c.id, c)
+
+      // Determine currency for a payment: prefer the course's currency,
+      // then the payment's stored currency, then default 'ر.ي'.
+      const resolveCurrency = (pay: any): string => {
+        if (pay.course_id) {
+          const c = courseMap.get(pay.course_id)
+          if (c?.currency) return c.currency
+        }
+        return pay.currency || 'ر.ي'
+      }
+
+      // Group all payments by currency. For each currency, we compute:
+      //   total            = sum of amounts for COMPLETED payments
+      //   pending_total    = sum of amounts for PENDING payments
+      //   paid_count       = number of completed payments
+      //   pending_count    = number of pending payments
+      const groups: Record<string, { total: number; pending_total: number; paid_count: number; pending_count: number }> = {}
+      for (const pay of payments) {
+        const cur = resolveCurrency(pay)
+        if (!groups[cur]) groups[cur] = { total: 0, pending_total: 0, paid_count: 0, pending_count: 0 }
+        if (pay.status === 'مكتمل' || pay.status === 'completed' || pay.status === 'paid') {
+          groups[cur].total += Number(pay.amount) || 0
+          groups[cur].paid_count += 1
+        } else if (pay.status === 'قيد الانتظار' || pay.status === 'pending') {
+          groups[cur].pending_total += Number(pay.amount) || 0
+          groups[cur].pending_count += 1
+        }
+      }
+      const revenueByCurrency = Object.entries(groups).map(([currency, g]) => ({
+        currency, ...g,
+      })).sort((a, b) => b.total - a.total)
 
       setStats({
-        courses: courses.length,
+        courses: coursesArr.length,
         trainers: trainers.length,
         students: students.length,
         payments: payments.length,
-        totalRevenue,
-        pendingPayments,
-        completedEnrollments,
-        activeEnrollments,
+        pendingPayments: payments.filter(p => p.status === 'قيد الانتظار' || p.status === 'pending').length,
+        completedEnrollments: enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length,
+        activeEnrollments: enrollments.filter(e => e.status === 'active').length,
+        revenueByCurrency,
       })
     }).catch(() => {})
   }, [])
+
+  // Pretty currency formatter — group digits, append the currency code
+  const fmt = (amount: number, currency: string) => `${amount.toLocaleString('en-US')} ${currency}`
 
   return (
     <div className="space-y-6">
@@ -276,29 +320,91 @@ function AdminOverview() {
         <StatCard icon={CreditCard} label="المعاملات" value={stats.payments} color="green" />
       </div>
 
-      <SectionCard title="نظرة عامة مالية" description="إحصائيات حقيقية من قاعدة البيانات">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-navy to-navy-light text-white p-5 rounded-xl">
-            <DollarSign className="w-6 h-6 text-gold mb-2" />
-            <div className="text-2xl font-bold">{stats.totalRevenue.toLocaleString()}</div>
-            <div className="text-white/70 text-sm">ر.ي إجمالي الإيرادات (مكتمل)</div>
+      {/* ========= PROFESSIONAL FINANCIAL OVERVIEW ========= */}
+      <SectionCard title="نظرة عامة مالية" description="الإيرادات الفعلية مجمّعة حسب العملة">
+        {stats.revenueByCurrency.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>لا توجد معاملات بعد</p>
           </div>
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
-            <Clock className="w-6 h-6 mb-2" />
-            <div className="text-2xl font-bold">{stats.pendingPayments}</div>
-            <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
+        ) : (
+          <div className="space-y-6">
+            {/* Currency cards — one per currency, professional layout */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stats.revenueByCurrency.map((rev) => {
+                const isUSD = rev.currency === '$' || rev.currency === 'USD'
+                const isSAR = rev.currency === 'ر.س'
+                const gradient = isUSD
+                  ? 'from-emerald-600 to-emerald-800'
+                  : isSAR
+                    ? 'from-blue-700 to-blue-900'
+                    : 'from-navy to-navy-light'
+                const accent = isUSD ? 'text-emerald-300' : isSAR ? 'text-blue-300' : 'text-gold'
+                return (
+                  <div
+                    key={rev.currency}
+                    className={`relative bg-gradient-to-br ${gradient} text-white p-5 rounded-2xl shadow-lg overflow-hidden`}
+                  >
+                    {/* Decorative currency icon in background */}
+                    <div className="absolute -left-4 -bottom-4 text-white/10 text-7xl font-bold select-none">
+                      {rev.currency}
+                    </div>
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className={`w-5 h-5 ${accent}`} />
+                          <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">العملة</span>
+                        </div>
+                        <span className="text-base font-extrabold bg-white/15 px-2 py-0.5 rounded-md" dir="ltr">
+                          {rev.currency}
+                        </span>
+                      </div>
+                      {/* Total completed revenue — the headline number */}
+                      <div className="mb-3">
+                        <div className="text-[11px] text-white/70 mb-0.5">إجمالي الإيرادات المكتملة</div>
+                        <div className="text-3xl font-extrabold tracking-tight" dir="ltr">
+                          {fmt(rev.total, rev.currency)}
+                        </div>
+                      </div>
+                      {/* Pending row */}
+                      <div className="border-t border-white/15 pt-2 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="text-white/70">قيد الانتظار</div>
+                          <div className="font-bold" dir="ltr">{fmt(rev.pending_total, rev.currency)}</div>
+                          <div className="text-[10px] text-white/60">{rev.pending_count} معاملة</div>
+                        </div>
+                        <div>
+                          <div className="text-white/70">مكتملة</div>
+                          <div className="font-bold" dir="ltr">{fmt(rev.total, rev.currency)}</div>
+                          <div className="text-[10px] text-white/60">{rev.paid_count} معاملة</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Summary cards — count-based metrics (currency-agnostic) */}
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
+                <Clock className="w-6 h-6 mb-2" />
+                <div className="text-2xl font-bold">{stats.pendingPayments}</div>
+                <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
+              </div>
+              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+                <CheckCircle2 className="w-6 h-6 mb-2" />
+                <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
+                <div className="text-white/80 text-sm">دورات مكتملة</div>
+              </div>
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
+                <Activity className="w-6 h-6 mb-2" />
+                <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
+                <div className="text-white/80 text-sm">تسجيلات نشطة</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
-            <CheckCircle2 className="w-6 h-6 mb-2" />
-            <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
-            <div className="text-white/80 text-sm">دورات مكتملة</div>
-          </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
-            <Activity className="w-6 h-6 mb-2" />
-            <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
-            <div className="text-white/80 text-sm">تسجيلات نشطة</div>
-          </div>
-        </div>
+        )}
       </SectionCard>
     </div>
   )
@@ -370,16 +476,17 @@ function AdminCourses() {
       </div>
       {open && <ProCourseDialog open={open} onOpenChange={setOpen} course={editing} trainerId={undefined} onSaved={load} />}
 
-      <ConfirmDialog
+      {/* Password-confirmation dialog for course deletion. The user must
+          type their account password to confirm — protects against
+          accidental destructive deletes. */}
+      <PasswordConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
         title="تأكيد حذف الدورة"
-        message="هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء."
+        message="سيتم حذف جميع تفاصيل الدورة نهائياً: التقييمات، الشهادات، المدفوعات، الوحدات والدروس. لا يمكن التراجع عن هذا الإجراء."
         itemLabel="سيتم حذف الدورة التالية:"
         itemName={deleteTarget?.title}
-        confirmLabel="حذف الدورة"
-        cancelLabel="إلغاء"
-        variant="danger"
+        confirmLabel="حذف نهائي"
         onConfirm={handleDelete}
         loading={deleting}
       />
@@ -584,16 +691,14 @@ function AdminStudents() {
         </Dialog>
       )}
 
-      <ConfirmDialog
+      <PasswordConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
         title="تأكيد حذف المتدرب"
-        message="سيتم حذف المتدرب نهائياً من النظام. هل أنت متأكد؟"
+        message="سيتم حذف المتدرب نهائياً من النظام. أدخل كلمة مرورك للتأكيد."
         itemLabel="سيتم حذف المتدرب التالي:"
         itemName={deleteTarget?.name}
         confirmLabel="حذف نهائي"
-        cancelLabel="إلغاء"
-        variant="danger"
         onConfirm={handleDelete}
         loading={deleting}
       />
@@ -1317,16 +1422,14 @@ function AdminTrainers() {
       </div>
       {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
 
-      <ConfirmDialog
+      <PasswordConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
         title="تأكيد حذف المدرب"
-        message="هل أنت متأكد من حذف هذا المدرب؟"
+        message="سيتم حذف المدرب نهائياً. أدخل كلمة مرورك للتأكيد."
         itemLabel="سيتم حذف المدرب التالي:"
         itemName={deleteTarget?.name}
-        confirmLabel="حذف المدرب"
-        cancelLabel="إلغاء"
-        variant="danger"
+        confirmLabel="حذف نهائي"
         onConfirm={handleDelete}
         loading={deleting}
       />

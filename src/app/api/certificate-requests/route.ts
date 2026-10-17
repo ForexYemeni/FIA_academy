@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import {
+  notifyCertificateRequested, notifyTrainerApprovedCertificate,
+  notifyCertificateApproved, notifyCertificateRejected,
+} from '@/lib/notifications'
 
 // Certificate requests stored in the `payments` table creatively:
 // - amount = certificate fee
@@ -149,6 +153,11 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
 
+    // Send notification — student + admins + course trainer
+    try {
+      await notifyCertificateRequested(user_id, course_id)
+    } catch {}
+
     const request = parseRequest(data.reference, data)
     return NextResponse.json(request)
   } catch (e: any) {
@@ -232,6 +241,19 @@ export async function PUT(req: NextRequest) {
       .eq('id', id)
 
     if (updateErr) throw updateErr
+
+    // Send notifications based on the action taken
+    try {
+      if (action === 'trainer_approve' && request.user_id) {
+        await notifyTrainerApprovedCertificate(request.user_id, request.course_id)
+      } else if (action === 'admin_approve' && request.user_id) {
+        await notifyCertificateApproved(request.user_id, request.course_id)
+      } else if (action === 'issue' && request.user_id) {
+        await notifyCertificateApproved(request.user_id, request.course_id)
+      } else if (action === 'reject' && request.user_id) {
+        await notifyCertificateRejected(request.user_id, request.course_id)
+      }
+    } catch {}
 
     return NextResponse.json({
       success: true,

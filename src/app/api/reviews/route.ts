@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyReviewSubmitted } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
   try {
@@ -102,6 +103,10 @@ export async function POST(req: NextRequest) {
       }
       throw error
     }
+    // Notify the course trainer + admins about the new review
+    try {
+      await notifyReviewSubmitted(user_id, course_id, rating)
+    } catch {}
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
