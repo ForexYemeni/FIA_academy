@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -301,15 +302,17 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
         />
       )}
 
-      {/* Professional delete confirmation card */}
-      <ConfirmDialog
+      {/* Password-confirmation dialog for team member deletion.
+          Prevents accidental destructive deletes — the admin must
+          type their own account password to confirm. */}
+      <PasswordConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
         title="حذف عضو الفريق"
-        message="هل أنت متأكد من حذف هذا العضو؟ لا يمكن التراجع عن هذا الإجراء."
-        confirmLabel="حذف"
-        cancelLabel="إلغاء"
-        variant="danger"
+        message="سيتم حذف هذا العضو نهائياً. أدخل كلمة مرورك للتأكيد."
+        itemLabel="سيتم حذف العضو التالي:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف نهائي"
         onConfirm={del}
         loading={deleting}
       />

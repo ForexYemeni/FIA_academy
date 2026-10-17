@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyContactMessage } from '@/lib/notifications'
 
 export async function GET() {
   try {
@@ -32,6 +33,10 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
     if (error) throw error
+    // Notify admins about the new contact message
+    try {
+      await notifyContactMessage(name, subject)
+    } catch {}
     return NextResponse.json({ success: true, id: data.id })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

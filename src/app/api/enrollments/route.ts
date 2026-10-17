@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import {
+  notifyFreeEnrollment, notifyPaymentRequest, notifyCourseCompleted,
+} from '@/lib/notifications'
 
 // We store enrollments in the existing `payments` table creatively.
 // - amount = 0 means FREE enrollment
@@ -211,29 +214,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send notifications — to the user + to all admins
+    // Send notifications — use the shared notifications helper which
+    // handles different types of enrollment (free vs paid-pending).
     try {
-      // Lookup course title
-      const { data: course } = await supabaseAdmin.from('courses').select('title').eq('id', body.course_id).maybeSingle()
-      const courseTitle = course?.title || 'دورة'
-      // Notify the student
-      await supabaseAdmin.from('notifications').insert({
-        user_id: body.user_id,
-        type: 'enrollment',
-        title: 'تم تسجيلك في الدورة بنجاح',
-        body: `أنت الآن مسجّل في دورة "${courseTitle}". ابدأ التعلم الآن!`,
-        link: '/',
-      })
-      // Notify all admins
-      const { data: admins } = await supabaseAdmin.from('users').select('id').eq('role', 'admin')
-      for (const admin of admins || []) {
-        await supabaseAdmin.from('notifications').insert({
-          user_id: admin.id,
-          type: 'enrollment',
-          title: 'تسجيل جديد في دورة',
-          body: `متدرب جديد سجّل في دورة "${courseTitle}"`,
-          link: '/',
-        })
+      if (isFree) {
+        await notifyFreeEnrollment(body.user_id, body.course_id)
+      } else {
+        // Paid enrollment: payment is pending admin approval
+        await notifyPaymentRequest(body.user_id, body.course_id, body.amount_paid || coursePrice, currency)
       }
     } catch {}
 
@@ -258,6 +246,9 @@ export async function PUT(req: NextRequest) {
     if (updates.enrolled_at !== undefined) paymentUpdates.date = updates.enrolled_at
 
     // Store progress in reference field (append to existing reference)
+    // Track the PRE-progress value so we can detect the 100% transition
+    // and fire a course-completion notification exactly once.
+    let prevProgress = 0
     if (updates.progress !== undefined) {
       // Fetch current reference to preserve payment proof info
       const { data: existing } = await supabaseAdmin
@@ -266,6 +257,9 @@ export async function PUT(req: NextRequest) {
         .eq('id', id)
         .maybeSingle()
       const existingRef = existing?.reference || ''
+      // Extract the PRE-progress value
+      const prevMatch = existingRef.match(/__PROGRESS__:(\d+)/)
+      prevProgress = prevMatch ? parseInt(prevMatch[1]) : 0
       // Remove old progress marker if exists
       const cleanRef = existingRef.replace(/\s*\|?\s*__PROGRESS__:\d+/g, '').trim()
       // Add new progress marker
@@ -284,6 +278,16 @@ export async function PUT(req: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // === Course completion notification ===
+    // If the student reached 100% progress (course completed), notify
+    // student + trainer + admins. We only fire this once per
+    // enrollment — on the transition < 100 → 100.
+    if (updates.progress === 100 && prevProgress < 100 && data?.user_id && data?.course_id) {
+      try {
+        await notifyCourseCompleted(data.user_id, data.course_id)
+      } catch {}
+    }
 
     return NextResponse.json(toEnrollment(data as StoredEnrollment))
   } catch (e: any) {

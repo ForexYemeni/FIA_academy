@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyPaymentApproved, notifyPaymentRejected } from '@/lib/notifications'
 
 // GET /api/payments — admin: list all PAID payments only.
 // Free enrollments (amount=0, method='free') are tracked in the
@@ -84,23 +85,10 @@ export async function PUT(req: NextRequest) {
       try {
         const isApproved = status === 'مكتمل' || status === 'completed' || status === 'paid'
         const isRejected = status === 'ملغي' || status === 'cancelled' || status === 'failed'
-        if (isApproved || isRejected) {
-          // Lookup course title
-          const { data: course } = await supabaseAdmin
-            .from('courses')
-            .select('title')
-            .eq('id', updated.course_id)
-            .maybeSingle()
-          const courseTitle = course?.title || 'دورة'
-          await supabaseAdmin.from('notifications').insert({
-            user_id: updated.user_id,
-            type: 'payment',
-            title: isApproved ? 'تم تأكيد الدفع' : 'تم رفض الدفع',
-            body: isApproved
-              ? `تم تأكيد دفعك لدورة "${courseTitle}". يمكنك الآن الوصول إلى محتوى الدورة.`
-              : `للأسف لم يتم قبول دفعك لدورة "${courseTitle}". يرجى التواصل مع الإدارة لمزيد من التفاصيل.`,
-            link: '/',
-          })
+        if (isApproved) {
+          await notifyPaymentApproved(updated.user_id, updated.course_id)
+        } else if (isRejected) {
+          await notifyPaymentRejected(updated.user_id, updated.course_id)
         }
       } catch {}
     }

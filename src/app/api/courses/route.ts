@@ -230,6 +230,47 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    // ====== CASCADE DELETE — remove ALL related rows ======
+    // When a course is deleted, we must also delete:
+    //   - payments/enrollments for this course (would otherwise orphan)
+    //   - certificates for this course
+    //   - certificate_requests for this course
+    //   - reviews for this course
+    //   - exam_questions + exam_attempts for this course
+    //   - forum_topics for this course (if any)
+    //   - lesson_progress rows for this course
+    //   - course_progress rows for this course
+    // The course row itself is deleted last. We use service_role
+    // (supabaseAdmin) so RLS doesn't block us. Errors are swallowed
+    // per-table because some tables/columns might not exist on every
+    // install — we don't want to fail the whole delete because one
+    // optional side-table is missing.
+    const cascade = async (table: string, column: string) => {
+      try {
+        await supabaseAdmin.from(table).delete().eq(column, id)
+      } catch {}
+    }
+
+    // 1) Enrollments/payments (stored in `payments` table creatively)
+    await cascade('payments', 'course_id')
+    // 2) Certificates
+    await cascade('certificates', 'course_id')
+    // 3) Certificate requests
+    await cascade('certificate_requests', 'course_id')
+    // 4) Reviews
+    await cascade('reviews', 'course_id')
+    // 5) Exam questions + attempts
+    await cascade('exam_questions', 'course_id')
+    await cascade('exam_attempts', 'course_id')
+    // 6) Forum topics tied to this course
+    await cascade('forum_topics', 'course_id')
+    // 7) Progress tracking
+    await cascade('lesson_progress', 'course_id')
+    await cascade('course_progress', 'course_id')
+
+    // 8) Finally delete the course itself
     const { error } = await supabaseAdmin.from('courses').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

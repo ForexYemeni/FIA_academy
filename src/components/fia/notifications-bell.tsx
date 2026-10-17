@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users, AlertCircle } from 'lucide-react'
+import { Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users, AlertCircle, Award, BookOpen, FileText, Mail, Newspaper, Trophy, GraduationCap } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
@@ -16,6 +16,13 @@ const TYPE_ICON: Record<string, any> = {
   affiliate: Users,
   system: AlertCircle,
   message: MessageSquare,
+  welcome: GraduationCap,
+  certificate: Award,
+  completion: Trophy,
+  contact: Mail,
+  blog: Newspaper,
+  registration: Users,
+  forum: MessageSquare,
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -26,6 +33,13 @@ const TYPE_COLOR: Record<string, string> = {
   affiliate: 'bg-orange-500/15 text-orange-600 border-orange-500/30',
   system: 'bg-red-500/15 text-red-600 border-red-500/30',
   message: 'bg-navy/15 text-navy border-navy/30',
+  welcome: 'bg-green-500/15 text-green-600 border-green-500/30',
+  certificate: 'bg-gold/15 text-gold border-gold/30',
+  completion: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
+  contact: 'bg-blue-500/15 text-blue-600 border-blue-500/30',
+  blog: 'bg-navy/15 text-navy border-navy/30',
+  registration: 'bg-blue-500/15 text-blue-600 border-blue-500/30',
+  forum: 'bg-purple-500/15 text-purple-600 border-purple-500/30',
 }
 
 export function NotificationsBell() {
@@ -45,8 +59,11 @@ export function NotificationsBell() {
 
   useEffect(() => {
     load()
-    // Poll every 30s for new notifications
-    const interval = setInterval(load, 30000)
+    // Poll every 15s for new notifications — fast enough that the user
+    // sees new notifications quickly even if Supabase Realtime isn't
+    // reachable. (Realtime is also subscribed below for instant
+    // delivery when it works.)
+    const interval = setInterval(load, 15000)
     return () => clearInterval(interval)
   }, [user?.id])
 
