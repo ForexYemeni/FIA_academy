@@ -855,6 +855,14 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
 
 function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, userId }: any) {
   const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
+  // Auto-select the first payment method when the list arrives.
+  // Without this, selectedMethod stays null if methods was empty
+  // when the dialog first rendered (methods loads asynchronously).
+  useEffect(() => {
+    if (methods?.length > 0 && !selectedMethod) {
+      setSelectedMethod(methods[0])
+    }
+  }, [methods, selectedMethod])
   const [reference, setReference] = useState('')
   const [proofUrl, setProofUrl] = useState<string | null>(null)
   const [uploadingProof, setUploadingProof] = useState(false)
