@@ -574,6 +574,11 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
           const isOpenable = enr && !isPendingPayment
           const isFree = c.price_type === 'مجانية' || c.price === 0
           const isPaidNotEnrolled = !enr && !isFree
+          // Original (struck-through) price — only show if it's greater
+          // than the current/discounted price AND > 0.
+          const originalPrice = Number(c.original_price) || 0
+          const currentPrice = Number(c.price) || 0
+          const hasDiscount = !isFree && originalPrice > currentPrice && currentPrice > 0
           return (
             <Card
               key={c.id}
@@ -585,21 +590,53 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
               }`}
               onClick={() => handleCardClick(c)}
             >
-              <div className="h-32 bg-navy relative">
+              <div className="h-40 bg-navy relative">
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+                {/* Gradient overlay for legibility of the price badge */}
+                <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-transparent to-transparent" />
+
+                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+
+                {/* Prominent price display in the middle-bottom of the image */}
+                {!isFree && (
+                  <div className="absolute bottom-2 right-2 left-2 flex flex-col items-center justify-center text-center">
+                    {hasDiscount ? (
+                      <div className="flex items-baseline gap-2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
+                        <span className="text-xs line-through text-red-300 font-bold" dir="ltr">
+                          {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                        <span className="text-xl font-extrabold text-gold" dir="ltr">
+                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
+                        <span className="text-xl font-extrabold text-gold" dir="ltr">
+                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                      </div>
+                    )}
+                    {hasDiscount && (
+                      <div className="mt-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                        {Math.round((1 - currentPrice / originalPrice) * 100)}% خصم
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Status badge in top-left */}
                 {isOpenable ? (
-                  <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1">
+                  <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1 backdrop-blur-sm">
                     <CheckCircle2 className="w-3 h-3" /> مسجّل — اضغط للفتح
                   </Badge>
                 ) : isPendingPayment ? (
-                  <Badge className="absolute top-2 left-2 bg-yellow-500 text-navy flex items-center gap-1">
+                  <Badge className="absolute top-2 left-2 bg-yellow-500 text-navy flex items-center gap-1 backdrop-blur-sm">
                     <Clock className="w-3 h-3" /> بانتظار الدفع
                   </Badge>
                 ) : isFree ? (
-                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية — اضغط للفتح</Badge>
+                  <Badge className="absolute top-2 left-2 bg-green-500 text-white backdrop-blur-sm">مجانية — اضغط للفتح</Badge>
                 ) : (
-                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة — اضغط للاشتراك</Badge>
+                  <Badge className="absolute top-2 left-2 bg-gold text-navy backdrop-blur-sm">مدفوعة — اضغط للاشتراك</Badge>
                 )}
               </div>
               <div className="p-4">
@@ -610,7 +647,16 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
                     <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
                   </span>
                   <span className="font-bold text-navy" dir="ltr">
-                    {isFree ? <span className="text-green-600">مجانية</span> : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                    {isFree ? <span className="text-green-600">مجانية</span> : hasDiscount ? (
+                      <span>
+                        <span className="line-through text-red-500 text-[10px]" dir="ltr">
+                          {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>{' '}
+                        <span className="text-green-600" dir="ltr">
+                          {currentPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                      </span>
+                    ) : `${currentPrice.toLocaleString()} ${c.currency || 'ر.ي'}`}
                   </span>
                 </div>
                 <div className="text-[10px] text-muted-foreground/80 text-center">
@@ -633,6 +679,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
           course={payDialog.course}
           methods={paymentMethods}
           open={payDialog.open}
+          userId={userId}
           onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
           onPay={(method: any, reference: string, proofUrl?: string | null, couponCode?: string) => enrollPaid(payDialog.course, method, reference, proofUrl, couponCode)}
           loading={enrolling === payDialog.course.id}
@@ -642,7 +689,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
   )
 }
 
-function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: any) {
+function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, userId }: any) {
   const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
   const [reference, setReference] = useState('')
   const [proofUrl, setProofUrl] = useState<string | null>(null)
@@ -651,8 +698,16 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null)
   const [validatingCoupon, setValidatingCoupon] = useState(false)
   const [couponError, setCouponError] = useState('')
+  const [autoCouponApplied, setAutoCouponApplied] = useState(false)
 
-  const originalPrice = course.price || 0
+  // The "official" price (struck through) — only shown if it's greater
+  // than the current course price. This is the trainer's listed
+  // was-price. The student sees the current `course.price` as the
+  // final price, with `original_price` struck through in red.
+  const originalPrice = Number(course.price) || 0
+  const officialPrice = Number(course.original_price) || 0
+  const hasOriginalStrikethrough = officialPrice > originalPrice && originalPrice > 0
+
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === 'percentage'
       ? Math.round((originalPrice * (appliedCoupon.discount_value || 0)) / 100)
@@ -660,12 +715,55 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
     : 0
   const finalPrice = Math.max(0, originalPrice - discount)
 
+  // ============================================================
+  // AUTO-APPLY THE COURSE'S COUPON — if the trainer set an
+  // `auto_coupon_code` for this course, we validate + apply it
+  // automatically the moment the dialog opens, so the student
+  // sees the discounted price without needing to type anything.
+  // We pass the user_id so the per-user usage restriction is
+  // enforced (the student can't reuse the coupon on another course).
+  // ============================================================
+  useEffect(() => {
+    if (!open || !course?.auto_coupon_code || autoCouponApplied) return
+    setAutoCouponApplied(true) // mark as attempted, prevent retry loop
+    setCouponCode(course.auto_coupon_code)
+    // Validate the auto coupon with the user_id so per-user
+    // restriction is enforced.
+    ;(async () => {
+      setValidatingCoupon(true)
+      try {
+        const url = `/api/coupons?code=${encodeURIComponent(course.auto_coupon_code.toUpperCase())}` +
+          (userId ? `&user_id=${encodeURIComponent(userId)}` : '')
+        const res = await fetch(url)
+        const data = await res.json()
+        if (data.valid && data.coupon) {
+          setAppliedCoupon(data.coupon)
+        } else if (data.already_used) {
+          // Student already used this coupon on another course —
+          // don't apply it, just clear the code silently.
+          setCouponCode('')
+        } else {
+          // Invalid coupon — don't show an error (the user didn't
+          // type it manually). Just clear the code.
+          setCouponCode('')
+        }
+      } catch {
+        setCouponCode('')
+      } finally {
+        setValidatingCoupon(false)
+      }
+    })()
+  }, [open, course?.auto_coupon_code, userId])
+
   const validateCoupon = async () => {
     if (!couponCode.trim()) { setCouponError(''); setAppliedCoupon(null); return }
     setValidatingCoupon(true)
     setCouponError('')
     try {
-      const res = await fetch(`/api/coupons?code=${encodeURIComponent(couponCode.trim().toUpperCase())}`)
+      // Pass user_id so per-user restriction is enforced.
+      const url = `/api/coupons?code=${encodeURIComponent(couponCode.trim().toUpperCase())}` +
+        (userId ? `&user_id=${encodeURIComponent(userId)}` : '')
+      const res = await fetch(url)
       const data = await res.json()
       if (data.valid && data.coupon) {
         if (data.coupon.course_id && data.coupon.course_id !== course.id) {
@@ -674,6 +772,9 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
           return
         }
         setAppliedCoupon(data.coupon)
+      } else if (data.already_used) {
+        setCouponError('لقد استخدمت هذا الكوبون مسبقاً في دورة أخرى — كل متدرب يمكنه استخدام الكوبون مرة واحدة فقط')
+        setAppliedCoupon(null)
       } else {
         setCouponError(data.message || 'كوبون غير صالح')
         setAppliedCoupon(null)
@@ -757,23 +858,53 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
         </button>
         <DialogHeader><DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-4">
-          {/* Price with coupon */}
+          {/* Price with optional strikethrough + coupon discount */}
           <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg space-y-2">
+            {/* Case 1: coupon applied — show the post-coupon price
+                with the pre-coupon price struck through. */}
             {appliedCoupon && discount > 0 ? (
               <>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground line-through">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
-                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">-{discount.toLocaleString()}</Badge>
+                  <span className="text-muted-foreground line-through text-red-500" dir="ltr">
+                    {originalPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                  </span>
+                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">
+                    -{discount.toLocaleString()} {course.currency || 'ر.ي'}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-navy">المبلغ النهائي:</span>
-                  <span className="text-xl font-extrabold text-gold">{finalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                  <span className="text-xl font-extrabold text-gold" dir="ltr">{finalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                </div>
+              </>
+            ) : hasOriginalStrikethrough ? (
+              /* Case 2: no coupon applied, but the trainer set an
+                 original_price > current price. Show the trainer's
+                 strikethrough + the current discounted price. */
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">السعر الرسمي:</span>
+                  <span className="line-through text-red-500 font-bold" dir="ltr">
+                    {officialPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-navy">السعر بعد الخصم:</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xl font-extrabold text-green-600" dir="ltr">
+                      {originalPrice.toLocaleString()} {course.currency || 'ر.ي'}
+                    </span>
+                    <span className="text-[10px] text-green-600 font-bold">
+                      وفّر {(officialPrice - originalPrice).toLocaleString()} {course.currency || 'ر.ي'}
+                    </span>
+                  </div>
                 </div>
               </>
             ) : (
+              /* Case 3: no discount at all. */
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
-                <span className="text-xl font-extrabold text-gold">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                <span className="text-xl font-extrabold text-gold" dir="ltr">{originalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
               </div>
             )}
           </div>

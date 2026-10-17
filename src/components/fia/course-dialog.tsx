@@ -46,7 +46,8 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     course || {
       title: '', short_description: '', description: '',
       category: '', specialization: '',
-      level: 'متوسط', price_type: 'مجانية', price: 0, currency: 'ر.ي',
+      level: 'متوسط', price_type: 'مجانية', price: 0, original_price: 0, currency: 'ر.ي',
+      auto_coupon_code: '',
       duration_hours: 0, pass_score: 60, cover: '', status: 'منشورة',
     }
   )
@@ -55,6 +56,10 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
   // Collapsible description state — defaults to collapsed so the
   // dialog stays compact, expands when the user wants to write more.
   const [descExpanded, setDescExpanded] = useState(false)
+  // Show the "create coupon inline" form when the trainer wants to
+  // create a NEW coupon (vs. just typing an existing coupon code).
+  const [showCreateCoupon, setShowCreateCoupon] = useState(false)
+  const [newCouponDiscount, setNewCouponDiscount] = useState('10')
 
   useEffect(() => {
     // When loading a course for editing, strip any HTML tags from
@@ -101,10 +106,13 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
       pass_score: String(course.pass_score ?? 60),
       duration_hours: String(course.duration_hours ?? 0),
       price: String(course.price ?? 0),
+      original_price: String(course.original_price ?? 0),
+      auto_coupon_code: course.auto_coupon_code || '',
     } : {
       title: '', short_description: '', description: '',
       category: '', specialization: '',
-      level: 'متوسط', price_type: 'مجانية', price: '0', currency: 'ر.ي',
+      level: 'متوسط', price_type: 'مجانية', price: '0', original_price: '0', currency: 'ر.ي',
+      auto_coupon_code: '',
       duration_hours: '', pass_score: '', cover: '', status: 'منشورة',
     })
   }, [course, open])
@@ -133,6 +141,39 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     }
   }
 
+  // Create a new coupon inline (when trainer wants to add a fresh
+  // discount coupon for this course). Generates a FIA-XXXXXX code.
+  const createCouponInline = async () => {
+    const code = 'FIA-' + Math.random().toString(36).substring(2, 8).toUpperCase()
+    const discount = Number(newCouponDiscount) || 10
+    try {
+      const res = await fetch('/api/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          description: `كوبون تلقائي لدورة: ${form.title || ''}`,
+          discount_type: 'percentage',
+          discount_value: discount,
+          // No max_uses — unlimited (but per-user restriction still
+          // applies: each student can only use it once across all
+          // courses).
+          // No course_id — coupon can be entered manually too.
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.code) {
+        setForm((prev: any) => ({ ...prev, auto_coupon_code: data.code }))
+        toast.success(`تم إنشاء الكوبون: ${data.code}`)
+        setShowCreateCoupon(false)
+      } else {
+        toast.error(data.error || 'فشل إنشاء الكوبون')
+      }
+    } catch {
+      toast.error('خطأ في إنشاء الكوبون')
+    }
+  }
+
   const save = async () => {
     if (!form.title) { toast.error('أدخل عنوان الدورة'); return }
     setSaving(true)
@@ -147,7 +188,9 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
         level: form.level,
         price_type: form.price_type,
         price: Number(form.price) || 0,
+        original_price: Number(form.original_price) || 0,
         currency: form.currency || 'ر.ي',
+        auto_coupon_code: form.auto_coupon_code?.trim() || null,
         duration_hours: Number(form.duration_hours) || 0,
         pass_score: Number(form.pass_score) || 60,
         status: form.status || 'منشورة',
@@ -313,12 +356,88 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
               />
             </div>
             {form.price_type === 'مدفوعة' && (
-              <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">المبلغ</Label>
-                <Input type="number" value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  className="h-10 text-sm" dir="ltr" placeholder="0" />
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Official price (struck through) */}
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block flex items-center gap-1.5">
+                      <span className="line-through text-red-500">السعر الرسمي</span>
+                    </Label>
+                    <Input type="number" value={form.original_price}
+                      onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+                      className="h-10 text-sm" dir="ltr" placeholder="100" />
+                    <p className="text-[10px] text-muted-foreground mt-1">يظهر مشطوباً بالأحمر للمتدرب</p>
+                  </div>
+                  {/* Discounted (final) price */}
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block text-green-600">السعر بعد الخصم</Label>
+                    <Input type="number" value={form.price}
+                      onChange={(e) => setForm({ ...form, price: e.target.value })}
+                      className="h-10 text-sm border-green-500/30" dir="ltr" placeholder="50" />
+                    <p className="text-[10px] text-muted-foreground mt-1">السعر النهائي للمتدرب</p>
+                  </div>
+                </div>
+                {/* Live preview */}
+                {Number(form.original_price) > Number(form.price) && Number(form.price) > 0 && (
+                  <div className="flex items-center gap-2 bg-navy/5 border border-navy/10 rounded-md px-3 py-2">
+                    <span className="text-xs text-muted-foreground">معاينة:</span>
+                    <span className="text-sm line-through text-red-500" dir="ltr">
+                      {Number(form.original_price).toLocaleString()} {form.currency || 'ر.ي'}
+                    </span>
+                    <span className="text-base font-extrabold text-green-600" dir="ltr">
+                      {Number(form.price).toLocaleString()} {form.currency || 'ر.ي'}
+                    </span>
+                  </div>
+                )}
+                {/* Auto-applied coupon for this course */}
+                <div className="bg-gold/5 border border-gold/20 rounded-md p-3 space-y-2">
+                  <Label className="text-xs font-bold text-navy mb-1.5 block">كوبون خصم تلقائي (اختياري)</Label>
+                  <div className="flex gap-2">
+                    <Input value={form.auto_coupon_code || ''}
+                      onChange={(e) => setForm({ ...form, auto_coupon_code: e.target.value.toUpperCase() })}
+                      placeholder="FIA-XXXXXX"
+                      dir="ltr" className="font-mono text-sm h-9 flex-1" />
+                    {form.auto_coupon_code && (
+                      <Button type="button" variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/5"
+                        onClick={() => setForm({ ...form, auto_coupon_code: '' })}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    إذا أدخلت كوبوناً هنا، سيتم تطبيقه تلقائياً عند محاولة المتدرب الاشتراك — يرى السعر بعد الخصم مباشرة.
+                    المتدرب يمكنه استخدام الكوبون مرة واحدة فقط من حسابه.
+                  </p>
+                  {/* Quick create a new coupon inline */}
+                  {!form.auto_coupon_code && (
+                    <>
+                      {!showCreateCoupon ? (
+                        <button type="button" onClick={() => setShowCreateCoupon(true)}
+                          className="text-[10px] text-navy hover:text-gold flex items-center gap-1 font-semibold">
+                          + إنشاء كوبون جديد بنقرة واحدة
+                        </button>
+                      ) : (
+                        <div className="bg-white border border-gold/30 rounded-md p-2 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">نسبة الخصم %:</Label>
+                            <Input type="number" value={newCouponDiscount}
+                              onChange={(e) => setNewCouponDiscount(e.target.value)}
+                              className="h-8 text-sm w-20" dir="ltr" placeholder="10" />
+                            <Button type="button" size="sm" className="bg-navy hover:bg-navy-light text-gold h-8 text-xs"
+                              onClick={createCouponInline}>
+                              إنشاء
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs"
+                              onClick={() => setShowCreateCoupon(false)}>
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
