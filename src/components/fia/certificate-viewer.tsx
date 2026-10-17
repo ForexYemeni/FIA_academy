@@ -53,17 +53,15 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     }
   }
 
-  // Fixed landscape dimensions matching the sample (1492×1054 → ratio 1.416)
-  // Scaled to 780×551 for screen display, pixelRatio 2 gives 1560×1102 on export
-  const CERT_W = 780
-  const CERT_H = 551
+  // Fixed landscape: 768×542 → export at 2x = 1536×1084 ≈ 1536×1085
   const NAVY = '#0A1F44'
   const GOLD = '#C9A961'
   const GOLD_L = '#D4AF37'
   const CREAM = '#FBF7EC'
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
+      {/* Status */}
       <div className={`text-center ${isVerified ? 'text-green-600' : 'text-red-600'}`}>
         <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${isVerified ? 'bg-green-500/15 border border-green-500/30' : 'bg-red-500/15 border border-red-500/30'}`}>
           {isVerified ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
@@ -71,52 +69,50 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         </div>
       </div>
 
-      {/* Scrollable wrapper for mobile — certificate has FIXED landscape dimensions */}
+      {/* Fixed landscape certificate — 768×542 (export 2x = 1536×1084) */}
       <div className="overflow-x-auto">
-        <div ref={certRef} className="relative mx-auto" style={{ width: CERT_W, height: CERT_H }}>
-          {/* Triple frame */}
+        <div ref={certRef} style={{ width: 768, height: 542, margin: '0 auto', position: 'relative' }}>
+          {/* Gold frame */}
           <div style={{ width: '100%', height: '100%', padding: '4px', background: `linear-gradient(135deg, ${GOLD}, ${GOLD_L}, ${GOLD})`, borderRadius: '8px' }}>
+            {/* Navy frame */}
             <div style={{ width: '100%', height: '100%', padding: '3px', borderRadius: '6px', background: `linear-gradient(135deg, ${NAVY}, #102a63, ${NAVY})` }}>
+              {/* Cream content */}
               <div style={{ width: '100%', height: '100%', borderRadius: '4px', overflow: 'hidden', background: `linear-gradient(135deg, #FFFEF7, ${CREAM} 50%, #FFFEF7)`, position: 'relative' }}>
 
-                {/* Content — fills the fixed landscape area */}
                 <div style={{
-                  width: '100%',
-                  height: '100%',
-                  padding: '20px 36px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
+                  width: '100%', height: '100%', padding: '20px 36px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                  textAlign: 'center',
                   backgroundImage: 'radial-gradient(circle at 10% 10%, rgba(201,169,97,0.04) 0%, transparent 40%), radial-gradient(circle at 90% 90%, rgba(10,31,68,0.03) 0%, transparent 40%)',
                 }}>
 
-                  {/* ===== TOP: Name (left) + Logo (right) ===== */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '16px', height: '1px', background: `linear-gradient(to right, ${GOLD}, transparent)` }} />
-                        <span style={{ fontSize: '16px', fontWeight: 800, color: NAVY, lineHeight: 1.2 }}>أكاديمية المستقبل الدولية</span>
-                      </div>
-                      <p style={{ fontSize: '7px', color: GOLD, fontWeight: 700, letterSpacing: '0.3em', margin: '1px 0 0 0', textTransform: 'uppercase' }}>Future International Academy</p>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', borderRadius: '16px', background: `rgba(10,31,68,0.05)`, border: `1px solid ${GOLD}40`, marginTop: '5px' }}>
-                        <Award style={{ width: '10px', height: '10px', color: GOLD }} />
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: NAVY }}>شهادة إكمال معتمدة</span>
-                      </div>
+                  {/* ===== TOP: Logo CENTERED + Academy name CENTERED ===== */}
+                  <div>
+                    <img src="/fia/logo-certificate.png" alt="FIA" style={{ width: '52px', height: '52px', objectFit: 'contain', margin: '0 auto 4px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '1px' }}>
+                      <div style={{ width: '20px', height: '1px', background: `linear-gradient(to right, ${GOLD}, transparent)` }} />
+                      <span style={{ fontSize: '17px', fontWeight: 800, color: NAVY, lineHeight: 1.2 }}>أكاديمية المستقبل الدولية</span>
+                      <div style={{ width: '20px', height: '1px', background: `linear-gradient(to left, ${GOLD}, transparent)` }} />
                     </div>
-                    <img src="/fia/logo-certificate.png" alt="FIA" style={{ width: '52px', height: '52px', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))', flexShrink: 0 }} />
+                    <p style={{ fontSize: '8px', color: GOLD, fontWeight: 700, letterSpacing: '0.3em', margin: 0, textTransform: 'uppercase' }}>Future International Academy</p>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 12px', borderRadius: '16px', background: `rgba(10,31,68,0.05)`, border: `1px solid ${GOLD}40`, marginTop: '6px' }}>
+                      <Award style={{ width: '11px', height: '11px', color: GOLD }} />
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: NAVY }}>شهادة إكمال معتمدة</span>
+                      <Award style={{ width: '11px', height: '11px', color: GOLD }} />
+                    </div>
                   </div>
 
-                  {/* Separator */}
+                  {/* Gold separator */}
                   <div style={{ height: '1px', background: `linear-gradient(to left, transparent, ${GOLD}, transparent)` }} />
 
                   {/* ===== CENTER: Student + Course ===== */}
-                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1 }}>
-                    <p style={{ fontSize: '10px', color: 'rgba(10,31,68,0.6)', margin: '0 0 4px 0' }}>تشهد أكاديمية المستقبل الدولية بأن</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1 }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(10,31,68,0.6)', margin: '0 0 4px 0' }}>تشهد أكاديمية المستقبل الدولية بأن</p>
                     <h2 style={{ fontSize: '24px', fontWeight: 800, color: NAVY, margin: '0 0 6px 0', textShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>{certificate.student_name}</h2>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <div style={{ width: '44px', height: '1px', background: `linear-gradient(to left, ${GOLD}80, transparent)` }} />
-                      <Sparkles style={{ width: '12px', height: '12px', color: GOLD }} />
                       <div style={{ width: '44px', height: '1px', background: `linear-gradient(to right, ${GOLD}80, transparent)` }} />
+                      <Sparkles style={{ width: '12px', height: '12px', color: GOLD }} />
+                      <div style={{ width: '44px', height: '1px', background: `linear-gradient(to left, ${GOLD}80, transparent)` }} />
                     </div>
                     <p style={{ fontSize: '10px', color: 'rgba(10,31,68,0.6)', margin: '0 0 3px 0' }}>قد أتمّ بنجاح جميع متطلبات دورة</p>
                     <h3 style={{ fontSize: '14px', fontWeight: 700, color: GOLD, margin: 0, textShadow: `0 1px 2px ${GOLD}30` }}>{certificate.course_title || 'دورة معتمدة'}</h3>
@@ -130,18 +126,18 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
 
                   {/* Dot divider */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ flex: 1, height: '1px', background: `linear-gradient(to left, ${GOLD}40, transparent)` }} />
+                    <div style={{ flex: 1, height: '1px', background: `linear-gradient(to right, ${GOLD}40, transparent)` }} />
                     <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: `${GOLD}66` }} />
                     <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: `${GOLD}99` }} />
                     <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: `${GOLD}66` }} />
-                    <div style={{ flex: 1, height: '1px', background: `linear-gradient(to right, ${GOLD}40, transparent)` }} />
+                    <div style={{ flex: 1, height: '1px', background: `linear-gradient(to left, ${GOLD}40, transparent)` }} />
                   </div>
 
                   {/* ===== BOTTOM: QR (left) + info (center) + signature (right) ===== */}
                   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px' }}>
-                    {/* QR */}
+                    {/* QR — visually on the left in LTR, which is correct */}
                     <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                      <img src={`/api/qr-code?text=${encodeURIComponent('fiaacademy.vercel.app/verify/' + certificate.certificate_number)}`} alt="QR" style={{ width: '48px', height: '48px', border: `1px solid ${GOLD}33`, borderRadius: '4px', padding: '2px', background: 'white' }} />
+                      <img src={`/api/qr-code?text=${encodeURIComponent('fiaacademy.vercel.app/verify/' + certificate.certificate_number)}`} alt="QR" style={{ width: '46px', height: '46px', border: `1px solid ${GOLD}33`, borderRadius: '4px', padding: '2px', background: 'white' }} />
                       <div style={{ fontSize: '7px', color: 'rgba(10,31,68,0.4)', marginTop: '2px' }}>امسح للتحقق</div>
                     </div>
                     {/* Info */}
