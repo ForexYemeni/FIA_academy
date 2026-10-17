@@ -85,6 +85,39 @@ export async function PUT(req: NextRequest) {
   try {
     const body = await req.json()
 
+    // === Telegram integration protection ===
+    // The Telegram bot token + channel ID are critical — they control
+    // how images, videos, and notifications get published to the
+    // academy's channel. If they're being CHANGED (different from the
+    // currently stored values), we require the caller to verify their
+    // admin password via /api/auth/verify-password. This prevents
+    // accidental lockout (e.g. a typo in the bot token would break
+    // all image uploads).
+    const PROTECTED_FIELDS = ['telegram_bot_token', 'telegram_channel_id']
+    const tryingToChangeTelegram = PROTECTED_FIELDS.some((f) =>
+      body[f] !== undefined && body[f] !== null && String(body[f]).trim() !== ''
+    )
+    if (tryingToChangeTelegram) {
+      // Verify password
+      const { user_id, password } = body as { user_id?: string, password?: string }
+      if (!user_id || !password) {
+        return NextResponse.json({
+          error: 'لتغيير إعدادات تيليجرام (التوكن أو الـ Channel ID)، يجب إدخال كلمة مرور حسابك للتأكيد.',
+        }, { status: 403 })
+      }
+      const { data: u, error: uErr } = await supabaseAdmin
+        .from('users')
+        .select('id, password')
+        .eq('id', user_id)
+        .maybeSingle()
+      if (uErr || !u) {
+        return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
+      }
+      if (String(u.password || '') !== String(password)) {
+        return NextResponse.json({ error: 'كلمة المرور غير صحيحة — لا يمكن تغيير إعدادات تيليجرام' }, { status: 403 })
+      }
+    }
+
     // Split into basic fields (existing columns) and extra fields (stored as JSON)
     const basicFields: any = {
       academy_name: body.academy_name,
@@ -94,9 +127,9 @@ export async function PUT(req: NextRequest) {
       telegram_channel_id: body.telegram_channel_id,
     }
 
-    // Build extra JSON from all non-basic fields
+    // Build extra JSON from all non-basic fields (excluding password + user_id which we used above)
     const extra: any = {}
-    const basicKeys = ['academy_name', 'phone', 'email', 'telegram_bot_token', 'telegram_channel_id', 'id', 'updated_at']
+    const basicKeys = ['academy_name', 'phone', 'email', 'telegram_bot_token', 'telegram_channel_id', 'id', 'updated_at', 'password', 'user_id']
     for (const [k, v] of Object.entries(body)) {
       if (!basicKeys.includes(k) && v !== undefined) {
         extra[k] = v

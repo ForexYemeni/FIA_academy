@@ -6,6 +6,7 @@ import {
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
+  Sparkles, Star,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -567,6 +568,92 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
 
   return (
     <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة — اضغط على الدورة لفتحها">
+      {/* === Featured + Limited-time offers — shown ABOVE the grid === */}
+      {(() => {
+        const featuredCourses = (courses || []).filter((c: any) =>
+          (c.offer_type === 'featured' || c.offer_type === 'limited_time') &&
+          !isEnrolled(c.id)
+        )
+        if (featuredCourses.length === 0) return null
+        return (
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-navy">
+              <Sparkles className="w-4 h-4 text-gold" /> عروض خاصة ومميزة
+              <Badge className="bg-gold/15 text-gold border-gold/30">{featuredCourses.length}</Badge>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {featuredCourses.map((c: any) => {
+                const isFree = c.price_type === 'مجانية' || c.price === 0
+                const offerPrice = Number(c.offer_price) || 0
+                const displayPrice = offerPrice > 0 ? offerPrice : (Number(c.price) || 0)
+                const originalPrice = Number(c.original_price) || 0
+                const hasDiscount = originalPrice > displayPrice && displayPrice > 0
+                const isLimited = c.offer_type === 'limited_time'
+                const unitLabel = c.offer_duration_unit === 'hours' ? 'ساعة' :
+                  c.offer_duration_unit === 'days' ? 'يوم' :
+                  c.offer_duration_unit === 'weeks' ? 'أسبوع' : 'شهر'
+                return (
+                  <Card
+                    key={c.id}
+                    className={`overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-1 ring-2 ${isLimited ? 'ring-gold/50' : 'ring-gold/30'}`}
+                    onClick={() => handleCardClick(c)}
+                  >
+                    {/* Cover + prominent featured badge */}
+                    <div className="h-32 bg-navy relative">
+                      {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+                      <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/30 to-transparent" />
+                      {/* Big offer badge top-right */}
+                      <div className={`absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 ${isLimited ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse' : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'}`}>
+                        {isLimited ? <Clock className="w-3.5 h-3.5" /> : <Star className="w-3.5 h-3.5" />}
+                        <span className="text-xs font-extrabold">{isLimited ? '⏰ لمدة محدودة' : '⭐ مميزة'}</span>
+                      </div>
+                      {/* Duration chip */}
+                      {Number(c.offer_duration_value) > 0 && (
+                        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-navy text-[10px] font-bold px-2 py-0.5 rounded-md" dir="ltr">
+                          {c.offer_duration_value} {unitLabel}
+                        </div>
+                      )}
+                    </div>
+                    {/* Body */}
+                    <div className="p-4">
+                      {c.offer_headline && (
+                        <div className={`text-xs font-bold mb-1 ${isLimited ? 'text-red-600' : 'text-gold'}`}>
+                          {isLimited ? '⏰' : '⭐'} {c.offer_headline}
+                        </div>
+                      )}
+                      <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+                      <div className="flex items-baseline gap-2 mb-3">
+                        {isFree ? (
+                          <span className="text-2xl font-extrabold text-green-600" dir="ltr">مجانية</span>
+                        ) : (
+                          <>
+                            {hasDiscount && (
+                              <span className="text-xs line-through text-red-500" dir="ltr">
+                                {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                              </span>
+                            )}
+                            <span className="text-xl font-extrabold text-gold" dir="ltr">
+                              {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className={`w-full text-xs ${isLimited ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-navy hover:bg-navy-light text-gold'}`}
+                        onClick={(e) => { e.stopPropagation(); handleCardClick(c) }}
+                      >
+                        {isFree ? 'سجّل الآن — مجانية' : 'احصل على العرض الآن'}
+                      </Button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {courses.map((c: any) => {
           const enr = enrollments?.find((e: any) => e.course_id === c.id)

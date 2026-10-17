@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { tgModuleCreated } from '@/lib/telegram'
 
 // Store modules as JSON inside the course's `description` field.
 // Format: <regular description>\n\n===FIA_MODULES===\n<JSON array of modules>
@@ -107,6 +108,12 @@ export async function POST(req: NextRequest) {
     }
     modules.push(newModule)
     await saveCourseModules(body.course_id, modules)
+
+    // Publish to Telegram — every new module is announced on the channel
+    try {
+      await tgModuleCreated(body.course_id, body.title)
+    } catch {}
+
     return NextResponse.json(newModule)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

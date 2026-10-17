@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyPaymentApproved, notifyPaymentRejected } from '@/lib/notifications'
+import { tgPaymentApproved, tgPaymentRejected as tgReject } from '@/lib/telegram'
 
 // GET /api/payments — admin: list all PAID payments only.
 // Free enrollments (amount=0, method='free') are tracked in the
@@ -87,8 +88,10 @@ export async function PUT(req: NextRequest) {
         const isRejected = status === 'ملغي' || status === 'cancelled' || status === 'failed'
         if (isApproved) {
           await notifyPaymentApproved(updated.user_id, updated.course_id)
+          await tgPaymentApproved(updated.user_id, updated.course_id)
         } else if (isRejected) {
           await notifyPaymentRejected(updated.user_id, updated.course_id)
+          await tgReject(updated.user_id, updated.course_id)
         }
       } catch {}
     }

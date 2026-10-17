@@ -3,10 +3,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users, AlertCircle, Award, BookOpen, FileText, Mail, Newspaper, Trophy, GraduationCap } from 'lucide-react'
+import { Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users, AlertCircle, Award, BookOpen, FileText, Mail, Newspaper, Trophy, GraduationCap, Volume2, VolumeX } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
+import { playSoundForNotification, unlockAudio, isMuted, setMuted } from '@/lib/sounds'
 
 const TYPE_ICON: Record<string, any> = {
   enrollment: Users,
@@ -47,7 +48,29 @@ export function NotificationsBell() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [muted, setMutedState] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Initialize muted state from localStorage
+  useEffect(() => {
+    setMutedState(isMuted())
+    // Try to unlock audio on first user interaction (mobile requires
+    // a user gesture before audio can play).
+    const unlock = () => { unlockAudio(); document.removeEventListener('click', unlock); document.removeEventListener('touchstart', unlock) }
+    document.addEventListener('click', unlock, { once: true })
+    document.addEventListener('touchstart', unlock, { once: true })
+    return () => {
+      document.removeEventListener('click', unlock)
+      document.removeEventListener('touchstart', unlock)
+    }
+  }, [])
+
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    setMutedState(next)
+    if (!next) unlockAudio() // unlock audio when user un-mutes
+  }
 
   const load = () => {
     if (!user?.id) return
@@ -79,6 +102,10 @@ export function NotificationsBell() {
           (payload: any) => {
             const n = payload.new
             setItems((prev) => [n, ...prev].slice(0, 50))
+            // Professional sound notification — each type has its own
+            // distinct tone (payment = coin chime, certificate = fanfare,
+            // enrollment = welcoming chord, etc.)
+            playSoundForNotification(n.type)
             toast(n.title, { description: n.body })
           }
         )
@@ -112,7 +139,15 @@ export function NotificationsBell() {
   if (!user) return null
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center gap-1" ref={ref}>
+      {/* Mute toggle — lets the user silence all sound notifications */}
+      <button
+        onClick={toggleMute}
+        className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
+        title={muted ? 'تفعيل الأصوات' : 'كتم الأصوات'}
+      >
+        {muted ? <VolumeX className="w-4 h-4 text-muted-foreground" /> : <Volume2 className="w-4 h-4 text-navy" />}
+      </button>
       <button
         onClick={() => { setOpen(!open); if (!open) load() }}
         className="relative w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
