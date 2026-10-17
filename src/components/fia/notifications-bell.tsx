@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import {
   Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users,
   AlertCircle, Award, Mail, Newspaper, Trophy, GraduationCap,
-  Volume2, VolumeX, X,
+  Volume2, VolumeX, X, BellRing,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
 import { playSoundForNotification, unlockAudio, isMuted, setMuted } from '@/lib/sounds'
+import { showNotificationToast } from '@/lib/notification-toast'
 
 const TYPE_ICON: Record<string, any> = {
   enrollment: Users,
@@ -85,31 +86,127 @@ export function NotificationsBell() {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [muted, setMutedState] = useState(false)
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
+  const [notifPerm, setNotifPerm] = useState<string>('default')
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initialize muted state from localStorage + unlock audio on first
-  // user interaction (mobile requires a gesture before audio plays).
+  // Initialize muted state + audio unlock + notification permission
   useEffect(() => {
     setMutedState(isMuted())
+    if (typeof Notification !== 'undefined') {
+      setNotifPerm(Notification.permission)
+    }
+    // Try to unlock audio on the FIRST user interaction — this is
+    // critical for iOS Safari + most desktop browsers. We attach to
+    // multiple events to be sure we catch a gesture.
     const unlock = () => {
       unlockAudio()
+      setAudioUnlocked(true)
+      // Remove all the gesture handlers once we've unlocked.
       document.removeEventListener('click', unlock)
       document.removeEventListener('touchstart', unlock)
+      document.removeEventListener('keydown', unlock)
     }
     document.addEventListener('click', unlock, { once: true })
     document.addEventListener('touchstart', unlock, { once: true })
+    document.addEventListener('keydown', unlock, { once: true })
     return () => {
       document.removeEventListener('click', unlock)
       document.removeEventListener('touchstart', unlock)
+      document.removeEventListener('keydown', unlock)
     }
   }, [])
+
+  // Helper — fire sound + toast + browser notification for a new
+  // notification object. Used by BOTH Realtime INSERT handler AND
+  // the polling fallback, so the experience is identical.
+  const announceNotification = (n: any) => {
+    // 1) Sound — each type has a distinct professional tone.
+    // We attempt this even if audio wasn't explicitly unlocked;
+    // some browsers (Chrome desktop) will play it anyway as long
+    // as the user has interacted with the page once.
+    try { playSoundForNotification(n.type) } catch {}
+    // 2) In-app professional toast with per-type styling.
+    try { showNotificationToast(n) } catch {}
+    // 3) Browser native notification (OS-level popup). Only fires
+    // if the user previously granted permission via the opt-in card.
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const notif = new Notification(n.title, {
+          body: n.body || '',
+          icon: '/fia/logo-fia.png',
+          badge: '/fia/favicon.svg',
+          tag: n.id,
+          dir: 'rtl',
+          lang: 'ar',
+        })
+        // Click on the OS notification → navigate to the link + focus
+        notif.onclick = () => {
+          window.focus()
+          if (n.link) window.location.href = n.link
+          notif.close()
+        }
+      }
+    } catch {}
+  }
 
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation()
     const next = !muted
     setMuted(next)
     setMutedState(next)
-    if (!next) unlockAudio()
+    if (!next) {
+      unlockAudio()
+      setAudioUnlocked(true)
+    }
+    toast.success(next ? 'تم كتم الأصوات' : 'تم تفعيل الأصوات ✓')
+  }
+
+  // Re-trigger the browser notification permission request directly
+  // from the bell dropdown (for users who dismissed the opt-in card).
+  const requestNotificationPermission = async () => {
+    if (typeof Notification === 'undefined') {
+      toast.error('المتصفح لا يدعم الإشعارات المنبثقة')
+      return
+    }
+    if (Notification.permission === 'granted') {
+      toast.success('الإشعارات المنبثقة مُفعّلة ✓')
+      setNotifPerm('granted')
+      // Send a test notification
+      try {
+        new Notification('الإشعارات مُفعّلة', {
+          body: 'ستصلك الإشعارات المنبثقة فور وصولها.',
+          icon: '/fia/logo-fia.png',
+        })
+      } catch {}
+      return
+    }
+    if (Notification.permission === 'denied') {
+      toast.error('تم رفض الإذن مسبقاً من المتصفح — يرجى تفعيله من إعدادات الموقع')
+      return
+    }
+    try {
+      const perm = await Notification.requestPermission()
+      setNotifPerm(perm)
+      if (perm === 'granted') {
+        toast.success('تم تفعيل الإشعارات المنبثقة ✓')
+        try {
+          new Notification('تم التفعيل بنجاح', {
+            body: 'ستصلك الإشعارات والنغمات الصوتية فور وصولها.',
+            icon: '/fia/logo-fia.png',
+          })
+        } catch {}
+        // Also unlock audio + clear mute
+        unlockAudio()
+        setAudioUnlocked(true)
+        setMuted(false)
+        setMutedState(false)
+      } else if (perm === 'denied') {
+        toast.error('تم رفض الإذن — يمكنك تفعيله لاحقاً من إعدادات المتصفح')
+      }
+    } catch {
+      toast.error('فشل طلب الإذن')
+    }
   }
 
   const load = () => {
@@ -118,32 +215,15 @@ export function NotificationsBell() {
       .then((r) => r.json())
       .then((d) => {
         const newItems = Array.isArray(d) ? d : []
-        // Detect new notifications since the last load by comparing
-        // unread counts. If unread went UP, that means a new
-        // notification arrived — play sound + show toast + browser
-        // notification. This is a fallback for when Supabase Realtime
-        // isn't reachable.
+        // Detect new notifications by comparing prev IDs vs new IDs.
+        // If new IDs appeared since last load, fire sound + toast +
+        // browser notification. This is the FALLBACK for when Supabase
+        // Realtime isn't reachable — guarantees delivery.
         setItems((prev) => {
-          const prevUnread = prev.filter(n => !n.read_at).length
-          const newUnread = newItems.filter(n => !n.read_at).length
-          if (newUnread > prevUnread && prev.length > 0) {
-            // Find the newly-arrived notifications (those that aren't
-            // in prev) and announce them.
+          if (prev.length > 0) {
             const prevIds = new Set(prev.map(n => n.id))
             const fresh = newItems.filter(n => !prevIds.has(n.id))
-            for (const n of fresh) {
-              playSoundForNotification(n.type)
-              toast(n.title, { description: n.body, duration: 5000 })
-              try {
-                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                  new Notification(n.title, {
-                    body: n.body || '',
-                    icon: '/fia/logo-fia.png',
-                    tag: n.id,
-                  })
-                }
-              } catch {}
-            }
+            for (const n of fresh) announceNotification(n)
           }
           return newItems
         })
@@ -159,7 +239,7 @@ export function NotificationsBell() {
     return () => clearInterval(interval)
   }, [user?.id])
 
-  // Real-time subscription for instant delivery
+  // Real-time subscription for instant delivery (sub-second latency).
   useEffect(() => {
     if (!user?.id) return
     let channel: any
@@ -171,20 +251,7 @@ export function NotificationsBell() {
           (payload: any) => {
             const n = payload.new
             setItems((prev) => [n, ...prev].slice(0, 50))
-            // Professional sound — each type has a distinct tone.
-            playSoundForNotification(n.type)
-            // Pop a toast notification too (uses the sonner library).
-            toast(n.title, { description: n.body, duration: 5000 })
-            // Browser native notification (if user granted permission)
-            try {
-              if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                new Notification(n.title, {
-                  body: n.body || '',
-                  icon: '/fia/logo-fia.png',
-                  tag: n.id,
-                })
-              }
-            } catch {}
+            announceNotification(n)
           }
         )
         .subscribe()
@@ -309,6 +376,30 @@ export function NotificationsBell() {
               </button>
             </div>
           </div>
+
+          {/* === Enable-notifications banner (only if not yet granted) === */}
+          {notifPerm !== 'granted' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); requestNotificationPermission() }}
+              className="w-full p-3 bg-gradient-to-r from-gold/10 to-gold/5 border-b border-gold/20 hover:bg-gold/15 transition-colors flex items-center gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-gold to-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                <BellRing className="w-4 h-4 text-navy animate-swing" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-navy">فعّل الإشعارات الصوتية والمنبثقة</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">اضغط هنا لتفعيل التوصيل الفوري</p>
+              </div>
+              <span className="text-gold text-xs font-bold">تفعيل ←</span>
+            </button>
+          )}
+
+          {/* === Audio-unlocked indicator (subtle, only when not unlocked) === */}
+          {!audioUnlocked && (
+            <div className="px-3 py-1.5 bg-blue-500/5 border-b border-blue-500/10 text-[10px] text-blue-600 text-center">
+              💡 الصوت سيعمل عند أول نقرة في الصفحة
+            </div>
+          )}
 
           {/* Body — scrollable notifications list */}
           <div className="max-h-[60vh] overflow-y-auto">
