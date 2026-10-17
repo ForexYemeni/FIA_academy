@@ -70,12 +70,41 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { data, error } = await supabaseAdmin
-      .from('courses')
-      .insert(body)
-      .select()
-      .single()
+    let body = await req.json()
+
+    // === Duplicate-slug safety net ===
+    // If the body doesn't include a slug, or the provided slug already
+    // exists in the DB, we generate a unique ASCII slug as a fallback.
+    // This prevents "duplicate key value violates unique constraint
+    // courses_slug_key" errors when two courses get similar slugs.
+    const ensureUniqueSlug = async (attempt: number): Promise<string> => {
+      const base = body.slug || 'course'
+      const suffix = `${Date.now().toString(36).slice(-6).toUpperCase()}${attempt ? '-' + attempt : ''}`
+      return `${base}-${suffix}`.slice(0, 100)
+    }
+
+    let attempt = 0
+    let data: any = null
+    let error: any = null
+    // Try up to 3 times with fresh slugs on duplicate-key conflict.
+    while (attempt < 3) {
+      const result = await supabaseAdmin
+        .from('courses')
+        .insert(body)
+        .select()
+        .single()
+      data = result.data
+      error = result.error
+      if (!error) break
+      // If it's a duplicate-slug error, regenerate slug and retry.
+      if (/duplicate key|courses_slug_key|slug/i.test(error.message || '')) {
+        attempt++
+        body = { ...body, slug: await ensureUniqueSlug(attempt) }
+        continue
+      }
+      // Other errors — break and surface to caller.
+      break
+    }
     if (error) throw error
     return NextResponse.json(data)
   } catch (e: any) {
