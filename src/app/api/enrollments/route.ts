@@ -149,13 +149,30 @@ export async function POST(req: NextRequest) {
     // courses, set status to 'مكتمل' (completed) immediately.
     const initialStatus = isFree ? 'مكتمل' : 'قيد الانتظار'
 
+    // Look up the course to get the correct currency — if the caller
+    // didn't pass a currency, we use the course's currency rather than
+    // defaulting to 'ر.ي' (which is wrong for USD courses).
+    let currency = body.currency
+    if (!currency) {
+      try {
+        const { data: courseRow } = await supabaseAdmin
+          .from('courses')
+          .select('currency')
+          .eq('id', body.course_id)
+          .maybeSingle()
+        currency = courseRow?.currency || 'ر.ي'
+      } catch {
+        currency = 'ر.ي'
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('payments')
       .insert({
         user_id: body.user_id,
         course_id: body.course_id,
         amount: body.amount_paid || 0,
-        currency: body.currency || 'ر.ي',
+        currency,
         method: body.payment_method || (isFree ? 'free' : null),
         status: initialStatus,
         reference: body.payment_reference || (isFree ? 'FREE' : null),

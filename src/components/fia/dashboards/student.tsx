@@ -21,6 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { supabasePublic } from '@/lib/supabase'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
 import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
@@ -422,7 +423,8 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId, course_id: course.id, payment_status: 'pending',
-          amount_paid: finalAmount, payment_method: method.name, payment_reference: fullReference,
+          amount_paid: finalAmount, currency: course.currency || 'ر.ي',
+          payment_method: method.name, payment_reference: fullReference,
         }),
       })
       const data = await res.json()
@@ -552,34 +554,64 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading }: 
   const handleProofUpload = async (file: File) => {
     setUploadingProof(true)
     try {
-      const reader = new FileReader()
-      reader.onload = (e) => {
+      // 1) Read the file as a data URL so we can draw it onto a canvas.
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = () => reject(new Error('فشل قراءة الملف'))
+        reader.readAsDataURL(file)
+      })
+
+      // 2) Load the image so we know its dimensions for resizing.
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image()
-        img.onload = () => {
-          const maxW = 1024, maxH = 1024
-          let { width, height } = img
-          if (width > maxW) { height = (height * maxW) / width; width = maxW }
-          if (height > maxH) { width = (width * maxH) / height; height = maxH }
-          const canvas = document.createElement('canvas')
-          canvas.width = width; canvas.height = height
-          const ctx = canvas.getContext('2d')!
-          ctx.drawImage(img, 0, 0, width, height)
-          canvas.toBlob(async (blob) => {
-            if (!blob) { setUploadingProof(false); return }
-            const fd = new FormData()
-            fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
-            fd.append('folder', 'payment-proofs')
-            const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
-            const data = await res.json()
-            if (data.url) { setProofUrl(data.url); toast.success('تم رفع إثبات الدفع') }
-            else { toast.error('فشل رفع الصورة') }
-            setUploadingProof(false)
-          }, 'image/jpeg', 0.85)
-        }
-        img.src = e.target?.result as string
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error('فشل تحميل الصورة'))
+        img.src = dataUrl
+      })
+
+      // 3) Compress the image to max 1024x1024 JPEG @ 85% quality.
+      const blob = await new Promise<Blob | null>((resolve) => {
+        const maxW = 1024, maxH = 1024
+        let { width, height } = img
+        if (width > maxW) { height = (height * maxW) / width; width = maxW }
+        if (height > maxH) { width = (width * maxH) / height; height = maxH }
+        const canvas = document.createElement('canvas')
+        canvas.width = width; canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(null); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(resolve, 'image/jpeg', 0.85)
+      })
+
+      if (!blob) {
+        toast.error('فشل معالجة الصورة')
+        setUploadingProof(false)
+        return
       }
-      reader.readAsDataURL(file)
-    } catch { toast.error('خطأ في الرفع'); setUploadingProof(false) }
+
+      // 4) Upload the compressed image to the server.
+      const fd = new FormData()
+      fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
+      fd.append('folder', 'payment-proofs')
+
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+
+      if (data.url) {
+        // IMPORTANT: call setProofUrl with the URL string. The button's
+        // disabled condition `!proofUrl` will then evaluate to false and
+        // the button will become clickable (and visually black/navy).
+        setProofUrl(data.url)
+        toast.success('تم رفع إثبات الدفع')
+      } else {
+        toast.error(data.error || 'فشل رفع الصورة')
+      }
+    } catch (err) {
+      toast.error('خطأ في الرفع')
+    } finally {
+      setUploadingProof(false)
+    }
   }
 
   return (
@@ -934,6 +966,18 @@ function Payments({ payments, userId, courses }: any) {
     return courses?.find((c: any) => c.id === courseId)?.title || null
   }
 
+  // Determine the currency to display for a payment. We prefer the
+  // course's currency (source of truth) over the payment's stored
+  // currency — older payment rows may have defaulted to 'ر.ي' even
+  // when the course is in USD.
+  const getCurrency = (p: any) => {
+    if (p.course_id) {
+      const course = courses?.find((c: any) => c.id === p.course_id)
+      if (course?.currency) return course.currency
+    }
+    return p.currency || 'ر.ي'
+  }
+
   const fmtAmount = (p: any) => {
     const amt = typeof p.amount === 'number' ? p.amount : Number(p.amount) || 0
     return amt.toLocaleString('en-US')
@@ -985,7 +1029,7 @@ function Payments({ payments, userId, courses }: any) {
                     <div className="min-w-0">
                       <div className="text-[11px] text-gold/80 font-semibold mb-0.5">المبلغ</div>
                       <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
-                        {fmtAmount(p)} <span className="text-base font-bold text-gold">{p.currency || 'ر.ي'}</span>
+                        {fmtAmount(p)} <span className="text-base font-bold text-gold">{getCurrency(p)}</span>
                       </div>
                     </div>
                     <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>

@@ -151,8 +151,10 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
         cover: form.cover ?? null,
         slug,
         trainer_id: trainerId,
-        modules_count: 0,
-        lessons_count: 0,
+        // NOTE: modules_count and lessons_count are NOT sent here. The
+        // /api/courses PUT handler recomputes them from the inline
+        // modules JSON stored in the description, so we never
+        // accidentally zero them out when editing the course.
       }
       const res = await fetch('/api/courses', {
         method: course ? 'PUT' : 'POST',
