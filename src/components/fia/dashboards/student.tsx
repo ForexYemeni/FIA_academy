@@ -388,7 +388,9 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
       // Combine reference with proof URL
       const fullReference = proofUrl ? `${reference} | PROOF: ${proofUrl}` : reference
 
-      // 1. Create enrollment with pending payment
+      // Create enrollment with pending payment — this creates a SINGLE
+      // payment row in the payments table. We do NOT also call
+      // /api/payments because that would create a DUPLICATE row.
       const res = await fetch('/api/enrollments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -405,20 +407,6 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
       if (data.already_enrolled) {
         toast.info('أنت مسجّل في هذه الدورة')
       } else if (res.ok) {
-        // 2. Create payment record with proof URL
-        await fetch('/api/payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: course.price,
-            currency: course.currency || 'ر.ي',
-            method: method.name,
-            status: 'قيد الانتظار',
-            reference: fullReference,
-            user_id: userId,
-            course_id: course.id,
-          }),
-        })
         toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
         onEnrolled()
         setPayDialog(null)
