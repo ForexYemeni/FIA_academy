@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
   BookOpen, GraduationCap, UserCog, Crown, ChevronLeft, X, Star, Briefcase, Phone, Linkedin,
-  Building2, ExternalLink, CheckCircle2,
+  Building2, ExternalLink, CheckCircle2, Loader2, Send,
 } from 'lucide-react'
 
 export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | null; onClose: () => void; settings: any }) {
@@ -535,8 +535,13 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       )
     }
 
+    // === SUPPORT — with contact form that sends to admin inbox ===
+    if (cardId === 'support') {
+      return <SupportContactForm settings={settings} />
+    }
+
     // === POLICIES ===
-    const fieldMap: Record<string, string> = { privacy: 'policy_privacy', terms: 'policy_terms', refund: 'policy_refund', support: 'policy_support' }
+    const fieldMap: Record<string, string> = { privacy: 'policy_privacy', terms: 'policy_terms', refund: 'policy_refund' }
     const content = settings[fieldMap[cardId]] || 'هذا المحتوى قيد التحضير. سيتم تحديثه قريباً.'
     return (
       <div className="p-4 bg-gray-50 rounded-xl">
@@ -557,7 +562,7 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
           </div>
         </DialogHeader>
         {getContent()}
-        {['privacy', 'terms', 'refund', 'support'].includes(cardId) && settings.email && (
+        {['privacy', 'terms', 'refund'].includes(cardId) && settings.email && (
           <div className="mt-4 pt-4 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-500 mb-2">لأي استفسار بخصوص {m.title}</p>
             <a href={`mailto:${settings.email}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0A1F44]/5 border border-[#C9A961]/20 text-sm font-medium text-[#0A1F44] hover:bg-[#0A1F44]/10 transition-colors">
@@ -567,5 +572,72 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Support contact form — sends a message to the admin's inbox
+function SupportContactForm({ settings }: { settings: any }) {
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const submit = async () => {
+    if (!form.name || !form.email || !form.message) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) setSent(true)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="p-6 text-center">
+        <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+        </div>
+        <h4 className="font-bold text-[#0A1F44] text-base mb-1">تم إرسال رسالتك بنجاح!</h4>
+        <p className="text-xs text-gray-500 mb-4">سنرد عليك في أقرب وقت ممكن عبر بريدك الإلكتروني</p>
+        <button onClick={() => { setSent(false); setForm({ name: '', email: '', subject: '', message: '' }) }} className="text-xs text-[#C9A961] font-bold hover:underline">إرسال رسالة أخرى</button>
+      </div>
+    )
+  }
+
+  const supportText = settings.policy_support || 'فريق الدعم لدينا متاح لمساعدتك في أي وقت. أرسل لنا رسالتك وسنرد عليك في أقرب وقت ممكن.'
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-gray-50 rounded-xl">
+        <p className="text-xs text-gray-600 leading-relaxed">{supportText}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الاسم *</label>
+          <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="اسمك الكامل" />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">البريد *</label>
+          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="email@example.com" dir="ltr" />
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الموضوع</label>
+        <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="موضوع الرسالة" />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الرسالة *</label>
+        <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows={4} className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20 resize-none" placeholder="اكتب رسالتك هنا..." />
+      </div>
+      <button onClick={submit} disabled={sending || !form.name || !form.email || !form.message} className="w-full h-11 bg-[#0A1F44] hover:bg-[#102a63] text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        {sending ? 'جاري الإرسال...' : 'إرسال الرسالة'}
+      </button>
+    </div>
   )
 }
