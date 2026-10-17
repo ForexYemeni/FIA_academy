@@ -629,6 +629,24 @@ function AdminPayments() {
     return p?.currency || 'ر.ي'
   }
 
+  // Extract coupon code from the reference field — stored as
+  // "| COUPON:CODE-HERE". Returns null if no coupon was applied.
+  const getCouponCode = (p: any): string | null => {
+    const ref = p?.reference
+    if (!ref) return null
+    const match = String(ref).match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+    return match ? match[1].toUpperCase() : null
+  }
+
+  // Strip PROOF: and COUPON: markers from reference for clean display
+  const cleanReference = (ref: string | null | undefined) => {
+    if (!ref) return null
+    return ref
+      .replace(/\s*\|\s*PROOF:.*$/i, '')
+      .replace(/\s*\|\s*COUPON:.*$/i, '')
+      .trim() || null
+  }
+
   return (
     <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -646,24 +664,42 @@ function AdminPayments() {
           const course = getCourse(p.course_id)
           const proofUrl = extractProofUrl(p.reference)
           const isPending = p.status === 'قيد الانتظار'
+          const couponCode = getCouponCode(p)
+          const ref = cleanReference(p.reference)
+          const currency = getCurrency(p)
+          const hasCoupon = !!couponCode
           return (
-            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+            <div
+              key={p.id}
+              className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border rounded-lg ${
+                hasCoupon
+                  ? 'border-r-4 border-r-red-500 ring-1 ring-red-500/20 bg-red-50/30'
+                  : 'border-border'
+              }`}
+            >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-bold text-navy text-sm">{p.amount?.toLocaleString()} {getCurrency(p)}</span>
+                  <span className="font-bold text-navy text-sm" dir="ltr">
+                    {p.amount?.toLocaleString()} {currency}
+                  </span>
                   <Badge className={
                     p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
                     : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
                     : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
                   }>{p.status}</Badge>
                   {proofUrl && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">📎 إثبات دفع</Badge>}
+                  {hasCoupon && (
+                    <Badge className="bg-red-500/15 text-red-600 border-red-500/40 font-mono" dir="ltr">
+                      🎟️ كوبون: {couponCode}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
                   {' • '}
                   <span>{p.method || '-'}</span>
                   {' • '}
-                  <span dir="ltr">{p.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</span>
+                  <span dir="ltr">{ref || '-'}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
               </div>
@@ -694,14 +730,30 @@ function AdminPayments() {
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle>تفاصيل المعاملة</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg flex items-center justify-between">
-                <span className="text-sm font-semibold text-navy">المبلغ:</span>
-                <span className="text-xl font-extrabold text-gold">{selectedPayment.amount?.toLocaleString()} {getCurrency(selectedPayment)}</span>
-              </div>
+              {(() => {
+                const couponCode = getCouponCode(selectedPayment)
+                const currency = getCurrency(selectedPayment)
+                const hasCoupon = !!couponCode
+                return (
+                  <div className={`p-4 rounded-lg flex items-center justify-between ${hasCoupon ? 'bg-red-50 border-2 border-red-500' : 'bg-gold/10 border border-gold/30'}`}>
+                    <span className={`text-sm font-semibold ${hasCoupon ? 'text-red-700' : 'text-navy'}`}>
+                      {hasCoupon ? '⚠ المبلغ بعد الخصم:' : 'المبلغ:'}
+                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-xl font-extrabold ${hasCoupon ? 'text-red-600' : 'text-gold'}`} dir="ltr">
+                        {selectedPayment.amount?.toLocaleString()} {currency}
+                      </span>
+                      {hasCoupon && (
+                        <span className="text-[11px] text-red-600 font-mono" dir="ltr">🎟️ {couponCode}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
                 <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{selectedPayment.reference?.replace(/\s*\| PROOF:.*$/i, '') || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div></div>
                 <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
                   <Badge className={
                     selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'

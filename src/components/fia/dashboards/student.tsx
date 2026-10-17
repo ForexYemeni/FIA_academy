@@ -171,7 +171,7 @@ export function StudentDashboard() {
         <>
           {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
-          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} />}
+          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} onViewCourse={(c) => { setViewingCourse(c); setViewingEnrollment(enrollments.find((e:any)=>e.course_id===c.id) || null); setActive('course-view') }} />}
           {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
           {active === 'results' && <Results />}
           {active === 'certificates' && <StudentCertificates user={user} />}
@@ -359,7 +359,7 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   )
 }
 
-function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
+function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse }: any) {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -374,6 +374,8 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
     // Double-check client-side before calling API
     if (isEnrolled(course.id)) {
       toast.info('أنت مسجّل في هذه الدورة')
+      // If already enrolled, just open the course viewer immediately
+      onViewCourse?.(course)
       return
     }
     setEnrolling(course.id)
@@ -386,14 +388,36 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
       const data = await res.json()
       if (data.already_enrolled) {
         toast.info('أنت مسجّل في هذه الدورة')
+        // Refresh + open the course viewer
+        await onEnrolled?.()
+        onViewCourse?.(course)
       } else if (res.ok) {
         toast.success(`تم التسجيل في دورة: ${course.title}`)
-        onEnrolled()
+        await onEnrolled?.()
+        // OPEN THE COURSE IMMEDIATELY after successful free enrollment
+        // (the user expects: click free course → it opens)
+        onViewCourse?.(course)
       } else toast.error('فشل التسجيل')
     } catch {
       toast.error('خطأ')
     } finally {
       setEnrolling(null)
+    }
+  }
+
+  // Clicking the entire card triggers the appropriate action:
+  // - If already enrolled → open the course viewer immediately
+  // - If free            → auto-enroll then open the course viewer
+  // - If paid            → open the payment dialog (course opens after admin approval)
+  const handleCardClick = (c: any) => {
+    const enrolled = isEnrolled(c.id)
+    const isFree = c.price_type === 'مجانية' || c.price === 0
+    if (enrolled) {
+      onViewCourse?.(c)
+    } else if (isFree) {
+      enrollFree(c)
+    } else {
+      setPayDialog({ course: c, open: true })
     }
   }
 
@@ -438,20 +462,29 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
   }
 
   return (
-    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة">
+    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة — اضغط على الدورة لفتحها">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {courses.map((c: any) => {
           const enrolled = isEnrolled(c.id)
           const isFree = c.price_type === 'مجانية' || c.price === 0
+          const isPaidNotEnrolled = !enrolled && !isFree
           return (
-            <Card key={c.id} className="overflow-hidden card-hover">
+            <Card
+              key={c.id}
+              className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${enrolled ? 'ring-2 ring-green-500/30' : isPaidNotEnrolled ? 'ring-1 ring-gold/40' : ''}`}
+              onClick={() => handleCardClick(c)}
+            >
               <div className="h-32 bg-navy relative">
                 {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
                 <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
-                {isFree ? (
-                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية</Badge>
+                {enrolled ? (
+                  <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> مسجّل
+                  </Badge>
+                ) : isFree ? (
+                  <Badge className="absolute top-2 left-2 bg-green-500 text-white">مجانية — اضغط للفتح</Badge>
                 ) : (
-                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة</Badge>
+                  <Badge className="absolute top-2 left-2 bg-gold text-navy">مدفوعة — اضغط للاشتراك</Badge>
                 )}
               </div>
               <div className="p-4">
@@ -461,32 +494,17 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled }: any) {
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
                   </span>
-                  <span className="font-bold text-navy">
+                  <span className="font-bold text-navy" dir="ltr">
                     {isFree ? <span className="text-green-600">مجانية</span> : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}
                   </span>
                 </div>
-                {enrolled ? (
-                  <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 bg-green-500/5">
-                    <CheckCircle2 className="w-4 h-4 ml-1" /> مسجّل
-                  </Button>
-                ) : isFree ? (
-                  <Button
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={() => enrollFree(c)}
-                    disabled={enrolling === c.id}
-                  >
-                    {enrolling === c.id ? 'جاري التسجيل...' : 'سجّل الآن'}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="w-full bg-gold hover:bg-gold-light text-navy"
-                    onClick={() => setPayDialog({ course: c, open: true })}
-                  >
-                    <Lock className="w-3.5 h-3.5 ml-1" /> اشترك الآن
-                  </Button>
-                )}
+                <div className="text-[10px] text-muted-foreground/80 text-center">
+                  {enrolled
+                    ? '↵ اضغط لفتح الدورة'
+                    : isFree
+                      ? '↵ اضغط للتسجيل والفتح فوراً'
+                      : '↵ اضغط لإكمال الاشتراك'}
+                </div>
               </div>
             </Card>
           )
@@ -978,6 +996,19 @@ function Payments({ payments, userId, courses }: any) {
     return p.currency || 'ر.ي'
   }
 
+  // Extract coupon code from the reference field — stored as
+  // "| COUPON:CODE-HERE". Returns null if no coupon was applied.
+  const getCouponCode = (p: any): string | null => {
+    const ref = p?.reference
+    if (!ref) return null
+    const match = String(ref).match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+    return match ? match[1].toUpperCase() : null
+  }
+
+  // Format currency code for nicer display (e.g. 'ر.ي' stays as is,
+  // '$' gets a small "USD" tooltip-style wrapper).
+  const fmtCurrency = (code: string) => code || 'ر.ي'
+
   const fmtAmount = (p: any) => {
     const amt = typeof p.amount === 'number' ? p.amount : Number(p.amount) || 0
     return amt.toLocaleString('en-US')
@@ -992,7 +1023,12 @@ function Payments({ payments, userId, courses }: any) {
 
   const cleanReference = (ref: string | null | undefined) => {
     if (!ref) return null
-    return ref.replace(/\s*\|\s*PROOF:.*$/i, '').trim() || null
+    // Strip both PROOF: and COUPON: markers so the user sees only the
+    // transaction reference they typed, not the internal storage markers.
+    return ref
+      .replace(/\s*\|\s*PROOF:.*$/i, '')
+      .replace(/\s*\|\s*COUPON:.*$/i, '')
+      .trim() || null
   }
 
   const getProofUrl = (p: any): string | null => {
@@ -1021,19 +1057,30 @@ function Payments({ payments, userId, courses }: any) {
             const ref = cleanReference(p.reference)
             const dateStr = fmtDate(p.date)
             const proofUrl = getProofUrl(p)
+            const couponCode = getCouponCode(p)
+            const currency = getCurrency(p)
+            const hasCoupon = !!couponCode
             return (
-              <Card key={p.id} className="p-0 overflow-hidden border-border card-hover">
-                {/* Amount header */}
-                <div className="bg-gradient-to-br from-navy to-navy-light p-4 text-white">
+              <Card key={p.id} className={`p-0 overflow-hidden card-hover ${hasCoupon ? 'border-l-4 border-l-red-500 ring-1 ring-red-500/20' : 'border-border'}`}>
+                {/* Amount header — has red accent when coupon applied */}
+                <div className={`p-4 text-white ${hasCoupon ? 'bg-gradient-to-br from-red-700 to-red-900' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[11px] text-gold/80 font-semibold mb-0.5">المبلغ</div>
+                      <div className={`text-[11px] font-semibold mb-0.5 ${hasCoupon ? 'text-red-100' : 'text-gold/80'}`}>
+                        {hasCoupon ? '⚠ المبلغ بعد الخصم' : 'المبلغ'}
+                      </div>
                       <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
-                        {fmtAmount(p)} <span className="text-base font-bold text-gold">{getCurrency(p)}</span>
+                        {fmtAmount(p)} <span className={`text-base font-bold ${hasCoupon ? 'text-red-200' : 'text-gold'}`}>{fmtCurrency(currency)}</span>
                       </div>
                     </div>
                     <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>
                   </div>
+                  {hasCoupon && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 bg-red-500/30 border border-red-300/50 rounded-md px-2 py-0.5">
+                      <span className="text-[10px] text-red-100">كوبون خصم:</span>
+                      <span className="text-[11px] font-bold text-white font-mono" dir="ltr">{couponCode}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Receipt thumbnail — opens in-app viewer */}
@@ -1070,6 +1117,10 @@ function Payments({ payments, userId, courses }: any) {
                       <div className="text-[11px] text-muted-foreground mb-0.5">التاريخ</div>
                       <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
                     </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-0.5">العملة</div>
+                    <div className="text-sm font-bold text-navy" dir="ltr">{fmtCurrency(currency)}</div>
                   </div>
                   {ref && (
                     <div>
