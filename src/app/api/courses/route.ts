@@ -146,12 +146,51 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('courses')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+    // === DEFENSIVE WRITE for new columns (original_price, auto_coupon_code) ===
+    // These columns were added by migration 008. If the migration
+    // hasn't been applied yet, OR if PostgREST's schema cache hasn't
+    // refreshed, the update will fail with a "column not found" error.
+    // We try WITH the new fields first; on column-error, retry without
+    // them so the rest of the course can still be saved.
+    const NEW_COLUMNS = ['original_price', 'auto_coupon_code']
+    const hasNewColumns = NEW_COLUMNS.some((c) => c in updates)
+    let data: any = null
+    let error: any = null
+    if (hasNewColumns) {
+      const result = await supabaseAdmin
+        .from('courses')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      data = result.data
+      error = result.error
+      // If the error is about a missing column, retry without the new
+      // columns. This handles both: (a) migration not yet applied, and
+      // (b) PostgREST schema cache stale.
+      if (error && /could not find the column|column .* does not exist|schema cache/i.test(error.message || '')) {
+        const fallback: any = { ...updates }
+        for (const c of NEW_COLUMNS) delete fallback[c]
+        const retry = await supabaseAdmin
+          .from('courses')
+          .update(fallback)
+          .eq('id', id)
+          .select()
+          .single()
+        data = retry.data
+        error = retry.error
+      }
+    } else {
+      const result = await supabaseAdmin
+        .from('courses')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      data = result.data
+      error = result.error
+    }
+
     if (error) throw error
     return NextResponse.json(data)
   } catch (e: any) {
