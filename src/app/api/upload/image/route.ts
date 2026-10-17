@@ -99,32 +99,35 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
   }
 }
 
-// Fallback: store the file locally in /public/uploads/
-// Returns a URL like /uploads/<hash>.<ext> that Next.js serves
-// as a static file. This is the safety net when Telegram is down
-// or the bot token isn't configured.
+// Fallback: store the file locally. On Vercel, /public is read-only,
+// so we use /tmp (writable) and return a data: URI (base64) that
+// works everywhere — no file serving needed. For large files (>2MB),
+// we skip the data URI (too big) and return the error so the caller
+// can retry with Telegram.
 async function uploadLocally(file: File, folder: string): Promise<{ url: string; error?: never }> {
-  // Compute a deterministic filename: <folder>/<random-hash>.<ext>
-  // The random hash ensures we don't collide with other uploads.
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
   const hash = crypto.randomBytes(8).toString('hex')
-  // Sanitize folder name — only allow alphanumeric + dash
   const safeFolder = (folder || 'uploads').replace(/[^a-zA-Z0-9-]/g, '')
   const filename = `${hash}.${ext}`
-  // The path ON DISK — Next.js serves /public/ at the root.
-  const diskDir = path.join(process.cwd(), 'public', safeFolder)
-  const diskPath = path.join(diskDir, filename)
-  // The URL the browser will use to fetch it
-  const publicUrl = `/${safeFolder}/${filename}`
 
+  // Try /tmp first (writable on Vercel + all platforms)
+  const tmpDir = path.join('/tmp', safeFolder)
+  const tmpPath = path.join(tmpDir, filename)
   try {
-    // Ensure the directory exists
-    await fs.mkdir(diskDir, { recursive: true })
-    // Convert File → Buffer and write
+    await fs.mkdir(tmpDir, { recursive: true })
     const arrayBuffer = await file.arrayBuffer()
     const buf = Buffer.from(arrayBuffer)
-    await fs.writeFile(diskPath, buf)
-    return { url: publicUrl }
+    await fs.writeFile(tmpPath, buf)
+    // Convert to data URI so it works without a file server
+    const mime = file.type || 'application/octet-stream'
+    // Only use data URI for small files (<2MB) to avoid huge payloads
+    if (buf.length < 2 * 1024 * 1024) {
+      const b64 = buf.toString('base64')
+      return { url: `data:${mime};base64,${b64}` }
+    }
+    // For larger files, return a /tmp path (won't be served, but at
+    // least the upload technically succeeded — caller can retry)
+    throw new Error('File too large for data URI fallback')
   } catch (e: any) {
     throw new Error(`Local storage failed: ${e.message}`)
   }
