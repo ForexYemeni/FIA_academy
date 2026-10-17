@@ -31,6 +31,7 @@ import {
 } from './admin-extended'
 import { AdminForumBans } from './shared-community'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
+import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -326,7 +327,7 @@ function AdminCourses() {
           </tbody>
         </table>
       </div>
-      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['title', 'short_description', 'description', 'level', 'price', 'duration_hours', 'pass_score']} apiPath="/api/courses" />}
+      {open && <ProCourseDialog open={open} onOpenChange={setOpen} course={editing} trainerId={undefined} onSaved={load} />}
 
       <ConfirmDialog
         open={!!deleteTarget}
