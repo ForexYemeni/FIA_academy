@@ -173,6 +173,23 @@ export function NotificationsBell() {
     // Unlock audio right now (this click counts as a user gesture)
     tryUnlockAudio()
     setAudioUnlocked(true)
+
+    // If browser notification permission isn't granted yet, request
+    // it NOW. The user just clicked a button, which counts as an
+    // "active user gesture" — exactly when browsers will accept a
+    // Notification.requestPermission() call.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try {
+        const perm = await Notification.requestPermission()
+        setNotifPerm(perm)
+        if (perm === 'granted') {
+          toast.success('تم منح إذن الإشعارات المنبثقة ✓')
+        } else if (perm === 'denied') {
+          toast.error('تم رفض الإذن — يمكنك تفعيله لاحقاً من إعدادات المتصفّح')
+        }
+      } catch {}
+    }
+
     try {
       // 1) Send the test notification via API
       const res = await fetch('/api/notifications/test', {
@@ -198,7 +215,12 @@ export function NotificationsBell() {
       announceNotification(testNotif)
       // 3) Also reload notifications to pick up the new row
       setTimeout(load, 200)
-      toast.success('تم إرسال إشعار الاختبار')
+      // 4) Show a status toast about browser notifications
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        toast.success('تم إرسال إشعار الاختبار — تحقق من الإشعار المنبثق الخارجي')
+      } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        toast.warning('الإشعار المنبثق الخارجي مُعطّل — فعّله من إعدادات المتصفّح لرؤية الإشعارات خارج التطبيق')
+      }
     } catch (err) {
       toast.error('خطأ في الاتصال')
     } finally {
