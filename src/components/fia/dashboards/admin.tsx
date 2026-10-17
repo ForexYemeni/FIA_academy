@@ -575,6 +575,27 @@ function AdminPayments() {
 
   const updateStatus = async (id: string, status: string) => {
     await fetch('/api/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+    // If approving payment, also update any duplicate enrollment rows
+    // for the same user+course to the same status — this fixes the
+    // duplicate-row issue where the admin approved one row but the
+    // student's enrollment was reading from the other (un-updated) row.
+    if (status === 'مكتمل') {
+      try {
+        // Find the payment we just updated to get user_id + course_id
+        const updated = items.find(p => p.id === id)
+        if (updated?.user_id && updated?.course_id) {
+          // Find ALL other payment rows for the same user+course
+          const duplicates = items.filter(p => p.user_id === updated.user_id && p.course_id === updated.course_id && p.id !== id)
+          for (const dup of duplicates) {
+            await fetch('/api/payments', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: dup.id, status }),
+            })
+          }
+        }
+      } catch {}
+    }
     toast.success(status === 'مكتمل' ? 'تم قبول الدفع' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
     load()
     setSelectedPayment(null)
