@@ -9,6 +9,7 @@ import { supabasePublic } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
   Send, Loader2, Search, X, MessageCircle, ArrowRight, Users, Trash2,
+  AlertTriangle,
 } from 'lucide-react'
 
 export function ChatWidget({ initialRecipientId, initialRecipientName }: { initialRecipientId?: string; initialRecipientName?: string }) {
@@ -25,6 +26,8 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -69,20 +72,28 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     setTimeout(() => searchRef.current?.focus(), 200)
   }
 
-  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
+  const requestDelete = (convId: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('هل تريد حذف هذه المحادثة بالكامل؟ لا يمكن التراجع.')) return
+    setDeleteTarget({ id: convId, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
       await fetch('/api/chat', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: convId }),
+        body: JSON.stringify({ conversation_id: deleteTarget.id }),
       })
-      setConversations((prev) => prev.filter((c) => c.id !== convId))
-      if (activeConvId === convId) goBack()
+      setConversations((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      if (activeConvId === deleteTarget.id) goBack()
       toast.success('تم حذف المحادثة')
+      setDeleteTarget(null)
     } catch {
       toast.error('فشل الحذف')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -286,7 +297,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                             {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         </button>
-                        <button onClick={(e) => deleteConversation(c.id, e)} className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" title="حذف المحادثة">
+                        <button onClick={(e) => requestDelete(c.id, c.other?.name || 'مستخدم', e)} className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" title="حذف المحادثة">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -330,7 +341,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                 </div>
                 {activeConvId && (
                   <button
-                    onClick={(e) => deleteConversation(activeConvId, e)}
+                    onClick={(e) => requestDelete(activeConvId, otherName, e)}
                     className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 transition-colors"
                     title="حذف المحادثة"
                   >
@@ -410,6 +421,51 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* === DELETE CONFIRMATION CARD — professional === */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { if (!deleting) setDeleteTarget(null) }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Top: red gradient with icon */}
+            <div className="bg-gradient-to-br from-red-500 to-red-600 p-6 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-2">
+                <AlertTriangle className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-white text-lg font-bold">حذف المحادثة</h3>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 text-center">
+              <p className="text-sm text-gray-600 mb-1">سيتم حذف المحادثة بالكامل مع</p>
+              <p className="font-bold text-navy text-base mb-3">{deleteTarget.name}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-xs text-red-600 leading-relaxed">
+                  ⚠️ سيتم حذف جميع الرسائل نهائياً ولا يمكن استعادتها بعد الحذف.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="flex-1 h-11 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="flex-1 h-11 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deleting ? 'جاري الحذف...' : 'حذف نهائي'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>
