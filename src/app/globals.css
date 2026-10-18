@@ -278,3 +278,235 @@ video.fia-video::-internal-media-controls-overlay-cast-button { display: none; }
   animation: swing 1.5s ease-in-out infinite;
   transform-origin: top center;
 }
+
+/* ============================================================================
+ * MOBILE OPTIMIZATION + RESPONSIVE LAYOUT
+ * ========================================================================== */
+
+/* === Safe area insets (iPhone notch + Android edge-to-edge) ===
+ * With viewport-fit=cover, the web app extends into the notch area.
+ * These CSS variables let us add padding so content doesn't go under
+ * the notch. Use as: padding-top: env(safe-area-inset-top);
+ */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* === Mobile viewport height fix ===
+ * On mobile browsers, 100vh includes the address bar height, which
+ * shrinks when the user scrolls. This causes layout jumps. The .h-screen
+ * utility (Tailwind) uses 100vh. We override .h-screen to use 100dvh
+ * (dynamic viewport height) which correctly accounts for the address bar.
+ */
+@supports (height: 100dvh) {
+  .h-screen { height: 100dvh !important; }
+  .min-h-screen { min-height: 100dvh !important; }
+}
+
+/* === Better mobile text rendering ===
+ * -webkit-font-smoothing: antialiased — smoother Arabic text on iOS
+ * text-rendering: optimizeSpeed — faster text rendering at slight cost
+ *   of kerning quality (acceptable for body text)
+ * -webkit-text-size-adjust: 100% — prevent iOS from zooming text when
+ *   the device is rotated
+ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Prevent text selection on UI elements (but allow on form fields
+   * and content). Long-press on a button shouldn't select text. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Allow text selection in form inputs + content areas (override above) */
+input, textarea, [contenteditable], .selectable {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* === Touch targets — minimum 44x44px (Apple HIG + Material Design) ===
+ * On mobile, buttons/tap targets should be at least 44px tall so
+ * users can tap them with their finger without missing. Tailwind's
+ * default sizes for some buttons are too small.
+ */
+@media (max-width: 768px) {
+  button:not(.touch-auto),
+  a[role="button"]:not(.touch-auto),
+  [data-touch-target]:not(.touch-auto) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* === Disable iOS double-tap-to-zoom on UI elements (faster taps) ===
+ * iOS has a 300ms delay on first tap to detect double-tap. Setting
+ * touch-action: manipulation removes the delay.
+ */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* === Better scrolling on mobile (momentum + no chained scroll) ===
+ * -webkit-overflow-scrolling: touch — iOS momentum scrolling
+ * overscroll-behavior: contain — prevent pull-to-refresh from
+ *   scrolling the page behind a modal
+ */
+body {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* === Hide scrollbars on mobile horizontal scroll containers (cleaner UI) === */
+@media (max-width: 768px) {
+  .fia-scroll::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .fia-scroll::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.3);
+    border-radius: 4px;
+  }
+  .fia-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* === Better word-break for Arabic long content (no horizontal overflow) ===
+ * Arabic text doesn't have word boundaries like English, so long
+ * strings (e.g., URLs) can break layout. Use overflow-wrap: anywhere
+ * on body to break long words at any character if needed.
+ */
+body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* === Image loading shimmer effect (perceived performance) ===
+ * Images load with a subtle shimmer background while they fetch,
+ * so the layout doesn't jump and the user sees "something is loading"
+ * instead of a blank box.
+ */
+img[loading="lazy"] {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 37%, rgba(0,0,0,0.04) 63%);
+  background-size: 400% 100%;
+  animation: fia-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes fia-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Remove the shimmer once the image is fully loaded.
+ * We use the JS-loaded class (.img-loaded) instead of the
+ * pseudo-class :loaded which doesn't exist. */
+img.img-loaded {
+  background: none !important;
+  animation: none !important;
+}
+
+/* === Reduce layout shift for images (CLS) ===
+ * Set explicit aspect ratios where possible so the browser reserves
+ * space before the image loads.
+ */
+img[width][height] {
+  height: auto;
+}
+
+/* === Faster CSS transitions on low-end mobile (60fps) ===
+ * Use transform/opacity only (GPU-accelerated, doesn't trigger
+ * layout). Avoid transitioning width/height/top/left which cause
+ * reflow on every frame.
+ */
+.fia-card-hover {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.fia-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(10, 31, 68, 0.12);
+}
+
+/* === Container utility for mobile-first design ===
+ * .fia-container: full-width on mobile, max-width on larger screens
+ */
+.fia-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .fia-container {
+    max-width: 640px;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fia-container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .fia-container {
+    max-width: 1280px;
+  }
+}
+
+/* === Hide elements that should only show on desktop === */
+.fia-mobile-only { display: block; }
+.fia-desktop-only { display: none; }
+
+@media (min-width: 1024px) {
+  .fia-mobile-only { display: none; }
+  .fia-desktop-only { display: block; }
+}
+
+/* === Reduce font sizes slightly on small screens (better fit) === */
+@media (max-width: 480px) {
+  html {
+    font-size: 14px; /* Default 16px → 14px on small phones */
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 769px) {
+  html {
+    font-size: 16px; /* Standard */
+  }
+}
+
+/* === Prevent layout shift from RTL horizontal scroll ===
+ * In RTL mode, the page can sometimes show a horizontal scrollbar
+ * if any element has margin-left/right that pushes content off-screen.
+ * Use overflow-x: hidden on body to prevent this.
+ */
+body {
+  overflow-x: hidden;
+}
+
+/* === Print-friendly (when users print certificates/documents) === */
+@media print {
+  .fia-no-print { display: none !important; }
+  body { background: white !important; color: black !important; }
+}
