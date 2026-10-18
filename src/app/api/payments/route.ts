@@ -53,12 +53,20 @@ export async function POST(req: NextRequest) {
 // the approved status for consistency.
 export async function PUT(req: NextRequest) {
   try {
-    const { id, status, ...otherUpdates } = await req.json()
+    const { id, status, rejection_reason, ...otherUpdates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     if (!status) return NextResponse.json({ error: 'status required' }, { status: 400 })
 
-    // 1) Update the targeted payment row
     const updates: any = { status, ...otherUpdates }
+
+    // Store rejection reason in the reference field
+    if (rejection_reason && (status === 'ملغي' || status === 'cancelled')) {
+      const { data: existing } = await supabaseAdmin
+        .from('payments').select('reference').eq('id', id).maybeSingle()
+      const existingRef = existing?.reference || ''
+      const cleanRef = existingRef.replace(/\s*\|\s*REJECTION:.*$/i, '').trim()
+      updates.reference = cleanRef ? `${cleanRef} | REJECTION: ${rejection_reason}` : `REJECTION: ${rejection_reason}`
+    }
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('payments')
@@ -68,10 +76,7 @@ export async function PUT(req: NextRequest) {
       .single()
     if (updateError) throw updateError
 
-    // 2) If this is an approval, also update duplicate rows for same
-    //    user+course so the student's enrollment reflects the new status.
-    //    (Only for approval, not rejection — rejection should NOT
-    //    update other rows.)
+    // 2) Only update duplicate rows on APPROVAL (not rejection)
     if (status === 'مكتمل' && updated?.user_id && updated?.course_id) {
       try {
         await supabaseAdmin
@@ -92,7 +97,27 @@ export async function PUT(req: NextRequest) {
           await notifyPaymentApproved(updated.user_id, updated.course_id)
           await tgPaymentApproved(updated.user_id, updated.course_id)
         } else if (isRejected) {
-          await notifyPaymentRejected(updated.user_id, updated.course_id)
+          // Include rejection reason in the notification
+          try {
+            const courseTitle = await getCourseTitle(updated.course_id)
+            await supabaseAdmin.from('notifications').insert({
+              user_id: updated.user_id,
+              type: 'payment',
+              title: '❌ تم رفض الدفع',
+              body: rejection_reason
+                ? `تم رفض دفعك لدورة "${courseTitle}". السبب: ${rejection_reason}. يمكنك إعادة الاشتراك برفع إثبات دفع صحيح.`
+                : `تم رفض دفعك لدورة "${courseTitle}". يمكنك إعادة الاشتراك برفع إثبات دفع صحيح.`,
+              link: '/',
+            })
+            const { sendPushNotification } = await import('@/lib/onesignal')
+            await sendPushNotification(updated.user_id,
+              '❌ تم رفض الدفع',
+              rejection_reason
+                ? `دورة "${courseTitle}". السبب: ${rejection_reason}.`
+                : `دورة "${courseTitle}". يمكنك إعادة الاشتراك.`,
+              { type: 'payment', link: '/' }
+            )
+          } catch {}
           await tgReject(updated.user_id, updated.course_id)
         }
       } catch {}
