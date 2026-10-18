@@ -5,6 +5,12 @@ export interface User {
   phone?: string
   password: string
   role: 'admin' | 'trainer' | 'student'
+  /** Team role marker (e.g., 'founder', 'leader', 'team'). Set at login
+   *  time by reading the trainers table's password marker. Used by the
+   *  dashboard shell to render the role badge — we can't parse
+   *  `user.password` directly because the login route never returns
+   *  the actual password to the client (security best practice). */
+  team_role?: string
   avatar?: string | null
   title?: string | null
   bio?: string | null
