@@ -510,3 +510,84 @@ body {
   .fia-no-print { display: none !important; }
   body { background: white !important; color: black !important; }
 }
+
+/* === Dialog/Modal mobile responsive overrides ===
+ * Ensure the dialog's inner card NEVER exceeds the viewport height.
+ * The Dialog component itself centers vertically via flexbox, but
+ * individual dialogs may use sm:max-w-* and add max-h-[90vh] directly.
+ * We add a global rule that the inner card uses max-h-[90dvh] (dynamic)
+ * so it accounts for iOS Safari address bar shrinkage.
+ */
+[data-slot="dialog-content"] > div {
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* For dialogs that have their own max-h + overflow classes, override
+ * them on mobile to use the same flex-col + scrollable body pattern.
+ * The header (DialogHeader) and footer (DialogFooter) are sticky at
+ * top/bottom; the middle section scrolls.
+ */
+@media (max-width: 640px) {
+  [data-slot="dialog-content"] {
+    /* The outer container — center vertically, full screen */
+    padding: 0.5rem !important;
+  }
+  [data-slot="dialog-content"] > div {
+    /* The inner card — constrained to viewport height */
+    max-height: 95dvh !important;
+    width: 100% !important;
+  }
+  /* On mobile, dialogs that don't use the new sticky pattern still
+   * need scroll. The overflow-y-auto classes on individual dialogs
+   * continue to work. */
+  [data-slot="dialog-content"] [data-slot="dialog-header"] {
+    flex-shrink: 0;
+  }
+  [data-slot="dialog-content"] [data-slot="dialog-footer"] {
+    flex-shrink: 0;
+  }
+}
+
+/* Fix: dialogs that previously used translate(-50%, -50%) had no
+ * mobile-specific behavior. With the new flex centering, on very
+ * tall screens the dialog stays centered — good. On short screens
+ * (landscape phones), the dialog respects max-h-[90dvh]. */
+
+/* Prevent text selection in dialog title (looks weird on long-press) */
+[data-slot="dialog-title"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Make the close button more touch-friendly on mobile */
+[data-slot="dialog-close"] {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === Better mobile dialogs for content like blog post viewer,
+ * certificate viewer, etc. that have heavy content === */
+.fia-dialog-content {
+  width: 100%;
+  max-width: 95vw;
+  max-height: 95dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 640px) {
+  .fia-dialog-content {
+    max-width: 32rem; /* sm:max-w-lg */
+  }
+}
+
+@media (min-width: 1024px) {
+  .fia-dialog-content {
+    max-width: 48rem;
+  }
+}
