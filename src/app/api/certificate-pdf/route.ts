@@ -953,6 +953,14 @@ export async function GET(req: NextRequest) {
     const certNum = req.nextUrl.searchParams.get('number')
     const certId = req.nextUrl.searchParams.get('id')
     const format = req.nextUrl.searchParams.get('format') || 'pdf'
+    // `?download=1` forces `Content-Disposition: attachment` instead of
+    // `inline`. This is the difference between "open in browser tab" and
+    // "trigger an actual file download to the device". For the FIA
+    // Android APK (WebView), attachment disposition is what makes the
+    // WebView's DownloadListener fire → the file lands in the
+    // Downloads/Gallery folder. Without this, `window.open()` just
+    // opens a new view and the user has to long-press → save manually.
+    const downloadMode = req.nextUrl.searchParams.get('download') === '1'
 
     if (!certNum && !certId) {
       return NextResponse.json({ error: 'رقم الشهادة أو المعرّف مطلوب' }, { status: 400 })
@@ -999,14 +1007,19 @@ export async function GET(req: NextRequest) {
       const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
       const headers = new Headers()
       headers.set('Content-Type', 'image/png')
-      headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.png"`)
+      // attachment disposition triggers Android WebView's
+      // DownloadListener → file lands in Downloads/Gallery. inline just
+      // opens the image in a viewable tab.
+      const disposition = downloadMode ? 'attachment' : 'inline'
+      headers.set('Content-Disposition', `${disposition}; filename="FIA-Certificate-${cert.certificate_number}.png"`)
       headers.set('Cache-Control', 'public, max-age=3600')
       return new NextResponse(pngBytes, { status: 200, headers })
     } else {
       const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
       const headers = new Headers()
       headers.set('Content-Type', 'application/pdf')
-      headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.pdf"`)
+      const disposition = downloadMode ? 'attachment' : 'inline'
+      headers.set('Content-Disposition', `${disposition}; filename="FIA-Certificate-${cert.certificate_number}.pdf"`)
       headers.set('Cache-Control', 'public, max-age=3600')
       return new NextResponse(pdfBytes, { status: 200, headers })
     }

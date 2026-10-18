@@ -7,10 +7,12 @@ import {
   Loader2, CheckCircle2, X, Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { downloadCertificateFile, isAndroidWebView } from '@/lib/certificate-download'
 
 export function CertificateViewer({ certificate, onClose }: { certificate: any; onClose?: () => void }) {
   const certRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+  const [pdfDownloading, setPdfDownloading] = useState(false)
 
   const issuedAt = certificate.issued_at ? new Date(certificate.issued_at) : null
   const isVerified = certificate.status === 'صالحة'
@@ -19,17 +21,43 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     if (!certRef.current) return
     setDownloading(true)
     try {
-      // Direct approach: use the server-side certificate PDF/PNG generator
-      // which produces a consistent, high-quality image that matches
-      // what's displayed on screen.
-      const pngUrl = `/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png`
-      // Open in new tab — user can long-press to save
-      window.open(pngUrl, '_blank')
-      toast.success('تم فتح الشهادة في تبويب جديد — احفظها من هناك')
+      // Use the shared download helper — works in browsers AND in the
+      // FIA APK (Android WebView). The helper tries blob+anchor first,
+      // falls back to window.open with attachment disposition, and
+      // finally falls back to inline view + manual save. It also calls
+      // the APK's native showToast bridge for in-app confirmation.
+      await downloadCertificateFile({
+        certificateNumber: certificate.certificate_number,
+        format: 'png',
+        onStatus: (msg, kind) => {
+          if (kind === 'success') toast.success(msg)
+          else if (kind === 'error') toast.error(msg)
+          else toast.info(msg)
+        },
+      })
     } catch (e) {
       toast.error('فشل تحميل الشهادة')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  const downloadPdf = async () => {
+    setPdfDownloading(true)
+    try {
+      await downloadCertificateFile({
+        certificateNumber: certificate.certificate_number,
+        format: 'pdf',
+        onStatus: (msg, kind) => {
+          if (kind === 'success') toast.success(msg)
+          else if (kind === 'error') toast.error(msg)
+          else toast.info(msg)
+        },
+      })
+    } catch (e) {
+      toast.error('فشل تحميل PDF')
+    } finally {
+      setPdfDownloading(false)
     }
   }
 
@@ -194,10 +222,19 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         <button onClick={copyCertNumber} className="inline-flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
           <Copy className="w-4 h-4" /> نسخ الرقم
         </button>
-        <button onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=pdf`, '_blank')} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
-          <FileText className="w-4 h-4" /> تنزيل PDF
+        <button onClick={downloadPdf} disabled={pdfDownloading} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50">
+          {pdfDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+          {pdfDownloading ? 'جاري...' : 'تنزيل PDF'}
         </button>
       </div>
+      {/* APK-specific hint — only shown when actually running in the
+          FIA Android WebView, so desktop users don't see irrelevant
+          instructions. */}
+      {isAndroidWebView() && (
+        <p className="text-[10px] text-muted-foreground text-center mt-1">
+          💡 في تطبيق الموبايل: سيتم حفظ الصورة تلقائياً في المعرض. قد يظهر إشعار تأكيد.
+        </p>
+      )}
     </div>
   )
 }
