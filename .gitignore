@@ -65,3 +65,11 @@ server.log
 /prompt
 agent-ctx
 tool-results/
+
+# Android SDK + build artifacts (added during APK build)
+android-sdk/
+android-fia/app/build/
+android-fia/.gradle/
+android-fia/local.properties
+*.apk
+!download/*.apk

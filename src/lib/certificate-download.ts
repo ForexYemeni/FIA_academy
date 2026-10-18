@@ -175,38 +175,105 @@ export async function downloadCertificateFile(
   }
 
   // ====================================================================
-  // PATH 2: FIA APK WebView — NO DownloadListener registered. The
-  // blob+anchor approach silently fails (the WebView just ignores the
-  // navigation). The only honest path is to OPEN the image in a new
-  // view and tell the user to long-press → save manually. The system's
-  // long-press context menu IS built into Android and works in any
-  // WebView window — that's how users save images from any webview-
-  // based app.
+  // PATH 2: FIA APK WebView v2.3.0+ — uses the new
+  // FIANativeBridge.saveImageToGallery(base64, mimeType, filename)
+  // method. This is the GUARANTEED path that actually saves the file
+  // to the gallery — it goes through the APK's MainActivity which
+  // uses MediaStore on Android 10+ (or direct file write on 9 and
+  // below) to write the file to the public Pictures/FIA folder.
+  //
+  // The previous APK had NO DownloadListener and NO saveImageToGallery
+  // method — only `window.open()` worked, and the user had to long-
+  // press to save manually. With v2.3.0+, both fixes are in place:
+  //   - DownloadListener handles any URL with Content-Disposition:
+  //     attachment → goes through DownloadManager → saves to gallery
+  //   - saveImageToGallery(base64, mime, filename) writes base64-
+  //     encoded bytes directly via MediaStore — fastest path, no
+  //     need for a separate download
   // ====================================================================
   vibrateNative()
-  // Use the inline URL — no point adding &download=1 since the
-  // WebView has no listener to honor the Content-Disposition header.
-  // The image just needs to be VIEWABLE for long-press → save to work.
+
+  // Try the bridge method FIRST — it's the most reliable path on
+  // Android 10+ because it uses scoped storage MediaStore directly.
   try {
-    const w = window.open(inlineUrl, '_blank')
-    if (w) {
-      // Honest toast — the user needs to manually save.
-      showNativeToast('افتح الصورة واضغط مطولاً عليها ثم اختر "حفظ الصورة"')
-      onStatus('اضغط مطولاً على الصورة ثم اختر "حفظ الصورة" للمعرض', 'info')
-      return 'open-inline'
+    const bridge = (window as any).FIANativeBridge
+    if (bridge && typeof bridge.saveImageToGallery === 'function' && format === 'png') {
+      const res = await fetch(inlineUrl, { credentials: 'omit' })
+      if (res.ok) {
+        const blob = await res.blob()
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const result = reader.result as string
+            const idx = result.indexOf(',')
+            resolve(idx >= 0 ? result.substring(idx + 1) : result)
+          }
+          reader.onerror = () => reject(new Error('FileReader failed'))
+          reader.readAsDataURL(blob)
+        })
+        const saved = bridge.saveImageToGallery(base64, 'image/png', filename)
+        if (saved) {
+          showNativeToast('تم حفظ الشهادة في المعرض ✓')
+          onStatus('تم تنزيل الشهادة إلى المعرض ✓', 'success')
+          return 'blob'
+        } else {
+          showNativeToast('فشل الحفظ المباشر — جاري فتح الصورة للحفظ اليدوي')
+        }
+      }
     }
-    // window.open itself failed (popup blocked) — try attachment URL
-    const w2 = window.open(attachmentUrl, '_blank')
-    if (w2) {
-      showNativeToast('اضغط مطولاً على الصورة واحفظها للمعرض')
-      onStatus('اضغط مطولاً على الصورة واحفظها للمعرض', 'info')
+    if (bridge && typeof bridge.savePdfToDownloads === 'function' && format === 'pdf') {
+      const res = await fetch(inlineUrl, { credentials: 'omit' })
+      if (res.ok) {
+        const blob = await res.blob()
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const result = reader.result as string
+            const idx = result.indexOf(',')
+            resolve(idx >= 0 ? result.substring(idx + 1) : result)
+          }
+          reader.onerror = () => reject(new Error('FileReader failed'))
+          reader.readAsDataURL(blob)
+        })
+        const saved = bridge.savePdfToDownloads(base64, filename)
+        if (saved) {
+          showNativeToast('تم حفظ ملف PDF في مجلد التنزيلات ✓')
+          onStatus('تم تنزيل PDF إلى مجلد التنزيلات ✓', 'success')
+          return 'blob'
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[FIA] saveImageToGallery bridge call failed:', e?.message)
+  }
+
+  // Fallback: the APK v2.3.0+ now also has a DownloadListener that
+  // handles URLs with Content-Disposition: attachment. We just open
+  // the attachment URL — the DownloadListener fires and DownloadManager
+  // takes over.
+  try {
+    const w = window.open(attachmentUrl, '_blank')
+    if (w) {
+      showNativeToast('جاري تنزيل الشهادة عبر DownloadManager...')
+      onStatus('جاري التنزيل عبر DownloadManager — سيظهر إشعار عند الاكتمال', 'info')
       return 'open-attachment'
     }
   } catch (e: any) {
     console.warn('[FIA] WebView open failed:', e?.message)
   }
 
-  // Total failure — couldn't even open a window
+  // Last resort — inline view + manual save instructions
+  try {
+    const w = window.open(inlineUrl, '_blank')
+    if (w) {
+      showNativeToast('اضغط مطولاً على الصورة واحفظها للمعرض')
+      onStatus('اضغط مطولاً على الصورة واحفظها للمعرض', 'info')
+      return 'open-inline'
+    }
+  } catch (e: any) {
+    console.warn('[FIA] WebView inline open failed:', e?.message)
+  }
+
   showNativeToast('فشل فتح الشهادة — تحقق من اتصالك بالإنترنت')
   onStatus('فشل فتح الشهادة', 'error')
   return 'open-inline'
