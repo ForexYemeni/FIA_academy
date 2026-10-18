@@ -75,30 +75,45 @@ export function Header({ onLoginClick }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-navy/95 backdrop-blur-md border-b border-gold/20">
-      <div className="container mx-auto px-4 lg:px-6">
-        <div className="flex h-16 items-center justify-between">
-          <a href="#home" className="flex items-center gap-2">
-            <img src="/fia/logo-fia.png" alt="FIA" className="h-8 w-8 object-cover rounded-lg flex-shrink-0" />
-            <div className="hidden sm:block">
-              <div className="text-white font-bold text-base leading-tight">أكاديمية المستقبل الدولية</div>
-              <div className="text-gold text-xs font-semibold tracking-wider">FIA — Future International Academy</div>
+    <header
+      className="sticky top-0 z-40 bg-navy/95 backdrop-blur-md border-b border-gold/20"
+      style={{ paddingTop: 'var(--safe-area-top)' }}
+    >
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="flex h-14 sm:h-16 items-center justify-between">
+          <a href="#home" className="flex items-center gap-2 min-w-0 flex-1">
+            <img
+              src="/fia/logo-fia.png"
+              alt="FIA"
+              width={32}
+              height={32}
+              loading="eager"
+              className="h-8 w-8 sm:h-9 sm:w-9 object-cover rounded-lg flex-shrink-0"
+            />
+            <div className="hidden sm:block min-w-0 flex-shrink">
+              <div className="text-white font-bold text-sm sm:text-base leading-tight truncate">أكاديمية المستقبل الدولية</div>
+              <div className="text-gold text-[10px] sm:text-xs font-semibold tracking-wider truncate">FIA — Future International Academy</div>
+            </div>
+            {/* Mobile-only compact name (replaces the long subtitle on phones) */}
+            <div className="sm:hidden min-w-0">
+              <div className="text-white font-bold text-sm leading-tight truncate">أكاديمية المستقبل</div>
+              <div className="text-gold text-[9px] font-semibold tracking-wider truncate">FIA ACADEMY</div>
             </div>
           </a>
 
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 flex-shrink-0">
             {navLinks.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-white/80 hover:text-gold hover:bg-white/5 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                className="text-white/80 hover:text-gold hover:bg-white/5 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               >
                 {l.label}
               </a>
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {user ? (
               <>
                 <Button
