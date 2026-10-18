@@ -292,6 +292,42 @@ export function SharedForum({ user }: { user: any }) {
   useEffect(() => { loadTopics() }, [loadTopics])
   useEffect(() => { checkBan() }, [checkBan])
 
+  // Auto-open a topic when arriving via a deep-link notification.
+  // Notification link format: `/#forum?t=<topic-id>`. The useHashTab hook
+  // in the dashboard shell sets the active tab to `forum`; then this
+  // effect parses `?t=ID` from the hash and fetches the topic + posts.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const applyTopicDeepLink = async () => {
+      const hash = window.location.hash.replace(/^#/, '')
+      if (!hash) return
+      const params = new URLSearchParams(hash.split('?')[1] || hash.split('&').slice(1).join('&'))
+      const tId = params.get('t')
+      if (!tId || !topics.length) return
+      // Find the topic in the loaded list
+      const topic = topics.find((x: any) => x.id === tId)
+      if (topic) {
+        await openTopic(topic)
+        // Clean the hash so refresh doesn't reopen the topic
+        try { history.replaceState(null, '', window.location.pathname + window.location.search) } catch {}
+      } else {
+        // Topic might be in another category — fetch directly
+        try {
+          const r = await fetch(`/api/forum-topics?topic_id=${tId}`)
+          const d = await r.json()
+          if (d && d.id) {
+            await openTopic(d)
+            try { history.replaceState(null, '', window.location.pathname + window.location.search) } catch {}
+          }
+        } catch {}
+      }
+    }
+    applyTopicDeepLink()
+    const handler = () => applyTopicDeepLink()
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [topics])
+
   const openTopic = async (t: any) => {
     setViewingTopic(t)
     const res = await fetch(`/api/forum?topic_id=${t.id}`)

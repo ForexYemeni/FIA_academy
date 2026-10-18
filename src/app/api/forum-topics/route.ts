@@ -57,6 +57,22 @@ export async function GET(req: NextRequest) {
     const categoryId = req.nextUrl.searchParams.get('category_id')
     const slug = req.nextUrl.searchParams.get('slug')
     const userId = req.nextUrl.searchParams.get('user_id') // filter by author
+    const topicId = req.nextUrl.searchParams.get('topic_id')
+
+    // Single-topic deep-link fetch (used by notification deep links
+    // when the topic might be in a different category than the one
+    // currently loaded in the UI). Returns a single enriched topic.
+    if (topicId) {
+      const { data: topic, error } = await supabaseAdmin
+        .from('forum_topics')
+        .select('*')
+        .eq('id', topicId)
+        .maybeSingle()
+      if (error) throw error
+      if (!topic) return NextResponse.json({ error: 'موضوع غير موجود' }, { status: 404 })
+      const profiles = await fetchProfiles([topic.user_id])
+      return NextResponse.json({ ...topic, author: profiles[topic.user_id] || null })
+    }
 
     if (slug && !categoryId) {
       const { data: cat } = await supabaseAdmin

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
+import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -108,6 +109,7 @@ export function getPaymentRecordStatusInfo(status: string | undefined | null): {
 
 export function StudentDashboard() {
   const [active, setActive] = useState('overview')
+  useHashTab(NAV.map((n) => n.id), setActive)
   const [viewingCourse, setViewingCourse] = useState<any | null>(null)
   const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
   const user = useAuth((s) => s.user)

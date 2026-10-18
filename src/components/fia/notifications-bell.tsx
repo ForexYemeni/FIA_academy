@@ -441,10 +441,36 @@ export function NotificationsBell() {
     } catch {}
   }
 
+  // Navigate to a notification link.
+  // For same-path hash-only links like `/#courses`, setting
+  // `window.location.href` correctly updates the URL bar and fires
+  // `hashchange` (browsers special-case this — no reload happens if
+  // only the hash differs). The dashboard's `useHashTab` hook listens
+  // for that event and switches tabs.
+  // For the edge case where the user clicks the same notification twice
+  // (same hash → no `hashchange` fires), we manually dispatch one.
+  const navigateToLink = (link?: string | null) => {
+    if (!link) return
+    try {
+      const url = new URL(link, window.location.origin)
+      const samePath = url.pathname === window.location.pathname
+      const hasHash = url.hash && url.hash.length > 1
+      if (samePath && hasHash && url.hash === window.location.hash) {
+        // Same hash → browser won't fire `hashchange`. Force-fire.
+        window.dispatchEvent(new HashChangeEvent('hashchange'))
+        return
+      }
+      // Different path, different hash, or no hash — let the browser handle it
+      window.location.href = link
+    } catch {
+      window.location.href = link
+    }
+  }
+
   const markOneRead = async (n: any) => {
     if (n.read_at) {
       // Already read — navigate if there's a link
-      if (n.link) window.location.href = n.link
+      navigateToLink(n.link)
       return
     }
     // Mark as read locally + via API
@@ -456,7 +482,7 @@ export function NotificationsBell() {
         body: JSON.stringify({ ids: [n.id] }),
       })
     } catch {}
-    if (n.link) window.location.href = n.link
+    navigateToLink(n.link)
   }
 
   if (!user) return null

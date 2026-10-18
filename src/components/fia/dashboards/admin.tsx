@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
+import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -65,6 +66,7 @@ const NAV: NavItem[] = [
 
 export function AdminDashboard() {
   const [active, setActive] = useState('overview')
+  useHashTab(NAV.map((n) => n.id), setActive)
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)
   const updateUser = useAuth((s) => s.updateUser)

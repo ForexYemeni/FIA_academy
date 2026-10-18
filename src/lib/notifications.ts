@@ -226,22 +226,23 @@ export async function notifyForumTopicCreated(userId: string, topicTitle: string
   const userName = await getUserName(userId)
   const admins = await getAdminIds()
   await sendToMany(admins, 'forum', 'موضوع جديد في المنتدى',
-    `نشر "${userName}" موضوعاً جديداً: "${topicTitle}".`, '/forum')
-  const link = topicId ? `/forum?topic=${topicId}` : '/forum'
+    `نشر "${userName}" موضوعاً جديداً: "${topicTitle}".`, '/#forum')
+  const link = topicId ? `/#forum?t=${topicId}` : '/#forum'
   await send(userId, 'forum', 'تم نشر موضوعك',
     `تم نشر موضوعك "${topicTitle}" بنجاح في المنتدى.`, link)
 }
 
 /** New reply on a forum topic. Notify the original poster + admins. */
-export async function notifyForumReplyPosted(replierId: string, topicTitle: string, originalPosterId?: string | null) {
+export async function notifyForumReplyPosted(replierId: string, topicTitle: string, originalPosterId?: string | null, topicId?: string) {
   const replierName = await getUserName(replierId)
+  const link = topicId ? `/#forum?t=${topicId}` : '/#forum'
   if (originalPosterId && originalPosterId !== replierId) {
     await send(originalPosterId, 'forum', 'رد جديد على موضوعك',
-      `ردّ "${replierName}" على موضوعك "${topicTitle}".`, '/forum')
+      `ردّ "${replierName}" على موضوعك "${topicTitle}".`, link)
   }
   const admins = await getAdminIds()
   await sendToMany(admins, 'forum', 'رد جديد في المنتدى',
-    `ردّ "${replierName}" على موضوع "${topicTitle}".`, '/forum')
+    `ردّ "${replierName}" على موضوع "${topicTitle}".`, '/#forum')
 }
 
 // === CONTACT MESSAGE EVENTS ===
