@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, FileText, Users, CreditCard,
+     6→  Award, GraduationCap, Building2, Shield, UserCog, Settings,
+     7→  BarChart3, ScrollText, Plus, Edit, Trash2, Eye, EyeOff,
+     8→  DollarSign, TrendingUp, Activity, Star, ArrowRight,
+     9→  Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
+    10→  Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
+    11→  Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
+    12→  Eraser, Brush,
+    13→} from 'lucide-react'
+    14→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    15→import { useAuth } from '@/lib/auth-store'
+    16→import { useHashTab } from '@/lib/use-hash-tab'
+    17→import { Button } from '@/components/ui/button'
+    18→import { Card } from '@/components/ui/card'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Input } from '@/components/ui/input'
+    21→import { Label } from '@/components/ui/label'
+    22→import { Textarea } from '@/components/ui/textarea'
+    23→import { Switch } from '@/components/ui/switch'
+    24→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+    25→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    26→import { toast } from 'sonner'
+    27→import { TeamEditor } from '@/components/fia/team-editor'
+    28→import { CourseContentManager } from '@/components/fia/course-content-manager'
+    29→import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+    30→import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
+    31→import {
+    32→  AdminCoupons, AdminAffiliates, AdminExamQuestions, AdminReviews,
+    33→  AdminForum, AdminBlog, AdminContact, AdminFaqs,
+    34→} from './admin-extended'
+    35→import { AdminForumBans } from './shared-community'
+    36→import { CertificateViewer } from '@/components/fia/certificate-viewer'
+    37→import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
+    38→
+    39→const NAV: NavItem[] = [
+    40→  { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
+    41→  { id: 'courses', label: 'الدورات', icon: BookOpen },
+    42→  { id: 'content', label: 'محتوى الدورات', icon: FileText },
+    43→  { id: 'exams', label: 'الاختبارات', icon: FileText },
+    44→  { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle },
+    45→  { id: 'students', label: 'المتدربون', icon: Users },
+    46→  { id: 'payments', label: 'المدفوعات', icon: CreditCard },
+    47→  { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
+    48→  { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
+    49→  { id: 'affiliates', label: 'المسوّقون', icon: Users },
+    50→  { id: 'certificates', label: 'الشهادات', icon: Award },  // Re-enabled
+    51→  { id: 'trainers', label: 'المدربون', icon: GraduationCap },
+    52→  { id: 'reviews', label: 'تقييمات المتدربين', icon: Star },
+    53→  { id: 'partners', label: 'الشركاء', icon: Building2 },
+    54→  { id: 'licenses', label: 'التراخيص', icon: Shield },
+    55→  { id: 'founder', label: 'المؤسس والفريق', icon: UserCog },
+    56→  { id: 'blog', label: 'المدونة', icon: Newspaper },
+    57→  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+    58→  { id: 'forum-bans', label: 'حظر المنتدى', icon: Ban },
+    59→  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
+    60→  { id: 'contact', label: 'صندوق الرسائل', icon: Mail },
+    61→  { id: 'site', label: 'إعدادات الموقع', icon: Settings },
+    62→  { id: 'account', label: 'الحساب والأمان', icon: User },
+    63→  { id: 'reports', label: 'التقارير', icon: BarChart3 },
+    64→  { id: 'logs', label: 'سجل العمليات', icon: ScrollText },
+    65→]
+    66→
+    67→export function AdminDashboard() {
+    68→  const [active, setActive] = useState('overview')
+    69→  useHashTab(NAV.map((n) => n.id), setActive)
+    70→  const [contentCourseId, setContentCourseId] = useState<string | null>(null)
+    71→  const user = useAuth((s) => s.user)
+    72→  const updateUser = useAuth((s) => s.updateUser)
+    73→  const logout = useAuth((s) => s.logout)
+    74→
+    75→  return (
+    76→    <DashboardShell
+    77→      nav={NAV}
+    78→      active={active}
+    79→      onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
+    80→      roleLabel="مدير"
+    81→      roleColor="bg-red-500/15 text-red-600 border-red-500/30"
+    82→    >
+    83→      {active === 'overview' && <AdminOverview />}
+    84→      {active === 'courses' && <AdminCourses />}
+    85→      {active === 'content' && (
+    86→        <AdminContent
+    87→          contentCourseId={contentCourseId}
+    88→          setContentCourseId={setContentCourseId}
+    89→        />
+    90→      )}
+    91→      {active === 'exams' && <AdminExams />}
+    92→      {active === 'exam-questions' && <AdminExamQuestions />}
+    93→      {active === 'students' && <AdminStudents />}
+    94→      {active === 'payments' && <AdminPayments />}
+    95→      {active === 'payment-methods' && <AdminPaymentMethods />}
+    96→      {active === 'coupons' && <AdminCoupons />}
+    97→      {active === 'affiliates' && <AdminAffiliates />}
+    98→      {/* Certificate management — re-enabled */}
+    99→      {active === 'certificates' && <AdminCertificates />}
+   100→      {active === 'trainers' && <AdminTrainers />}
+   101→      {active === 'reviews' && <AdminReviews />}
+   102→      {active === 'partners' && <AdminPartners />}
+   103→      {active === 'licenses' && <AdminLicenses />}
+   104→      {active === 'founder' && <AdminFounder user={user} />}
+   105→      {active === 'blog' && <AdminBlog />}
+   106→      {active === 'forum' && <AdminForum />}
+   107→      {active === 'forum-bans' && <AdminForumBans />}
+   108→      {active === 'faqs' && <AdminFaqs />}
+   109→      {active === 'contact' && <AdminContact />}
+   110→      {active === 'site' && <AdminSite />}
+   111→      {active === 'account' && <AdminAccount user={user} updateUser={updateUser} logout={logout} />}
+   112→      {active === 'reports' && <AdminReports />}
+   113→      {active === 'logs' && <AdminLogs />}
+   114→    </DashboardShell>
+   115→  )
+   116→}
+   117→
+   118→// ============== Admin Content Viewer (all courses + lessons) ==============
+   119→function AdminContent({ contentCourseId, setContentCourseId }: any) {
+   120→  const [courses, setCourses] = useState<any[]>([])
+   121→  const [enrollmentsByCourse, setEnrollmentsByCourse] = useState<Record<string, number>>({})
+   122→
+   123→  // Load courses + ALL enrollments (no user filter) so we can show the
+   124→  // real enrolled-students count per course. The legacy `c.enrolled`
+   125→  // column is never updated when a student enrolls, so we have to
+   126→  // compute the count from the payments/enrollments table.
+   127→  useEffect(() => {
+   128→    Promise.all([
+   129→      fetch('/api/courses').then((r) => r.json()).catch(() => []),
+   130→      fetch('/api/enrollments').then((r) => r.json()).catch(() => []),
+   131→    ]).then(([c, e]: any) => {
+   132→      setCourses(Array.isArray(c) ? c : [])
+   133→      const list: any[] = Array.isArray(e) ? e : []
+   134→      // Count active enrollments — only those that have real access:
+   135→      //   payment_status in ['free', 'confirmed', 'completed']
+   136→      // Skip 'pending' (payment not yet approved) and any
+   137→      // cancelled/failed enrollments.
+   138→      const counts: Record<string, number> = {}
+   139→      for (const enr of list) {
+   140→        if (!enr?.course_id) continue
+   141→        const ps = enr.payment_status
+   142→        // Defensive: accept the canonical normalized values, AND
+   143→        // the raw status 'مكتمل'/'completed' as a fallback (in case
+   144→        // the toEnrollment normalization in the API missed an edge
+   145→        // case, the count should still reflect reality).
+   146→        const rawStatus = (enr.status || '').trim()
+   147→        const isApproved =
+   148→          ps === 'free' ||
+   149→          ps === 'confirmed' ||
+   150→          ps === 'completed' ||
+   151→          rawStatus === 'مكتمل' ||
+   152→          rawStatus === 'completed' ||
+   153→          rawStatus === 'paid'
+   154→        if (!isApproved) continue
+   155→        counts[enr.course_id] = (counts[enr.course_id] || 0) + 1
+   156→      }
+   157→      setEnrollmentsByCourse(counts)
+   158→    })
+   159→  }, [])
+   160→
+   161→  // Helper to get actual enrolled count for a course
+   162→  const enrolledCount = (courseId: string) => enrollmentsByCourse[courseId] || 0
+   163→
+   164→  if (contentCourseId) {
+   165→    return (
+   166→      <div className="space-y-4">
+   167→        <Button variant="ghost" onClick={() => setContentCourseId(null)} className="text-navy hover:bg-navy/5">
+   168→          <ArrowRight className="w-4 h-4 ml-1" /> العودة لقائمة الدورات
+   169→        </Button>
+   170→        <CourseContentManager courseId={contentCourseId} />
+   171→      </div>
+   172→    )
+   173→  }
+   174→
+   175→  return (
+   176→    <SectionCard
+   177→      title="محتوى الدورات"
+   178→      description="تصفّح كل الدورات والدروس"
+   179→    >
+   180→      {courses.length === 0 ? (
+   181→        <div className="text-center py-12">
+   182→          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   183→          <p className="text-muted-foreground">لا توجد دورات بعد</p>
+   184→        </div>
+   185→      ) : (
+   186→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   187→          {courses.map((c: any) => {
+   188→            const isFree = c.price_type === 'مجانية' || c.price === 0
+   189→            return (
+   190→              <Card key={c.id} className="overflow-hidden card-hover">
+   191→                <div className="h-32 bg-navy relative">
+   192→                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   193→                  <div className="absolute top-2 right-2 flex gap-1">
+   194→                    <Badge className="bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+   195→                  </div>
+   196→                  <div className="absolute top-2 left-2">
+   197→                    <Badge className={isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}>
+   198→                      {isFree ? 'مجانية' : 'مدفوعة'}
+   199→                    </Badge>
+   200→                  </div>
+   201→                </div>
+   202→                <div className="p-4">
+   203→                  <h3 className="font-bold text-navy text-sm mb-2 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+   204→                  <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   205→                    <span>{c.modules_count || 0} وحدة</span>
+   206→                    <span>{c.lessons_count || 0} درس</span>
+   207→                    <span>{c.duration_hours || 0} ساعة</span>
+   208→                  </div>
+   209→                  <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
+   210→                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-navy/10 text-navy font-bold text-[10px]">
+   211→                      {enrolledCount(c.id)}
+   212→                    </span>
+   213→                    <span>متدرب مسجّل فعلياً</span>
+   214→                  </div>
+   215→                  <Button
+   216→                    size="sm"
+   217→                    className="w-full bg-navy hover:bg-navy-light"
+   218→                    onClick={() => setContentCourseId(c.id)}
+   219→                  >
+   220→                    <FileText className="w-3.5 h-3.5 ml-1" /> عرض المحتوى
+   221→                  </Button>
+   222→                </div>
+   223→              </Card>
+   224→            )
+   225→          })}
+   226→        </div>
+   227→      )}
+   228→    </SectionCard>
+   229→  )
+   230→}
+   231→
+   232→function AdminOverview() {
+   233→  const [stats, setStats] = useState({
+   234→    courses: 0, trainers: 0, students: 0, payments: 0,
+   235→    pendingPayments: 0, completedEnrollments: 0, activeEnrollments: 0,
+   236→    // Revenue grouped by currency. Each entry: { currency, total, count, paid_count, pending_count, pending_total }
+   237→    revenueByCurrency: [] as any[],
+   238→  })
+   239→
+   240→  // Get the course lookup map so we can resolve a payment's currency
+   241→  // from the course (source of truth) when the payment row itself
+   242→  // has the wrong/missing currency (legacy rows default to 'ر.ي').
+   243→  const [courses, setCourses] = useState<any[]>([])
+   244→
+   245→  useEffect(() => {
+   246→    Promise.all([
+   247→      fetch('/api/courses').then((r) => r.json()),
+   248→      fetch('/api/trainers').then((r) => r.json()),
+   249→      fetch('/api/students?role=student').then((r) => r.json()),
+   250→      fetch('/api/payments').then((r) => r.json()),
+   251→      fetch('/api/enrollments').then((r) => r.json()),
+   252→    ]).then(([c, t, s, p, e]) => {
+   253→      const coursesArr = Array.isArray(c) ? c : []
+   254→      const trainers = Array.isArray(t) ? t : []
+   255→      const students = Array.isArray(s) ? s : []
+   256→      const payments = Array.isArray(p) ? p : []
+   257→      const enrollments = Array.isArray(e) ? e : []
+   258→
+   259→      setCourses(coursesArr)
+   260→
+   261→      // Build a course-id → course map for currency resolution
+   262→      const courseMap = new Map<string, any>()
+   263→      for (const c of coursesArr) courseMap.set(c.id, c)
+   264→
+   265→      // Determine currency for a payment: prefer the course's currency,
+   266→      // then the payment's stored currency, then default 'ر.ي'.
+   267→      const resolveCurrency = (pay: any): string => {
+   268→        if (pay.course_id) {
+   269→          const c = courseMap.get(pay.course_id)
+   270→          if (c?.currency) return c.currency
+   271→        }
+   272→        return pay.currency || 'ر.ي'
+   273→      }
+   274→
+   275→      // Group all payments by currency. For each currency, we compute:
+   276→      //   total            = sum of amounts for COMPLETED payments
+   277→      //   pending_total    = sum of amounts for PENDING payments
+   278→      //   paid_count       = number of completed payments
+   279→      //   pending_count    = number of pending payments
+   280→      const groups: Record<string, { total: number; pending_total: number; paid_count: number; pending_count: number }> = {}
+   281→      for (const pay of payments) {
+   282→        const cur = resolveCurrency(pay)
+   283→        if (!groups[cur]) groups[cur] = { total: 0, pending_total: 0, paid_count: 0, pending_count: 0 }
+   284→        if (pay.status === 'مكتمل' || pay.status === 'completed' || pay.status === 'paid') {
+   285→          groups[cur].total += Number(pay.amount) || 0
+   286→          groups[cur].paid_count += 1
+   287→        } else if (pay.status === 'قيد الانتظار' || pay.status === 'pending') {
+   288→          groups[cur].pending_total += Number(pay.amount) || 0
+   289→          groups[cur].pending_count += 1
+   290→        }
+   291→      }
+   292→      const revenueByCurrency = Object.entries(groups).map(([currency, g]) => ({
+   293→        currency, ...g,
+   294→      })).sort((a, b) => b.total - a.total)
+   295→
+   296→      setStats({
+   297→        courses: coursesArr.length,
+   298→        trainers: trainers.length,
+   299→        students: students.length,
+   300→        payments: payments.length,
+   301→        pendingPayments: payments.filter(p => p.status === 'قيد الانتظار' || p.status === 'pending').length,
+   302→        completedEnrollments: enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length,
+   303→        activeEnrollments: enrollments.filter(e => e.status === 'active').length,
+   304→        revenueByCurrency,
+   305→      })
+   306→    }).catch(() => {})
+   307→  }, [])
+   308→
+   309→  // Pretty currency formatter — group digits, append the currency code
+   310→  const fmt = (amount: number, currency: string) => `${amount.toLocaleString('en-US')} ${currency}`
+   311→
+   312→  return (
+   313→    <div className="space-y-6">
+   314→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   315→        <h2 className="text-2xl font-bold mb-1">لوحة تحكم الإدارة 👑</h2>
+   316→        <p className="text-white/80">نظرة شاملة على المنصة</p>
+   317→      </div>
+   318→
+   319→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   320→        <StatCard icon={BookOpen} label="إجمالي الدورات" value={stats.courses} color="navy" />
+   321→        <StatCard icon={GraduationCap} label="المدربون" value={stats.trainers} color="gold" />
+   322→        <StatCard icon={Users} label="المتدربون" value={stats.students} color="blue" />
+   323→        <StatCard icon={CreditCard} label="المعاملات" value={stats.payments} color="green" />
+   324→      </div>
+   325→
+   326→      {/* ========= PROFESSIONAL FINANCIAL OVERVIEW ========= */}
+   327→      <SectionCard title="نظرة عامة مالية" description="الإيرادات الفعلية مجمّعة حسب العملة">
+   328→        {stats.revenueByCurrency.length === 0 ? (
+   329→          <div className="text-center py-10 text-muted-foreground">
+   330→            <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   331→            <p>لا توجد معاملات بعد</p>
+   332→          </div>
+   333→        ) : (
+   334→          <div className="space-y-6">
+   335→            {/* Currency cards — one per currency, professional layout */}
+   336→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   337→              {stats.revenueByCurrency.map((rev) => {
+   338→                const isUSD = rev.currency === '$' || rev.currency === 'USD'
+   339→                const isSAR = rev.currency === 'ر.س'
+   340→                const gradient = isUSD
+   341→                  ? 'from-emerald-600 to-emerald-800'
+   342→                  : isSAR
+   343→                    ? 'from-blue-700 to-blue-900'
+   344→                    : 'from-navy to-navy-light'
+   345→                const accent = isUSD ? 'text-emerald-300' : isSAR ? 'text-blue-300' : 'text-gold'
+   346→                return (
+   347→                  <div
+   348→                    key={rev.currency}
+   349→                    className={`relative bg-gradient-to-br ${gradient} text-white p-5 rounded-2xl shadow-lg overflow-hidden`}
+   350→                  >
+   351→                    {/* Decorative currency icon in background */}
+   352→                    <div className="absolute -left-4 -bottom-4 text-white/10 text-7xl font-bold select-none">
+   353→                      {rev.currency}
+   354→                    </div>
+   355→                    <div className="relative">
+   356→                      <div className="flex items-center justify-between mb-3">
+   357→                        <div className="flex items-center gap-2">
+   358→                          <DollarSign className={`w-5 h-5 ${accent}`} />
+   359→                          <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">العملة</span>
+   360→                        </div>
+   361→                        <span className="text-base font-extrabold bg-white/15 px-2 py-0.5 rounded-md" dir="ltr">
+   362→                          {rev.currency}
+   363→                        </span>
+   364→                      </div>
+   365→                      {/* Total completed revenue — the headline number */}
+   366→                      <div className="mb-3">
+   367→                        <div className="text-[11px] text-white/70 mb-0.5">إجمالي الإيرادات المكتملة</div>
+   368→                        <div className="text-3xl font-extrabold tracking-tight" dir="ltr">
+   369→                          {fmt(rev.total, rev.currency)}
+   370→                        </div>
+   371→                      </div>
+   372→                      {/* Pending row */}
+   373→                      <div className="border-t border-white/15 pt-2 grid grid-cols-2 gap-2 text-xs">
+   374→                        <div>
+   375→                          <div className="text-white/70">قيد الانتظار</div>
+   376→                          <div className="font-bold" dir="ltr">{fmt(rev.pending_total, rev.currency)}</div>
+   377→                          <div className="text-[10px] text-white/60">{rev.pending_count} معاملة</div>
+   378→                        </div>
+   379→                        <div>
+   380→                          <div className="text-white/70">مكتملة</div>
+   381→                          <div className="font-bold" dir="ltr">{fmt(rev.total, rev.currency)}</div>
+   382→                          <div className="text-[10px] text-white/60">{rev.paid_count} معاملة</div>
+   383→                        </div>
+   384→                      </div>
+   385→                    </div>
+   386→                  </div>
+   387→                )
+   388→              })}
+   389→            </div>
+   390→
+   391→            {/* Summary cards — count-based metrics (currency-agnostic) */}
+   392→            <div className="grid sm:grid-cols-3 gap-4">
+   393→              <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
+   394→                <Clock className="w-6 h-6 mb-2" />
+   395→                <div className="text-2xl font-bold">{stats.pendingPayments}</div>
+   396→                <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
+   397→              </div>
+   398→              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+   399→                <CheckCircle2 className="w-6 h-6 mb-2" />
+   400→                <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
+   401→                <div className="text-white/80 text-sm">دورات مكتملة</div>
+   402→              </div>
+   403→              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
+   404→                <Activity className="w-6 h-6 mb-2" />
+   405→                <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
+   406→                <div className="text-white/80 text-sm">تسجيلات نشطة</div>
+   407→              </div>
+   408→            </div>
+   409→          </div>
+   410→        )}
+   411→      </SectionCard>
+   412→    </div>
+   413→  )
+   414→}
+   415→
+   416→// ============== COURSES ==============
+   417→function AdminCourses() {
+   418→  const [items, setItems] = useState<any[]>([])
+   419→  const [loading, setLoading] = useState(true)
+   420→  const [editing, setEditing] = useState<any | null>(null)
+   421→  const [open, setOpen] = useState(false)
+   422→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   423→  const [deleting, setDeleting] = useState(false)
+   424→
+   425→  const load = () => {
+   426→    setLoading(true)
+   427→    fetch('/api/courses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+   428→  }
+   429→  useEffect(() => { load() }, [])
+   430→
+   431→  const handleDelete = async () => {
+   432→    if (!deleteTarget) return
+   433→    setDeleting(true)
+   434→    try {
+   435→      await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   436→      toast.success('تم الحذف')
+   437→      setDeleteTarget(null)
+   438→      load()
+   439→    } finally {
+   440→      setDeleting(false)
+   441→    }
+   442→  }
+   443→
+   444→  return (
+   445→    <SectionCard
+   446→      title="إدارة الدورات"
+   447→      description={`${items.length} دورة`}
+   448→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+   449→    >
+   450→      <div className="overflow-x-auto">
+   451→        <table className="w-full text-sm">
+   452→          <thead>
+   453→            <tr className="border-b border-border text-right text-muted-foreground">
+   454→              <th className="py-3 px-2">العنوان</th>
+   455→              <th className="py-3 px-2">المستوى</th>
+   456→              <th className="py-3 px-2">السعر</th>
+   457→              <th className="py-3 px-2">الحالة</th>
+   458→              <th className="py-3 px-2">إجراءات</th>
+   459→            </tr>
+   460→          </thead>
+   461→          <tbody>
+   462→            {items.map((c) => (
+   463→              <tr key={c.id} className="border-b border-border">
+   464→                <td className="py-3 px-2 font-medium text-navy">{c.title}</td>
+   465→                <td className="py-3 px-2">{c.level}</td>
+   466→                <td className="py-3 px-2">{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency}`}</td>
+   467→                <td className="py-3 px-2"><Badge className="bg-green-500/15 text-green-600 border-green-500/30">{c.status}</Badge></td>
+   468→                <td className="py-3 px-2">
+   469→                  <div className="flex gap-1">
+   470→                    <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-4 h-4 text-navy" /></Button>
+   471→                    <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(c)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+   472→                  </div>
+   473→                </td>
+   474→              </tr>
+   475→            ))}
+   476→            {!items.length && !loading && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد دورات</td></tr>}
+   477→          </tbody>
+   478→        </table>
+   479→      </div>
+   480→      {open && <ProCourseDialog open={open} onOpenChange={setOpen} course={editing} trainerId={undefined} onSaved={load} />}
+   481→
+   482→      {/* Password-confirmation dialog for course deletion. The user must
+   483→          type their account password to confirm — protects against
+   484→          accidental destructive deletes. */}
+   485→      <PasswordConfirmDialog
+   486→        open={!!deleteTarget}
+   487→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+   488→        title="تأكيد حذف الدورة"
+   489→        message="سيتم حذف جميع تفاصيل الدورة نهائياً: التقييمات، الشهادات، المدفوعات، الوحدات والدروس. لا يمكن التراجع عن هذا الإجراء."
+   490→        itemLabel="سيتم حذف الدورة التالية:"
+   491→        itemName={deleteTarget?.title}
+   492→        confirmLabel="حذف نهائي"
+   493→        onConfirm={handleDelete}
+   494→        loading={deleting}
+   495→      />
+   496→    </SectionCard>
+   497→  )
+   498→}
+   499→
+   500→function AdminExams() {
+   501→  return (
+   502→    <SectionCard title="الاختبارات" description="إدارة الاختبارات">
+   503→      <div className="text-center py-12">
+   504→        <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   505→        <p className="text-muted-foreground mb-4">لا توجد اختبارات</p>
+   506→        <Button className="bg-navy hover:bg-navy-light"><Plus className="w-4 h-4 ml-1" /> اختبار جديد</Button>
+   507→      </div>
+   508→    </SectionCard>
+   509→  )
+   510→}
+   511→
+   512→function AdminStudents() {
+   513→  const [items, setItems] = useState<any[]>([])
+   514→  const [courses, setCourses] = useState<any[]>([])
+   515→  const [enrollments, setEnrollments] = useState<any[]>([])
+   516→  const [search, setSearch] = useState('')
+   517→  const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
+   518→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   519→  const [deleting, setDeleting] = useState(false)
+   520→
+   521→  useEffect(() => {
+   522→    fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   523→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+   524→    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+   525→  }, [])
+   526→
+   527→  const handleDelete = async () => {
+   528→    if (!deleteTarget) return
+   529→    setDeleting(true)
+   530→    try {
+   531→      await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   532→      toast.success('تم الحذف')
+   533→      setItems(items.filter((s) => s.id !== deleteTarget.id))
+   534→      setDeleteTarget(null)
+   535→      setSelectedStudent(null)
+   536→    } finally {
+   537→      setDeleting(false)
+   538→    }
+   539→  }
+   540→
+   541→  const filtered = items.filter(s => {
+   542→    if (!search.trim()) return true
+   543→    const q = search.toLowerCase()
+   544→    return (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q) || (s.phone || '').includes(q)
+   545→  })
+   546→
+   547→  // Get student's enrollments
+   548→  const getStudentEnrollments = (studentId: string) => enrollments.filter(e => e.user_id === studentId)
+   549→
+   550→  return (
+   551→    <SectionCard title="المتدربون" description={`${filtered.length} متدرب`}>
+   552→      <div className="flex gap-2 mb-4">
+   553→        <Input placeholder="بحث بالاسم أو البريد أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+   554→      </div>
+   555→
+   556→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   557→        {filtered.map((s) => {
+   558→          const sEnrs = getStudentEnrollments(s.id)
+   559→          return (
+   560→            <Card key={s.id} className="overflow-hidden card-hover">
+   561→              <div className="p-4 bg-fia-gradient text-white">
+   562→                <div className="flex items-center gap-3">
+   563→                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold/30 flex-shrink-0 bg-navy-light">
+   564→                    {s.avatar ? (
+   565→                      <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+   566→                    ) : (
+   567→                      <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl">{s.name?.charAt(0)}</div>
+   568→                    )}
+   569→                  </div>
+   570→                  <div className="flex-1 min-w-0">
+   571→                    <div className="font-bold text-sm truncate">{s.name}</div>
+   572→                    <div className="text-xs text-white/70 truncate" dir="ltr">{s.email}</div>
+   573→                  </div>
+   574→                </div>
+   575→              </div>
+   576→              <div className="p-4 space-y-2">
+   577→                {s.phone && (
+   578→                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   579→                    <span>📞</span><span dir="ltr">{s.phone}</span>
+   580→                  </div>
+   581→                )}
+   582→                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   583→                  <span>📅</span><span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+   584→                </div>
+   585→                <div className="flex items-center gap-2 text-xs">
+   586→                  <span>📚</span>
+   587→                  <span className="font-semibold text-navy">{sEnrs.length} دورة مسجّلة</span>
+   588→                </div>
+   589→                {sEnrs.slice(0, 2).map((e) => {
+   590→                  const c = courses.find(co => co.id === e.course_id)
+   591→                  return c ? (
+   592→                    <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
+   593→                      <span className="truncate">{c.title}</span>
+   594→                      <Badge className={
+   595→                        e.status === 'completed' || e.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
+   596→                        : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-[10px]'
+   597→                        : 'bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]'
+   598→                      }>
+   599→                        {e.status === 'completed' || e.status === 'مكتمل' ? 'مكتمل'  : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   600→                      </Badge>
+   601→                    </div>
+   602→                  ) : null
+   603→                })}
+   604→                {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground">+{sEnrs.length - 2} دورة أخرى</div>}
+   605→              </div>
+   606→              <div className="flex gap-1 p-3 pt-0">
+   607→                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
+   608→                <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(s)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
+   609→              </div>
+   610→            </Card>
+   611→          )
+   612→        })}
+   613→      </div>
+   614→
+   615→      {filtered.length === 0 && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
+   616→
+   617→      {/* Student detail modal */}
+   618→      {selectedStudent && (
+   619→        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedStudent(null) }}>
+   620→          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+   621→            <DialogHeader><DialogTitle>تفاصيل المتدرب</DialogTitle></DialogHeader>
+   622→            <div className="space-y-4 py-4">
+   623→              <div className="flex items-center gap-4 p-4 bg-fia-gradient rounded-lg text-white">
+   624→                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/30 bg-navy-light">
+   625→                  {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gold font-bold text-2xl">{selectedStudent.name?.charAt(0)}</div>}
+   626→                </div>
+   627→                <div>
+   628→                  <div className="font-bold text-lg">{selectedStudent.name}</div>
+   629→                  <div className="text-xs text-white/70" dir="ltr">{selectedStudent.email}</div>
+   630→                </div>
+   631→              </div>
+   632→              <div className="grid grid-cols-2 gap-3">
+   633→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
+   634→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
+   635→              </div>
+   636→              <div>
+   637→                <h4 className="font-bold text-navy text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
+   638→                <div className="space-y-2">
+   639→                  {getStudentEnrollments(selectedStudent.id).map((e) => {
+   640→                    const c = courses.find(co => co.id === e.course_id)
+   641→                    if (!c) return null
+   642→                    const isFree = c.price_type === 'مجانية' || c.price === 0
+   643→                    const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+   644→                    return (
+   645→                      <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+   646→                        <div className="flex-1 min-w-0">
+   647→                          <div className="font-medium text-navy text-sm truncate">{c.title}</div>
+   648→                          <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
+   649→                        </div>
+   650→                        <div className="flex items-center gap-2 flex-shrink-0">
+   651→                          {/* DISABLED: certificate issuance button removed — will be re-enabled when design+prompt provided */}
+   652→                          {/* {isCompleted && (
+   653→                            <Button
+   654→                              size="sm"
+   655→                              className="bg-gold hover:bg-gold-light text-navy text-xs"
+   656→                              onClick={async () => {
+   657→                                // Auto-issue certificate directly
+   658→                                const certNum = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+   659→                                await fetch('/api/certificates', {
+   660→                                  method: 'POST',
+   661→                                  headers: { 'Content-Type': 'application/json' },
+   662→                                  body: JSON.stringify({
+   663→                                    student_name: selectedStudent.name,
+   664→                                    course_title: c.title,
+   665→                                    status: 'صالحة',
+   666→                                    issued_by: 'أكاديمية المستقبل الدولية',
+   667→                                  }),
+   668→                                })
+   669→                                toast.success(`تم إصدار الشهادة: ${certNum}`)
+   670→                              }}
+   671→                            >
+   672→                              <Award className="w-3.5 h-3.5 ml-1" /> إصدار شهادة
+   673→                            </Button>
+   674→                          )} */}
+   675→                          <Badge className={
+   676→                            isCompleted ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   677→                            : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   678→                            : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+   679→                          }>
+   680→                            {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+   681→                          </Badge>
+   682→                        </div>
+   683→                      </div>
+   684→                    )
+   685→                  })}
+   686→                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة</p>}
+   687→                </div>
+   688→              </div>
+   689→            </div>
+   690→            <DialogFooter>
+   691→              <Button variant="outline" onClick={() => setSelectedStudent(null)}>إغلاق</Button>
+   692→            </DialogFooter>
+   693→          </DialogContent>
+   694→        </Dialog>
+   695→      )}
+   696→
+   697→      <PasswordConfirmDialog
+   698→        open={!!deleteTarget}
+   699→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+   700→        title="تأكيد حذف المتدرب"
+   701→        message="سيتم حذف المتدرب نهائياً من النظام. أدخل كلمة مرورك للتأكيد."
+   702→        itemLabel="سيتم حذف المتدرب التالي:"
+   703→        itemName={deleteTarget?.name}
+   704→        confirmLabel="حذف نهائي"
+   705→        onConfirm={handleDelete}
+   706→        loading={deleting}
+   707→      />
+   708→    </SectionCard>
+   709→  )
+   710→}
+   711→
+   712→function AdminPayments() {
+   713→  const [items, setItems] = useState<any[]>([])
+   714→  const [courses, setCourses] = useState<any[]>([])
+   715→  const [search, setSearch] = useState('')
+   716→  const [statusFilter, setStatusFilter] = useState('all')
+   717→  const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
+   718→
+   719→  const load = () => {
+   720→    fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   721→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+   722→  }
+   723→  useEffect(() => { load() }, [])
+   724→
+   725→  const updateStatus = async (id: string, status: string, reason?: string) => {
+   726→    try {
+   727→      const res = await fetch('/api/payments', {
+   728→        method: 'PUT',
+   729→        headers: { 'Content-Type': 'application/json' },
+   730→        body: JSON.stringify({ id, status, rejection_reason: reason }),
+   731→      })
+   732→      if (!res.ok) {
+   733→        const err = await res.json().catch(() => ({}))
+   734→        toast.error(err.error || 'فشل تحديث حالة الدفع')
+   735→        return
+   736→      }
+   737→      toast.success(status === 'مكتمل' ? 'تم قبول الدفع — تم تفعيل الدورة للمتدرب' : status === 'ملغي' ? 'تم رفض الدفع — تم إشعار المتدرب' : 'تم التحديث')
+   738→      load()
+   739→      setSelectedPayment(null)
+   740→    } catch {
+   741→      toast.error('خطأ في الاتصال')
+   742→    }
+   743→  }
+   744→
+   745→  const filtered = items.filter(p => {
+   746→    if (statusFilter !== 'all' && p.status !== statusFilter) return false
+   747→    if (search.trim()) {
+   748→      const q = search.toLowerCase()
+   749→      return (p.reference || '').toLowerCase().includes(q) || (p.method || '').toLowerCase().includes(q)
+   750→    }
+   751→    return true
+   752→  })
+   753→
+   754→  // Extract proof URL from reference field (format: "JB-123 | PROOF: https://...")
+   755→  const extractProofUrl = (ref: string) => {
+   756→    if (!ref) return null
+   757→    const match = ref.match(/PROOF:\s*(https?:\/\/[^\s|]+)/i)
+   758→    return match ? match[1] : null
+   759→  }
+   760→
+   761→  // Get course for payment
+   762→  const getCourse = (courseId: string) => courses.find(c => c.id === courseId)
+   763→
+   764→  // Determine currency to display — prefer the course's currency
+   765→  // (source of truth) over the payment's stored currency, since
+   766→  // older payment rows may have defaulted to 'ر.ي' for USD courses.
+   767→  const getCurrency = (p: any) => {
+   768→    if (p?.course_id) {
+   769→      const course = getCourse(p.course_id)
+   770→      if (course?.currency) return course.currency
+   771→    }
+   772→    return p?.currency || 'ر.ي'
+   773→  }
+   774→
+   775→  // Extract coupon code from the reference field — stored as
+   776→  // "| COUPON:CODE-HERE". Returns null if no coupon was applied.
+   777→  const getCouponCode = (p: any): string | null => {
+   778→    const ref = p?.reference
+   779→    if (!ref) return null
+   780→    const match = String(ref).match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+   781→    return match ? match[1].toUpperCase() : null
+   782→  }
+   783→
+   784→  // Strip PROOF: and COUPON: markers from reference for clean display
+   785→  const cleanReference = (ref: string | null | undefined) => {
+   786→    if (!ref) return null
+   787→    return ref
+   788→      .replace(/\s*\|\s*PROOF:.*$/i, '')
+   789→      .replace(/\s*\|\s*COUPON:.*$/i, '')
+   790→      .trim() || null
+   791→  }
+   792→
+   793→  return (
+   794→    <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
+   795→      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+   796→        <Input placeholder="بحث برقم المعاملة أو الطريقة..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+   797→        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+   798→          <option value="all">كل الحالات</option>
+   799→          <option value="قيد الانتظار">قيد الانتظار</option>
+   800→          <option value="مكتمل">مكتمل</option>
+   801→          <option value="ملغي">ملغي</option>
+   802→        </select>
+   803→      </div>
+   804→
+   805→      <div className="space-y-2">
+   806→        {filtered.map((p) => {
+   807→          const course = getCourse(p.course_id)
+   808→          const proofUrl = extractProofUrl(p.reference)
+   809→          const isPending = p.status === 'قيد الانتظار'
+   810→          const couponCode = getCouponCode(p)
+   811→          const ref = cleanReference(p.reference)
+   812→          const currency = getCurrency(p)
+   813→          const hasCoupon = !!couponCode
+   814→          return (
+   815→            <div
+   816→              key={p.id}
+   817→              className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border rounded-lg ${
+   818→                hasCoupon
+   819→                  ? 'border-r-4 border-r-red-500 ring-1 ring-red-500/20 bg-red-50/30'
+   820→                  : 'border-border'
+   821→              }`}
+   822→            >
+   823→              <div className="flex-1 min-w-0">
+   824→                <div className="flex items-center gap-2 mb-1 flex-wrap">
+   825→                  <span className="font-bold text-navy text-sm" dir="ltr">
+   826→                    {p.amount?.toLocaleString()} {currency}
+   827→                  </span>
+   828→                  <Badge className={
+   829→                    p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   830→                    : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+   831→                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   832→                  }>{p.status}</Badge>
+   833→                  {proofUrl && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">📎 إثبات دفع</Badge>}
+   834→                  {hasCoupon && (
+   835→                    <Badge className="bg-red-500/15 text-red-600 border-red-500/40 font-mono" dir="ltr">
+   836→                      🎟️ كوبون: {couponCode}
+   837→                    </Badge>
+   838→                  )}
+   839→                </div>
+   840→                <div className="text-xs text-muted-foreground">
+   841→                  {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
+   842→                  {' • '}
+   843→                  <span>{p.method || '-'}</span>
+   844→                  {' • '}
+   845→                  <span dir="ltr">{ref || '-'}</span>
+   846→                </div>
+   847→                <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
+   848→              </div>
+   849→              <div className="flex gap-1 flex-shrink-0">
+   850→                <Button size="sm" variant="ghost" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
+   851→                  <Eye className="w-4 h-4 text-navy" />
+   852→                </Button>
+   853→                {isPending && (
+   854→                  <>
+   855→                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
+   856→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
+   857→                    </Button>
+   858→                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(p.id, 'ملغي', reason || undefined) }}>
+   859→                      <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+   860→                    </Button>
+   861→                  </>
+   862→                )}
+   863→              </div>
+   864→            </div>
+   865→          )
+   866→        })}
+   867→        {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
+   868→      </div>
+   869→
+   870→      {/* Payment detail modal with proof image */}
+   871→      {selectedPayment && (
+   872→        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedPayment(null) }}>
+   873→          <DialogContent className="sm:max-w-lg">
+   874→            <DialogHeader><DialogTitle>تفاصيل المعاملة</DialogTitle></DialogHeader>
+   875→            <div className="space-y-4 py-4">
+   876→              {(() => {
+   877→                const couponCode = getCouponCode(selectedPayment)
+   878→                const currency = getCurrency(selectedPayment)
+   879→                const hasCoupon = !!couponCode
+   880→                return (
+   881→                  <div className={`p-4 rounded-lg flex items-center justify-between ${hasCoupon ? 'bg-red-50 border-2 border-red-500' : 'bg-gold/10 border border-gold/30'}`}>
+   882→                    <span className={`text-sm font-semibold ${hasCoupon ? 'text-red-700' : 'text-navy'}`}>
+   883→                      {hasCoupon ? '⚠ المبلغ بعد الخصم:' : 'المبلغ:'}
+   884→                    </span>
+   885→                    <div className="flex flex-col items-end gap-1">
+   886→                      <span className={`text-xl font-extrabold ${hasCoupon ? 'text-red-600' : 'text-gold'}`} dir="ltr">
+   887→                        {selectedPayment.amount?.toLocaleString()} {currency}
+   888→                      </span>
+   889→                      {hasCoupon && (
+   890→                        <span className="text-[11px] text-red-600 font-mono" dir="ltr">🎟️ {couponCode}</span>
+   891→                      )}
+   892→                    </div>
+   893→                  </div>
+   894→                )
+   895→              })()}
+   896→              <div className="grid grid-cols-2 gap-3">
+   897→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
+   898→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
+   899→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div></div>
+   900→                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
+   901→                  <Badge className={
+   902→                    selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
+   903→                    : selectedPayment.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
+   904→                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+   905→                  }>{selectedPayment.status}</Badge>
+   906→                </div>
+   907→              </div>
+   908→              {(() => {
+   909→                const course = getCourse(selectedPayment.course_id)
+   910→                return course ? (
+   911→                  <div className="bg-muted/30 p-3 rounded-lg">
+   912→                    <div className="text-xs text-muted-foreground">الدورة</div>
+   913→                    <div className="text-sm font-medium text-navy">{course.title}</div>
+   914→                    <div className="text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
+   915→                  </div>
+   916→                ) : null
+   917→              })()}
+   918→
+   919→              {/* Proof image */}
+   920→              {(() => {
+   921→                const proofUrl = extractProofUrl(selectedPayment.reference)
+   922→                return proofUrl ? (
+   923→                  <div>
+   924→                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
+   925→                    <div className="rounded-lg overflow-hidden border-2 border-gold/30">
+   926→                      <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain rounded-lg mx-auto" />
+   927→                    </div>
+   928→                  </div>
+   929→                ) : (
+   930→                  <div className="text-center py-4 text-muted-foreground text-sm">لا يوجد إثبات دفع مرفق</div>
+   931→                )
+   932→              })()}
+   933→
+   934→              {selectedPayment.status === 'قيد الانتظار' && (
+   935→                <div className="flex gap-2 pt-2">
+   936→                  <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
+   937→                    <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
+   938→                  </Button>
+   939→                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(selectedPayment.id, 'ملغي', reason || undefined) }}>
+   940→                    <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
+   941→                  </Button>
+   942→                </div>
+   943→              )}
+   944→            </div>
+   945→            <DialogFooter>
+   946→              <Button variant="outline" onClick={() => setSelectedPayment(null)}>إغلاق</Button>
+   947→            </DialogFooter>
+   948→          </DialogContent>
+   949→        </Dialog>
+   950→      )}
+   951→    </SectionCard>
+   952→  )
+   953→}
+   954→
+   955→function AdminPaymentMethods() {
+   956→  const [items, setItems] = useState<any[]>([])
+   957→  const [open, setOpen] = useState(false)
+   958→  const [editing, setEditing] = useState<any | null>(null)
+   959→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   960→  const [deleting, setDeleting] = useState(false)
+   961→  const load = () => fetch('/api/payment-methods').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   962→  useEffect(() => { load() }, [])
+   963→  const toggle = async (id: string, enabled: boolean) => {
+   964→    await fetch('/api/payment-methods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enabled }) })
+   965→    setItems(items.map((p) => (p.id === id ? { ...p, enabled } : p)))
+   966→  }
+   967→  const handleDelete = async () => {
+   968→    if (!deleteTarget) return
+   969→    setDeleting(true)
+   970→    try {
+   971→      await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   972→      toast.success('تم الحذف')
+   973→      setDeleteTarget(null)
+   974→      load()
+   975→    } finally {
+   976→      setDeleting(false)
+   977→    }
+   978→  }
+   979→  return (
+   980→    <SectionCard
+   981→      title="طرق الدفع"
+   982→      description={`${items.length} طريقة`}
+   983→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديدة</Button>}
+   984→    >
+   985→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   986→        {items.map((p) => (
+   987→          <Card key={p.id} className="p-5">
+   988→            <div className="flex items-start justify-between mb-3">
+   989→              <div className="text-3xl">{p.icon}</div>
+   990→              <Switch checked={!!p.enabled} onCheckedChange={(v) => toggle(p.id, v)} />
+   991→            </div>
+   992→            <div className="font-bold text-navy">{p.name}</div>
+   993→            <div className="text-xs text-muted-foreground mb-2">{p.description || ''}</div>
+   994→            {p.wallet_id && <div className="text-xs font-mono text-gold" dir="ltr">{p.wallet_id}</div>}
+   995→            <div className="flex gap-2 mt-3">
+   996→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+   997→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
+   998→            </div>
+   999→          </Card>
+  1000→        ))}
+  1001→      </div>
+  1002→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'icon', 'type', 'wallet_id', 'description', 'instructions']} apiPath="/api/payment-methods" />}
+  1003→
+  1004→      <ConfirmDialog
+  1005→        open={!!deleteTarget}
+  1006→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1007→        title="تأكيد حذف طريقة الدفع"
+  1008→        message="هل أنت متأكد من الحذف؟"
+  1009→        itemLabel="سيتم حذف طريقة الدفع التالية:"
+  1010→        itemName={deleteTarget?.name}
+  1011→        confirmLabel="حذف"
+  1012→        cancelLabel="إلغاء"
+  1013→        variant="danger"
+  1014→        onConfirm={handleDelete}
+  1015→        loading={deleting}
+  1016→      />
+  1017→    </SectionCard>
+  1018→  )
+  1019→}
+  1020→
+  1021→function AdminCertificates() {
+  1022→  const [items, setItems] = useState<any[]>([])
+  1023→  const [requests, setRequests] = useState<any[]>([])
+  1024→  const [courses, setCourses] = useState<any[]>([])
+  1025→  const [enrollments, setEnrollments] = useState<any[]>([])
+  1026→  const [open, setOpen] = useState(false)
+  1027→  const [editing, setEditing] = useState<any | null>(null)
+  1028→  const [search, setSearch] = useState('')
+  1029→  const [statusFilter, setStatusFilter] = useState<string>('all')
+  1030→  const [revokeTarget, setRevokeTarget] = useState<any | null>(null)
+  1031→  const [revokeReason, setRevokeReason] = useState('')
+  1032→  const [previewCert, setPreviewCert] = useState<any | null>(null)
+  1033→  const [tab, setTab] = useState<'issued' | 'requests'>('issued')
+  1034→  const [approveNote, setApproveNote] = useState('')
+  1035→
+  1036→  // === Confirm-dialog states for the three certificate actions:
+  1037→  // del (permanent delete), restore (mark valid again), reissue (regenerate with new number)
+  1038→  const [certDeleteTarget, setCertDeleteTarget] = useState<any | null>(null)
+  1039→  const [certDeleting, setCertDeleting] = useState(false)
+  1040→  const [certRestoreTarget, setCertRestoreTarget] = useState<any | null>(null)
+  1041→  const [certRestoring, setCertRestoring] = useState(false)
+  1042→  const [reissueTarget, setReissueTarget] = useState<any | null>(null)
+  1043→  const [reissuing, setReissuing] = useState<string | null>(null)
+  1044→
+  1045→  const load = () => {
+  1046→    fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1047→    fetch('/api/certificate-requests').then((r) => r.json()).then((d) => setRequests(Array.isArray(d) ? d : []))
+  1048→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+  1049→    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+  1050→  }
+  1051→  useEffect(() => { load() }, [])
+  1052→
+  1053→  const filtered = items.filter((c) => {
+  1054→    if (statusFilter !== 'all' && c.status !== statusFilter) return false
+  1055→    if (search.trim()) {
+  1056→      const q = search.trim().toLowerCase()
+  1057→      return (c.certificate_number || '').toLowerCase().includes(q) || (c.student_name || '').toLowerCase().includes(q) || (c.course_title || '').toLowerCase().includes(q)
+  1058→    }
+  1059→    return true
+  1060→  })
+  1061→
+  1062→  const del = async () => {
+  1063→    if (!certDeleteTarget) return
+  1064→    setCertDeleting(true)
+  1065→    try {
+  1066→      await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certDeleteTarget.id }) })
+  1067→      toast.success('تم الحذف')
+  1068→      setCertDeleteTarget(null)
+  1069→      load()
+  1070→    } finally {
+  1071→      setCertDeleting(false)
+  1072→    }
+  1073→  }
+  1074→  const revoke = async () => { if (!revokeTarget || !revokeReason.trim()) { toast.error('أدخل سبب الإلغاء'); return }; await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: revokeTarget.id, status: 'ملغاة' }) }); toast.success('تم إلغاء الشهادة'); setRevokeTarget(null); setRevokeReason(''); load() }
+  1075→  const restore = async () => {
+  1076→    if (!certRestoreTarget) return
+  1077→    setCertRestoring(true)
+  1078→    try {
+  1079→      await fetch('/api/certificates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certRestoreTarget.id, status: 'صالحة' }) })
+  1080→      toast.success('تمت الاستعادة')
+  1081→      setCertRestoreTarget(null)
+  1082→      load()
+  1083→    } finally {
+  1084→      setCertRestoring(false)
+  1085→    }
+  1086→  }
+  1087→
+  1088→  // === Reissue: regenerate the same certificate with a new number & new issued_at ===
+  1089→  // Use case: certificate has wrong data / student wants fresh copy / status issue — no need to delete user
+  1090→  const reissue = async () => {
+  1091→    if (!reissueTarget) return
+  1092→    setReissuing(reissueTarget.id)
+  1093→    try {
+  1094→      const res = await fetch('/api/certificates', {
+  1095→        method: 'POST',
+  1096→        headers: { 'Content-Type': 'application/json' },
+  1097→        body: JSON.stringify({ action: 'reissue', id: reissueTarget.id }),
+  1098→      })
+  1099→      const data = await res.json()
+  1100→      if (res.ok && data.success) {
+  1101→        toast.success('تم إعادة الإصدار بنجاح!', {
+  1102→          description: `الرقم الجديد: ${data.new_certificate.certificate_number}`,
+  1103→        })
+  1104→        setReissueTarget(null)
+  1105→        load()
+  1106→        // Open the new certificate PDF in a new tab automatically
+  1107→        window.open(`/api/certificate-pdf?number=${encodeURIComponent(data.new_certificate.certificate_number)}&format=pdf`, '_blank')
+  1108→      } else {
+  1109→        toast.error(data.error || 'فشل في إعادة الإصدار')
+  1110→      }
+  1111→    } catch (e: any) {
+  1112→      toast.error('خطأ في الشبكة')
+  1113→    } finally {
+  1114→      setReissuing(null)
+  1115→    }
+  1116→  }
+  1117→
+  1118→  // Certificate request actions
+  1119→  const handleRequestAction = async (reqId: string, action: string, note?: string) => {
+  1120→    try {
+  1121→      const res = await fetch('/api/certificate-requests', {
+  1122→        method: 'PUT',
+  1123→        headers: { 'Content-Type': 'application/json' },
+  1124→        body: JSON.stringify({ id: reqId, action, note }),
+  1125→      })
+  1126→      if (res.ok) {
+  1127→        toast.success(action === 'issue' ? 'تم إصدار الشهادة بنجاح!' : action === 'reject' ? 'تم رفض الطلب' : 'تم التحديث')
+  1128→        load()
+  1129→      } else {
+  1130→        const d = await res.json(); toast.error(d.error || 'فشل')
+  1131→      }
+  1132→    } catch { toast.error('خطأ') }
+  1133→  }
+  1134→
+  1135→  // Check if student completed the course
+  1136→  const isCourseCompleted = (userId: string, courseId: string) => {
+  1137→    return enrollments.some(e => e.user_id === userId && e.course_id === courseId && (e.status === 'completed' || e.status === 'مكتمل'))
+  1138→  }
+  1139→
+  1140→  const requestStatusBadge = (status: string) => {
+  1141→    const map: any = {
+  1142→      pending: { label: 'بانتظار موافقة المدرب', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
+  1143→      trainer_approved: { label: 'بانتظار موافقة المدير', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+  1144→      admin_approved: { label: 'بانتظار دفع الرسوم', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
+  1145→      issued: { label: 'تم الإصدار', color: 'bg-green-500/15 text-green-600 border-green-500/30' },
+  1146→      rejected: { label: 'مرفوض', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+  1147→    }
+  1148→    return map[status] || map.pending
+  1149→  }
+  1150→
+  1151→  return (
+  1152→    <SectionCard
+  1153→      title="الشهادات"
+  1154→      description={tab === 'issued' ? `${filtered.length} شهادة صادرة` : `${requests.length} طلب شهادة`}
+  1155→    >
+  1156→      {/* Tabs */}
+  1157→      <div className="flex gap-2 border-b border-border pb-3 mb-4">
+  1158→        <button onClick={() => setTab('issued')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'issued' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📄 الشهادات الصادرة</button>
+  1159→        <button onClick={() => setTab('requests')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'requests' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📋 طلبات الشهادات {requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length > 0 && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 mr-1">{requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length}</span>}</button>
+  1160→      </div>
+  1161→
+  1162→      {tab === 'issued' ? (
+  1163→        <>
+  1164→          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+  1165→            <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+  1166→            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1167→              <option value="all">كل الحالات</option>
+  1168→              <option value="صالحة">صالحة</option>
+  1169→              <option value="ملغاة">ملغاة</option>
+  1170→              <option value="مستبدلة">مستبدلة (تم إعادة إصدارها)</option>
+  1171→            </select>
+  1172→          </div>
+  1173→          <div className="space-y-2">
+  1174→            {filtered.map((c) => (
+  1175→              <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
+  1176→                <div className="flex-1 min-w-0">
+  1177→                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+  1178→                    <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
+  1179→                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : c.status === 'مستبدلة' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
+  1180→                  </div>
+  1181→                  <div className="font-medium text-navy text-sm">{c.student_name}</div>
+  1182→                  <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
+  1183→                </div>
+  1184→                <div className="flex gap-1 flex-shrink-0 flex-wrap">
+  1185→                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة الشهادة"><Eye className="w-4 h-4 text-navy" /></Button>
+  1186→                  <Button size="sm" variant="ghost" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار (برقم جديد)" className="text-blue-600">
+  1187→                    {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+  1188→                  </Button>
+  1189→                  <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
+  1190→                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => setCertRestoreTarget(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
+  1191→                  <Button size="sm" variant="ghost" onClick={() => setCertDeleteTarget(c)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+  1192→                </div>
+  1193→              </div>
+  1194→            ))}
+  1195→            {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
+  1196→          </div>
+  1197→        </>
+  1198→      ) : (
+  1199→        /* Certificate requests tab */
+  1200→        <div className="space-y-2">
+  1201→          {requests.map((r) => {
+  1202→            const badge = requestStatusBadge(r.status)
+  1203→            const completed = isCourseCompleted(r.user_id, r.course_id)
+  1204→            return (
+  1205→              <div key={r.id} className="p-3 bg-white border border-border rounded-lg">
+  1206→                <div className="flex items-center gap-2 mb-2 flex-wrap">
+  1207→                  <Badge className={badge.color}>{badge.label}</Badge>
+  1208→                  {completed && <Badge className="bg-green-500/15 text-green-600 border-green-500/30">✅ الدورة مكتملة</Badge>}
+  1209→                  {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
+  1210→                </div>
+  1211→                <div className="font-medium text-navy text-sm">{r.student_name}</div>
+  1212→                <div className="text-xs text-muted-foreground">{r.course_title || '-'}</div>
+  1213→                {r.amount > 0 && <div className="text-xs text-muted-foreground mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
+  1214→                {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
+  1215→                {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
+  1216→                {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
+  1217→                {r.cert_number && <div className="text-xs font-mono text-green-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
+  1218→                {r.verify_code && <div className="text-xs font-mono text-green-600" dir="ltr">رمز التحقق: {r.verify_code}</div>}
+  1219→
+  1220→                {/* Action buttons based on status */}
+  1221→                <div className="flex gap-2 mt-3 pt-2 border-t border-border">
+  1222→                  {r.status === 'pending' && (
+  1223→                    <>
+  1224→                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
+  1225→                        <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
+  1226→                      </Button>
+  1227→                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>
+  1228→                        <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+  1229→                      </Button>
+  1230→                    </>
+  1231→                  )}
+  1232→                  {r.status === 'trainer_approved' && (
+  1233→                    <Button size="sm" className="bg-navy hover:bg-navy-light text-gold text-xs" onClick={() => handleRequestAction(r.id, 'admin_approve', 'تمت الموافقة على الطلب')}>
+  1234→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدير
+  1235→                    </Button>
+  1236→                  )}
+  1237→                  {r.status === 'admin_approved' && (
+  1238→                    <Button size="sm" className="bg-gold hover:bg-gold-light text-navy text-xs" onClick={() => handleRequestAction(r.id, 'issue')}>
+  1239→                      <Award className="w-3.5 h-3.5 ml-1" /> إصدار الشهادة
+  1240→                    </Button>
+  1241→                  )}
+  1242→                  {r.status === 'issued' && r.cert_number && (
+  1243→                    <a href={`/api/certificate-pdf?number=${encodeURIComponent(r.cert_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
+  1244→                      <Button size="sm" variant="outline" className="border-gold/30 text-navy hover:bg-gold/10 text-xs">
+  1245→                        <Download className="w-3.5 h-3.5 ml-1" /> تحميل الشهادة
+  1246→                      </Button>
+  1247→                    </a>
+  1248→                  )}
+  1249→                </div>
+  1250→              </div>
+  1251→            )
+  1252→          })}
+  1253→          {requests.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد طلبات شهادات</div>}
+  1254→        </div>
+  1255→      )}
+  1256→
+  1257→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['student_name', 'course_title', 'status', 'issued_by', 'external_accreditation_body']} apiPath="/api/certificates" />}
+  1258→
+  1259→      {revokeTarget && (
+  1260→        <Dialog open={true} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeReason('') } }}>
+  1261→          <DialogContent className="sm:max-w-md">
+  1262→            <DialogHeader><DialogTitle>إلغاء الشهادة</DialogTitle></DialogHeader>
+  1263→            <div className="space-y-3 py-4">
+  1264→              <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
+  1265→                <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
+  1266→                <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
+  1267→                <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
+  1268→              </div>
+  1269→              <div><Label>سبب الإلغاء *</Label><Textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={3} placeholder="مثال: خطأ في بيانات المتدرب..." className="mt-1" /></div>
+  1270→            </div>
+  1271→            <DialogFooter>
+  1272→              <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }}>إلغاء</Button>
+  1273→              <Button onClick={revoke} className="bg-red-500 hover:bg-red-600 text-white">تأكيد الإلغاء</Button>
+  1274→            </DialogFooter>
+  1275→          </DialogContent>
+  1276→        </Dialog>
+  1277→      )}
+  1278→
+  1279→      {previewCert && (
+  1280→        <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
+  1281→          <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
+  1282→            <DialogHeader>
+  1283→              <div className="flex items-center justify-between">
+  1284→                <DialogTitle className="flex items-center gap-2">
+  1285→                  <Award className="w-5 h-5 text-gold" /> معاينة الشهادة — {previewCert.certificate_number}
+  1286→                </DialogTitle>
+  1287→                <button onClick={() => setPreviewCert(null)} className="text-muted-foreground hover:text-navy">
+  1288→                  <X className="w-5 h-5" />
+  1289→                </button>
+  1290→              </div>
+  1291→            </DialogHeader>
+  1292→            <CertificateViewer certificate={previewCert} onClose={() => setPreviewCert(null)} />
+  1293→          </DialogContent>
+  1294→        </Dialog>
+  1295→      )}
+  1296→
+  1297→      {/* Permanent-delete confirm */}
+  1298→      <ConfirmDialog
+  1299→        open={!!certDeleteTarget}
+  1300→        onOpenChange={(o) => { if (!o && !certDeleting) setCertDeleteTarget(null) }}
+  1301→        title="تأكيد الحذف النهائي"
+  1302→        message="هل أنت متأكد من الحذف النهائي؟"
+  1303→        itemLabel="سيتم حذف الشهادة التالية:"
+  1304→        itemName={certDeleteTarget ? `${certDeleteTarget.student_name} — ${certDeleteTarget.certificate_number}` : undefined}
+  1305→        confirmLabel="حذف نهائي"
+  1306→        cancelLabel="إلغاء"
+  1307→        variant="danger"
+  1308→        onConfirm={del}
+  1309→        loading={certDeleting}
+  1310→      />
+  1311→
+  1312→      {/* Restore certificate confirm */}
+  1313→      <ConfirmDialog
+  1314→        open={!!certRestoreTarget}
+  1315→        onOpenChange={(o) => { if (!o && !certRestoring) setCertRestoreTarget(null) }}
+  1316→        title="تأكيد استعادة الشهادة"
+  1317→        message={'سيتم تغيير حالة الشهادة إلى "صالحة". هل أنت متأكد؟'}
+  1318→        itemLabel="سيتم استعادة الشهادة التالية:"
+  1319→        itemName={certRestoreTarget ? `${certRestoreTarget.student_name} — ${certRestoreTarget.certificate_number}` : undefined}
+  1320→        confirmLabel="استعادة"
+  1321→        cancelLabel="إلغاء"
+  1322→        variant="info"
+  1323→        onConfirm={restore}
+  1324→        loading={certRestoring}
+  1325→      />
+  1326→
+  1327→      {/* Reissue certificate confirm (uses existing reissuing spinner state) */}
+  1328→      <ConfirmDialog
+  1329→        open={!!reissueTarget}
+  1330→        onOpenChange={(o) => { if (!o && !reissuing) setReissueTarget(null) }}
+  1331→        title="إعادة إصدار الشهادة"
+  1332→        message={'سيتم:\n- تمييز الشهادة الحالية كـ "مستبدلة"\n- إصدار شهادة جديدة برقم جديد وتاريخ جديد\n- بقاء بيانات المتدرب والتسجيل كما هي'}
+  1333→        itemLabel="الشهادة الحالية:"
+  1334→        itemName={reissueTarget ? `${reissueTarget.student_name} | ${reissueTarget.course_title || '-'} | ${reissueTarget.certificate_number}` : undefined}
+  1335→        confirmLabel="إعادة الإصدار"
+  1336→        cancelLabel="إلغاء"
+  1337→        variant="info"
+  1338→        onConfirm={reissue}
+  1339→        loading={!!reissuing}
+  1340→      />
+  1341→    </SectionCard>
+  1342→  )
+  1343→}
+  1344→
+  1345→function AdminTrainers() {
+  1346→  const [items, setItems] = useState<any[]>([])
+  1347→  const [open, setOpen] = useState(false)
+  1348→  const [editing, setEditing] = useState<any | null>(null)
+  1349→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1350→  const [deleting, setDeleting] = useState(false)
+  1351→  const [checkingTeam, setCheckingTeam] = useState(false)
+  1352→  const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1353→  useEffect(() => { load() }, [])
+  1354→
+  1355→  // Pre-flight: make sure the trainer is not a team member (founder/leader).
+  1356→  // If they are, show a toast error and skip opening the confirm dialog.
+  1357→  const requestDelete = async (trainer: any) => {
+  1358→    setCheckingTeam(true)
+  1359→    try {
+  1360→      const teamRes = await fetch('/api/team')
+  1361→      const teamData = await teamRes.json()
+  1362→      const teamMember = (teamData || []).find((m: any) => m.id === trainer.id)
+  1363→      if (teamMember) {
+  1364→        toast.error(`لا يمكن حذف هذا المدرب لأنه مسجّل كـ "${teamMember.role === 'founder' ? 'المؤسس' : 'عضو فريق'}" في قسم المؤسس والفريق. احذفه من هناك أولاً.`)
+  1365→        return
+  1366→      }
+  1367→    } catch {}
+  1368→    setCheckingTeam(false)
+  1369→    setDeleteTarget(trainer)
+  1370→  }
+  1371→
+  1372→  const handleDelete = async () => {
+  1373→    if (!deleteTarget) return
+  1374→    setDeleting(true)
+  1375→    try {
+  1376→      await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+  1377→      toast.success('تم الحذف')
+  1378→      setDeleteTarget(null)
+  1379→      load()
+  1380→    } finally {
+  1381→      setDeleting(false)
+  1382→    }
+  1383→  }
+  1384→  return (
+  1385→    <SectionCard
+  1386→      title="المدربون"
+  1387→      description={`${items.length} مدرب`}
+  1388→      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+  1389→    >
+  1390→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1391→        {items.map((t) => {
+  1392→          // Check if this trainer is a team member
+  1393→          const isTeamMember = t.password && t.password.startsWith('__TEAM_MEMBER__')
+  1394→          return (
+  1395→            <Card key={t.id} className="p-5">
+  1396→              <div className="flex items-center gap-3 mb-3">
+  1397→                <Avatar className="w-14 h-14 border-2 border-gold/30">
+  1398→                  <AvatarImage src={t.avatar || ''} />
+  1399→                  <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
+  1400→                </Avatar>
+  1401→                <div>
+  1402→                  <div className="font-bold text-navy">{t.name}</div>
+  1403→                  <div className="text-xs text-gold">{t.title}</div>
+  1404→                  {isTeamMember && <Badge className="mt-1 bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">👑 عضو فريق</Badge>}
+  1405→                </div>
+  1406→              </div>
+  1407→              <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
+  1408→              <div className="text-xs space-y-1 mb-3">
+  1409→                <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
+  1410→                <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
+  1411→              </div>
+  1412→              <div className="flex gap-2">
+  1413→                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1414→                <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1415→              </div>
+  1416→            </Card>
+  1417→          )
+  1418→        })}
+  1419→      </div>
+  1420→      {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+  1421→
+  1422→      <PasswordConfirmDialog
+  1423→        open={!!deleteTarget}
+  1424→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1425→        title="تأكيد حذف المدرب"
+  1426→        message="سيتم حذف المدرب نهائياً. أدخل كلمة مرورك للتأكيد."
+  1427→        itemLabel="سيتم حذف المدرب التالي:"
+  1428→        itemName={deleteTarget?.name}
+  1429→        confirmLabel="حذف نهائي"
+  1430→        onConfirm={handleDelete}
+  1431→        loading={deleting}
+  1432→      />
+  1433→    </SectionCard>
+  1434→  )
+  1435→}
+  1436→
+  1437→function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
+  1438→  const [form, setForm] = useState<any>(
+  1439→    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
+  1440→  )
+  1441→  const [saving, setSaving] = useState(false)
+  1442→  const [showPwd, setShowPwd] = useState(false)
+  1443→  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  1444→
+  1445→  useEffect(() => {
+  1446→    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
+  1447→  }, [initial])
+  1448→
+  1449→  const handleAvatarUpload = async (file: File) => {
+  1450→    setUploadingAvatar(true)
+  1451→    try {
+  1452→      const compressedFile = await new Promise<File>((resolve, reject) => {
+  1453→        const reader = new FileReader()
+  1454→        reader.onload = (e) => {
+  1455→          const img = new Image()
+  1456→          img.onload = () => {
+  1457→            const maxW = 512, maxH = 512
+  1458→            let { width, height } = img
+  1459→            if (width > maxW) { height = (height * maxW) / width; width = maxW }
+  1460→            if (height > maxH) { width = (width * maxH) / height; height = maxH }
+  1461→            const canvas = document.createElement('canvas')
+  1462→            canvas.width = width; canvas.height = height
+  1463→            const ctx = canvas.getContext('2d')!
+  1464→            ctx.drawImage(img, 0, 0, width, height)
+  1465→            canvas.toBlob((blob) => {
+  1466→              if (!blob) { reject(new Error('Compression failed')); return }
+  1467→              resolve(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+  1468→            }, 'image/jpeg', 0.85)
+  1469→          }
+  1470→          img.onerror = () => reject(new Error('Image load failed'))
+  1471→          img.src = e.target?.result as string
+  1472→        }
+  1473→        reader.onerror = () => reject(new Error('File read failed'))
+  1474→        reader.readAsDataURL(file)
+  1475→      })
+  1476→
+  1477→      const fd = new FormData()
+  1478→      fd.append('file', compressedFile)
+  1479→      fd.append('folder', 'trainer-avatars')
+  1480→      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+  1481→      const data = await res.json()
+  1482→      if (data.url) {
+  1483→        setForm({ ...form, avatar: data.url })
+  1484→        toast.success('تم رفع صورة المدرب')
+  1485→      } else {
+  1486→        toast.error(data.error || 'فشل رفع الصورة')
+  1487→      }
+  1488→    } catch {
+  1489→      toast.error('خطأ في رفع الصورة')
+  1490→    } finally {
+  1491→      setUploadingAvatar(false)
+  1492→    }
+  1493→  }
+  1494→
+  1495→  const save = async () => {
+  1496→    if (!form.name || !form.email) { toast.error('الاسم والبريد مطلوبان'); return }
+  1497→    if (!initial && !form.password) { toast.error('كلمة المرور مطلوبة'); return }
+  1498→    setSaving(true)
+  1499→    try {
+  1500→      const res = await fetch('/api/trainers', {
+  1501→        method: initial ? 'PUT' : 'POST',
+  1502→        headers: { 'Content-Type': 'application/json' },
+  1503→        body: JSON.stringify(initial ? { id: initial.id, ...form } : form),
+  1504→      })
+  1505→      if (res.ok) {
+  1506→        toast.success(initial ? 'تم التحديث' : 'تمت الإضافة')
+  1507→        onSaved(); onOpenChange(false)
+  1508→      } else {
+  1509→        const d = await res.json(); toast.error(d.error || 'فشل')
+  1510→      }
+  1511→    } catch { toast.error('خطأ') } finally { setSaving(false) }
+  1512→  }
+  1513→
+  1514→  const TITLES = ['استشاري', 'أخصائي', 'محاضر', 'مدرب معتمد', 'مدرس']
+  1515→  const SPECIALIZATIONS = ['الطب الباطني', 'طب الطوارئ', 'التمريض', 'الإنعاش القلبي الرئوي', 'مكافحة العدوى', 'صحة الأم والطفل', 'الصيدلة السريرية', 'إدارة المنشآت الصحية', 'التعليم الطبي']
+  1516→
+  1517→  return (
+  1518→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1519→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+  1520→        <DialogHeader><DialogTitle>{initial ? 'تعديل مدرب' : 'إضافة مدرب جديد'}</DialogTitle></DialogHeader>
+  1521→        <div className="space-y-4 py-4">
+  1522→          {/* Avatar upload */}
+  1523→          <div className="flex items-center gap-4">
+  1524→            <div className="relative flex-shrink-0">
+  1525→              <Avatar className="w-16 h-16 border-2 border-gold/30">
+  1526→                <AvatarImage src={form.avatar || ''} />
+  1527→                <AvatarFallback className="bg-navy text-gold text-xl">{form.name?.charAt(0) || '؟'}</AvatarFallback>
+  1528→              </Avatar>
+  1529→              <input type="file" accept="image/*" className="hidden" id="trainer-avatar" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f) }} />
+  1530→              <button
+  1531→                onClick={() => document.getElementById('trainer-avatar')?.click()}
+  1532→                disabled={uploadingAvatar}
+  1533→                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gold text-navy flex items-center justify-center text-xs disabled:opacity-50"
+  1534→                title="رفع صورة"
+  1535→              >
+  1536→                {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
+  1537→              </button>
+  1538→            </div>
+  1539→            <div className="flex-1">
+  1540→              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم المدرب *" className="text-base font-medium" />
+  1541→            </div>
+  1542→          </div>
+  1543→
+  1544→          {/* Quick selects */}
+  1545→          <div className="grid grid-cols-2 gap-3">
+  1546→            <div>
+  1547→              <Label className="text-xs">المسمى</Label>
+  1548→              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1549→                <option value="">— اختر —</option>
+  1550→                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+  1551→              </select>
+  1552→            </div>
+  1553→            <div>
+  1554→              <Label className="text-xs">التخصص</Label>
+  1555→              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1556→                <option value="">— اختر —</option>
+  1557→                {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+  1558→              </select>
+  1559→            </div>
+  1560→          </div>
+  1561→
+  1562→          {/* Email + Password */}
+  1563→          <div><Label className="text-xs">البريد الإلكتروني *</Label>
+  1564→            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" placeholder="example@fia.edu" />
+  1565→          </div>
+  1566→          <div>
+  1567→            <Label className="text-xs">كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}</Label>
+  1568→            <div className="relative mt-1">
+  1569→              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" placeholder="••••••••" />
+  1570→              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+  1571→                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+  1572→              </button>
+  1573→            </div>
+  1574→          </div>
+  1575→
+  1576→          {/* Phone */}
+  1577→          <div><Label className="text-xs">الهاتف</Label>
+  1578→            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
+  1579→          </div>
+  1580→
+  1581→          {/* Professional Complete Bio — نبذة تعريفية احترافية واحدة */}
+  1582→          <div className="border-t border-border pt-4">
+  1583→            <div className="flex items-center justify-between mb-1">
+  1584→              <Label className="text-xs font-bold text-navy">النبذة التعريفية الكاملة</Label>
+  1585→              <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
+  1586→            </div>
+  1587→            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+  1588→              اكتب نبذة واحدة متكاملة واحترافية عن المدرب — تظهر بالضبط كما تكتبها هنا في حساب المدرب وفي الصفحة الرئيسية عند الضغط على المدرب.
+  1589→              <br />
+  1590→              <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ، مثل: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
+  1591→            </p>
+  1592→            <textarea
+  1593→              value={form.bio || ''}
+  1594→              onChange={(e) => setForm({ ...form, bio: e.target.value })}
+  1595→              className="w-full min-h-[260px] p-4 border border-input rounded-lg text-sm leading-relaxed bg-background focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/40 transition-all"
+  1596→              placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
+  1597→            />
+  1598→            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+  1599→              <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
+  1600→              <span>{(form.bio || '').length} حرف</span>
+  1601→            </div>
+  1602→          </div>
+  1603→
+  1604→          {/* Years experience */}
+  1605→          <div>
+  1606→            <Label className="text-xs">سنوات الخبرة</Label>
+  1607→            <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} className="mt-1" placeholder="0" />
+  1608→          </div>
+  1609→        </div>
+  1610→        <DialogFooter>
+  1611→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1612→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+  1613→            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ'}
+  1614→          </Button>
+  1615→        </DialogFooter>
+  1616→      </DialogContent>
+  1617→    </Dialog>
+  1618→  )
+  1619→}
+  1620→
+  1621→function AdminPartners() {
+  1622→  const [items, setItems] = useState<any[]>([])
+  1623→  const [open, setOpen] = useState(false)
+  1624→  const [editing, setEditing] = useState<any | null>(null)
+  1625→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1626→  const [deleting, setDeleting] = useState(false)
+  1627→  const load = () => fetch('/api/partners').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1628→  useEffect(() => { load() }, [])
+  1629→  const handleDelete = async () => {
+  1630→    if (!deleteTarget) return
+  1631→    setDeleting(true)
+  1632→    try {
+  1633→      await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+  1634→      toast.success('تم الحذف')
+  1635→      setDeleteTarget(null)
+  1636→      load()
+  1637→    } finally {
+  1638→      setDeleting(false)
+  1639→    }
+  1640→  }
+  1641→  const toggleStatus = async (p: any) => {
+  1642→    const newStatus = p.status === 'نشط' ? 'متوقف' : 'نشط'
+  1643→    await fetch('/api/partners', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, status: newStatus }) })
+  1644→    toast.success(newStatus === 'نشط' ? 'تم تنشيط الشراكة' : 'تم إيقاف الشراكة')
+  1645→    load()
+  1646→  }
+  1647→  return (
+  1648→    <SectionCard title="الشركاء" description={`${items.length} شريك`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+  1649→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1650→        {items.map((p) => (
+  1651→          <Card key={p.id} className="p-5">
+  1652→            <div className="flex items-start gap-3 mb-3">
+  1653→              <div className="text-3xl">{p.logo}</div>
+  1654→              <div className="flex-1">
+  1655→                <div className="font-bold text-navy">{p.name}</div>
+  1656→                <div className="text-xs text-muted-foreground">{p.description}</div>
+  1657→                {p.since && <Badge variant="outline" className="mt-1 text-xs">منذ {p.since}</Badge>}
+  1658→              </div>
+  1659→            </div>
+  1660→            <div className="mb-3">
+  1661→              <Badge className={p.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
+  1662→                {p.status === 'نشط' ? '● نشط' : '● متوقف'}
+  1663→              </Badge>
+  1664→            </div>
+  1665→            <div className="flex gap-2">
+  1666→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1667→              <Button size="sm" variant="outline" className={p.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(p)}>
+  1668→                {p.status === 'نشط' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+  1669→              </Button>
+  1670→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1671→            </div>
+  1672→          </Card>
+  1673→        ))}
+  1674→      </div>
+  1675→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'logo', 'description', 'website', 'since', 'status']} apiPath="/api/partners" />}
+  1676→
+  1677→      <ConfirmDialog
+  1678→        open={!!deleteTarget}
+  1679→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1680→        title="تأكيد حذف الشريك"
+  1681→        message="هل أنت متأكد من الحذف؟"
+  1682→        itemLabel="سيتم حذف الشريك التالي:"
+  1683→        itemName={deleteTarget?.name}
+  1684→        confirmLabel="حذف"
+  1685→        cancelLabel="إلغاء"
+  1686→        variant="danger"
+  1687→        onConfirm={handleDelete}
+  1688→        loading={deleting}
+  1689→      />
+  1690→    </SectionCard>
+  1691→  )
+  1692→}
+  1693→
+  1694→function AdminLicenses() {
+  1695→  const [items, setItems] = useState<any[]>([])
+  1696→  const [open, setOpen] = useState(false)
+  1697→  const [editing, setEditing] = useState<any | null>(null)
+  1698→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1699→  const [deleting, setDeleting] = useState(false)
+  1700→  const load = () => fetch('/api/licenses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1701→  useEffect(() => { load() }, [])
+  1702→  const handleDelete = async () => {
+  1703→    if (!deleteTarget) return
+  1704→    setDeleting(true)
+  1705→    try {
+  1706→      await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+  1707→      toast.success('تم الحذف')
+  1708→      setDeleteTarget(null)
+  1709→      load()
+  1710→    } finally {
+  1711→      setDeleting(false)
+  1712→    }
+  1713→  }
+  1714→  const toggleStatus = async (l: any) => {
+  1715→    const newStatus = l.status === 'ساري' ? 'متوقف' : 'ساري'
+  1716→    await fetch('/api/licenses', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, status: newStatus }) })
+  1717→    toast.success(newStatus === 'ساري' ? 'تم تنشيط الترخيص' : 'تم إيقاف الترخيص')
+  1718→    load()
+  1719→  }
+  1720→  return (
+  1721→    <SectionCard title="التراخيص" description={`${items.length} ترخيص`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+  1722→      <div className="grid md:grid-cols-2 gap-4">
+  1723→        {items.map((l) => (
+  1724→          <Card key={l.id} className="p-5">
+  1725→            <div className="flex items-start justify-between mb-3">
+  1726→              <div>
+  1727→                <div className="font-bold text-navy">{l.issuing_body}</div>
+  1728→                <div className="text-xs text-gold">{l.type}</div>
+  1729→              </div>
+  1730→              <Badge className={l.status === 'ساري' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{l.status === 'ساري' ? '● ساري' : '● متوقف'}</Badge>
+  1731→            </div>
+  1732→            <div className="text-xs text-muted-foreground mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
+  1733→            <div className="flex justify-between text-xs text-muted-foreground mb-3">
+  1734→              <span>إصدار: <span dir="ltr">{l.issued_at}</span></span>
+  1735→              <span>انتهاء: <span dir="ltr">{l.expires_at}</span></span>
+  1736→            </div>
+  1737→            <div className="flex gap-2">
+  1738→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(l); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1739→              <Button size="sm" variant="outline" className={l.status === 'ساري' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(l)}>
+  1740→                {l.status === 'ساري' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
+  1741→              </Button>
+  1742→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(l)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1743→            </div>
+  1744→          </Card>
+  1745→        ))}
+  1746→      </div>
+  1747→      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['issuing_body', 'type', 'number', 'issued_at', 'expires_at', 'status', 'verification_url']} apiPath="/api/licenses" />}
+  1748→
+  1749→      <ConfirmDialog
+  1750→        open={!!deleteTarget}
+  1751→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1752→        title="تأكيد حذف الترخيص"
+  1753→        message="هل أنت متأكد من الحذف؟"
+  1754→        itemLabel="سيتم حذف الترخيص التالي:"
+  1755→        itemName={deleteTarget?.issuing_body}
+  1756→        confirmLabel="حذف"
+  1757→        cancelLabel="إلغاء"
+  1758→        variant="danger"
+  1759→        onConfirm={handleDelete}
+  1760→        loading={deleting}
+  1761→      />
+  1762→    </SectionCard>
+  1763→  )
+  1764→}
+  1765→
+  1766→function AdminFounder({ user }: any) {
+  1767→  const [tab, setTab] = useState<'founder' | 'team'>('founder')
+  1768→
+  1769→  return (
+  1770→    <SectionCard title="المؤسس والفريق" description="إدارة معلومات المؤسس وأعضاء الفريق بشكل احترافي">
+  1771→      <div className="space-y-5">
+  1772→        <div className="flex gap-2 border-b border-border pb-3">
+  1773→          <button
+  1774→            onClick={() => setTab('founder')}
+  1775→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'founder' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+  1776→          >
+  1777→            👑 المؤسس
+  1778→          </button>
+  1779→          <button
+  1780→            onClick={() => setTab('team')}
+  1781→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'team' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+  1782→          >
+  1783→            👥 الفريق القيادي
+  1784→          </button>
+  1785→        </div>
+  1786→
+  1787→        {tab === 'founder' ? (
+  1788→          <TeamEditor filterRole="founder" />
+  1789→        ) : (
+  1790→          <TeamEditor filterRole="leader" />
+  1791→        )}
+  1792→      </div>
+  1793→    </SectionCard>
+  1794→  )
+  1795→}
+  1796→
+  1797→function AdminSite() {
+  1798→  const [settings, setSettings] = useState<any>({})
+  1799→  const [saving, setSaving] = useState(false)
+  1800→  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
+  1801→  useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
+  1802→  const save = async () => {
+  1803→    setSaving(true)
+  1804→    try {
+  1805→      const res = await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+  1806→      if (!res.ok) {
+  1807→        const data = await res.json()
+  1808→        toast.error(data.error || 'فشل الحفظ')
+  1809→      } else {
+  1810→        toast.success('تم الحفظ بنجاح')
+  1811→      }
+  1812→    } catch { toast.error('فشل') } finally { setSaving(false) }
+  1813→  }
+  1814→
+  1815→  return (
+  1816→    <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
+  1817→      {/* Tabs */}
+  1818→      <div className="flex gap-2 border-b border-border pb-3 mb-4 flex-wrap">
+  1819→        {[
+  1820→          { id: 'basic', label: 'معلومات أساسية' },
+  1821→          { id: 'about', label: 'من نحن' },
+  1822→          { id: 'policies', label: 'السياسات' },
+  1823→          { id: 'social', label: 'التواصل' },
+  1824→          { id: 'visibility', label: 'الإظهار' },
+  1825→        ].map((t) => (
+  1826→          <button key={t.id} onClick={() => setTab(t.id as any)}
+  1827→            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === t.id ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>
+  1828→            {t.label}
+  1829→          </button>
+  1830→        ))}
+  1831→      </div>
+  1832→
+  1833→      <div className="space-y-4 max-w-3xl">
+  1834→        {/* BASIC */}
+  1835→        {tab === 'basic' && (
+  1836→          <div className="space-y-4">
+  1837→            <div className="grid sm:grid-cols-2 gap-4">
+  1838→              <div><Label>اسم الأكاديمية (عربي)</Label><Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="mt-1" /></div>
+  1839→              <div><Label>اسم الأكاديمية (إنجليزي)</Label><Input value={settings.academy_name_en || ''} onChange={(e) => setSettings({ ...settings, academy_name_en: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1840→              <div><Label>الاختصار</Label><Input value={settings.academy_short || ''} onChange={(e) => setSettings({ ...settings, academy_short: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1841→              <div><Label>الهاتف</Label><Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1842→              <div><Label>البريد</Label><Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="mt-1" /></div>
+  1843→              <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
+  1844→            </div>
+  1845→            <div className="border-t border-border pt-4">
+  1846→              <h3 className="font-bold text-navy mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
+  1847→              <div className="grid sm:grid-cols-2 gap-4">
+  1848→                <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+  1849→                <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+  1850→              </div>
+  1851→            </div>
+  1852→          </div>
+  1853→        )}
+  1854→
+  1855→        {/* ABOUT US */}
+  1856→        {tab === 'about' && (
+  1857→          <div className="space-y-4">
+  1858→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1859→              💡 يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
+  1860→            </div>
+  1861→            <div>
+  1862→              <Label>رؤيتنا</Label>
+  1863→              <textarea value={settings.about_vision || ''} onChange={(e) => setSettings({ ...settings, about_vision: e.target.value })}
+  1864→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رؤية الأكاديمية..." />
+  1865→            </div>
+  1866→            <div>
+  1867→              <Label>رسالتنا</Label>
+  1868→              <textarea value={settings.about_mission || ''} onChange={(e) => setSettings({ ...settings, about_mission: e.target.value })}
+  1869→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رسالة الأكاديمية..." />
+  1870→            </div>
+  1871→            <div>
+  1872→              <Label>قيمنا</Label>
+  1873→              <textarea value={settings.about_values || ''} onChange={(e) => setSettings({ ...settings, about_values: e.target.value })}
+  1874→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب قيم الأكاديمية..." />
+  1875→            </div>
+  1876→            <div>
+  1877→              <Label>فريقنا</Label>
+  1878→              <textarea value={settings.about_team || ''} onChange={(e) => setSettings({ ...settings, about_team: e.target.value })}
+  1879→                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب وصف فريق الأكاديمية..." />
+  1880→            </div>
+  1881→          </div>
+  1882→        )}
+  1883→
+  1884→        {/* POLICIES */}
+  1885→        {tab === 'policies' && (
+  1886→          <div className="space-y-4">
+  1887→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1888→              💡 تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
+  1889→            </div>
+  1890→            <div>
+  1891→              <Label>سياسة الخصوصية</Label>
+  1892→              <textarea value={settings.policy_privacy || ''} onChange={(e) => setSettings({ ...settings, policy_privacy: e.target.value })}
+  1893→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الخصوصية..." />
+  1894→            </div>
+  1895→            <div>
+  1896→              <Label>شروط الاستخدام</Label>
+  1897→              <textarea value={settings.policy_terms || ''} onChange={(e) => setSettings({ ...settings, policy_terms: e.target.value })}
+  1898→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب شروط الاستخدام..." />
+  1899→            </div>
+  1900→            <div>
+  1901→              <Label>سياسة الاسترداد</Label>
+  1902→              <textarea value={settings.policy_refund || ''} onChange={(e) => setSettings({ ...settings, policy_refund: e.target.value })}
+  1903→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الاسترداد..." />
+  1904→            </div>
+  1905→            <div>
+  1906→              <Label>الدعم والمساعدة</Label>
+  1907→              <textarea value={settings.policy_support || ''} onChange={(e) => setSettings({ ...settings, policy_support: e.target.value })}
+  1908→                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب معلومات الدعم..." />
+  1909→            </div>
+  1910→          </div>
+  1911→        )}
+  1912→
+  1913→        {/* SOCIAL */}
+  1914→        {tab === 'social' && (
+  1915→          <div className="space-y-4">
+  1916→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1917→              💡 كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
+  1918→            </div>
+  1919→            {/* Facebook */}
+  1920→            <div className="border border-border rounded-lg p-3">
+  1921→              <div className="flex items-center justify-between mb-2">
+  1922→                <Label className="font-bold">فيسبوك</Label>
+  1923→                <label className="flex items-center gap-2 text-xs">
+  1924→                  <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} />
+  1925→                  تفعيل
+  1926→                </label>
+  1927→              </div>
+  1928→              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm" />
+  1929→            </div>
+  1930→            {/* Telegram */}
+  1931→            <div className="border border-border rounded-lg p-3">
+  1932→              <div className="flex items-center justify-between mb-2">
+  1933→                <Label className="font-bold">تيليجرام (قناة أو يوزر)</Label>
+  1934→                <label className="flex items-center gap-2 text-xs">
+  1935→                  <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} />
+  1936→                  تفعيل
+  1937→                </label>
+  1938→              </div>
+  1939→              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm" />
+  1940→            </div>
+  1941→            {/* WhatsApp */}
+  1942→            <div className="border border-border rounded-lg p-3">
+  1943→              <div className="flex items-center justify-between mb-2">
+  1944→                <Label className="font-bold">واتساب (قناة)</Label>
+  1945→                <label className="flex items-center gap-2 text-xs">
+  1946→                  <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} />
+  1947→                  تفعيل
+  1948→                </label>
+  1949→              </div>
+  1950→              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm" />
+  1951→            </div>
+  1952→            {/* SMS */}
+  1953→            <div className="border border-border rounded-lg p-3">
+  1954→              <div className="flex items-center justify-between mb-2">
+  1955→                <Label className="font-bold">رقم للمراسلات النصية (SMS)</Label>
+  1956→                <label className="flex items-center gap-2 text-xs">
+  1957→                  <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} />
+  1958→                  تفعيل
+  1959→                </label>
+  1960→              </div>
+  1961→              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm" />
+  1962→            </div>
+  1963→          </div>
+  1964→        )}
+  1965→
+  1966→        {/* VISIBILITY */}
+  1967→        {tab === 'visibility' && (
+  1968→          <div className="space-y-4">
+  1969→            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
+  1970→              💡 تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
+  1971→            </div>
+  1972→            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+  1973→              <div>
+  1974→                <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
+  1975→                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+  1976→              </div>
+  1977→              <label className="flex items-center gap-2 text-xs">
+  1978→                <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} />
+  1979→                تفعيل
+  1980→              </label>
+  1981→            </div>
+  1982→            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
+  1983→              <div>
+  1984→                <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
+  1985→                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+  1986→              </div>
+  1987→              <label className="flex items-center gap-2 text-xs">
+  1988→                <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} />
+  1989→                تفعيل
+  1990→              </label>
+  1991→            </div>
+  1992→          </div>
+  1993→        )}
+  1994→
+  1995→        <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
+  1996→      </div>
+  1997→    </SectionCard>
+  1998→  )
+  1999→}
+  2000→
+
+[showing lines 1-2000 of 2923; use offset=2001 with limit to continue reading]

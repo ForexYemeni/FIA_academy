@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import {
+     5→  LayoutDashboard, BookOpen, FileText, Award, CreditCard,
+     6→  User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
+     7→  Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
+     8→  Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
+     9→  Sparkles, Star,
+    10→} from 'lucide-react'
+    11→import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+    12→import { useAuth } from '@/lib/auth-store'
+    13→import { useHashTab } from '@/lib/use-hash-tab'
+    14→import { Button } from '@/components/ui/button'
+    15→import { Card } from '@/components/ui/card'
+    16→import { Badge } from '@/components/ui/badge'
+    17→import { Input } from '@/components/ui/input'
+    18→import { Label } from '@/components/ui/label'
+    19→import { Textarea } from '@/components/ui/textarea'
+    20→import { Progress } from '@/components/ui/progress'
+    21→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    22→import {
+    23→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    24→} from '@/components/ui/dialog'
+    25→import { toast } from 'sonner'
+    26→import { supabasePublic } from '@/lib/supabase'
+    27→import { AvatarUploader } from '@/components/fia/avatar-uploader'
+    28→import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
+    29→import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
+    30→import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
+    31→import { CertificateRequest } from '@/components/fia/certificate-request'
+    32→import { CertificateViewer } from '@/components/fia/certificate-viewer'
+    33→
+    34→const NAV: NavItem[] = [
+    35→  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+    36→  { id: 'courses', label: 'دوراتي', icon: BookOpen },
+    37→  { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
+    38→  { id: 'exams', label: 'اختباراتي', icon: FileText },
+    39→  { id: 'results', label: 'نتائجي', icon: TrendingUp },
+    40→  { id: 'certificates', label: 'شهاداتي', icon: Award },
+    41→  { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
+    42→  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
+    43→  { id: 'blog', label: 'المدونة', icon: Newspaper },
+    44→  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
+    45→  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift },
+    46→  { id: 'profile', label: 'ملفي الشخصي', icon: User },
+    47→  { id: 'notifications', label: 'الإشعارات', icon: Bell },
+    48→  { id: 'settings', label: 'الإعدادات', icon: Settings },
+    49→]
+    50→
+    51→// Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
+    52→// Show only the human-readable text in the UI, but preserve the extra data on save.
+    53→const FIA_BIO_EXTRA_MARKER = '===FIA_EXTRA==='
+    54→const splitBio = (raw: string) => {
+    55→  const i = raw.indexOf(FIA_BIO_EXTRA_MARKER)
+    56→  return i === -1 ? raw : raw.slice(0, i).trimEnd()
+    57→}
+    58→const joinBio = (display: string, original?: string) => {
+    59→  if (!original) return display
+    60→  const i = original.indexOf(FIA_BIO_EXTRA_MARKER)
+    61→  if (i === -1) return display
+    62→  return `${display.trimEnd()}\n\n${original.slice(i)}`
+    63→}
+    64→
+    65→// Returns a normalized status info object for an enrollment's payment_status.
+    66→// payment_status can be one of: 'pending' | 'confirmed' | 'completed' | 'free'.
+    67→// - 'pending'    -> student paid, waiting for admin approval (yellow)
+    68→// - 'confirmed'  -> admin approved the payment, course in progress (green)
+    69→// - 'completed'  -> payment confirmed AND course finished (green)
+    70→// - 'free'       -> free enrollment (blue)
+    71→export function getPaymentStatusInfo(paymentStatus: string | undefined | null): {
+    72→  label: string
+    73→  badgeClass: string
+    74→} {
+    75→  switch (paymentStatus) {
+    76→    case 'completed':
+    77→      return { label: 'مكتمل', badgeClass: 'bg-green-500 text-white' }
+    78→    case 'confirmed':
+    79→      return { label: 'تم تأكيد الدفع', badgeClass: 'bg-green-500 text-white' }
+    80→    case 'free':
+    81→      return { label: 'مجانية', badgeClass: 'bg-blue-500 text-white' }
+    82→    case 'pending':
+    83→    default:
+    84→      return { label: 'بانتظار تأكيد الدفع', badgeClass: 'bg-yellow-500 text-white' }
+    85→  }
+    86→}
+    87→
+    88→// Returns a status info object for a raw payment record's `status` field
+    89→// (used in the Payments section). Raw status can be: 'مكتمل' | 'completed' |
+    90→// 'قيد الانتظار' | 'pending' | 'بانتظار' | 'ملغي' | 'failed' | 'فشل' | etc.
+    91→export function getPaymentRecordStatusInfo(status: string | undefined | null): {
+    92→  label: string
+    93→  badgeClass: string
+    94→} {
+    95→  const s = (status || '').trim()
+    96→  const norm = s.toLowerCase()
+    97→  if (s === 'مكتمل' || norm === 'completed' || norm === 'paid' || norm === 'confirmed') {
+    98→    return { label: s || 'مكتمل', badgeClass: 'bg-green-500/15 text-green-600 border-green-500/30' }
+    99→  }
+   100→  if (s === 'ملغي' || norm === 'failed' || s === 'فشل' || norm === 'cancelled' || norm === 'canceled') {
+   101→    return { label: s || 'فشل', badgeClass: 'bg-red-500/15 text-red-600 border-red-500/30' }
+   102→  }
+   103→  if (s === 'قيد الانتظار' || s === 'بانتظار' || norm === 'pending' || s === '') {
+   104→    return { label: s || 'بانتظار', badgeClass: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' }
+   105→  }
+   106→  // Unknown status — show as neutral
+   107→  return { label: s, badgeClass: 'bg-muted text-muted-foreground border-border' }
+   108→}
+   109→
+   110→export function StudentDashboard() {
+   111→  const [active, setActive] = useState('overview')
+   112→  useHashTab(NAV.map((n) => n.id), setActive)
+   113→  const [viewingCourse, setViewingCourse] = useState<any | null>(null)
+   114→  const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
+   115→  const user = useAuth((s) => s.user)
+   116→  const updateUser = useAuth((s) => s.updateUser)
+   117→  const [courses, setCourses] = useState<any[]>([])
+   118→  const [certificates, setCertificates] = useState<any[]>([])
+   119→  const [payments, setPayments] = useState<any[]>([])
+   120→  const [enrollments, setEnrollments] = useState<any[]>([])
+   121→  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || '') })
+   122→
+   123→  const loadEnrollments = () => {
+   124→    if (!user?.id) return
+   125→    fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
+   126→  }
+   127→
+   128→  useEffect(() => {
+   129→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+   130→    fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+   131→    fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+   132→    loadEnrollments()
+   133→  }, [user?.id])
+   134→
+   135→  // Real-time: when admin updates a course (e.g. changes price_type
+   136→  // from مدفوعة to مجانية or vice versa), refresh the courses list
+   137→  // immediately so the student sees the updated price/status.
+   138→  useEffect(() => {
+   139→    let channel: any
+   140→    try {
+   141→      channel = supabasePublic
+   142→        .channel('courses-realtime')
+   143→        .on('postgres_changes',
+   144→          { event: 'UPDATE', schema: 'public', table: 'courses' },
+   145→          () => {
+   146→            fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+   147→          }
+   148→        )
+   149→        .subscribe()
+   150→    } catch {}
+   151→    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+   152→  }, [])
+   153→
+   154→  const onEnrolled = () => {
+   155→    loadEnrollments()
+   156→  }
+   157→
+   158→  return (
+   159→    <DashboardShell
+   160→      nav={NAV}
+   161→      active={active}
+   162→      onNavigate={(id) => { setActive(id); if (id !== 'course-view') setViewingCourse(null) }}
+   163→      roleLabel="متدرب"
+   164→      roleColor="bg-blue-500/15 text-blue-600 border-blue-500/30"
+   165→    >
+   166→      {active === 'course-view' && viewingCourse ? (
+   167→        <StudentCourseViewer
+   168→          course={viewingCourse}
+   169→          enrollment={viewingEnrollment}
+   170→          onBack={() => { setViewingCourse(null); setActive('courses'); loadEnrollments() }}
+   171→        />
+   172→      ) : null}
+   173→      {active !== 'course-view' && (
+   174→        <>
+   175→          {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => {
+   176→            // === SAFETY CHECK: never open a paid course the student hasn't paid for ===
+   177→            const enr = enrollments.find((e:any)=>e.course_id===c.id)
+   178→            const isFree = c.price_type === 'مجانية' || c.price === 0
+   179→            if (!enr) {
+   180→              // Not enrolled at all — route to BrowseCourses
+   181→              toast.info(isFree ? 'سجّل في الدورة مجاناً من قسم "استكشاف الدورات"' : 'اشترك في الدورة من قسم "استكشاف الدورات"')
+   182→              setActive('browse')
+   183→              return
+   184→            }
+   185→            if (enr.payment_status === 'pending') {
+   186→              toast.info('هذه الدورة مدفوعة وبانتظار تأكيد الإدارة للدفع. سيتم تفعيلها قريباً.')
+   187→              return
+   188→            }
+   189→            setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
+   190→          }} />}
+   191→          {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
+   192→          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} onViewCourse={(c) => {
+   193→            // Same safety check — only open if enrolled and not pending
+   194→            const enr = enrollments.find((e:any)=>e.course_id===c.id)
+   195→            if (!enr || enr.payment_status === 'pending') {
+   196→              toast.info('لا يمكن فتح الدورة قبل إتمام التسجيل/الدفع')
+   197→              return
+   198→            }
+   199→            setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
+   200→          }} />}
+   201→          {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
+   202→          {active === 'results' && <Results />}
+   203→          {active === 'certificates' && <StudentCertificates user={user} />}
+   204→          {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
+   205→          {active === 'forum' && <SharedForum user={user} />}
+   206→          {active === 'blog' && <SharedBlog />}
+   207→          {active === 'faqs' && <SharedFAQ />}
+   208→          {active === 'affiliate' && (
+   209→            <SectionCard title="برنامج العمولة" description="شارك أصدقاءك واكسب عمولة">
+   210→              <AffiliateDashboard />
+   211→            </SectionCard>
+   212→          )}
+   213→          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+   214→          {active === 'notifications' && <Notifications userId={user?.id} enrollments={enrollments} courses={courses} />}
+   215→          {active === 'settings' && <SettingsTab user={user} updateUser={updateUser} />}
+   216→        </>
+   217→      )}
+   218→    </DashboardShell>
+   219→  )
+   220→}
+   221→
+   222→function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
+   223→  // Helper: determine if a course can be opened by the student.
+   224→  // Returns { canOpen, reason, enrollment } so the UI can decide what
+   225→  // to do when the user clicks "عرض الدورة".
+   226→  // - Free + not enrolled  -> should auto-enroll then open
+   227→  // - Paid + not enrolled  -> must open payment dialog
+   228→  // - Paid + enrolled pending -> cannot open (waiting admin approval)
+   229→  // - Enrolled (free/confirmed/completed) -> can open
+   230→  const getCourseAccess = (c: any) => {
+   231→    const enr = enrollments?.find((e: any) => e.course_id === c.id)
+   232→    const isFree = c.price_type === 'مجانية' || c.price === 0
+   233→    if (enr) {
+   234→      if (enr.payment_status === 'pending') {
+   235→        return { canOpen: false, reason: 'بانتظار تأكيد الدفع', enrollment: enr }
+   236→      }
+   237→      // free | confirmed | completed -> can open
+   238→      return { canOpen: true, reason: '', enrollment: enr }
+   239→    }
+   240→    if (isFree) {
+   241→      return { canOpen: false, reason: 'free-not-enrolled', enrollment: null }
+   242→    }
+   243→    return { canOpen: false, reason: 'paid-not-enrolled', enrollment: null }
+   244→  }
+   245→
+   246→  return (
+   247→    <div className="space-y-6">
+   248→      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
+   249→        <h2 className="text-2xl font-bold mb-1">أهلاً، {user?.name} 👋</h2>
+   250→        <p className="text-white/80">إليك ملخّص نشاطك في أكاديمية المستقبل الدولية</p>
+   251→      </div>
+   252→
+   253→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   254→        <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
+   255→        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
+   256→        <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
+   257→        <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
+   258→      </div>
+   259→
+   260→      <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
+   261→        <div className="space-y-4">
+   262→          {enrollments && enrollments.length > 0 ? (
+   263→            enrollments.slice(0, 3).map((e: any) => {
+   264→              const c = courses.find((x:any) => x.id === e.course_id)
+   265→              if (!c) return null
+   266→              return (
+   267→                <div key={e.id} className="space-y-2">
+   268→                  <div className="flex items-center justify-between">
+   269→                    <div className="font-medium text-navy text-sm">{c.title}</div>
+   270→                    <span className="text-xs text-muted-foreground">{e.progress || 0}%</span>
+   271→                  </div>
+   272→                  <Progress value={e.progress || 0} className="h-2" />
+   273→                </div>
+   274→              )
+   275→            })
+   276→          ) : (
+   277→            <div className="text-center py-6 text-muted-foreground text-sm">لا توجد دورات مسجّلة بعد — تصفّح الدورات المتاحة</div>
+   278→          )}
+   279→        </div>
+   280→      </SectionCard>
+   281→
+   282→      <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات — اضغط للتسجيل أو فتح الدورة">
+   283→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   284→          {courses.slice(0, 3).map((c: any) => {
+   285→            const access = getCourseAccess(c)
+   286→            const isFree = c.price_type === 'مجانية' || c.price === 0
+   287→            // Decide button label + action based on access state
+   288→            let btnLabel = 'عرض الدورة'
+   289→            let btnAction: () => void = () => onViewCourse?.(c)
+   290→            let btnClass = 'w-full bg-navy hover:bg-navy-light'
+   291→            if (access.enrollment?.payment_status === 'pending') {
+   292→              btnLabel = 'بانتظار تأكيد الدفع'
+   293→              btnClass = 'w-full bg-yellow-500/20 text-yellow-700 border border-yellow-500/30 cursor-not-allowed'
+   294→              btnAction = () => toast.info('سيتم تفعيل الدورة بعد تأكيد الإدارة للدفع')
+   295→            } else if (access.reason === 'free-not-enrolled') {
+   296→              btnLabel = 'سجّل الآن — مجانية'
+   297→              btnClass = 'w-full bg-green-600 hover:bg-green-700 text-white'
+   298→              // Will be handled by parent (BrowseCourses logic) — for now, just route to "browse"
+   299→              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" للتسجيل') }
+   300→            } else if (access.reason === 'paid-not-enrolled') {
+   301→              btnLabel = 'اشترك الآن'
+   302→              btnClass = 'w-full bg-gold hover:bg-gold-light text-navy'
+   303→              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" لإتمام الدفع') }
+   304→            } else if (access.canOpen) {
+   305→              btnLabel = 'عرض الدورة'
+   306→              btnClass = 'w-full bg-navy hover:bg-navy-light'
+   307→              btnAction = () => onViewCourse?.(c)
+   308→            }
+   309→            return (
+   310→              <Card key={c.id} className="p-4 card-hover">
+   311→                <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden relative">
+   312→                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   313→                  <Badge className={`absolute top-2 left-2 ${isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}`}>
+   314→                    {isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}
+   315→                  </Badge>
+   316→                </div>
+   317→                <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
+   318→                <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
+   319→                <Button size="sm" className={btnClass} onClick={btnAction} disabled={access.enrollment?.payment_status === 'pending'}>
+   320→                  {btnLabel}
+   321→                </Button>
+   322→              </Card>
+   323→            )
+   324→          })}
+   325→        </div>
+   326→      </SectionCard>
+   327→    </div>
+   328→  )
+   329→}
+   330→
+   331→function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
+   332→  const [requesting, setRequesting] = useState<string | null>(null)
+   333→
+   334→  const requestCertificate = async (course: any) => {
+   335→    setRequesting(course.id)
+   336→    try {
+   337→      const res = await fetch('/api/certificate-requests', {
+   338→        method: 'POST',
+   339→        headers: { 'Content-Type': 'application/json' },
+   340→        body: JSON.stringify({
+   341→          user_id: course.enrollment.user_id,
+   342→          course_id: course.id,
+   343→          student_name: studentName || course.enrollment.user_id || 'متدرب',
+   344→          course_title: course.title,
+   345→          fee: 0,
+   346→        }),
+   347→      })
+   348→      const data = await res.json()
+   349→      if (res.ok) {
+   350→        toast.success('تم إرسال طلب الشهادة! سيتم مراجعته من قبل المدرب والإدارة')
+   351→      } else {
+   352→        toast.error(data.error || 'فشل الطلب')
+   353→      }
+   354→    } catch {
+   355→      toast.error('خطأ في الاتصال')
+   356→    } finally {
+   357→      setRequesting(null)
+   358→    }
+   359→  }
+   360→
+   361→  const enrolled = (enrollments || [])
+   362→    .map((e: any) => {
+   363→      const course = courses.find((c: any) => c.id === e.course_id)
+   364→      return course ? { ...course, enrollment: e } : null
+   365→    })
+   366→    .filter(Boolean)
+   367→
+   368→  return (
+   369→    <SectionCard title="دوراتي المسجّلة" description={`${enrolled.length} دورة`}>
+   370→      {enrolled.length === 0 ? (
+   371→        <div className="text-center py-12">
+   372→          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+   373→          <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
+   374→          <p className="text-xs text-muted-foreground mb-4">تصفّح الدورات المتاحة في قسم "استكشاف الدورات"</p>
+   375→        </div>
+   376→      ) : (
+   377→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   378→          {enrolled.map((c: any) => (
+   379→            <Card key={c.id} className="overflow-hidden card-hover">
+   380→              <div className="h-32 bg-navy relative">
+   381→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   382→                <div className="absolute top-2 right-2">
+   383→                  <Badge className={getPaymentStatusInfo(c.enrollment.payment_status).badgeClass}>
+   384→                    {getPaymentStatusInfo(c.enrollment.payment_status).label}
+   385→                  </Badge>
+   386→                </div>
+   387→              </div>
+   388→              <div className="p-4">
+   389→                <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+   390→                <Progress value={c.enrollment.progress || 0} className="h-2 mb-2" />
+   391→                <div className="flex justify-between text-xs text-muted-foreground mb-3">
+   392→                  <span>{c.enrollment.progress || 0}% مكتمل</span>
+   393→                  <span>{c.duration_hours} ساعة</span>
+   394→                </div>
+   395→                {c.enrollment.payment_status === 'pending' ? (
+   396→                  <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
+   397→                    بانتظار تأكيد الدفع
+   398→                  </Button>
+   399→                ) : c.enrollment.payment_status === 'completed' ? (
+   400→                  <div className="space-y-2">
+   401→                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
+   402→                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
+   403→                    </Button>
+   404→                    <div className="grid grid-cols-2 gap-2">
+   405→                      <Button
+   406→                        size="sm"
+   407→                        variant="outline"
+   408→                        className="border-navy/30 text-navy hover:bg-navy/5"
+   409→                        onClick={() => onContinue(c, c.enrollment)}
+   410→                      >
+   411→                        <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
+   412→                      </Button>
+   413→                      {/* DISABLED: certificate request button removed — will be re-enabled when design+prompt provided */}
+   414→                      {/* <Button
+   415→                        size="sm"
+   416→                        className="bg-gold hover:bg-gold-light text-navy"
+   417→                        disabled={requesting === c.id}
+   418→                        onClick={() => requestCertificate(c)}
+   419→                      >
+   420→                        {requesting === c.id ? (
+   421→                          <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري...</>
+   422→                        ) : (
+   423→                          <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
+   424→                        )}
+   425→                      </Button> */}
+   426→                    </div>
+   427→                  </div>
+   428→                ) : (
+   429→                  <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>
+   430→                    متابعة التعلّم
+   431→                  </Button>
+   432→                )}
+   433→              </div>
+   434→            </Card>
+   435→          ))}
+   436→        </div>
+   437→      )}
+   438→    </SectionCard>
+   439→  )
+   440→}
+   441→
+   442→function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse }: any) {
+   443→  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+   444→  const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
+   445→  const [enrolling, setEnrolling] = useState<string | null>(null)
+   446→
+   447→  useEffect(() => {
+   448→    fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
+   449→  }, [])
+   450→
+   451→  const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
+   452→
+   453→  // Helper: determine if a course can be OPENED by the student.
+   454→  // CRITICAL: A paid course must NOT open just because the student
+   455→  // uploaded a payment proof. The course only opens after admin
+   456→  // confirms the payment (payment_status === 'confirmed' or 'completed').
+   457→  // - Not enrolled + free  → can enroll then open (caller handles)
+   458→  // - Not enrolled + paid  → must open payment dialog
+   459→  // - Enrolled + pending   → CANNOT open (waiting admin approval)
+   460→  // - Enrolled + free/confirmed/completed → can open
+   461→  const getAccess = (c: any) => {
+   462→    const enr = enrollments?.find((e: any) => e.course_id === c.id)
+   463→    const isFree = c.price_type === 'مجانية' || c.price === 0
+   464→    if (!enr) {
+   465→      return { state: isFree ? 'free-not-enrolled' : 'paid-not-enrolled', enrollment: null }
+   466→    }
+   467→    if (enr.payment_status === 'pending') {
+   468→      return { state: 'pending', enrollment: enr }
+   469→    }
+   470→    return { state: 'can-open', enrollment: enr }
+   471→  }
+   472→
+   473→  const enrollFree = async (course: any) => {
+   474→    // Double-check client-side before calling API
+   475→    if (isEnrolled(course.id)) {
+   476→      toast.info('أنت مسجّل في هذه الدورة')
+   477→      // If already enrolled, just open the course viewer immediately
+   478→      onViewCourse?.(course)
+   479→      return
+   480→    }
+   481→    setEnrolling(course.id)
+   482→    try {
+   483→      const res = await fetch('/api/enrollments', {
+   484→        method: 'POST',
+   485→        headers: { 'Content-Type': 'application/json' },
+   486→        body: JSON.stringify({ user_id: userId, course_id: course.id, payment_status: 'free' }),
+   487→      })
+   488→      const data = await res.json()
+   489→      if (data.already_enrolled) {
+   490→        toast.info('أنت مسجّل في هذه الدورة')
+   491→        // Refresh + open the course viewer
+   492→        await onEnrolled?.()
+   493→        onViewCourse?.(course)
+   494→      } else if (res.ok) {
+   495→        toast.success(`تم التسجيل في دورة: ${course.title}`)
+   496→        await onEnrolled?.()
+   497→        // OPEN THE COURSE IMMEDIATELY after successful free enrollment
+   498→        // (the user expects: click free course → it opens)
+   499→        onViewCourse?.(course)
+   500→      } else toast.error('فشل التسجيل')
+   501→    } catch {
+   502→      toast.error('خطأ')
+   503→    } finally {
+   504→      setEnrolling(null)
+   505→    }
+   506→  }
+   507→
+   508→  // Clicking the entire card triggers the appropriate action:
+   509→  // - If enrolled + payment confirmed → open the course viewer immediately
+   510→  // - If enrolled + payment PENDING   → show toast (waiting admin approval)
+   511→  // - If free + not enrolled          → auto-enroll then open the course viewer
+   512→  // - If paid + not enrolled          → open the payment dialog (course opens AFTER admin approval)
+   513→  const handleCardClick = (c: any) => {
+   514→    const enr = enrollments?.find((e: any) => e.course_id === c.id)
+   515→    const isFree = c.price_type === 'مجانية' || c.price === 0
+   516→    if (enr) {
+   517→      // SAFETY: even if enrolled, don't open if payment is pending
+   518→      if (enr.payment_status === 'pending') {
+   519→        toast.info('بانتظار تأكيد الإدارة للدفع — سيتم تفعيل الدورة قريباً')
+   520→        return
+   521→      }
+   522→      // free | confirmed | completed → safe to open
+   523→      onViewCourse?.(c)
+   524→    } else if (isFree) {
+   525→      enrollFree(c)
+   526→    } else {
+   527→      setPayDialog({ course: c, open: true })
+   528→    }
+   529→  }
+   530→
+   531→  const enrollPaid = async (course: any, method: any, reference: string, proofUrl?: string | null, couponCode?: string) => {
+   532→    if (isEnrolled(course.id)) { toast.info('أنت مسجّل في هذه الدورة'); return }
+   533→    setEnrolling(course.id)
+   534→    try {
+   535→      let fullReference = proofUrl ? (reference + ' | PROOF: ' + proofUrl) : reference
+   536→      // If coupon was applied, validate it server-side and get discounted price
+   537→      let finalAmount = course.price
+   538→      if (couponCode) {
+   539→        try {
+   540→          const couponRes = await fetch(`/api/coupons?code=${encodeURIComponent(couponCode.toUpperCase())}`)
+   541→          const couponData = await couponRes.json()
+   542→          if (couponData.valid && couponData.coupon) {
+   543→            const c = couponData.coupon
+   544→            finalAmount = c.discount_type === 'percentage'
+   545→              ? Math.max(0, course.price - Math.round((course.price * c.discount_value) / 100))
+   546→              : Math.max(0, course.price - c.discount_value)
+   547→            // Add coupon info to the reference
+   548→            fullReference = fullReference + ' | COUPON:' + couponCode
+   549→          }
+   550→        } catch {}
+   551→      }
+   552→      const res = await fetch('/api/enrollments', {
+   553→        method: 'POST',
+   554→        headers: { 'Content-Type': 'application/json' },
+   555→        body: JSON.stringify({
+   556→          user_id: userId, course_id: course.id, payment_status: 'pending',
+   557→          amount_paid: finalAmount, currency: course.currency || 'ر.ي',
+   558→          payment_method: method.name, payment_reference: fullReference,
+   559→        }),
+   560→      })
+   561→      const data = await res.json()
+   562→      if (data.already_enrolled) { toast.info('أنت مسجّل في هذه الدورة') }
+   563→      else if (res.ok) {
+   564→        toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
+   565→        onEnrolled(); setPayDialog(null)
+   566→      } else toast.error('فشل التسجيل')
+   567→    } catch { toast.error('خطأ') }
+   568→    finally { setEnrolling(null) }
+   569→  }
+   570→
+   571→  return (
+   572→    <SectionCard title="استكشاف الدورات" description="تصفّح جميع الدورات المتاحة — اضغط على الدورة لفتحها">
+   573→      {/* === Featured + Limited-time offers — shown ABOVE the grid === */}
+   574→      {(() => {
+   575→        const featuredCourses = (courses || []).filter((c: any) =>
+   576→          (c.offer_type === 'featured' || c.offer_type === 'limited_time') &&
+   577→          !isEnrolled(c.id)
+   578→        )
+   579→        if (featuredCourses.length === 0) return null
+   580→        return (
+   581→          <div className="mb-6 space-y-3">
+   582→            <div className="flex items-center gap-2 text-sm font-bold text-navy">
+   583→              <Sparkles className="w-4 h-4 text-gold" /> عروض خاصة ومميزة
+   584→              <Badge className="bg-gold/15 text-gold border-gold/30">{featuredCourses.length}</Badge>
+   585→            </div>
+   586→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   587→              {featuredCourses.map((c: any) => {
+   588→                const isFree = c.price_type === 'مجانية' || c.price === 0
+   589→                const offerPrice = Number(c.offer_price) || 0
+   590→                const displayPrice = offerPrice > 0 ? offerPrice : (Number(c.price) || 0)
+   591→                const originalPrice = Number(c.original_price) || 0
+   592→                const hasDiscount = originalPrice > displayPrice && displayPrice > 0
+   593→                const isLimited = c.offer_type === 'limited_time'
+   594→                const unitLabel = c.offer_duration_unit === 'hours' ? 'ساعة' :
+   595→                  c.offer_duration_unit === 'days' ? 'يوم' :
+   596→                  c.offer_duration_unit === 'weeks' ? 'أسبوع' : 'شهر'
+   597→
+   598→                // === Remaining time for limited-time offers ===
+   599→                // Use the course's updated_at as the offer start time
+   600→                // (the trainer saves the course when setting the offer).
+   601→                // Compute the expiry = updated_at + duration, then
+   602→                // remaining = expiry - now. If remaining ≤ 0, the
+   603→                // offer has expired — don't show this card.
+   604→                const offerStart = c.updated_at || c.created_at
+   605→                let remainingMs: number | null = null
+   606→                let expired = false
+   607→                if (isLimited && offerStart && Number(c.offer_duration_value) > 0) {
+   608→                  const start = new Date(offerStart).getTime()
+   609→                  const dur = Number(c.offer_duration_value)
+   610→                  const unitMs = c.offer_duration_unit === 'hours' ? 3600000 :
+   611→                    c.offer_duration_unit === 'days' ? 86400000 :
+   612→                    c.offer_duration_unit === 'weeks' ? 604800000 : 2592000000
+   613→                  const expiry = start + dur * unitMs
+   614→                  remainingMs = expiry - Date.now()
+   615→                  if (remainingMs <= 0) expired = true
+   616→                }
+   617→                if (expired) return null
+   618→                // Format remaining time as "X ساعة Y دقيقة" or "X يوم Y ساعة"
+   619→                const fmtRemaining = (ms: number) => {
+   620→                  const totalSec = Math.floor(ms / 1000)
+   621→                  const days = Math.floor(totalSec / 86400)
+   622→                  const hours = Math.floor((totalSec % 86400) / 3600)
+   623→                  const mins = Math.floor((totalSec % 3600) / 60)
+   624→                  if (days > 0) return `${days} يوم ${hours} ساعة`
+   625→                  if (hours > 0) return `${hours} ساعة ${mins} دقيقة`
+   626→                  if (mins > 0) return `${mins} دقيقة`
+   627→                  return 'تنتهي قريباً'
+   628→                }
+   629→                return (
+   630→                  <Card
+   631→                    key={c.id}
+   632→                    className={`overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-1 ring-2 ${isLimited ? 'ring-gold/50' : 'ring-gold/30'}`}
+   633→                    onClick={() => handleCardClick(c)}
+   634→                  >
+   635→                    {/* Cover + prominent featured badge */}
+   636→                    <div className="h-32 bg-navy relative">
+   637→                      {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   638→                      <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/30 to-transparent" />
+   639→                      {/* Big offer badge top-right */}
+   640→                      <div className={`absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 ${isLimited ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse' : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'}`}>
+   641→                        {isLimited ? <Clock className="w-3.5 h-3.5" /> : <Star className="w-3.5 h-3.5" />}
+   642→                        <span className="text-xs font-extrabold">{isLimited ? '⏰ لمدة محدودة' : '⭐ مميزة'}</span>
+   643→                      </div>
+   644→                      {/* Remaining time chip for limited-time offers */}
+   645→                      {isLimited && remainingMs !== null && (
+   646→                        <div className="absolute bottom-2 right-2 bg-white text-red-600 text-[10px] font-extrabold px-2 py-1 rounded-md shadow-md border border-red-500/30 flex items-center gap-1">
+   647→                          <Clock className="w-3 h-3" /> {fmtRemaining(remainingMs)}
+   648→                        </div>
+   649→                      )}
+   650→                      {/* For featured (not limited), show duration chip */}
+   651→                      {!isLimited && Number(c.offer_duration_value) > 0 && (
+   652→                        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-navy text-[10px] font-bold px-2 py-0.5 rounded-md" dir="ltr">
+   653→                          {c.offer_duration_value} {unitLabel}
+   654→                        </div>
+   655→                      )}
+   656→                    </div>
+   657→                    {/* Body */}
+   658→                    <div className="p-4">
+   659→                      {c.offer_headline && (
+   660→                        <div className={`text-xs font-bold mb-1 ${isLimited ? 'text-red-600' : 'text-gold'}`}>
+   661→                          {isLimited ? '⏰' : '⭐'} {c.offer_headline}
+   662→                        </div>
+   663→                      )}
+   664→                      <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+   665→                      <div className="flex items-baseline gap-2 mb-3">
+   666→                        {isFree ? (
+   667→                          <span className="text-2xl font-extrabold text-green-600" dir="ltr">مجانية</span>
+   668→                        ) : (
+   669→                          <>
+   670→                            {hasDiscount && (
+   671→                              <span className="text-xs line-through text-red-500" dir="ltr">
+   672→                                {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
+   673→                              </span>
+   674→                            )}
+   675→                            <span className="text-xl font-extrabold text-gold" dir="ltr">
+   676→                              {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
+   677→                            </span>
+   678→                          </>
+   679→                        )}
+   680→                      </div>
+   681→                      <Button
+   682→                        size="sm"
+   683→                        className={`w-full text-xs ${isLimited ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-navy hover:bg-navy-light text-gold'}`}
+   684→                        onClick={(e) => { e.stopPropagation(); handleCardClick(c) }}
+   685→                      >
+   686→                        {isFree ? 'سجّل الآن — مجانية' : 'احصل على العرض الآن'}
+   687→                      </Button>
+   688→                    </div>
+   689→                  </Card>
+   690→                )
+   691→              })}
+   692→            </div>
+   693→          </div>
+   694→        )
+   695→      })()}
+   696→
+   697→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   698→        {courses.map((c: any) => {
+   699→          const enr = enrollments?.find((e: any) => e.course_id === c.id)
+   700→          const isPendingPayment = enr?.payment_status === 'pending'
+   701→          const isOpenable = enr && !isPendingPayment
+   702→          const isFree = c.price_type === 'مجانية' || c.price === 0
+   703→          const isPaidNotEnrolled = !enr && !isFree
+   704→          // === Offer price logic ===
+   705→          // - offer_price (if > 0) takes priority — it's the special
+   706→          //   promotional price for this course.
+   707→          // - If offer_price = 0, fall back to the regular course.price.
+   708→          // - The "struck through" original is whichever is bigger:
+   709→          //   original_price (the was-price) or the regular price
+   710→          //   (when offer_price < price).
+   711→          const originalPriceField = Number(c.original_price) || 0
+   712→          const regularPrice = Number(c.price) || 0
+   713→          const offerPrice = Number(c.offer_price) || 0
+   714→          // displayPrice = the price the student actually pays
+   715→          const displayPrice = offerPrice > 0 ? offerPrice : regularPrice
+   716→          // strikePrice = the price that gets struck through (the "was" price)
+   717→          // Pick the LARGER of original_price and regular price as the
+   718→          // "was" price, so the user sees the biggest possible discount.
+   719→          const strikePrice = Math.max(originalPriceField, regularPrice, offerPrice)
+   720→          const hasDiscount = !isFree && strikePrice > displayPrice && displayPrice > 0
+   721→          // Offer flag — is this course currently in an offer period?
+   722→          const hasOffer = !isFree && (c.offer_type === 'limited_time' || c.offer_type === 'featured')
+   723→          const offerPct = hasDiscount
+   724→            ? Math.round((1 - displayPrice / strikePrice) * 100)
+   725→            : 0
+   726→          return (
+   727→            <Card
+   728→              key={c.id}
+   729→              className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${
+   730→                hasOffer ? 'ring-2 ring-gold/50' :
+   731→                isOpenable ? 'ring-2 ring-green-500/30'
+   732→                : isPendingPayment ? 'ring-2 ring-yellow-500/40'
+   733→                : isPaidNotEnrolled ? 'ring-1 ring-gold/40'
+   734→                : ''
+   735→              }`}
+   736→              onClick={() => handleCardClick(c)}
+   737→            >
+   738→              <div className="h-40 bg-navy relative">
+   739→                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+   740→                {/* Gradient overlay for legibility of the price badge */}
+   741→                <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-transparent to-transparent" />
+   742→
+   743→                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+   744→
+   745→                {/* Prominent price display in the middle-bottom of the image */}
+   746→                {!isFree && (
+   747→                  <div className="absolute bottom-2 right-2 left-2 flex flex-col items-center justify-center text-center">
+   748→                    {hasDiscount ? (
+   749→                      <div className={`flex items-baseline gap-2 rounded-lg px-3 py-1.5 border shadow-lg ${
+   750→                        hasOffer
+   751→                          ? 'bg-gradient-to-r from-red-600 to-red-800 border-red-300/30'
+   752→                          : 'bg-white/10 backdrop-blur-md border-white/20'
+   753→                      }`}>
+   754→                        <span className="text-xs line-through text-white/70 font-bold" dir="ltr">
+   755→                          {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
+   756→                        </span>
+   757→                        <span className={`text-xl font-extrabold ${hasOffer ? 'text-gold' : 'text-gold'}`} dir="ltr">
+   758→                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
+   759→                        </span>
+   760→                      </div>
+   761→                    ) : (
+   762→                      <div className="bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
+   763→                        <span className="text-xl font-extrabold text-gold" dir="ltr">
+   764→                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
+   765→                        </span>
+   766→                      </div>
+   767→                    )}
+   768→                    {hasDiscount && (
+   769→                      <div className={`mt-1 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow ${
+   770→                        hasOffer ? 'bg-yellow-400 text-navy' : 'bg-red-500'
+   771→                      }`}>
+   772→                        {offerPct}% خصم{hasOffer ? ' — عرض خاص' : ''}
+   773→                      </div>
+   774→                    )}
+   775→                  </div>
+   776→                )}
+   777→
+   778→                {/* Status / offer badge in top-left */}
+   779→                {hasOffer ? (
+   780→                  <Badge className={`absolute top-2 left-2 flex items-center gap-1 backdrop-blur-sm ${
+   781→                    c.offer_type === 'limited_time'
+   782→                      ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse'
+   783→                      : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'
+   784→                  }`}>
+   785→                    {c.offer_type === 'limited_time' ? <Clock className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+   786→                    {c.offer_type === 'limited_time' ? '⏰ لمدة محدودة' : '⭐ مميزة'}
+   787→                  </Badge>
+   788→                ) : isOpenable ? (
+   789→                  <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1 backdrop-blur-sm">
+   790→                    <CheckCircle2 className="w-3 h-3" /> مسجّل — اضغط للفتح
+   791→                  </Badge>
+   792→                ) : isPendingPayment ? (
+   793→                  <Badge className="absolute top-2 left-2 bg-yellow-500 text-navy flex items-center gap-1 backdrop-blur-sm">
+   794→                    <Clock className="w-3 h-3" /> بانتظار الدفع
+   795→                  </Badge>
+   796→                ) : isFree ? (
+   797→                  <Badge className="absolute top-2 left-2 bg-green-500 text-white backdrop-blur-sm">مجانية — اضغط للفتح</Badge>
+   798→                ) : (
+   799→                  <Badge className="absolute top-2 left-2 bg-gold text-navy backdrop-blur-sm">مدفوعة — اضغط للاشتراك</Badge>
+   800→                )}
+   801→              </div>
+   802→              <div className="p-4">
+   803→                {/* Offer headline (if set) */}
+   804→                {hasOffer && c.offer_headline && (
+   805→                  <div className={`text-xs font-bold mb-1 truncate ${c.offer_type === 'limited_time' ? 'text-red-600' : 'text-gold'}`}>
+   806→                    {c.offer_type === 'limited_time' ? '⏰' : '⭐'} {c.offer_headline}
+   807→                  </div>
+   808→                )}
+   809→                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+   810→                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
+   811→                <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+   812→                  <span className="flex items-center gap-1">
+   813→                    <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
+   814→                  </span>
+   815→                  <span className="font-bold text-navy" dir="ltr">
+   816→                    {isFree ? <span className="text-green-600">مجانية</span> : hasDiscount ? (
+   817→                      <span>
+   818→                        <span className="line-through text-red-500 text-[10px]" dir="ltr">
+   819→                          {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
+   820→                        </span>{' '}
+   821→                        <span className="text-green-600" dir="ltr">
+   822→                          {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
+   823→                        </span>
+   824→                      </span>
+   825→                    ) : `${displayPrice.toLocaleString()} ${c.currency || 'ر.ي'}`}
+   826→                  </span>
+   827→                </div>
+   828→                <div className="text-[10px] text-muted-foreground/80 text-center">
+   829→                  {isOpenable
+   830→                    ? '↵ اضغط لفتح الدورة'
+   831→                    : isPendingPayment
+   832→                      ? '↵ اضغط لمعرفة الحالة'
+   833→                      : isFree
+   834→                        ? '↵ اضغط للتسجيل والفتح فوراً'
+   835→                        : '↵ اضغط لإكمال الاشتراك'}
+   836→                </div>
+   837→              </div>
+   838→            </Card>
+   839→          )
+   840→        })}
+   841→      </div>
+   842→
+   843→      {payDialog?.open && (
+   844→        <PaymentDialog
+   845→          course={payDialog.course}
+   846→          methods={paymentMethods}
+   847→          open={payDialog.open}
+   848→          userId={userId}
+   849→          onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
+   850→          onPay={(method: any, reference: string, proofUrl?: string | null, couponCode?: string) => enrollPaid(payDialog.course, method, reference, proofUrl, couponCode)}
+   851→          loading={enrolling === payDialog.course.id}
+   852→        />
+   853→      )}
+   854→    </SectionCard>
+   855→  )
+   856→}
+   857→
+   858→function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, userId }: any) {
+   859→  const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
+   860→  // Auto-select the first payment method when the list arrives.
+   861→  // Without this, selectedMethod stays null if methods was empty
+   862→  // when the dialog first rendered (methods loads asynchronously).
+   863→  useEffect(() => {
+   864→    if (methods?.length > 0 && !selectedMethod) {
+   865→      setSelectedMethod(methods[0])
+   866→    }
+   867→  }, [methods, selectedMethod])
+   868→  const [reference, setReference] = useState('')
+   869→  const [proofUrl, setProofUrl] = useState<string | null>(null)
+   870→  const [uploadingProof, setUploadingProof] = useState(false)
+   871→  const [couponCode, setCouponCode] = useState('')
+   872→  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null)
+   873→  const [validatingCoupon, setValidatingCoupon] = useState(false)
+   874→  const [couponError, setCouponError] = useState('')
+   875→  const [autoCouponApplied, setAutoCouponApplied] = useState(false)
+   876→
+   877→  // The "official" price (struck through) — only shown if it's greater
+   878→  // === PRICING LOGIC FOR PAYMENT ===
+   879→  // - `course.price` = the regular course price (shown when no offer)
+   880→  // - `course.original_price` = the "was" price (struck through)
+   881→  // - `course.offer_price` = the special promotional offer price (if
+   882→  //   the course is currently in an offer period — limited_time or
+   883→  //   featured). When set and > 0, this is what the student pays.
+   884→  // - `course.auto_coupon_code` = coupon that's auto-applied at
+   885→  //   checkout (if the student hasn't already used it on another
+   886→  //   course)
+   887→  // The student is charged `finalPrice` below, which is the offer
+   888→  // price (or regular price if no offer) minus any coupon discount.
+   889→  const regularPrice = Number(course.price) || 0
+   890→  const offerPrice = Number(course.offer_price) || 0
+   891→  const officialPrice = Number(course.original_price) || 0
+   892→  // The "base price" is what the student pays BEFORE any coupon.
+   893→  // If there's an offer_price, use it; otherwise fall back to the
+   894→  // regular course.price.
+   895→  const basePrice = offerPrice > 0 ? offerPrice : regularPrice
+   896→  // The struck-through "was" price — pick the larger of official_price
+   897→  // and regular_price so the student sees the biggest discount.
+   898→  const strikePrice = Math.max(officialPrice, regularPrice, offerPrice)
+   899→  const hasStrikethrough = strikePrice > basePrice && basePrice > 0
+   900→  // For backward compat, alias to old variable names used elsewhere.
+   901→  const originalPrice = basePrice
+   902→
+   903→  const discount = appliedCoupon
+   904→    ? appliedCoupon.discount_type === 'percentage'
+   905→      ? Math.round((basePrice * (appliedCoupon.discount_value || 0)) / 100)
+   906→      : (appliedCoupon.discount_value || 0)
+   907→    : 0
+   908→  const finalPrice = Math.max(0, originalPrice - discount)
+   909→
+   910→  // ============================================================
+   911→  // AUTO-APPLY THE COURSE'S COUPON — if the trainer set an
+   912→  // `auto_coupon_code` for this course, we validate + apply it
+   913→  // automatically the moment the dialog opens, so the student
+   914→  // sees the discounted price without needing to type anything.
+   915→  // We pass the user_id so the per-user usage restriction is
+   916→  // enforced (the student can't reuse the coupon on another course).
+   917→  // ============================================================
+   918→  useEffect(() => {
+   919→    if (!open || !course?.auto_coupon_code || autoCouponApplied) return
+   920→    setAutoCouponApplied(true) // mark as attempted, prevent retry loop
+   921→    setCouponCode(course.auto_coupon_code)
+   922→    // Validate the auto coupon with the user_id so per-user
+   923→    // restriction is enforced.
+   924→    ;(async () => {
+   925→      setValidatingCoupon(true)
+   926→      try {
+   927→        const url = `/api/coupons?code=${encodeURIComponent(course.auto_coupon_code.toUpperCase())}` +
+   928→          (userId ? `&user_id=${encodeURIComponent(userId)}` : '')
+   929→        const res = await fetch(url)
+   930→        const data = await res.json()
+   931→        if (data.valid && data.coupon) {
+   932→          setAppliedCoupon(data.coupon)
+   933→        } else if (data.already_used) {
+   934→          // Student already used this coupon on another course —
+   935→          // don't apply it, just clear the code silently.
+   936→          setCouponCode('')
+   937→        } else {
+   938→          // Invalid coupon — don't show an error (the user didn't
+   939→          // type it manually). Just clear the code.
+   940→          setCouponCode('')
+   941→        }
+   942→      } catch {
+   943→        setCouponCode('')
+   944→      } finally {
+   945→        setValidatingCoupon(false)
+   946→      }
+   947→    })()
+   948→  }, [open, course?.auto_coupon_code, userId])
+   949→
+   950→  const validateCoupon = async () => {
+   951→    if (!couponCode.trim()) { setCouponError(''); setAppliedCoupon(null); return }
+   952→    setValidatingCoupon(true)
+   953→    setCouponError('')
+   954→    try {
+   955→      // Pass user_id so per-user restriction is enforced.
+   956→      const url = `/api/coupons?code=${encodeURIComponent(couponCode.trim().toUpperCase())}` +
+   957→        (userId ? `&user_id=${encodeURIComponent(userId)}` : '')
+   958→      const res = await fetch(url)
+   959→      const data = await res.json()
+   960→      if (data.valid && data.coupon) {
+   961→        if (data.coupon.course_id && data.coupon.course_id !== course.id) {
+   962→          setCouponError('غير صالح لهذه الدورة')
+   963→          setAppliedCoupon(null)
+   964→          return
+   965→        }
+   966→        setAppliedCoupon(data.coupon)
+   967→      } else if (data.already_used) {
+   968→        setCouponError('لقد استخدمت هذا الكوبون مسبقاً في دورة أخرى — كل متدرب يمكنه استخدام الكوبون مرة واحدة فقط')
+   969→        setAppliedCoupon(null)
+   970→      } else {
+   971→        setCouponError(data.message || 'كوبون غير صالح')
+   972→        setAppliedCoupon(null)
+   973→      }
+   974→    } catch {
+   975→      setCouponError('فشل التحقق')
+   976→      setAppliedCoupon(null)
+   977→    } finally {
+   978→      setValidatingCoupon(false)
+   979→    }
+   980→  }
+   981→
+   982→  const handleProofUpload = async (file: File) => {
+   983→    setUploadingProof(true)
+   984→    try {
+   985→      // 1) Read the file as a data URL so we can draw it onto a canvas.
+   986→      const dataUrl = await new Promise<string>((resolve, reject) => {
+   987→        const reader = new FileReader()
+   988→        reader.onload = (e) => resolve(e.target?.result as string)
+   989→        reader.onerror = () => reject(new Error('فشل قراءة الملف'))
+   990→        reader.readAsDataURL(file)
+   991→      })
+   992→
+   993→      // 2) Load the image so we know its dimensions for resizing.
+   994→      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+   995→        const img = new Image()
+   996→        img.onload = () => resolve(img)
+   997→        img.onerror = () => reject(new Error('فشل تحميل الصورة'))
+   998→        img.src = dataUrl
+   999→      })
+  1000→
+  1001→      // 3) Compress the image to max 1024x1024 JPEG @ 85% quality.
+  1002→      const blob = await new Promise<Blob | null>((resolve) => {
+  1003→        const maxW = 1024, maxH = 1024
+  1004→        let { width, height } = img
+  1005→        if (width > maxW) { height = (height * maxW) / width; width = maxW }
+  1006→        if (height > maxH) { width = (width * maxH) / height; height = maxH }
+  1007→        const canvas = document.createElement('canvas')
+  1008→        canvas.width = width; canvas.height = height
+  1009→        const ctx = canvas.getContext('2d')
+  1010→        if (!ctx) { resolve(null); return }
+  1011→        ctx.drawImage(img, 0, 0, width, height)
+  1012→        canvas.toBlob(resolve, 'image/jpeg', 0.85)
+  1013→      })
+  1014→
+  1015→      if (!blob) {
+  1016→        toast.error('فشل معالجة الصورة')
+  1017→        setUploadingProof(false)
+  1018→        return
+  1019→      }
+  1020→
+  1021→      // 4) Upload the compressed image to the server.
+  1022→      const fd = new FormData()
+  1023→      fd.append('file', new File([blob], 'proof.jpg', { type: 'image/jpeg' }))
+  1024→      fd.append('folder', 'payment-proofs')
+  1025→
+  1026→      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+  1027→      const data = await res.json().catch(() => ({}))
+  1028→
+  1029→      if (data.url) {
+  1030→        // IMPORTANT: call setProofUrl with the URL string. The button's
+  1031→        // disabled condition `!proofUrl` will then evaluate to false and
+  1032→        // the button will become clickable (and visually black/navy).
+  1033→        setProofUrl(data.url)
+  1034→        toast.success('تم رفع إثبات الدفع')
+  1035→      } else {
+  1036→        toast.error(data.error || 'فشل رفع الصورة')
+  1037→      }
+  1038→    } catch (err) {
+  1039→      toast.error('خطأ في الرفع')
+  1040→    } finally {
+  1041→      setUploadingProof(false)
+  1042→    }
+  1043→  }
+  1044→
+  1045→  return (
+  1046→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1047→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+  1048→        <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50" title="إغلاق">
+  1049→          <X className="w-4 h-4 text-muted-foreground" />
+  1050→        </button>
+  1051→        <DialogHeader><DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle></DialogHeader>
+  1052→        <div className="space-y-4 py-4">
+  1053→          {/* Price with optional strikethrough + coupon discount */}
+  1054→          <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg space-y-2">
+  1055→            {/* Case 1: coupon applied — show the post-coupon price
+  1056→                with the pre-coupon (strikePrice) struck through. */}
+  1057→            {appliedCoupon && discount > 0 ? (
+  1058→              <>
+  1059→                <div className="flex items-center justify-between text-sm">
+  1060→                  <span className="text-muted-foreground line-through text-red-500" dir="ltr">
+  1061→                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
+  1062→                  </span>
+  1063→                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">
+  1064→                    -{discount.toLocaleString()} {course.currency || 'ر.ي'}
+  1065→                  </Badge>
+  1066→                </div>
+  1067→                <div className="flex items-center justify-between">
+  1068→                  <span className="text-sm font-semibold text-navy">المبلغ النهائي:</span>
+  1069→                  <span className="text-xl font-extrabold text-gold" dir="ltr">{finalPrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+  1070→                </div>
+  1071→              </>
+  1072→            ) : hasStrikethrough ? (
+  1073→              /* Case 2: no coupon applied, but there's a strike price
+  1074→                 (original_price OR regular price > offer_price). Show
+  1075→                 strikePrice struck through + the actual charged price
+  1076→                 (basePrice = offer_price or regular price). */
+  1077→              <>
+  1078→                <div className="flex items-center justify-between text-sm">
+  1079→                  <span className="text-muted-foreground">السعر الرسمي:</span>
+  1080→                  <span className="line-through text-red-500 font-bold" dir="ltr">
+  1081→                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
+  1082→                  </span>
+  1083→                </div>
+  1084→                <div className="flex items-center justify-between">
+  1085→                  <span className="text-sm font-semibold text-navy">
+  1086→                    {offerPrice > 0 ? 'سعر العرض:' : 'السعر بعد الخصم:'}
+  1087→                  </span>
+  1088→                  <div className="flex flex-col items-end">
+  1089→                    <span className="text-xl font-extrabold text-green-600" dir="ltr">
+  1090→                      {basePrice.toLocaleString()} {course.currency || 'ر.ي'}
+  1091→                    </span>
+  1092→                    <span className="text-[10px] text-green-600 font-bold">
+  1093→                      وفّر {(strikePrice - basePrice).toLocaleString()} {course.currency || 'ر.ي'}
+  1094→                    </span>
+  1095→                  </div>
+  1096→                </div>
+  1097→              </>
+  1098→            ) : (
+  1099→              /* Case 3: no discount at all. */
+  1100→              <div className="flex items-center justify-between">
+  1101→                <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
+  1102→                <span className="text-xl font-extrabold text-gold" dir="ltr">{basePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+  1103→              </div>
+  1104→            )}
+  1105→          </div>
+  1106→          {/* Coupon input */}
+  1107→          <div>
+  1108→            <Label className="text-navy text-xs">كوبون خصم (اختياري)</Label>
+  1109→            <div className="flex gap-2 mt-1">
+  1110→              <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(null); setCouponError('') }} placeholder="FIA-XXXX" dir="ltr" className="font-mono text-sm" />
+  1111→              <Button variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()} className="flex-shrink-0 text-xs">
+  1112→                {validatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'تطبيق'}
+  1113→              </Button>
+  1114→            </div>
+  1115→            {couponError && <p className="text-[10px] text-red-500 mt-1">{couponError}</p>}
+  1116→            {appliedCoupon && (
+  1117→              <div className="mt-2 flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg p-2">
+  1118→                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+  1119→                <span className="text-xs text-green-700 font-bold">{appliedCoupon.code}</span>
+  1120→                <span className="text-xs text-muted-foreground">{appliedCoupon.discount_type === 'percentage' ? `${appliedCoupon.discount_value}%` : `${appliedCoupon.discount_value} ر.ي`} خصم</span>
+  1121→                <button onClick={() => { setAppliedCoupon(null); setCouponCode('') }} className="text-red-500 text-xs mr-auto">إزالة</button>
+  1122→              </div>
+  1123→            )}
+  1124→          </div>
+  1125→          {/* Payment methods */}
+  1126→          <div>
+  1127→            <Label className="text-navy">اختر طريقة الدفع</Label>
+  1128→            <div className="grid grid-cols-2 gap-2 mt-2">
+  1129→              {methods.map((m: any) => (
+  1130→                <button key={m.id} onClick={() => setSelectedMethod(m)} className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${selectedMethod?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:border-muted'}`}>
+  1131→                  <span className="text-2xl">{m.icon}</span>
+  1132→                  <div className="text-right"><div className="font-bold text-navy text-sm">{m.name}</div>{m.wallet_id && <div className="text-xs text-muted-foreground font-mono" dir="ltr">{m.wallet_id}</div>}</div>
+  1133→                </button>
+  1134→              ))}
+  1135→            </div>
+  1136→          </div>
+  1137→          {selectedMethod && (
+  1138→            <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
+  1139→              <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
+  1140→              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم ارفع صورة الإيصال.'}</p>
+  1141→            </div>
+  1142→          )}
+  1143→          <div>
+  1144→            <Label htmlFor="ref">رقم المعاملة / المرجع</Label>
+  1145→            <Input id="ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="مثال: JB-123456789" dir="ltr" className="mt-1" />
+  1146→          </div>
+  1147→          <div>
+  1148→            <Label className="text-navy">رفع صورة إثبات الدفع (إيصال)</Label>
+  1149→            <input type="file" accept="image/*" className="hidden" id="proof-upload" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProofUpload(f) }} />
+  1150→            <div className="mt-1 flex items-center gap-3">
+  1151→              {proofUrl ? (
+  1152→                <div className="flex items-center gap-2 flex-1">
+  1153→                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-md border-2 border-green-500/30" />
+  1154→                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تم رفع الإيصال</div>
+  1155→                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs">إزالة</button>
+  1156→                </div>
+  1157→              ) : (
+  1158→                <Button type="button" variant="outline" disabled={uploadingProof} className="flex-1" onClick={() => document.getElementById('proof-upload')?.click()}>
+  1159→                  {uploadingProof ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</> : <><FileUp className="w-4 h-4 ml-1" /> اختر صورة الإيصال</>}
+  1160→                </Button>
+  1161→              )}
+  1162→            </div>
+  1163→          </div>
+  1164→        </div>
+  1165→        <DialogFooter>
+  1166→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1167→          <Button className="bg-navy hover:bg-navy-light" disabled={loading || !selectedMethod || !reference.trim() || !proofUrl} onClick={() => onPay(selectedMethod, reference, proofUrl, appliedCoupon?.code)}>
+  1168→            {loading ? 'جاري المعالجة...' : `تأكيد الاشتراك${finalPrice < originalPrice ? ` (${finalPrice.toLocaleString()} ${course.currency || 'ر.ي'})` : ''}`}
+  1169→          </Button>
+  1170→        </DialogFooter>
+  1171→      </DialogContent>
+  1172→    </Dialog>
+  1173→  )
+  1174→}
+  1175→
+  1176→function Exams({ userId, courses }: any) {
+  1177→  const [exams, setExams] = useState<any[]>([])
+  1178→  const [loading, setLoading] = useState(true)
+  1179→
+  1180→  useEffect(() => {
+  1181→    let cancelled = false
+  1182→    const load = async () => {
+  1183→      if (!userId) {
+  1184→        setLoading(false)
+  1185→        return
+  1186→      }
+  1187→      try {
+  1188→        // 1. Fetch the student's enrollments (only their own).
+  1189→        const enrRes = await fetch(`/api/enrollments?user_id=${userId}`)
+  1190→        const enrollments = await enrRes.json()
+  1191→        const validEnrollments: any[] = Array.isArray(enrollments) ? enrollments : []
+  1192→
+  1193→        // 2. For each enrolled course, fetch its lessons and filter exam-type lessons.
+  1194→        //    Only show exams for courses the student actually has access to
+  1195→        //    (i.e., payment_status is NOT 'pending').
+  1196→        const accessible = validEnrollments.filter(
+  1197→          (e: any) => e.payment_status !== 'pending'
+  1198→        )
+  1199→
+  1200→        const results = await Promise.all(
+  1201→          accessible.map(async (e: any) => {
+  1202→            try {
+  1203→              const lessonsRes = await fetch(`/api/lessons?course_id=${e.course_id}`)
+  1204→              const lessons = await lessonsRes.json()
+  1205→              const allLessons: any[] = Array.isArray(lessons) ? lessons : []
+  1206→              const examLessons = allLessons.filter(
+  1207→                (l: any) => l.lesson_type === 'exam'
+  1208→              )
+  1209→              const courseTitle =
+  1210→                courses?.find((c: any) => c.id === e.course_id)?.title || null
+  1211→              return examLessons.map((l: any) => ({
+  1212→                id: l.id,
+  1213→                name: l.title || 'اختبار بدون اسم',
+  1214→                course_id: e.course_id,
+  1215→                course_title: courseTitle,
+  1216→                enrollment_id: e.id,
+  1217→                duration_minutes: l.duration_minutes || 0,
+  1218→              }))
+  1219→            } catch {
+  1220→              return []
+  1221→            }
+  1222→          })
+  1223→        )
+  1224→
+  1225→        if (cancelled) return
+  1226→        setExams(results.flat())
+  1227→      } catch {
+  1228→        if (!cancelled) setExams([])
+  1229→      } finally {
+  1230→        if (!cancelled) setLoading(false)
+  1231→      }
+  1232→    }
+  1233→    load()
+  1234→    return () => {
+  1235→      cancelled = true
+  1236→    }
+  1237→  }, [userId, courses])
+  1238→
+  1239→  return (
+  1240→    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك في دوراتك المسجّلة">
+  1241→      {loading ? (
+  1242→        <div className="flex flex-col items-center justify-center py-12 gap-3">
+  1243→          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+  1244→          <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
+  1245→        </div>
+  1246→      ) : exams.length === 0 ? (
+  1247→        <div className="text-center py-16">
+  1248→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+  1249→            <FileText className="w-10 h-10 text-muted-foreground/50" />
+  1250→          </div>
+  1251→          <p className="text-base font-semibold text-navy mb-1">لا توجد اختبارات متاحة لك حالياً</p>
+  1252→          <p className="text-xs text-muted-foreground">
+  1253→            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة.
+  1254→          </p>
+  1255→        </div>
+  1256→      ) : (
+  1257→        <div className="space-y-3">
+  1258→          {exams.map((exam: any, i: number) => (
+  1259→            <div
+  1260→              key={exam.id || i}
+  1261→              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border"
+  1262→            >
+  1263→              <div className="min-w-0">
+  1264→                <div className="flex items-center gap-2 mb-1">
+  1265→                  <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center flex-shrink-0">
+  1266→                    <FileText className="w-4 h-4 text-navy" />
+  1267→                  </div>
+  1268→                  <div className="font-semibold text-navy text-sm">{exam.name}</div>
+  1269→                </div>
+  1270→                <div className="text-xs text-muted-foreground mr-11 flex flex-wrap items-center gap-x-2">
+  1271→                  {exam.course_title && <span>{exam.course_title}</span>}
+  1272→                  {exam.duration_minutes ? <span>• {exam.duration_minutes} دقيقة</span> : null}
+  1273→                </div>
+  1274→              </div>
+  1275→              <div className="flex items-center gap-2 flex-shrink-0">
+  1276→                <Button size="sm" className="bg-navy hover:bg-navy-light">
+  1277→                  ابدأ الاختبار
+  1278→                </Button>
+  1279→              </div>
+  1280→            </div>
+  1281→          ))}
+  1282→        </div>
+  1283→      )}
+  1284→    </SectionCard>
+  1285→  )
+  1286→}
+  1287→
+  1288→function Results() {
+  1289→  // NOTE: Exam results are not currently stored in a dedicated table — the
+  1290→  // platform doesn't persist a per-student score for each exam yet. Once that
+  1291→  // backend exists, this component should fetch and render the real results.
+  1292→  // For now we show a professional empty state so students aren't shown fake
+  1293→  // placeholder data.
+  1294→  return (
+  1295→    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات التي أتممتها">
+  1296→      <div className="text-center py-16">
+  1297→        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+  1298→          <TrendingUp className="w-10 h-10 text-muted-foreground/50" />
+  1299→        </div>
+  1300→        <p className="text-base font-semibold text-navy mb-1">
+  1301→          لا توجد نتائج بعد — لم تقم بأي اختبار بعد
+  1302→        </p>
+  1303→        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+  1304→          عند إكمالك لأحد الاختبارات في دوراتك المسجّلة، ستظهر نتيجتك وتفاصيلها هنا مع
+  1305→          النسبة المئوية وحالة النجاح أو الرسوب.
+  1306→        </p>
+  1307→      </div>
+  1308→    </SectionCard>
+  1309→  )
+  1310→}
+  1311→
+  1312→function Certificates({ certificates }: any) {
+  1313→  const myCerts = certificates.length > 0 ? certificates : []
+  1314→  const [downloading, setDownloading] = useState<string | null>(null)
+  1315→  const [copiedCert, setCopiedCert] = useState<string | null>(null)
+  1316→
+  1317→  const handleDownload = (cert: any) => {
+  1318→    setDownloading(cert.id)
+  1319→    // Open PDF in new tab (browser will download or preview)
+  1320→    window.open(`/api/certificate-pdf?number=${encodeURIComponent(cert.certificate_number)}&format=pdf`, '_blank')
+  1321→    setTimeout(() => setDownloading(null), 2000)
+  1322→  }
+  1323→
+  1324→  const handleCopyCode = (cert: any, e: React.MouseEvent) => {
+  1325→    e.stopPropagation()
+  1326→    navigator.clipboard.writeText(cert.certificate_number)
+  1327→    setCopiedCert(cert.id)
+  1328→    toast.success('تم نسخ كود الشهادة', { description: cert.certificate_number })
+  1329→    setTimeout(() => setCopiedCert(null), 2000)
+  1330→  }
+  1331→
+  1332→  const handleShare = (cert: any, e: React.MouseEvent) => {
+  1333→    e.stopPropagation()
+  1334→    const url = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+  1335→    if (navigator.share) {
+  1336→      navigator.share({
+  1337→        title: 'شهادة معتمدة - أكاديمية المستقبل الدولية',
+  1338→        text: `شهادة ${cert.student_name || ''} - ${cert.course_title || ''}`,
+  1339→        url,
+  1340→      }).catch(() => {})
+  1341→    } else {
+  1342→      navigator.clipboard.writeText(url)
+  1343→      toast.success('تم نسخ رابط الشهادة')
+  1344→    }
+  1345→  }
+  1346→
+  1347→  return (
+  1348→    <SectionCard title="شهاداتي" description="الشهادات التي حصلت عليها">
+  1349→      {myCerts.length === 0 ? (
+  1350→        <div className="text-center py-12">
+  1351→          <Award className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+  1352→          <p className="text-muted-foreground mb-2">لا توجد شهادات بعد</p>
+  1353→          <p className="text-xs text-muted-foreground">أنهِ دورة بنجاح للحصول على شهادة معتمدة</p>
+  1354→        </div>
+  1355→      ) : (
+  1356→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1357→          {myCerts.map((c: any) => (
+  1358→            <Card key={c.id} className="overflow-hidden card-hover border-2 border-gold/20">
+  1359→              <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden cursor-pointer" onClick={() => handleDownload(c)}>
+  1360→                <img
+  1361→                  src={`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`}
+  1362→                  alt={c.course_title || 'certificate'}
+  1363→                  className="w-full h-full object-cover"
+  1364→                  loading="lazy"
+  1365→                />
+  1366→              </div>
+  1367→              <div className="p-4">
+  1368→                <div className="flex items-center gap-2 mb-2">
+  1369→                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center">
+  1370→                    <Award className="w-5 h-5 text-gold" />
+  1371→                  </div>
+  1372→                  <div className="flex-1 min-w-0">
+  1373→                    <div className="font-bold text-navy text-sm line-clamp-1">{c.course_title || 'دورة'}</div>
+  1374→                  </div>
+  1375→                </div>
+  1376→                {/* Certificate code card — copyable & prominent */}
+  1377→                <div className="bg-gradient-to-br from-navy to-navy-light rounded-lg p-3 mb-3 border border-gold/30">
+  1378→                  <div className="text-[10px] text-gold/80 font-semibold mb-1">كود الشهادة (قابل للنسخ)</div>
+  1379→                  <div className="flex items-center gap-2">
+  1380→                    <div className="flex-1 text-white font-mono text-sm md:text-base font-bold tracking-wide truncate" dir="ltr">{c.certificate_number}</div>
+  1381→                    <button
+  1382→                      onClick={(e) => handleCopyCode(c, e)}
+  1383→                      className="flex-shrink-0 w-7 h-7 rounded-md bg-gold hover:bg-gold-light text-navy flex items-center justify-center transition-colors"
+  1384→                      title="نسخ الكود"
+  1385→                    >
+  1386→                      {copiedCert === c.id ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-3.5 h-3.5" />}
+  1387→                    </button>
+  1388→                  </div>
+  1389→                  <button
+  1390→                    onClick={(e) => handleShare(c, e)}
+  1391→                    className="mt-2 w-full text-[10px] text-gold/70 hover:text-gold flex items-center justify-center gap-1 py-1 rounded transition-colors"
+  1392→                  >
+  1393→                    <Share2 className="w-3 h-3" /> مشاركة الشهادة
+  1394→                  </button>
+  1395→                </div>
+  1396→                <Badge className="bg-green-500/15 text-green-600 border-green-500/30 mb-3">{c.status}</Badge>
+  1397→                <div className="flex gap-2">
+  1398→                  <Button size="sm" className="flex-1 bg-navy hover:bg-navy-light" onClick={() => handleDownload(c)} disabled={downloading === c.id}>
+  1399→                    <Download className="w-3.5 h-3.5 ml-1" /> PDF
+  1400→                  </Button>
+  1401→                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`, '_blank')}>
+  1402→                    صورة
+  1403→                  </Button>
+  1404→                </div>
+  1405→              </div>
+  1406→            </Card>
+  1407→          ))}
+  1408→        </div>
+  1409→      )}
+  1410→    </SectionCard>
+  1411→  )
+  1412→}
+  1413→
+  1414→function Payments({ payments, userId, courses }: any) {
+  1415→  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
+  1416→  // Filter by the current user's id so we never display someone else's payments.
+  1417→  const myPayments = (payments || []).filter((p: any) => p.user_id === userId)
+  1418→  // Sort by date DESC (most recent first) for display
+  1419→  const sortedPayments = [...myPayments].sort((a: any, b: any) => {
+  1420→    const da = a.date ? new Date(a.date).getTime() : 0
+  1421→    const db = b.date ? new Date(b.date).getTime() : 0
+  1422→    return db - da
+  1423→  })
+  1424→
+  1425→  const getCourseTitle = (courseId: string | null | undefined) => {
+  1426→    if (!courseId) return null
+  1427→    return courses?.find((c: any) => c.id === courseId)?.title || null
+  1428→  }
+  1429→
+  1430→  // Determine the currency to display for a payment. We prefer the
+  1431→  // course's currency (source of truth) over the payment's stored
+  1432→  // currency — older payment rows may have defaulted to 'ر.ي' even
+  1433→  // when the course is in USD.
+  1434→  const getCurrency = (p: any) => {
+  1435→    if (p.course_id) {
+  1436→      const course = courses?.find((c: any) => c.id === p.course_id)
+  1437→      if (course?.currency) return course.currency
+  1438→    }
+  1439→    return p.currency || 'ر.ي'
+  1440→  }
+  1441→
+  1442→  // Extract coupon code from the reference field — stored as
+  1443→  // "| COUPON:CODE-HERE". Returns null if no coupon was applied.
+  1444→  const getCouponCode = (p: any): string | null => {
+  1445→    const ref = p?.reference
+  1446→    if (!ref) return null
+  1447→    const match = String(ref).match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+  1448→    return match ? match[1].toUpperCase() : null
+  1449→  }
+  1450→
+  1451→  // Format currency code for nicer display (e.g. 'ر.ي' stays as is,
+  1452→  // '$' gets a small "USD" tooltip-style wrapper).
+  1453→  const fmtCurrency = (code: string) => code || 'ر.ي'
+  1454→
+  1455→  const fmtAmount = (p: any) => {
+  1456→    const amt = typeof p.amount === 'number' ? p.amount : Number(p.amount) || 0
+  1457→    return amt.toLocaleString('en-US')
+  1458→  }
+  1459→
+  1460→  const fmtDate = (d: string | null | undefined) => {
+  1461→    if (!d) return null
+  1462→    try {
+  1463→      return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+  1464→    } catch { return null }
+  1465→  }
+  1466→
+  1467→  const cleanReference = (ref: string | null | undefined) => {
+  1468→    if (!ref) return null
+  1469→    // Strip both PROOF: and COUPON: markers so the user sees only the
+  1470→    // transaction reference they typed, not the internal storage markers.
+  1471→    return ref
+  1472→      .replace(/\s*\|\s*PROOF:.*$/i, '')
+  1473→      .replace(/\s*\|\s*COUPON:.*$/i, '')
+  1474→      .trim() || null
+  1475→  }
+  1476→
+  1477→  const getProofUrl = (p: any): string | null => {
+  1478→    const ref = p?.reference
+  1479→    if (!ref) return null
+  1480→    const match = String(ref).match(/PROOF:\s*(\S+)/i)
+  1481→    return match ? match[1] : null
+  1482→  }
+  1483→
+  1484→  return (
+  1485→    <>
+  1486→    <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
+  1487→      {sortedPayments.length === 0 ? (
+  1488→        <div className="text-center py-16">
+  1489→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+  1490→            <CreditCard className="w-10 h-10 text-muted-foreground/50" />
+  1491→          </div>
+  1492→          <p className="text-base font-semibold text-navy mb-1">لا توجد مدفوعات بعد</p>
+  1493→          <p className="text-xs text-muted-foreground">عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.</p>
+  1494→        </div>
+  1495→      ) : (
+  1496→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  1497→          {sortedPayments.map((p: any) => {
+  1498→            const statusInfo = getPaymentRecordStatusInfo(p.status)
+  1499→            const courseTitle = getCourseTitle(p.course_id)
+  1500→            const ref = cleanReference(p.reference)
+  1501→            const dateStr = fmtDate(p.date)
+  1502→            const proofUrl = getProofUrl(p)
+  1503→            const couponCode = getCouponCode(p)
+  1504→            const currency = getCurrency(p)
+  1505→            const hasCoupon = !!couponCode
+  1506→            return (
+  1507→              <Card key={p.id} className={`p-0 overflow-hidden card-hover ${hasCoupon ? 'border-l-4 border-l-red-500 ring-1 ring-red-500/20' : 'border-border'}`}>
+  1508→                {/* Amount header — has red accent when coupon applied */}
+  1509→                <div className={`p-4 text-white ${hasCoupon ? 'bg-gradient-to-br from-red-700 to-red-900' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
+  1510→                  <div className="flex items-start justify-between gap-2">
+  1511→                    <div className="min-w-0">
+  1512→                      <div className={`text-[11px] font-semibold mb-0.5 ${hasCoupon ? 'text-red-100' : 'text-gold/80'}`}>
+  1513→                        {hasCoupon ? '⚠ المبلغ بعد الخصم' : 'المبلغ'}
+  1514→                      </div>
+  1515→                      <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
+  1516→                        {fmtAmount(p)} <span className={`text-base font-bold ${hasCoupon ? 'text-red-200' : 'text-gold'}`}>{fmtCurrency(currency)}</span>
+  1517→                      </div>
+  1518→                    </div>
+  1519→                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>
+  1520→                  </div>
+  1521→                  {hasCoupon && (
+  1522→                    <div className="mt-2 inline-flex items-center gap-1.5 bg-red-500/30 border border-red-300/50 rounded-md px-2 py-0.5">
+  1523→                      <span className="text-[10px] text-red-100">كوبون خصم:</span>
+  1524→                      <span className="text-[11px] font-bold text-white font-mono" dir="ltr">{couponCode}</span>
+  1525→                    </div>
+  1526→                  )}
+  1527→                </div>
+  1528→
+  1529→                {/* Receipt thumbnail — opens in-app viewer */}
+  1530→                {proofUrl && (
+  1531→                  <button
+  1532→                    type="button"
+  1533→                    onClick={() => setViewingReceipt(proofUrl)}
+  1534→                    className="relative block w-full h-36 bg-muted/40 group cursor-pointer"
+  1535→                    title="اضغط لعرض الإيصال"
+  1536→                  >
+  1537→                    <img src={proofUrl} alt="إيصال الدفع" className="w-full h-full object-cover" loading="lazy" />
+  1538→                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/50 transition-colors flex items-center justify-center">
+  1539→                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5">
+  1540→                        <FileUp className="w-4 h-4" /> عرض الإيصال
+  1541→                      </span>
+  1542→                    </div>
+  1543→                  </button>
+  1544→                )}
+  1545→
+  1546→                {/* Details body */}
+  1547→                <div className="p-4 space-y-3">
+  1548→                  {courseTitle && (
+  1549→                    <div>
+  1550→                      <div className="text-[11px] text-muted-foreground mb-0.5">الدورة</div>
+  1551→                      <div className="text-sm font-semibold text-navy line-clamp-2">{courseTitle}</div>
+  1552→                    </div>
+  1553→                  )}
+  1554→                  <div className="grid grid-cols-2 gap-3">
+  1555→                    <div>
+  1556→                      <div className="text-[11px] text-muted-foreground mb-0.5">طريقة الدفع</div>
+  1557→                      <div className="text-sm font-medium text-navy">{p.method || '-'}</div>
+  1558→                    </div>
+  1559→                    <div>
+  1560→                      <div className="text-[11px] text-muted-foreground mb-0.5">التاريخ</div>
+  1561→                      <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
+  1562→                    </div>
+  1563→                  </div>
+  1564→                  <div>
+  1565→                    <div className="text-[11px] text-muted-foreground mb-0.5">العملة</div>
+  1566→                    <div className="text-sm font-bold text-navy" dir="ltr">{fmtCurrency(currency)}</div>
+  1567→                  </div>
+  1568→                  {ref && (
+  1569→                    <div>
+  1570→                      <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
+  1571→                      <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref}</div>
+  1572→                    </div>
+  1573→                  )}
+  1574→                </div>
+  1575→              </Card>
+  1576→            )
+  1577→          })}
+  1578→        </div>
+  1579→      )}
+  1580→    </SectionCard>
+  1581→
+  1582→    {/* In-app receipt viewer — professional lightbox */}
+  1583→    <Dialog open={!!viewingReceipt} onOpenChange={(o) => { if (!o) setViewingReceipt(null) }}>
+  1584→      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+  1585→        <DialogHeader className="p-4 border-b border-border">
+  1586→          <DialogTitle className="text-navy text-lg flex items-center gap-2">
+  1587→            <FileUp className="w-5 h-5 text-green-600" /> إيصال الدفع
+  1588→          </DialogTitle>
+  1589→        </DialogHeader>
+  1590→        <div className="p-4 bg-muted/10">
+  1591→          {viewingReceipt && (
+  1592→            <div className="relative w-full flex items-center justify-center">
+  1593→              <img
+  1594→                src={viewingReceipt}
+  1595→                alt="إيصال الدفع"
+  1596→                className="max-w-full max-h-[60vh] rounded-lg border border-border shadow-lg object-contain"
+  1597→              />
+  1598→            </div>
+  1599→          )}
+  1600→        </div>
+  1601→      </DialogContent>
+  1602→    </Dialog>
+  1603→    </>
+  1604→  )
+  1605→}
+  1606→
+  1607→function Profile({ profile, setProfile, user, updateUser }: any) {
+  1608→  const [loading, setLoading] = useState(false)
+  1609→
+  1610→  const save = async () => {
+  1611→    setLoading(true)
+  1612→    try {
+  1613→      // Update locally — in real app, would call /api/students PUT
+  1614→      updateUser({
+  1615→        name: profile.name,
+  1616→        phone: profile.phone,
+  1617→        title: profile.title,
+  1618→        bio: joinBio(profile.bio, user?.bio),
+  1619→      })
+  1620→      toast.success('تم تحديث الملف الشخصي')
+  1621→    } catch {
+  1622→      toast.error('فشل التحديث')
+  1623→    } finally {
+  1624→      setLoading(false)
+  1625→    }
+  1626→  }
+  1627→
+  1628→  return (
+  1629→    <SectionCard title="الملف الشخصي" description="إدارة معلوماتك الشخصية">
+  1630→      <div className="space-y-6 max-w-2xl">
+  1631→        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+  1632→          <AvatarUploader
+  1633→            userId={user.id}
+  1634→            role="student"
+  1635→            initialUrl={user?.avatar}
+  1636→            name={user?.name}
+  1637→            size="xl"
+  1638→            onUploaded={(url) => updateUser({ avatar: url })}
+  1639→          />
+  1640→        </div>
+  1641→
+  1642→        <div className="grid sm:grid-cols-2 gap-4">
+  1643→          <div>
+  1644→            <Label className="text-navy">الاسم الكامل</Label>
+  1645→            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+  1646→          </div>
+  1647→          <div>
+  1648→            <Label className="text-navy">البريد الإلكتروني</Label>
+  1649→            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
+  1650→          </div>
+  1651→          <div>
+  1652→            <Label className="text-navy">رقم الهاتف</Label>
+  1653→            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
+  1654→          </div>
+  1655→          <div>
+  1656→            <Label className="text-navy">التخصص</Label>
+  1657→            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+  1658→          </div>
+  1659→        </div>
+  1660→        <div>
+  1661→          <Label className="text-navy">نبذة تعريفية</Label>
+  1662→          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+  1663→        </div>
+  1664→        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
+  1665→          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+  1666→        </Button>
+  1667→      </div>
+  1668→    </SectionCard>
+  1669→  )
+  1670→}
+  1671→
+  1672→function Notifications({ userId, enrollments, courses }: any) {
+  1673→  const [notifs, setNotifs] = useState<any[]>([])
+  1674→  const [loading, setLoading] = useState(true)
+  1675→
+  1676→  useEffect(() => {
+  1677→    let cancelled = false
+  1678→    const load = async () => {
+  1679→      try {
+  1680→        const items: any[] = []
+  1681→
+  1682→        // 1. Enrollment-based notifications (from the enrollments prop).
+  1683→        //    Each enrollment already encodes a payment_status that we map to a
+  1684→        //    human-readable notification.
+  1685→        const enrList: any[] = Array.isArray(enrollments) ? enrollments : []
+  1686→        const courseMap = new Map<string, any>(
+  1687→          (Array.isArray(courses) ? courses : []).map((c: any) => [c.id, c])
+  1688→        )
+  1689→
+  1690→        const fmtTime = (iso?: string | null) => {
+  1691→          if (!iso) return null
+  1692→          try {
+  1693→            return new Date(iso).toLocaleDateString('ar-EG', {
+  1694→              year: 'numeric',
+  1695→              month: 'long',
+  1696→              day: 'numeric',
+  1697→            })
+  1698→          } catch {
+  1699→            return null
+  1700→          }
+  1701→        }
+  1702→
+  1703→        for (const e of enrList) {
+  1704→          const c = courseMap.get(e.course_id)
+  1705→          const title = c?.title || 'دورة'
+  1706→          const ts = fmtTime(e.enrolled_at || (e as any).date)
+  1707→          const status = e.payment_status
+  1708→          if (status === 'pending') {
+  1709→            items.push({
+  1710→              id: `enr-pending-${e.id}`,
+  1711→              icon: Clock,
+  1712→              iconBg: 'bg-yellow-500/15 text-yellow-600',
+  1713→              title: 'بانتظار تأكيد الدفع',
+  1714→              desc: `طلبك للتسجيل في دورة "${title}" قيد المراجعة من قبل الإدارة`,
+  1715→              time: ts,
+  1716→            })
+  1717→          } else if (status === 'confirmed') {
+  1718→            items.push({
+  1719→              id: `enr-confirmed-${e.id}`,
+  1720→              icon: CheckCircle2,
+  1721→              iconBg: 'bg-green-500/15 text-green-600',
+  1722→              title: 'تم تأكيد التسجيل',
+  1723→              desc: `تم تأكيد تسجيلك في دورة "${title}". يمكنك الآن متابعة الدروس`,
+  1724→              time: ts,
+  1725→            })
+  1726→          } else if (status === 'completed') {
+  1727→            items.push({
+  1728→              id: `enr-completed-${e.id}`,
+  1729→              icon: Award,
+  1730→              iconBg: 'bg-gold/15 text-gold',
+  1731→              title: 'أكملت الدورة',
+  1732→              desc: `تهانينا! لقد أكملت دورة "${title}" بنجاح`,
+  1733→              time: ts,
+  1734→            })
+  1735→          } else if (status === 'free') {
+  1736→            items.push({
+  1737→              id: `enr-free-${e.id}`,
+  1738→              icon: BookOpen,
+  1739→              iconBg: 'bg-blue-500/15 text-blue-600',
+  1740→              title: 'تسجيل مجاني',
+  1741→              desc: `تم تسجيلك مجاناً في دورة "${title}". ابدأ التعلّم الآن`,
+  1742→              time: ts,
+  1743→            })
+  1744→          }
+  1745→        }
+  1746→
+  1747→        // 2. "New lesson added" notifications: compare each enrolled course's
+  1748→        //    lessons_count against a baseline we keep in localStorage. On the
+  1749→        //    first visit there's no baseline, so we just initialize it without
+  1750→        //    showing any "new lesson" notification.
+  1751→        const baselineKey = `fia_lesson_baseline_${userId || 'guest'}`
+  1752→        let baseline: Record<string, number> = {}
+  1753→        try {
+  1754→          const stored = localStorage.getItem(baselineKey)
+  1755→          if (stored) baseline = JSON.parse(stored) || {}
+  1756→        } catch {}
+  1757→
+  1758→        const newBaseline: Record<string, number> = { ...baseline }
+  1759→        // Only check lessons_count for courses the student has access to
+  1760→        // (payment_status !== 'pending').
+  1761→        const accessible = enrList.filter((e: any) => e.payment_status !== 'pending')
+  1762→        for (const e of accessible) {
+  1763→          const c = courseMap.get(e.course_id)
+  1764→          if (!c) continue
+  1765→          const current = Number(c.lessons_count || 0)
+  1766→          const prev = baseline[e.course_id] ?? null
+  1767→          newBaseline[e.course_id] = current
+  1768→          if (prev !== null && current > prev) {
+  1769→            items.push({
+  1770→              id: `new-lesson-${e.course_id}-${current}`,
+  1771→              icon: FileText,
+  1772→              iconBg: 'bg-purple-500/15 text-purple-600',
+  1773→              title: 'درس جديد',
+  1774→              desc: `تمت إضافة ${current - prev} درس جديد في دورة "${c.title}"`,
+  1775→              time: 'مؤخراً',
+  1776→            })
+  1777→          }
+  1778→        }
+  1779→
+  1780→        // Persist the new baseline so future visits can detect new lessons.
+  1781→        try {
+  1782→          localStorage.setItem(baselineKey, JSON.stringify(newBaseline))
+  1783→        } catch {}
+  1784→
+  1785→        if (!cancelled) setNotifs(items)
+  1786→      } catch {
+  1787→        if (!cancelled) setNotifs([])
+  1788→      } finally {
+  1789→        if (!cancelled) setLoading(false)
+  1790→      }
+  1791→    }
+  1792→    load()
+  1793→    return () => { cancelled = true }
+  1794→  }, [userId, enrollments, courses])
+  1795→
+  1796→  return (
+  1797→    <SectionCard title="الإشعارات" description="آخر التحديثات والتنبيهات">
+  1798→      {loading ? (
+  1799→        <div className="flex flex-col items-center justify-center py-12 gap-3">
+  1800→          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+  1801→          <p className="text-sm text-muted-foreground">جاري تحميل الإشعارات...</p>
+  1802→        </div>
+  1803→      ) : notifs.length === 0 ? (
+  1804→        <div className="text-center py-16">
+  1805→          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+  1806→            <Bell className="w-10 h-10 text-muted-foreground/50" />
+  1807→          </div>
+  1808→          <p className="text-base font-semibold text-navy mb-1">لا توجد إشعارات</p>
+  1809→          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+  1810→            ستظهر هنا تنبيهات عند تأكيد تسجيلك في الدورات أو عند إضافة دروس جديدة.
+  1811→          </p>
+  1812→        </div>
+  1813→      ) : (
+  1814→        <div className="space-y-3">
+  1815→          {notifs.map((n) => {
+  1816→            const Icon = n.icon
+  1817→            return (
+  1818→              <div
+  1819→                key={n.id}
+  1820→                className="p-4 rounded-lg border border-border bg-gold/5 flex items-start gap-3"
+  1821→              >
+  1822→                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${n.iconBg}`}>
+  1823→                  <Icon className="w-5 h-5" />
+  1824→                </div>
+  1825→                <div className="flex-1 min-w-0">
+  1826→                  <div className="font-semibold text-navy text-sm">{n.title}</div>
+  1827→                  <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+  1828→                </div>
+  1829→                {n.time && (
+  1830→                  <div className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap" dir="rtl">
+  1831→                    {n.time}
+  1832→                  </div>
+  1833→                )}
+  1834→              </div>
+  1835→            )
+  1836→          })}
+  1837→        </div>
+  1838→      )}
+  1839→    </SectionCard>
+  1840→  )
+  1841→}
+  1842→
+  1843→function SettingsTab({ user, updateUser }: any) {
+  1844→  // Email change state — uses /api/auth/change-credentials
+  1845→  const [newEmail, setNewEmail] = useState('')
+  1846→  const [emailPwd, setEmailPwd] = useState('')
+  1847→  const [showEmailPwd, setShowEmailPwd] = useState(false)
+  1848→  const [emailLoading, setEmailLoading] = useState(false)
+  1849→
+  1850→  // Password change state — uses /api/auth/change-credentials
+  1851→  const [currentPwd, setCurrentPwd] = useState('')
+  1852→  const [newPwd, setNewPwd] = useState('')
+  1853→  const [confirmPwd, setConfirmPwd] = useState('')
+  1854→  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+  1855→  const [showNewPwd, setShowNewPwd] = useState(false)
+  1856→  const [pwdLoading, setPwdLoading] = useState(false)
+  1857→
+  1858→  // Phone change state — uses /api/students PUT
+  1859→  const [phone, setPhone] = useState(user?.phone || '')
+  1860→  const [phoneLoading, setPhoneLoading] = useState(false)
+  1861→
+  1862→  // Email notification preference — persisted to localStorage (real toggle,
+  1863→  // not fake) so the choice survives across sessions. Default is OFF ("متوقف").
+  1864→  const [emailNotif, setEmailNotif] = useState(false)
+  1865→
+  1866→  useEffect(() => {
+  1867→    try {
+  1868→      const stored = localStorage.getItem(`fia_settings_${user?.id || 'guest'}`)
+  1869→      if (stored) {
+  1870→        const parsed = JSON.parse(stored)
+  1871→        if (typeof parsed.emailNotif === 'boolean') setEmailNotif(parsed.emailNotif)
+  1872→      }
+  1873→    } catch {}
+  1874→  }, [user?.id])
+  1875→
+  1876→  const saveEmailNotif = (val: boolean) => {
+  1877→    setEmailNotif(val)
+  1878→    try {
+  1879→      const key = `fia_settings_${user?.id || 'guest'}`
+  1880→      const stored = localStorage.getItem(key)
+  1881→      const obj = stored ? JSON.parse(stored) : {}
+  1882→      obj.emailNotif = val
+  1883→      localStorage.setItem(key, JSON.stringify(obj))
+  1884→    } catch {}
+  1885→    toast.success(val ? 'تم تفعيل إشعارات البريد' : 'تم إيقاف إشعارات البريد')
+  1886→  }
+  1887→
+  1888→  // ====== Handlers ======
+  1889→  const saveEmail = async () => {
+  1890→    if (!newEmail) {
+  1891→      toast.error('أدخل البريد الجديد')
+  1892→      return
+  1893→    }
+  1894→    if (!emailPwd) {
+  1895→      toast.error('أدخل كلمة المرور الحالية للتأكيد')
+  1896→      return
+  1897→    }
+  1898→    if (newEmail === user?.email) {
+  1899→      toast.error('البريد الجديد مطابق للبريد الحالي')
+  1900→      return
+  1901→    }
+  1902→    setEmailLoading(true)
+  1903→    try {
+  1904→      const res = await fetch('/api/auth/change-credentials', {
+  1905→        method: 'POST',
+  1906→        headers: { 'Content-Type': 'application/json' },
+  1907→        body: JSON.stringify({
+  1908→          userId: user.id,
+  1909→          currentEmail: user.email,
+  1910→          currentPassword: emailPwd,
+  1911→          newEmail,
+  1912→          role: 'student',
+  1913→        }),
+  1914→      })
+  1915→      const data = await res.json()
+  1916→      if (!res.ok) {
+  1917→        toast.error(data.error || 'فشل تحديث البريد')
+  1918→        return
+  1919→      }
+  1920→      toast.success('تم تحديث البريد. يرجى تسجيل الدخول بالبريد الجديد')
+  1921→      // Update local state so the user sees the new email immediately
+  1922→      updateUser({ email: newEmail })
+  1923→      setNewEmail('')
+  1924→      setEmailPwd('')
+  1925→    } catch {
+  1926→      toast.error('خطأ في الاتصال')
+  1927→    } finally {
+  1928→      setEmailLoading(false)
+  1929→    }
+  1930→  }
+  1931→
+  1932→  const savePassword = async () => {
+  1933→    if (!currentPwd) {
+  1934→      toast.error('أدخل كلمة المرور الحالية')
+  1935→      return
+  1936→    }
+  1937→    if (!newPwd) {
+  1938→      toast.error('أدخل كلمة المرور الجديدة')
+  1939→      return
+  1940→    }
+  1941→    if (newPwd.length < 6) {
+  1942→      toast.error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل')
+  1943→      return
+  1944→    }
+  1945→    if (newPwd !== confirmPwd) {
+  1946→      toast.error('كلمتا المرور غير متطابقتين')
+  1947→      return
+  1948→    }
+  1949→    setPwdLoading(true)
+  1950→    try {
+  1951→      const res = await fetch('/api/auth/change-credentials', {
+  1952→        method: 'POST',
+  1953→        headers: { 'Content-Type': 'application/json' },
+  1954→        body: JSON.stringify({
+  1955→          userId: user.id,
+  1956→          currentEmail: user.email,
+  1957→          currentPassword: currentPwd,
+  1958→          newPassword: newPwd,
+  1959→          role: 'student',
+  1960→        }),
+  1961→      })
+  1962→      const data = await res.json()
+  1963→      if (!res.ok) {
+  1964→        toast.error(data.error || 'فشل تغيير كلمة المرور')
+  1965→        return
+  1966→      }
+  1967→      toast.success('تم تغيير كلمة المرور بنجاح')
+  1968→      setCurrentPwd('')
+  1969→      setNewPwd('')
+  1970→      setConfirmPwd('')
+  1971→    } catch {
+  1972→      toast.error('خطأ في الاتصال')
+  1973→    } finally {
+  1974→      setPwdLoading(false)
+  1975→    }
+  1976→  }
+  1977→
+  1978→  const savePhone = async () => {
+  1979→    if (!phone) {
+  1980→      toast.error('أدخل رقم الهاتف')
+  1981→      return
+  1982→    }
+  1983→    setPhoneLoading(true)
+  1984→    try {
+  1985→      const res = await fetch('/api/students', {
+  1986→        method: 'PUT',
+  1987→        headers: { 'Content-Type': 'application/json' },
+  1988→        body: JSON.stringify({ id: user.id, phone }),
+  1989→      })
+  1990→      const data = await res.json()
+  1991→      if (!res.ok) {
+  1992→        toast.error(data.error || 'فشل تحديث رقم الهاتف')
+  1993→        return
+  1994→      }
+  1995→      updateUser({ phone })
+  1996→      toast.success('تم تحديث رقم الهاتف')
+  1997→    } catch {
+  1998→      toast.error('خطأ في الاتصال')
+  1999→    } finally {
+  2000→      setPhoneLoading(false)
+
+[showing lines 1-2000 of 2316; use offset=2001 with limit to continue reading]

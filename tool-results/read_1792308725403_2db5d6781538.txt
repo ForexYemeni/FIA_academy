@@ -1,0 +1,1017 @@
+     1→import { NextRequest, NextResponse } from 'next/server'
+     2→import { supabaseAdmin } from '@/lib/supabase'
+     3→import fs from 'fs'
+     4→import path from 'path'
+     5→import os from 'os'
+     6→import PDFDocument from 'pdfkit'
+     7→import QRCode from 'qrcode'
+     8→import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas'
+     9→import { Buffer } from 'buffer'
+    10→
+    11→export const runtime = 'nodejs'
+    12→export const maxDuration = 60
+    13→
+    14→// === ULTRA-PREMIUM CERTIFICATE PALETTE ===
+    15→const NAVY = '#0A1F44'         // Deep navy blue (primary)
+    16→const NAVY_DEEP = '#051429'    // Even deeper navy (background)
+    17→const NAVY_DARK = '#020A15'    // Darkest navy (plaque/ribbon)
+    18→const NAVY_MID = '#1B3A6B'     // Mid navy
+    19→const GOLD = '#C9A961'         // Royal gold (primary accent)
+    20→const GOLD_BRIGHT = '#E5C77E'  // Bright gold (highlights)
+    21→const GOLD_PALE = '#F5E5B3'    // Pale gold
+    22→const GOLD_DARK = '#8B6F2C'    // Dark gold (text)
+    23→const IVORY = '#FBF7EC'        // Premium ivory background
+    24→const IVORY_DEEP = '#F0E8D2'   // Deeper ivory
+    25→const CREAM = '#FDFAF0'        // Inner card cream
+    26→const EMERALD = '#1B7E3A'      // Valid status green
+    27→const EMERALD_LIGHT = '#D4EDDA'
+    28→const CRIMSON = '#A02424'      // Revoked status red
+    29→const CRIMSON_LIGHT = '#F8D7DA'
+    30→const GRAY_DARK = '#2C2C2C'    // Body text gray
+    31→const GRAY = '#6B6B6B'
+    32→const WHITE = '#FFFFFF'
+    33→const SIG_BLUE = '#0047AB'     // Signature royal blue ink
+    34→
+    35→function getFontPaths() {
+    36→  const candidates = [
+    37→    path.join(process.cwd(), '.fonts'),
+    38→    '/home/z/my-project/.fonts',
+    39→  ].filter(Boolean)
+    40→  const fontsDir = candidates.find((p) => fs.existsSync(p)) || candidates[0]
+    41→  return {
+    42→    regular: path.join(fontsDir, 'Cairo-Regular.ttf'),
+    43→    bold: path.join(fontsDir, 'Cairo-Bold.ttf'),
+    44→    black: path.join(fontsDir, 'Cairo-Black.ttf'),
+    45→  }
+    46→}
+    47→
+    48→let fontsRegistered = false
+    49→function registerFontsForCanvas() {
+    50→  if (fontsRegistered) return
+    51→  try {
+    52→    const fonts = getFontPaths()
+    53→    if (fs.existsSync(fonts.regular)) GlobalFonts.registerFromPath(fonts.regular, 'Cairo')
+    54→    if (fs.existsSync(fonts.bold)) GlobalFonts.registerFromPath(fonts.bold, 'Cairo-Bold')
+    55→    if (fs.existsSync(fonts.black)) GlobalFonts.registerFromPath(fonts.black, 'Cairo-Black')
+    56→    fontsRegistered = true
+    57→  } catch (e) {}
+    58→}
+    59→
+    60→async function generateBarcode(certNumber: string): Promise<Buffer> {
+    61→  try {
+    62→    const bwip = await import('bwip-js')
+    63→    return await (bwip.default || bwip).toBuffer({
+    64→      bcid: 'code128', text: certNumber, scale: 2, height: 18,
+    65→      includetext: false, paddingwidth: 3, paddingheight: 3,
+    66→      backgroundcolor: 'FFFFFF', foregroundcolor: '0A1F44',
+    67→    })
+    68→  } catch (e: any) {
+    69→    const canvas = createCanvas(200, 50)
+    70→    const ctx = canvas.getContext('2d')
+    71→    ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 200, 50)
+    72→    ctx.fillStyle = NAVY
+    73→    let x = 5
+    74→    for (let i = 0; i < 40; i++) {
+    75→      const w = 1 + ((certNumber.charCodeAt(i % certNumber.length) * (i + 1)) % 4)
+    76→      if (i % 2 === 0) ctx.fillRect(x, 5, w, 40)
+    77→      x += w
+    78→    }
+    79→    return await canvas.encode('png')
+    80→  }
+    81→}
+    82→
+    83→async function generateQR(url: string): Promise<Buffer> {
+    84→  return await QRCode.toBuffer(url, {
+    85→    type: 'png', width: 200, margin: 1,
+    86→    color: { dark: NAVY, light: WHITE },
+    87→  })
+    88→}
+    89→
+    90→// ============== Helper: Draw sophisticated corner ornament (PNG) ==============
+    91→// Premium geometric ornament: gold filigree with circles and curves
+    92→function drawCornerOrnament(ctx: any, x: number, y: number, scale: number, mx: number, my: number) {
+    93→  ctx.save()
+    94→  ctx.translate(x, y)
+    95→  ctx.scale(mx, my)
+    96→  ctx.lineCap = 'round'
+    97→  ctx.lineJoin = 'round'
+    98→
+    99→  // Outer filigree curve
+   100→  ctx.strokeStyle = GOLD
+   101→  ctx.lineWidth = 2 * scale
+   102→  ctx.beginPath()
+   103→  ctx.moveTo(0, 36 * scale)
+   104→  ctx.bezierCurveTo(0, 12 * scale, 12 * scale, 0, 36 * scale, 0)
+   105→  ctx.stroke()
+   106→
+   107→  // Inner curve
+   108→  ctx.strokeStyle = GOLD_BRIGHT
+   109→  ctx.lineWidth = 1.2 * scale
+   110→  ctx.beginPath()
+   111→  ctx.moveTo(6 * scale, 30 * scale)
+   112→  ctx.bezierCurveTo(6 * scale, 16 * scale, 16 * scale, 6 * scale, 30 * scale, 6 * scale)
+   113→  ctx.stroke()
+   114→
+   115→  // Decorative dots along the curve
+   116→  ctx.fillStyle = GOLD
+   117→  const dots = [[2, 32], [10, 22], [22, 10], [32, 2]]
+   118→  dots.forEach(([dx, dy]) => {
+   119→    ctx.beginPath()
+   120→    ctx.arc(dx * scale, dy * scale, 1.5 * scale, 0, Math.PI * 2)
+   121→    ctx.fill()
+   122→  })
+   123→
+   124→  // Central decorative diamond at corner pivot
+   125→  ctx.fillStyle = GOLD
+   126→  ctx.beginPath()
+   127→  ctx.moveTo(0, 0)
+   128→  ctx.lineTo(4 * scale, -4 * scale)
+   129→  ctx.lineTo(8 * scale, 0)
+   130→  ctx.lineTo(4 * scale, 4 * scale)
+   131→  ctx.closePath()
+   132→  ctx.fill()
+   133→
+   134→  ctx.restore()
+   135→}
+   136→
+   137→// ============== Helper: Draw premium corner ornament (PDF) ==============
+   138→function drawCornerOrnamentPDF(doc: any, x: number, y: number, mx: number, my: number) {
+   139→  doc.save()
+   140→  doc.translate(x, y)
+   141→  doc.scale(mx, my)
+   142→  doc.lineCap('round').lineJoin('round')
+   143→
+   144→  doc.lineWidth(2).strokeColor(GOLD)
+   145→  doc.moveTo(0, 36).bezierCurveTo(0, 12, 12, 0, 36, 0)
+   146→  doc.stroke()
+   147→
+   148→  doc.lineWidth(1.2).strokeColor(GOLD_BRIGHT)
+   149→  doc.moveTo(6, 30).bezierCurveTo(6, 16, 16, 6, 30, 6)
+   150→  doc.stroke()
+   151→
+   152→  doc.fillColor(GOLD)
+   153→  ;[[2, 32], [10, 22], [22, 10], [32, 2]].forEach(([dx, dy]) => {
+   154→    doc.circle(dx, dy, 1.5).fill(GOLD)
+   155→  })
+   156→
+   157→  // Central diamond
+   158→  doc.polygon([0, 0], [4, -4], [8, 0], [4, 4]).fill(GOLD)
+   159→  doc.restore()
+   160→}
+   161→
+   162→// ============== Helper: Draw signature strokes (PNG) — same as the extracted image ==============
+   163→function drawGelPenSignature(ctx: any, startX: number, centerY: number, width: number, scale: number) {
+   164→  const ink = SIG_BLUE
+   165→  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+   166→  const steps = 200
+   167→  for (let i = 0; i < steps; i++) {
+   168→    const t1 = i / steps, t2 = (i + 1) / steps
+   169→    const x1 = startX + width * t1, x2 = startX + width * t2
+   170→    const y1 = centerY + Math.sin(t1 * Math.PI * 5) * 10 * scale + Math.sin(t1 * Math.PI * 11) * 4 * scale + Math.cos(t1 * Math.PI * 3) * 7 * scale
+   171→    const y2 = centerY + Math.sin(t2 * Math.PI * 5) * 10 * scale + Math.sin(t2 * Math.PI * 11) * 4 * scale + Math.cos(t2 * Math.PI * 3) * 7 * scale
+   172→    const pressure = Math.abs(y2 - y1) > 0.15 ? 3.5 : 2
+   173→    ctx.strokeStyle = ink; ctx.lineWidth = pressure * scale
+   174→    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+   175→  }
+   176→  // Small left flourish
+   177→  ctx.strokeStyle = ink; ctx.lineWidth = 2.5 * scale
+   178→  ctx.beginPath()
+   179→  ctx.moveTo(startX - 8 * scale, centerY - 12 * scale)
+   180→  ctx.bezierCurveTo(startX - 16 * scale, centerY - 28 * scale, startX + 4 * scale, centerY - 30 * scale, startX + 6 * scale, centerY - 14 * scale)
+   181→  ctx.stroke()
+   182→  // Small right end flourish
+   183→  ctx.lineWidth = 3 * scale
+   184→  ctx.beginPath()
+   185→  ctx.moveTo(startX + width, centerY)
+   186→  ctx.bezierCurveTo(startX + width + 16 * scale, centerY - 16 * scale, startX + width + 22 * scale, centerY + 4 * scale, startX + width + 8 * scale, centerY + 6 * scale)
+   187→  ctx.stroke()
+   188→  // Underscore
+   189→  const usStartX = startX - 4 * scale, usEndX = startX + width + 10 * scale
+   190→  const usY = centerY + 24 * scale
+   191→  for (let i = 0; i < 100; i++) {
+   192→    const t1 = i / 100, t2 = (i + 1) / 100
+   193→    const x1 = usStartX + (usEndX - usStartX) * t1, x2 = usStartX + (usEndX - usStartX) * t2
+   194→    const y1 = usY + Math.sin(t1 * Math.PI * 3) * 1.5 * scale, y2 = usY + Math.sin(t2 * Math.PI * 3) * 1.5 * scale
+   195→    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2
+   196→    ctx.lineWidth = pressure * scale
+   197→    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+   198→  }
+   199→  // Initial dot
+   200→  ctx.fillStyle = ink
+   201→  ctx.beginPath()
+   202→  ctx.arc(startX - 14 * scale, centerY - 8 * scale, 1.8 * scale, 0, Math.PI * 2)
+   203→  ctx.fill()
+   204→}
+   205→
+   206→// ============== Helper: Draw signature (PDF) ==============
+   207→function drawGelPenSignaturePDF(doc: any, startX: number, centerY: number, width: number) {
+   208→  const ink = SIG_BLUE
+   209→  const steps = 200
+   210→  for (let i = 0; i < steps; i++) {
+   211→    const t1 = i / steps, t2 = (i + 1) / steps
+   212→    const x1 = startX + width * t1, x2 = startX + width * t2
+   213→    const y1 = centerY + Math.sin(t1 * Math.PI * 5) * 10 + Math.sin(t1 * Math.PI * 11) * 4 + Math.cos(t1 * Math.PI * 3) * 7
+   214→    const y2 = centerY + Math.sin(t2 * Math.PI * 5) * 10 + Math.sin(t2 * Math.PI * 11) * 4 + Math.cos(t2 * Math.PI * 3) * 7
+   215→    const pressure = Math.abs(y2 - y1) > 0.15 ? 3.5 : 2
+   216→    doc.lineWidth(pressure).strokeColor(ink)
+   217→    doc.moveTo(x1, y1).lineTo(x2, y2).stroke()
+   218→  }
+   219→  doc.lineWidth(2.5).strokeColor(ink)
+   220→  doc.moveTo(startX - 8, centerY - 12)
+   221→  doc.bezierCurveTo(startX - 16, centerY - 28, startX + 4, centerY - 30, startX + 6, centerY - 14)
+   222→  doc.stroke()
+   223→  doc.lineWidth(3)
+   224→  doc.moveTo(startX + width, centerY)
+   225→  doc.bezierCurveTo(startX + width + 16, centerY - 16, startX + width + 22, centerY + 4, startX + width + 8, centerY + 6)
+   226→  doc.stroke()
+   227→  const usStartX = startX - 4, usEndX = startX + width + 10
+   228→  const usY = centerY + 24
+   229→  for (let i = 0; i < 100; i++) {
+   230→    const t1 = i / 100, t2 = (i + 1) / 100
+   231→    const x1 = usStartX + (usEndX - usStartX) * t1, x2 = usStartX + (usEndX - usStartX) * t2
+   232→    const y1 = usY + Math.sin(t1 * Math.PI * 3) * 1.5, y2 = usY + Math.sin(t2 * Math.PI * 3) * 1.5
+   233→    const pressure = t1 < 0.1 || t1 > 0.9 ? 1.2 : 2
+   234→    doc.lineWidth(pressure).strokeColor(ink)
+   235→    doc.moveTo(x1, y1).lineTo(x2, y2).stroke()
+   236→  }
+   237→  doc.circle(startX - 14, centerY - 8, 1.8).fill(ink)
+   238→}
+   239→
+   240→// ============== ULTRA-PREMIUM PNG CERTIFICATE ==============
+   241→async function generateCertificatePNG(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null, signatoryName?: string | null, signatoryPosition?: string | null): Promise<Buffer> {
+   242→  registerFontsForCanvas()
+   243→
+   244→  const scale = 2
+   245→  const pageW = 842 * scale, pageH = 595 * scale
+   246→  const canvas = createCanvas(pageW, pageH)
+   247→  const ctx = canvas.getContext('2d')
+   248→
+   249→  // Helpers
+   250→  const fill = (c: string) => { ctx.fillStyle = c }
+   251→  const stroke = (c: string, w: number) => { ctx.strokeStyle = c; ctx.lineWidth = w }
+   252→  const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+   253→    ctx.beginPath()
+   254→    ctx.moveTo(x + r, y)
+   255→    ctx.lineTo(x + w - r, y)
+   256→    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+   257→    ctx.lineTo(x + w, y + h - r)
+   258→    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+   259→    ctx.lineTo(x + r, y + h)
+   260→    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+   261→    ctx.lineTo(x, y + r)
+   262→    ctx.quadraticCurveTo(x, y, x + r, y)
+   263→    ctx.closePath()
+   264→  }
+   265→  const fillRoundRect = (x: number, y: number, w: number, h: number, r: number, c: string) => {
+   266→    fill(c); roundRect(x, y, w, h, r); ctx.fill()
+   267→  }
+   268→  const strokeRoundRect = (x: number, y: number, w: number, h: number, r: number, c: string, lw: number) => {
+   269→    stroke(c, lw); roundRect(x, y, w, h, r); ctx.stroke()
+   270→  }
+   271→  const setFont = (size: number, weight: 'regular' | 'bold' | 'black' = 'regular') => {
+   272→    const family = weight === 'black' ? 'Cairo-Black' : weight === 'bold' ? 'Cairo-Bold' : 'Cairo'
+   273→    ctx.font = `${size * scale}px ${family}`
+   274→  }
+   275→
+   276→  const cx = pageW / 2
+   277→
+   278→  // ===== OUTER BACKGROUND: Deep navy with subtle radial gradient =====
+   279→  fill(NAVY_DEEP); ctx.fillRect(0, 0, pageW, pageH)
+   280→  const bgGrad = ctx.createRadialGradient(cx, pageH / 2, 100 * scale, cx, pageH / 2, pageW)
+   281→  bgGrad.addColorStop(0, NAVY)
+   282→  bgGrad.addColorStop(1, NAVY_DEEP)
+   283→  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, pageW, pageH)
+   284→
+   285→  // ===== Subtle geometric pattern on outer navy (very faint diamonds) =====
+   286→  ctx.save()
+   287→  ctx.globalAlpha = 0.06
+   288→  fill(GOLD)
+   289→  for (let row = 0; row < 8; row++) {
+   290→    for (let col = 0; col < 12; col++) {
+   291→      const x = col * 80 * scale + (row % 2 ? 40 * scale : 0)
+   292→      const y = row * 80 * scale
+   293→      ctx.save()
+   294→      ctx.translate(x, y)
+   295→      ctx.rotate(Math.PI / 4)
+   296→      ctx.fillRect(-2 * scale, -2 * scale, 4 * scale, 4 * scale)
+   297→      ctx.restore()
+   298→    }
+   299→  }
+   300→  ctx.restore()
+   301→
+   302→  // ===== INNER IVORY CARD (with shadow) =====
+   303→  const cardPad = 28 * scale
+   304→  const cardX = cardPad, cardY = cardPad
+   305→  const cardW = pageW - 2 * cardPad, cardH = pageH - 2 * cardPad
+   306→
+   307→  ctx.save()
+   308→  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+   309→  ctx.shadowBlur = 20 * scale
+   310→  ctx.shadowOffsetY = 6 * scale
+   311→  fillRoundRect(cardX, cardY, cardW, cardH, 16 * scale, IVORY)
+   312→  ctx.restore()
+   313→
+   314→  // Subtle inner gradient on cream
+   315→  const innerGrad = ctx.createLinearGradient(0, cardY, 0, cardY + cardH)
+   316→  innerGrad.addColorStop(0, CREAM)
+   317→  innerGrad.addColorStop(1, IVORY)
+   318→  fillRoundRect(cardX, cardY, cardW, cardH, 16 * scale, '#000')
+   319→  ctx.fillStyle = innerGrad
+   320→  roundRect(cardX, cardY, cardW, cardH, 16 * scale)
+   321→  ctx.fill()
+   322→
+   323→  // ===== TRIPLE GOLD FRAME (premium multi-line border) =====
+   324→  strokeRoundRect(cardX + 8 * scale, cardY + 8 * scale, cardW - 16 * scale, cardH - 16 * scale, 12 * scale, GOLD, 2.5 * scale)
+   325→  strokeRoundRect(cardX + 16 * scale, cardY + 16 * scale, cardW - 32 * scale, cardH - 32 * scale, 8 * scale, GOLD_BRIGHT, 1 * scale)
+   326→  strokeRoundRect(cardX + 22 * scale, cardY + 22 * scale, cardW - 44 * scale, cardH - 44 * scale, 6 * scale, GOLD, 0.5 * scale)
+   327→
+   328→  // ===== CORNER ORNAMENTS (4 corners, premium geometric filigree) =====
+   329→  const cornerInset = 28 * scale
+   330→  drawCornerOrnament(ctx, cardX + cornerInset, cardY + cornerInset, scale, 1, 1)
+   331→  drawCornerOrnament(ctx, cardX + cardW - cornerInset, cardY + cornerInset, scale, -1, 1)
+   332→  drawCornerOrnament(ctx, cardX + cornerInset, cardY + cardH - cornerInset, scale, 1, -1)
+   333→  drawCornerOrnament(ctx, cardX + cardW - cornerInset, cardY + cardH - cornerInset, scale, -1, -1)
+   334→
+   335→  // ===== TOP-LEFT FIA monogram badge (premium academic seal) =====
+   336→  const sealSize = 60 * scale
+   337→  const sealX = cardX + 50 * scale, sealY = cardY + 50 * scale
+   338→  // Outer gold ring
+   339→  fillRoundRect(sealX - sealSize / 2, sealY - sealSize / 2, sealSize, sealSize, sealSize / 2, NAVY_DARK)
+   340→  strokeRoundRect(sealX - sealSize / 2, sealY - sealSize / 2, sealSize, sealSize, sealSize / 2, GOLD, 2.5 * scale)
+   341→  // Inner gold accent ring
+   342→  strokeRoundRect(sealX - sealSize / 2 + 5 * scale, sealY - sealSize / 2 + 5 * scale, sealSize - 10 * scale, sealSize - 10 * scale, (sealSize - 10 * scale) / 2, GOLD_BRIGHT, 0.8 * scale)
+   343→  // FIA text inside seal
+   344→  setFont(18, 'bold')
+   345→  fill(GOLD_BRIGHT)
+   346→  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+   347→  ctx.fillText('FIA', sealX, sealY)
+   348→
+   349→  // ===== LOGO (top-right) =====
+   350→  const logoSize = 75 * scale
+   351→  const logoX = cardX + cardW - logoSize - 50 * scale
+   352→  const logoY = cardY + 45 * scale
+   353→  const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-fia.png')
+   354→  if (fs.existsSync(logoPath)) {
+   355→    const logoBuffer = fs.readFileSync(logoPath)
+   356→    const logoImg = await loadImage(logoBuffer)
+   357→    // White rounded background with gold frame
+   358→    fillRoundRect(logoX - 6 * scale, logoY - 6 * scale, logoSize + 12 * scale, logoSize + 12 * scale, 10 * scale, WHITE)
+   359→    strokeRoundRect(logoX - 6 * scale, logoY - 6 * scale, logoSize + 12 * scale, logoSize + 12 * scale, 10 * scale, GOLD, 2 * scale)
+   360→    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize)
+   361→  }
+   362→
+   363→  // ===== HEADER: Institution name (large, centered, navy) =====
+   364→  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl'
+   365→
+   366→  // Arabic institution name — large prestigious
+   367→  setFont(34, 'bold')
+   368→  fill(NAVY)
+   369→  ctx.fillText('أكاديمية المستقبل الدولية', cx, cardY + 80 * scale)
+   370→
+   371→  // English subtitle — gold, tracked
+   372→  ctx.direction = 'ltr'
+   373→  setFont(12, 'bold')
+   374→  fill(GOLD_DARK)
+   375→  ctx.fillText('F U T U R E   I N T E R N A T I O N A L   A C A D E M Y', cx, cardY + 115 * scale)
+   376→
+   377→  // ===== PREMIUM ORNAMENTAL DIVIDER (gold double-line with center diamond + side dots) =====
+   378→  const dividerY = cardY + 145 * scale
+   379→  // Upper thin gold line
+   380→  stroke(GOLD, 1.5 * scale)
+   381→  ctx.beginPath()
+   382→  ctx.moveTo(cx - 130 * scale, dividerY - 3 * scale)
+   383→  ctx.lineTo(cx - 16 * scale, dividerY - 3 * scale)
+   384→  ctx.moveTo(cx + 16 * scale, dividerY - 3 * scale)
+   385→  ctx.lineTo(cx + 130 * scale, dividerY - 3 * scale)
+   386→  ctx.stroke()
+   387→  // Lower thin gold line
+   388→  ctx.beginPath()
+   389→  ctx.moveTo(cx - 130 * scale, dividerY + 3 * scale)
+   390→  ctx.lineTo(cx - 16 * scale, dividerY + 3 * scale)
+   391→  ctx.moveTo(cx + 16 * scale, dividerY + 3 * scale)
+   392→  ctx.lineTo(cx + 130 * scale, dividerY + 3 * scale)
+   393→  ctx.stroke()
+   394→  // Central diamond
+   395→  fill(GOLD)
+   396→  ctx.beginPath()
+   397→  ctx.moveTo(cx, dividerY - 8 * scale)
+   398→  ctx.lineTo(cx + 8 * scale, dividerY)
+   399→  ctx.lineTo(cx, dividerY + 8 * scale)
+   400→  ctx.lineTo(cx - 8 * scale, dividerY)
+   401→  ctx.closePath()
+   402→  ctx.fill()
+   403→  // Side decorative dots
+   404→  ctx.beginPath()
+   405→  ctx.arc(cx - 18 * scale, dividerY, 2 * scale, 0, Math.PI * 2)
+   406→  ctx.arc(cx + 18 * scale, dividerY, 2 * scale, 0, Math.PI * 2)
+   407→  ctx.fill()
+   408→
+   409→  // ===== CERTIFICATE TITLE (شهادة إتمام + CERTIFICATE OF COMPLETION) =====
+   410→  // Arabic title — large, navy, prestigious
+   411→  ctx.direction = 'rtl'
+   412→  setFont(28, 'bold')
+   413→  fill(NAVY)
+   414→  ctx.fillText('شهادة إتمام', cx, cardY + 185 * scale)
+   415→  // English subtitle — small gold
+   416→  ctx.direction = 'ltr'
+   417→  setFont(11, 'bold')
+   418→  fill(GOLD_DARK)
+   419→  ctx.fillText('C E R T I F I C A T E   O F   C O M P L E T I O N', cx, cardY + 215 * scale)
+   420→
+   421→  // ===== CERTIFICATION STATEMENT =====
+   422→  ctx.direction = 'rtl'
+   423→  setFont(14, 'regular')
+   424→  fill(GRAY_DARK)
+   425→  ctx.fillText('تشهد أكاديمية المستقبل الدولية بأن', cx, cardY + 245 * scale)
+   426→
+   427→  // ===== RECIPIENT NAME — LARGEST element, focal point — AUTO-FIT for long names =====
+   428→  // Start at 38pt; if too long, shrink to fit within 80% of card width
+   429→  let nameFontSize = 38
+   430→  setFont(nameFontSize, 'black')
+   431→  let nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+   432→  const maxNameWidth = (cardW - 200 * scale)
+   433→  while (nameWidth > maxNameWidth && nameFontSize > 20) {
+   434→    nameFontSize -= 2
+   435→    setFont(nameFontSize, 'black')
+   436→    nameWidth = ctx.measureText(cert.student_name || 'طالب').width
+   437→  }
+   438→  fill(NAVY)
+   439→  ctx.fillText(cert.student_name || 'طالب', cx, cardY + 290 * scale)
+   440→
+   441→  // Decorative gold underline under recipient name
+   442→  stroke(GOLD, 1 * scale)
+   443→  ctx.beginPath()
+   444→  ctx.moveTo(cx - 80 * scale, cardY + 320 * scale)
+   445→  ctx.lineTo(cx + 80 * scale, cardY + 320 * scale)
+   446→  ctx.stroke()
+   447→  // Small center diamond under name
+   448→  fill(GOLD)
+   449→  ctx.beginPath()
+   450→  ctx.moveTo(cx, cardY + 316 * scale)
+   451→  ctx.lineTo(cx + 4 * scale, cardY + 320 * scale)
+   452→  ctx.lineTo(cx, cardY + 324 * scale)
+   453→  ctx.lineTo(cx - 4 * scale, cardY + 320 * scale)
+   454→  ctx.closePath()
+   455→  ctx.fill()
+   456→
+   457→  // ===== COMPLETION STATEMENT =====
+   458→  ctx.direction = 'rtl'
+   459→  setFont(14, 'regular')
+   460→  fill(GRAY_DARK)
+   461→  ctx.fillText('قد أتم بنجاح متطلبات دورة', cx, cardY + 345 * scale)
+   462→
+   463→  // ===== LUXURIOUS COURSE PLAQUE (dark navy with metallic-gold borders) =====
+   464→  // AUTO-FIT: shrink course title font if too long to fit in plaque
+   465→  const plaqueY = cardY + 380 * scale
+   466→  const plaqueH = 40 * scale
+   467→  let courseFontSize = 20
+   468→  setFont(courseFontSize, 'bold')
+   469→  const courseText = cert.course_title || 'دورة معتمدة'
+   470→  // Determine plaque width based on initial measurement
+   471→  let textWidth = ctx.measureText(courseText).width
+   472→  const plaquePadX = 50 * scale
+   473→  const maxPlaqueWidth = cardW - 100 * scale  // maximum plaque width
+   474→  // Shrink font if text + padding exceeds max plaque width
+   475→  while (textWidth + 100 * scale + plaquePadX * 2 > maxPlaqueWidth && courseFontSize > 11) {
+   476→    courseFontSize -= 1
+   477→    setFont(courseFontSize, 'bold')
+   478→    textWidth = ctx.measureText(courseText).width
+   479→  }
+   480→  const plaqueW = Math.max(textWidth + 100 * scale + plaquePadX * 2, 320 * scale)
+   481→  const plaqueX = cx - plaqueW / 2
+   482→
+   483→  // Outer shadow for depth
+   484→  ctx.save()
+   485→  ctx.shadowColor = 'rgba(0,0,0,0.3)'
+   486→  ctx.shadowBlur = 8 * scale
+   487→  ctx.shadowOffsetY = 3 * scale
+   488→  fill(NAVY_DARK)
+   489→  ctx.beginPath()
+   490→  ctx.moveTo(plaqueX + 18 * scale, plaqueY)
+   491→  ctx.lineTo(plaqueX + plaqueW - 18 * scale, plaqueY)
+   492→  ctx.lineTo(plaqueX + plaqueW, plaqueY + plaqueH / 2)
+   493→  ctx.lineTo(plaqueX + plaqueW - 18 * scale, plaqueY + plaqueH)
+   494→  ctx.lineTo(plaqueX + 18 * scale, plaqueY + plaqueH)
+   495→  ctx.lineTo(plaqueX, plaqueY + plaqueH / 2)
+   496→  ctx.closePath(); ctx.fill()
+   497→  ctx.restore()
+   498→
+   499→  // Metallic gold border (thick outer)
+   500→  stroke(GOLD, 2.5 * scale)
+   501→  ctx.beginPath()
+   502→  ctx.moveTo(plaqueX + 18 * scale, plaqueY)
+   503→  ctx.lineTo(plaqueX + plaqueW - 18 * scale, plaqueY)
+   504→  ctx.lineTo(plaqueX + plaqueW, plaqueY + plaqueH / 2)
+   505→  ctx.lineTo(plaqueX + plaqueW - 18 * scale, plaqueY + plaqueH)
+   506→  ctx.lineTo(plaqueX + 18 * scale, plaqueY + plaqueH)
+   507→  ctx.lineTo(plaqueX, plaqueY + plaqueH / 2)
+   508→  ctx.closePath(); ctx.stroke()
+   509→  // Inner thin gold accent
+   510→  stroke(GOLD_BRIGHT, 0.6 * scale)
+   511→  ctx.beginPath()
+   512→  ctx.moveTo(plaqueX + 22 * scale, plaqueY + 4 * scale)
+   513→  ctx.lineTo(plaqueX + plaqueW - 22 * scale, plaqueY + 4 * scale)
+   514→  ctx.lineTo(plaqueX + plaqueW - 5 * scale, plaqueY + plaqueH / 2)
+   515→  ctx.lineTo(plaqueX + plaqueW - 22 * scale, plaqueY + plaqueH - 4 * scale)
+   516→  ctx.lineTo(plaqueX + 22 * scale, plaqueY + plaqueH - 4 * scale)
+   517→  ctx.lineTo(plaqueX + 5 * scale, plaqueY + plaqueH / 2)
+   518→  ctx.closePath(); ctx.stroke()
+   519→
+   520→  // Course title inside plaque — bright gold
+   521→  fill(GOLD_BRIGHT)
+   522→  ctx.fillText(courseText, cx, plaqueY + plaqueH / 2 + 1 * scale)
+   523→
+   524→  // ===== 3 INFO BOXES — UNIFIED PROFESSIONAL DESIGN (all same shape/size) =====
+   525→  const boxesY = cardY + 425 * scale
+   526→  const boxesH = 42 * scale
+   527→  const boxW = 200 * scale
+   528→  const boxGap = 14 * scale
+   529→  const totalBoxesW = 3 * boxW + 2 * boxGap
+   530→  const boxesStartX = cx - totalBoxesW / 2
+   531→  const iconSize = 28 * scale
+   532→  const iconPad = 11 * scale
+   533→
+   534→  // Helper: draw one info box (unified design)
+   535→  const drawInfoBox = (x: number, icon: string, label: string, value: string, valueColor: string, boxBgColor: string = WHITE, boxBorderColor: string = GOLD) => {
+   536→    fillRoundRect(x, boxesY, boxW, boxesH, 8 * scale, boxBgColor)
+   537→    strokeRoundRect(x, boxesY, boxW, boxesH, 8 * scale, boxBorderColor, 1.5 * scale)
+   538→    // Icon circle
+   539→    fillRoundRect(x + iconPad, boxesY + (boxesH - iconSize) / 2, iconSize, iconSize, iconSize / 2, boxBorderColor === GOLD ? NAVY : boxBorderColor)
+   540→    setFont(11, 'bold'); fill(GOLD_BRIGHT); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+   541→    ctx.fillText(icon, x + iconPad + iconSize / 2, boxesY + boxesH / 2 + 1 * scale)
+   542→    // Label + value (right side, RTL)
+   543→    ctx.direction = 'rtl'; setFont(8, 'regular'); fill(GRAY); ctx.textAlign = 'right'
+   544→    ctx.fillText(label, x + boxW - 12 * scale, boxesY + 13 * scale)
+   545→    setFont(11, 'bold'); fill(valueColor)
+   546→    ctx.fillText(value, x + boxW - 12 * scale, boxesY + 30 * scale)
+   547→  }
+   548→
+   549→  // Box 1: Date
+   550→  drawInfoBox(boxesStartX, '📅', 'تاريخ الإصدار', issueDate, NAVY)
+   551→  // Box 2: Issuer
+   552→  const box2X = boxesStartX + boxW + boxGap
+   553→  drawInfoBox(box2X, '🎓', 'الجهة المصدرة', 'أكاديمية المستقبل الدولية', NAVY)
+   554→  // Box 3: Status
+   555→  const box3X = boxesStartX + 2 * (boxW + boxGap)
+   556→  const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
+   557→  const statusColor = isRevoked ? CRIMSON : EMERALD
+   558→  const statusBgColor = isRevoked ? CRIMSON_LIGHT : EMERALD_LIGHT
+   559→  const statusText = isRevoked ? 'ملغي' : 'صالح'
+   560→  drawInfoBox(box3X, isRevoked ? '✕' : '✓', 'الحالة', statusText, statusColor, statusBgColor, statusColor)
+   561→
+   562→  // ===== BOTTOM ROW: 3 EQUAL COLUMNS (QR / Cert ID / Signature) — INSIDE inner gold frame =====
+   563→  // Layout uses 3 equal columns within the inner gold frame area, with consistent spacing
+   564→  const innerLeft = cardX + 32 * scale  // inside inner gold frame
+   565→  const innerRight = cardX + cardW - 32 * scale
+   566→  const innerW = innerRight - innerLeft
+   567→  const colW = innerW / 3
+   568→  const colGap = 8 * scale
+   569→  const bottomY = cardY + 478 * scale
+   570→
+   571→  // --- QR (left column) ---
+   572→  const qrBuffer = await generateQR(verifyUrl)
+   573→  const qrImg = await loadImage(qrBuffer)
+   574→  const qrSize = 38 * scale
+   575→  const qrColCenterX = innerLeft + colW / 2 - colGap / 2
+   576→  const qrY = bottomY + 2 * scale
+   577→  // White card for QR
+   578→  fillRoundRect(qrColCenterX - qrSize / 2 - 4 * scale, qrY - 4 * scale, qrSize + 8 * scale, qrSize + 8 * scale, 4 * scale, WHITE)
+   579→  strokeRoundRect(qrColCenterX - qrSize / 2 - 4 * scale, qrY - 4 * scale, qrSize + 8 * scale, qrSize + 8 * scale, 4 * scale, GOLD, 1.2 * scale)
+   580→  ctx.drawImage(qrImg, qrColCenterX - qrSize / 2, qrY, qrSize, qrSize)
+   581→  // QR label
+   582→  ctx.direction = 'rtl'; setFont(9, 'bold'); fill(NAVY); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+   583→  ctx.fillText('امسح للتحقق', qrColCenterX, qrY + qrSize + 14 * scale)
+   584→
+   585→  // --- Cert ID (center column) — barcode + cert number inside white card ---
+   586→  const certColCenterX = innerLeft + colW + colGap / 2 + colW / 2 - colGap / 2
+   587→  const barcodeBuffer = await generateBarcode(cert.certificate_number)
+   588→  const barcodeImg = await loadImage(barcodeBuffer)
+   589→  const barcodeW = 100 * scale
+   590→  const barcodeH = 20 * scale
+   591→  const barcodeX = certColCenterX - barcodeW / 2
+   592→  const barcodeY = bottomY + 4 * scale
+   593→  const barcodeCardH = barcodeH + 28 * scale
+   594→  // White card containing barcode + cert number
+   595→  fillRoundRect(barcodeX - 6 * scale, barcodeY - 6 * scale, barcodeW + 12 * scale, barcodeCardH, 4 * scale, WHITE)
+   596→  strokeRoundRect(barcodeX - 6 * scale, barcodeY - 6 * scale, barcodeW + 12 * scale, barcodeCardH, 4 * scale, GOLD, 1.2 * scale)
+   597→  ctx.drawImage(barcodeImg, barcodeX, barcodeY, barcodeW, barcodeH)
+   598→  ctx.direction = 'ltr'; setFont(9, 'bold'); fill(NAVY)
+   599→  ctx.fillText(cert.certificate_number, certColCenterX, barcodeY + barcodeH + 8 * scale)
+   600→  setFont(7, 'regular'); fill(GRAY)
+   601→  ctx.fillText('CERTIFICATE ID', certColCenterX, barcodeY + barcodeH + 16 * scale)
+   602→
+   603→  // --- SIGNATURE (right column) — EMPTY by default, drawn only if signature_image provided ---
+   604→  const sigColCenterX = innerLeft + 2 * colW + colGap + colW / 2 - colGap / 2
+   605→  const sigAreaW = colW - 20 * scale
+   606→  const sigAreaX = sigColCenterX - sigAreaW / 2
+   607→
+   608→  // Top label
+   609→  ctx.direction = 'rtl'; setFont(10, 'bold'); fill(NAVY); ctx.textAlign = 'center'
+   610→  ctx.fillText('توقيع الجهة المانوحة', sigColCenterX, bottomY + 4 * scale)
+   611→
+   612→  // Signature image (only if provided from admin dashboard)
+   613→  let signatureDrawn = false
+   614→  if (founderSignature) {
+   615→    try {
+   616→      const sigImgBuf = await fetch(founderSignature).then(r => r.arrayBuffer())
+   617→      const sigImg = await loadImage(Buffer.from(sigImgBuf))
+   618→      const sigImgW = 100 * scale
+   619→      const sigImgH = 28 * scale
+   620→      ctx.drawImage(sigImg, sigColCenterX - sigImgW / 2, bottomY + 10 * scale, sigImgW, sigImgH)
+   621→      signatureDrawn = true
+   622→    } catch {}
+   623→  }
+   624→  // No fallback — area remains EMPTY
+   625→
+   626→  // Thin gold signature line
+   627→  stroke(GOLD, 1 * scale)
+   628→  ctx.beginPath()
+   629→  ctx.moveTo(sigAreaX + 5 * scale, bottomY + 42 * scale)
+   630→  ctx.lineTo(sigAreaX + sigAreaW - 5 * scale, bottomY + 42 * scale)
+   631→  ctx.stroke()
+   632→
+   633→  // Signatory name + position — ONLY shown if signature is approved
+   634→  if (signatureDrawn && signatoryName) {
+   635→    setFont(11, 'bold'); fill(NAVY)
+   636→    ctx.fillText(signatoryName, sigColCenterX, bottomY + 50 * scale)
+   637→  }
+   638→  if (signatureDrawn && signatoryPosition) {
+   639→    setFont(8, 'regular'); fill(GRAY_DARK)
+   640→    ctx.fillText(signatoryPosition, sigColCenterX, bottomY + 60 * scale)
+   641→  }
+   642→
+   643→  // ===== WATERMARK REMOVED (was interfering with text readability) =====
+   644→
+   645→  return await canvas.encode('png')
+   646→}
+   647→
+   648→// ============== PDF CERTIFICATE (matching PNG design) ==============
+   649→async function generateCertificatePDF(cert: any, issueDate: string, verifyUrl: string, founderSignature?: string | null, signatoryName?: string | null, signatoryPosition?: string | null): Promise<Buffer> {
+   650→  return new Promise(async (resolve, reject) => {
+   651→    try {
+   652→      const fonts = getFontPaths()
+   653→      const doc = new PDFDocument({
+   654→        size: [842, 595],
+   655→        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+   656→        info: {
+   657→          Title: `FIA Certificate — ${cert.certificate_number}`,
+   658→          Author: 'FIA — Future International Academy',
+   659→          Subject: 'Verified Professional Certificate',
+   660→        },
+   661→      })
+   662→
+   663→      const fontExists = (weight: 'regular' | 'bold' | 'black' = 'regular') => {
+   664→        const p = weight === 'black' ? fonts.black : weight === 'bold' ? fonts.bold : fonts.regular
+   665→        return fs.existsSync(p) ? p : undefined
+   666→      }
+   667→      const setFont = (size: number, weight: 'regular' | 'bold' | 'black' = 'regular') => {
+   668→        const fp = fontExists(weight)
+   669→        if (fp) doc.font(fp, size)
+   670→        else doc.font(weight === 'regular' ? 'Helvetica' : 'Helvetica-Bold', size)
+   671→      }
+   672→
+   673→      const chunks: Buffer[] = []
+   674→      doc.on('data', (c: Buffer) => chunks.push(c))
+   675→      doc.on('end', () => resolve(Buffer.concat(chunks)))
+   676→
+   677→      const pageW = 842, pageH = 595, cx = pageW / 2
+   678→
+   679→      const roundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
+   680→        doc.path(`M ${x + r},${y} L ${x + w - r},${y} Q ${x + w},${y} ${x + w},${y + r} L ${x + w},${y + h - r} Q ${x + w},${y + h} ${x + w - r},${y + h} L ${x + r},${y + h} Q ${x},${y + h} ${x},${y + h - r} L ${x},${y + r} Q ${x},${y} ${x + r},${y} Z`)
+   681→      }
+   682→
+   683→      // ===== OUTER BACKGROUND =====
+   684→      doc.rect(0, 0, pageW, pageH).fill(NAVY_DEEP)
+   685→
+   686→      // ===== INNER IVORY CARD (with shadow) =====
+   687→      const cardPad = 28, cardX = cardPad, cardY = cardPad
+   688→      const cardW = pageW - 2 * cardPad, cardH = pageH - 2 * cardPad
+   689→
+   690→      // Shadow
+   691→      doc.save()
+   692→      doc.fillColor('rgba(0,0,0,0.5)')
+   693→      roundRectPath(cardX + 2, cardY + 3, cardW, cardH, 16)
+   694→      doc.fill()
+   695→      doc.restore()
+   696→      // Card fill
+   697→      doc.save()
+   698→      roundRectPath(cardX, cardY, cardW, cardH, 16)
+   699→      doc.fill(IVORY)
+   700→      doc.restore()
+   701→
+   702→      // TRIPLE GOLD FRAME
+   703→      doc.save()
+   704→      doc.lineWidth(2.5).strokeColor(GOLD)
+   705→      roundRectPath(cardX + 8, cardY + 8, cardW - 16, cardH - 16, 12)
+   706→      doc.stroke()
+   707→      doc.restore()
+   708→      doc.save()
+   709→      doc.lineWidth(1).strokeColor(GOLD_BRIGHT)
+   710→      roundRectPath(cardX + 16, cardY + 16, cardW - 32, cardH - 32, 8)
+   711→      doc.stroke()
+   712→      doc.restore()
+   713→      doc.save()
+   714→      doc.lineWidth(0.5).strokeColor(GOLD)
+   715→      roundRectPath(cardX + 22, cardY + 22, cardW - 44, cardH - 44, 6)
+   716→      doc.stroke()
+   717→      doc.restore()
+   718→
+   719→      // Corner ornaments
+   720→      const cornerInset = 28
+   721→      drawCornerOrnamentPDF(doc, cardX + cornerInset, cardY + cornerInset, 1, 1)
+   722→      drawCornerOrnamentPDF(doc, cardX + cardW - cornerInset, cardY + cornerInset, -1, 1)
+   723→      drawCornerOrnamentPDF(doc, cardX + cornerInset, cardY + cardH - cornerInset, 1, -1)
+   724→      drawCornerOrnamentPDF(doc, cardX + cardW - cornerInset, cardY + cardH - cornerInset, -1, -1)
+   725→
+   726→      // ===== FIA SEAL (top-left) =====
+   727→      const sealSize = 60, sealX = cardX + 50, sealY = cardY + 50
+   728→      doc.save()
+   729→      roundRectPath(sealX - sealSize / 2, sealY - sealSize / 2, sealSize, sealSize, sealSize / 2)
+   730→      doc.fill(NAVY_DARK)
+   731→      doc.lineWidth(2.5).strokeColor(GOLD)
+   732→      doc.stroke()
+   733→      doc.restore()
+   734→      setFont(18, 'bold')
+   735→      doc.fillColor(GOLD_BRIGHT).text('FIA', sealX - 30, sealY - 12, { width: 60, align: 'center' })
+   736→
+   737→      // ===== LOGO (top-right) =====
+   738→      const logoSize = 75
+   739→      const logoX = cardX + cardW - logoSize - 50
+   740→      const logoY = cardY + 45
+   741→      const logoPath = path.join(process.cwd(), 'public', 'fia', 'logo-fia.png')
+   742→      if (fs.existsSync(logoPath)) {
+   743→        doc.save()
+   744→        roundRectPath(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12, 10)
+   745→        doc.fill(WHITE)
+   746→        doc.lineWidth(2).strokeColor(GOLD)
+   747→        doc.stroke()
+   748→        doc.restore()
+   749→        doc.image(logoPath, logoX, logoY, { width: logoSize, height: logoSize })
+   750→      }
+   751→
+   752→      // ===== HEADER: Institution name =====
+   753→      setFont(34, 'bold')
+   754→      doc.fillColor(NAVY).text('أكاديمية المستقبل الدولية', cx - 350, cardY + 65, { width: 700, align: 'center' })
+   755→      setFont(12, 'bold')
+   756→      doc.fillColor(GOLD_DARK).text('F U T U R E   I N T E R N A T I O N A L   A C A D E M Y', cx - 350, cardY + 108, { width: 700, align: 'center' })
+   757→
+   758→      // Ornamental divider
+   759→      const dividerY = cardY + 145
+   760→      doc.lineWidth(1.5).strokeColor(GOLD)
+   761→      doc.moveTo(cx - 130, dividerY - 3).lineTo(cx - 16, dividerY - 3).stroke()
+   762→      doc.moveTo(cx + 16, dividerY - 3).lineTo(cx + 130, dividerY - 3).stroke()
+   763→      doc.moveTo(cx - 130, dividerY + 3).lineTo(cx - 16, dividerY + 3).stroke()
+   764→      doc.moveTo(cx + 16, dividerY + 3).lineTo(cx + 130, dividerY + 3).stroke()
+   765→      doc.polygon([cx, dividerY - 8], [cx + 8, dividerY], [cx, dividerY + 8], [cx - 8, dividerY]).fill(GOLD)
+   766→
+   767→      // CERTIFICATE TITLE
+   768→      setFont(28, 'bold')
+   769→      doc.fillColor(NAVY).text('شهادة إتمام', cx - 350, cardY + 170, { width: 700, align: 'center' })
+   770→      setFont(11, 'bold')
+   771→      doc.fillColor(GOLD_DARK).text('C E R T I F I C A T E   O F   C O M P L E T I O N', cx - 350, cardY + 205, { width: 700, align: 'center' })
+   772→
+   773→      // CERTIFICATION STATEMENT
+   774→      setFont(14, 'regular')
+   775→      doc.fillColor(GRAY_DARK).text('تشهد أكاديمية المستقبل الدولية بأن', cx - 350, cardY + 238, { width: 700, align: 'center' })
+   776→
+   777→      // RECIPIENT NAME — largest with AUTO-FIT for long names
+   778→      let nameFontSize = 38
+   779→      setFont(nameFontSize, 'black')
+   780→      let nameWidth = doc.widthOfString(cert.student_name || 'طالب')
+   781→      const maxNameWidth = 600
+   782→      while (nameWidth > maxNameWidth && nameFontSize > 20) {
+   783→        nameFontSize -= 2
+   784→        setFont(nameFontSize, 'black')
+   785→        nameWidth = doc.widthOfString(cert.student_name || 'طالب')
+   786→      }
+   787→      doc.fillColor(NAVY).text(cert.student_name || 'طالب', cx - 350, cardY + 273, { width: 700, align: 'center' })
+   788→
+   789→      // Gold underline under recipient name
+   790→      doc.lineWidth(1).strokeColor(GOLD)
+   791→      doc.moveTo(cx - 80, cardY + 320).lineTo(cx + 80, cardY + 320).stroke()
+   792→      doc.polygon([cx, 316], [cx + 4, 320], [cx, 324], [cx - 4, 320]).fill(GOLD)
+   793→
+   794→      // COMPLETION STATEMENT
+   795→      setFont(14, 'regular')
+   796→      doc.fillColor(GRAY_DARK).text('قد أتم بنجاح متطلبات دورة', cx - 350, cardY + 340, { width: 700, align: 'center' })
+   797→
+   798→      // COURSE PLAQUE — with AUTO-FIT for long course names
+   799→      const plaqueY = cardY + 380, plaqueH = 40
+   800→      let courseFontSize = 20
+   801→      setFont(courseFontSize, 'bold')
+   802→      const courseText = cert.course_title || 'دورة معتمدة'
+   803→      let textWidth = doc.widthOfString(courseText)
+   804→      const plaquePadX = 50
+   805→      const maxPlaqueWidth = cardW - 100
+   806→      while (textWidth + 100 + plaquePadX * 2 > maxPlaqueWidth && courseFontSize > 11) {
+   807→        courseFontSize -= 1
+   808→        setFont(courseFontSize, 'bold')
+   809→        textWidth = doc.widthOfString(courseText)
+   810→      }
+   811→      const plaqueW = Math.max(textWidth + 100 + plaquePadX * 2, 320)
+   812→      const plaqueX = cx - plaqueW / 2
+   813→
+   814→      doc.save()
+   815→      doc.fillColor(NAVY_DARK)
+   816→      doc.path(`M ${plaqueX + 18},${plaqueY} L ${plaqueX + plaqueW - 18},${plaqueY} L ${plaqueX + plaqueW},${plaqueY + plaqueH / 2} L ${plaqueX + plaqueW - 18},${plaqueY + plaqueH} L ${plaqueX + 18},${plaqueY + plaqueH} L ${plaqueX},${plaqueY + plaqueH / 2} Z`)
+   817→      doc.fill()
+   818→      doc.restore()
+   819→      doc.save()
+   820→      doc.lineWidth(2.5).strokeColor(GOLD)
+   821→      doc.path(`M ${plaqueX + 18},${plaqueY} L ${plaqueX + plaqueW - 18},${plaqueY} L ${plaqueX + plaqueW},${plaqueY + plaqueH / 2} L ${plaqueX + plaqueW - 18},${plaqueY + plaqueH} L ${plaqueX + 18},${plaqueY + plaqueH} L ${plaqueX},${plaqueY + plaqueH / 2} Z`)
+   822→      doc.stroke()
+   823→      doc.restore()
+   824→      doc.fillColor(GOLD_BRIGHT).text(courseText, plaqueX, plaqueY + 16, { width: plaqueW, align: 'center' })
+   825→
+   826→      // 3 INFO BOXES — UNIFIED PROFESSIONAL DESIGN (all same shape/size)
+   827→      const boxesY = cardY + 425, boxesH = 42, boxW = 200, boxGap = 14
+   828→      const totalBoxesW = 3 * boxW + 2 * boxGap
+   829→      const boxesStartX = cx - totalBoxesW / 2
+   830→      const iconSize = 28, iconPad = 11
+   831→
+   832→      // Helper: draw one info box (unified design)
+   833→      const drawInfoBoxPDF = (x: number, icon: string, label: string, value: string, valueColor: string, boxBgColor: string = WHITE, boxBorderColor: string = GOLD) => {
+   834→        doc.save()
+   835→        roundRectPath(x, boxesY, boxW, boxesH, 8)
+   836→        doc.fill(boxBgColor)
+   837→        doc.lineWidth(1.5).strokeColor(boxBorderColor)
+   838→        doc.stroke()
+   839→        doc.restore()
+   840→        // Icon circle
+   841→        doc.save()
+   842→        roundRectPath(x + iconPad, boxesY + (boxesH - iconSize) / 2, iconSize, iconSize, iconSize / 2)
+   843→        doc.fill(boxBorderColor === GOLD ? NAVY : boxBorderColor)
+   844→        doc.restore()
+   845→        setFont(11, 'bold')
+   846→        doc.fillColor(GOLD_BRIGHT).text(icon, x + iconPad, boxesY + (boxesH - iconSize) / 2 + 5, { width: iconSize, align: 'center' })
+   847→        // Label + value
+   848→        setFont(8, 'regular')
+   849→        doc.fillColor(GRAY).text(label, x + iconPad + iconSize + 5, boxesY + 11, { width: boxW - iconPad - iconSize - 18, align: 'right' })
+   850→        setFont(11, 'bold')
+   851→        doc.fillColor(valueColor).text(value, x + iconPad + iconSize + 5, boxesY + 26, { width: boxW - iconPad - iconSize - 18, align: 'right' })
+   852→      }
+   853→
+   854→      drawInfoBoxPDF(boxesStartX, '📅', 'تاريخ الإصدار', issueDate, NAVY)
+   855→      const box2X = boxesStartX + boxW + boxGap
+   856→      drawInfoBoxPDF(box2X, '🎓', 'الجهة المصدرة', 'أكاديمية المستقبل الدولية', NAVY)
+   857→      const box3X = boxesStartX + 2 * (boxW + boxGap)
+   858→      const isRevoked = cert.status === 'ملغاة' || cert.status === 'ملغي'
+   859→      const statusColor = isRevoked ? CRIMSON : EMERALD
+   860→      const statusBgColor = isRevoked ? CRIMSON_LIGHT : EMERALD_LIGHT
+   861→      const statusText = isRevoked ? 'ملغي' : 'صالح'
+   862→      drawInfoBoxPDF(box3X, isRevoked ? '✕' : '✓', 'الحالة', statusText, statusColor, statusBgColor, statusColor)
+   863→
+   864→      // ===== BOTTOM ROW: 3 EQUAL COLUMNS (QR / Cert ID / Signature) — INSIDE inner gold frame =====
+   865→      const innerLeft = cardX + 32, innerRight = cardX + cardW - 32
+   866→      const innerW = innerRight - innerLeft
+   867→      const colW = innerW / 3, colGap = 8
+   868→      const bottomY = cardY + 478
+   869→
+   870→      // QR (left column)
+   871→      const qrBuffer = await generateQR(verifyUrl)
+   872→      const qrSize = 38
+   873→      const qrColCenterX = innerLeft + colW / 2 - colGap / 2
+   874→      const qrY = bottomY + 2
+   875→      doc.save()
+   876→      roundRectPath(qrColCenterX - qrSize / 2 - 4, qrY - 4, qrSize + 8, qrSize + 8, 4)
+   877→      doc.fill(WHITE)
+   878→      doc.lineWidth(1.2).strokeColor(GOLD)
+   879→      doc.stroke()
+   880→      doc.restore()
+   881→      doc.image(qrBuffer, qrColCenterX - qrSize / 2, qrY, { width: qrSize, height: qrSize })
+   882→      setFont(9, 'bold')
+   883→      doc.fillColor(NAVY).text('امسح للتحقق', qrColCenterX - 30, qrY + qrSize + 2, { width: 60, align: 'center' })
+   884→
+   885→      // Cert ID (center column)
+   886→      const certColCenterX = innerLeft + colW + colGap / 2 + colW / 2 - colGap / 2
+   887→      const barcodeBuffer = await generateBarcode(cert.certificate_number)
+   888→      const barcodeW = 100, barcodeH = 20
+   889→      const barcodeX = certColCenterX - barcodeW / 2
+   890→      const barcodeY = bottomY + 4
+   891→      const barcodeCardH = barcodeH + 28
+   892→      doc.save()
+   893→      roundRectPath(barcodeX - 6, barcodeY - 6, barcodeW + 12, barcodeCardH, 4)
+   894→      doc.fill(WHITE)
+   895→      doc.lineWidth(1.2).strokeColor(GOLD)
+   896→      doc.stroke()
+   897→      doc.restore()
+   898→      doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH })
+   899→      setFont(9, 'bold')
+   900→      doc.fillColor(NAVY).text(cert.certificate_number, certColCenterX - 60, barcodeY + barcodeH + 2, { width: 120, align: 'center' })
+   901→      setFont(7, 'regular')
+   902→      doc.fillColor(GRAY).text('CERTIFICATE ID', certColCenterX - 60, barcodeY + barcodeH + 12, { width: 120, align: 'center' })
+   903→
+   904→      // Signature (right column) — EMPTY by default
+   905→      const sigColCenterX = innerLeft + 2 * colW + colGap + colW / 2 - colGap / 2
+   906→      const sigAreaW = colW - 20
+   907→      const sigAreaX = sigColCenterX - sigAreaW / 2
+   908→      setFont(10, 'bold')
+   909→      doc.fillColor(NAVY).text('توقيع الجهة المانوحة', sigAreaX, bottomY + 2, { width: sigAreaW, align: 'center' })
+   910→
+   911→      // Signature image (only if provided)
+   912→      let signatureDrawn = false
+   913→      if (founderSignature) {
+   914→        try {
+   915→          const sigRes = await fetch(founderSignature)
+   916→          const sigBuf = await sigRes.arrayBuffer()
+   917→          const sigPath = path.join(os.tmpdir(), `sig-${Date.now()}.png`)
+   918→          fs.writeFileSync(sigPath, Buffer.from(sigBuf))
+   919→          if (fs.existsSync(sigPath)) {
+   920→            doc.image(sigPath, sigColCenterX - 50, bottomY + 10, { width: 100, height: 28 })
+   921→            fs.unlinkSync(sigPath)
+   922→            signatureDrawn = true
+   923→          }
+   924→        } catch {}
+   925→      }
+   926→      // No fallback signature
+   927→
+   928→      // Thin gold signature line
+   929→      doc.lineWidth(1).strokeColor(GOLD)
+   930→      doc.moveTo(sigAreaX + 5, bottomY + 42).lineTo(sigAreaX + sigAreaW - 5, bottomY + 42).stroke()
+   931→
+   932→      // Signatory name + position — ONLY shown if signature is approved
+   933→      if (signatureDrawn && signatoryName) {
+   934→        setFont(11, 'bold')
+   935→        doc.fillColor(NAVY).text(signatoryName, sigAreaX, bottomY + 48, { width: sigAreaW, align: 'center' })
+   936→      }
+   937→      if (signatureDrawn && signatoryPosition) {
+   938→        setFont(8, 'regular')
+   939→        doc.fillColor(GRAY_DARK).text(signatoryPosition, sigAreaX, bottomY + 58, { width: sigAreaW, align: 'center' })
+   940→      }
+   941→
+   942→      // WATERMARK REMOVED (was interfering with text readability)
+   943→
+   944→      doc.end()
+   945→    } catch (e: any) {
+   946→      reject(e)
+   947→    }
+   948→  })
+   949→}
+   950→
+   951→export async function GET(req: NextRequest) {
+   952→  try {
+   953→    const certNum = req.nextUrl.searchParams.get('number')
+   954→    const certId = req.nextUrl.searchParams.get('id')
+   955→    const format = req.nextUrl.searchParams.get('format') || 'pdf'
+   956→
+   957→    if (!certNum && !certId) {
+   958→      return NextResponse.json({ error: 'رقم الشهادة أو المعرّف مطلوب' }, { status: 400 })
+   959→    }
+   960→
+   961→    let query = supabaseAdmin.from('certificates').select('*')
+   962→    if (certNum) query = query.eq('certificate_number', certNum)
+   963→    else if (certId) query = query.eq('id', certId)
+   964→
+   965→    const { data: cert, error } = await query.single()
+   966→    if (error || !cert) {
+   967→      return NextResponse.json({ error: 'الشهادة غير موجودة' }, { status: 404 })
+   968→    }
+   969→
+   970→    const issueDate = cert.issued_at
+   971→      ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+   972→      : new Date().toLocaleDateString('ar-EG')
+   973→    const verifyUrl = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+   974→
+   975→    // Fetch founder's signature, signatory name & position from founder bio (added via admin dashboard)
+   976→    // The signature is OPTIONAL — area remains EMPTY if no signature has been added/approved by admin
+   977→    let founderSignature: string | null = null
+   978→    let signatoryName: string | null = null
+   979→    let signatoryPosition: string | null = null
+   980→    try {
+   981→      const { data: trainers } = await supabaseAdmin.from('trainers').select('*')
+   982→      if (trainers) {
+   983→        const founder = trainers.find((t: any) => t.password && t.password.startsWith('__TEAM_MEMBER__:founder'))
+   984→        if (founder) {
+   985→          const bioSeparator = '\n\n===FIA_EXTRA===\n'
+   986→          const idx = founder.bio ? founder.bio.indexOf(bioSeparator) : -1
+   987→          if (idx !== -1) {
+   988→            const extraJson = founder.bio.substring(idx + bioSeparator.length)
+   989→            const extra = JSON.parse(extraJson)
+   990→            founderSignature = extra.signature || null
+   991→            signatoryName = extra.signatory_name || founder.name || null
+   992→            signatoryPosition = extra.signatory_position || 'المدير التنفيذي'
+   993→          }
+   994→        }
+   995→      }
+   996→    } catch {}
+   997→
+   998→    if (format === 'png') {
+   999→      const pngBytes = await generateCertificatePNG(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
+  1000→      const headers = new Headers()
+  1001→      headers.set('Content-Type', 'image/png')
+  1002→      headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.png"`)
+  1003→      headers.set('Cache-Control', 'public, max-age=3600')
+  1004→      return new NextResponse(pngBytes, { status: 200, headers })
+  1005→    } else {
+  1006→      const pdfBytes = await generateCertificatePDF(cert, issueDate, verifyUrl, founderSignature, signatoryName, signatoryPosition)
+  1007→      const headers = new Headers()
+  1008→      headers.set('Content-Type', 'application/pdf')
+  1009→      headers.set('Content-Disposition', `inline; filename="FIA-Certificate-${cert.certificate_number}.pdf"`)
+  1010→      headers.set('Cache-Control', 'public, max-age=3600')
+  1011→      return new NextResponse(pdfBytes, { status: 200, headers })
+  1012→    }
+  1013→  } catch (e: any) {
+  1014→    return NextResponse.json({ error: e.message }, { status: 500 })
+  1015→  }
+  1016→}
+  1017→
