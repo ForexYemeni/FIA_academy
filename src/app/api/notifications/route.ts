@@ -76,6 +76,19 @@ export async function PUT(req: NextRequest) {
   }
 }
 
+// DELETE — delete a single notification by id
+export async function DELETE(req: NextRequest) {
+  try {
+    const { id } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const { error } = await supabaseAdmin.from('notifications').delete().eq('id', id)
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
 // Email sending — uses Resend / SendGrid / any SMTP via env vars
 // If no env vars are set, this is a silent no-op (notifications still go to DB).
 async function sendEmailNotification(userId: string, type: string, title: string, body?: string) {

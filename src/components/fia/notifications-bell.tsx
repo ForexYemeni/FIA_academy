@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users,
   AlertCircle, Award, Mail, Newspaper, Trophy, GraduationCap,
-  Volume2, VolumeX, X, BellRing, Play, Loader2,
+  Volume2, VolumeX, X, BellRing, Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
@@ -411,6 +411,36 @@ export function NotificationsBell() {
     setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })))
   }
 
+  // Delete a single notification
+  const deleteNotification = async (e: React.MouseEvent, n: any) => {
+    e.stopPropagation()
+    setItems((prev) => prev.filter((x) => x.id !== n.id))
+    try {
+      await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: n.id }),
+      })
+    } catch {}
+  }
+
+  // Delete ALL notifications
+  const deleteAllNotifications = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (!user?.id) return
+    const ids = items.map((n) => n.id)
+    setItems([])
+    try {
+      for (const id of ids) {
+        await fetch('/api/notifications', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+      }
+    } catch {}
+  }
+
   const markOneRead = async (n: any) => {
     if (n.read_at) {
       // Already read — navigate if there's a link
@@ -544,11 +574,19 @@ export function NotificationsBell() {
                   const label = TYPE_LABEL[n.type] || 'إشعار'
                   const isUnread = !n.read_at
                   return (
-                    <button
+                    <div
                       key={n.id}
+                      className={`group relative w-full text-right p-3 hover:bg-muted/40 transition-colors flex items-start gap-3 ${isUnread ? 'bg-gold/5' : ''}`}
                       onClick={() => markOneRead(n)}
-                      className={`w-full text-right p-3 hover:bg-muted/40 transition-colors flex items-start gap-3 ${isUnread ? 'bg-gold/5' : ''}`}
                     >
+                      {/* Delete button — appears on hover */}
+                      <button
+                        onClick={(e) => deleteNotification(e, n)}
+                        className="absolute top-2 left-2 w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-opacity flex items-center justify-center"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-500" />
+                      </button>
                       {/* Icon */}
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
                         <Icon className="w-4 h-4" />
@@ -566,21 +604,31 @@ export function NotificationsBell() {
                         <h5 className="text-xs font-bold text-navy line-clamp-1 leading-snug mb-0.5">{n.title}</h5>
                         {n.body && <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">{n.body}</p>}
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
             )}
           </div>
 
-          {/* Footer — link to mark all read */}
-          {items.length > 0 && unreadCount > 0 && (
-            <button
-              onClick={markAllRead}
-              className="w-full p-2.5 text-center text-xs text-navy font-semibold hover:bg-muted/40 transition-colors border-t border-gray-100 bg-muted/20"
-            >
-              ✓ تعليم الكل كمقروء
-            </button>
+          {/* Footer — mark all read + delete all */}
+          {items.length > 0 && (
+            <div className="flex border-t border-gray-100">
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="flex-1 p-2.5 text-center text-xs text-navy font-semibold hover:bg-muted/40 transition-colors bg-muted/20"
+                >
+                  ✓ تعليم الكل كمقروء
+                </button>
+              )}
+              <button
+                onClick={deleteAllNotifications}
+                className="flex-1 p-2.5 text-center text-xs text-red-500 font-semibold hover:bg-red-500/10 transition-colors border-r border-gray-100"
+              >
+                🗑 حذف الكل
+              </button>
+            </div>
           )}
 
           {/* === Diagnostic / Test buttons ===
