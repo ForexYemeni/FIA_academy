@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', topic_id)
       // Send forum reply notifications (in-app + OneSignal push)
-      try { await notifyForumReplyPosted(user_id, topic.title || 'موضوع', topic.user_id) } catch {}
+      try { await notifyForumReplyPosted(user_id, topic.title || 'موضوع', topic.user_id, topic_id) } catch {}
     }
 
     return NextResponse.json(data)
