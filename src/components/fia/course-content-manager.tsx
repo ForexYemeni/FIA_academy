@@ -591,6 +591,21 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   }, [editing])
 
   const handlePdfUpload = async (file: File) => {
+    // Android WebView's <input type=file> sometimes ignores the
+    // `accept` attribute filter and lets the user pick an image even
+    // when `accept="application/pdf"`. So we validate on the JS side
+    // too — if the picked file is not actually a PDF, reject it
+    // loudly instead of letting an image get uploaded as a "PDF".
+    const isPdf = file.type === 'application/pdf'
+               || file.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      toast.error(`الملف المختار ليس PDF (النوع: ${file.type || 'غير معروف'}). يرجى اختيار ملف PDF صالح.`)
+      return
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('حجم ملف PDF كبير جداً (حد أقصى 50 ميجابايت)')
+      return
+    }
     setSavingPdf(true)
     try {
       const fd = new FormData()
@@ -619,6 +634,18 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   // public URL in the lesson's video_url field. The trainer can also paste a
   // Telegram file URL / direct link directly into the input below.
   const handleVideoUpload = async (file: File) => {
+    // Validate the picked file is actually a video — Android WebView's
+    // accept filter isn't always honored, so check on the JS side too.
+    const isVideo = file.type.startsWith('video/')
+                 || /\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i.test(file.name)
+    if (!isVideo) {
+      toast.error(`الملف المختار ليس فيديو (النوع: ${file.type || 'غير معروف'}). يرجى اختيار ملف فيديو صالح.`)
+      return
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error('حجم الفيديو كبير جداً (حد أقصى 100 ميجابايت)')
+      return
+    }
     setUploadingVideo(true)
     try {
       const fd = new FormData()
@@ -723,7 +750,12 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                 <Label>رفع ملف PDF</Label>
                 <input
                   type="file"
-                  accept="application/pdf"
+                  // Broadened accept attribute — Android WebView sometimes
+                  // ignores `application/pdf` alone and falls back to the
+                  // gallery picker. Listing both MIME types AND the .pdf
+                  // extension gives the system file picker more chances
+                  // to recognize that we want a PDF document.
+                  accept=".pdf,application/pdf,application/octet-stream,application/x-pdf"
                   className="hidden"
                   id="pdf-upload"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }}
