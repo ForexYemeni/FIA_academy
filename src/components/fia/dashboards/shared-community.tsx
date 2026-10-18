@@ -635,6 +635,13 @@ function NewTopicDialog({ open, onOpenChange, categoryId, userId, onCreated }: a
 // SHARED BLOG — readable by students/trainers/team
 // ============================================================================
 export function SharedBlog() {
+  // Read the current user from the global auth store so we can pass
+  // user.id down to the reaction buttons + comment section. Previously
+  // this component referenced an undeclared `user` variable which threw
+  // a ReferenceError when the user opened a blog post inside the
+  // dashboard's blog tab ("Application error: a client-side exception
+  // has occurred").
+  const user = useAuth((s) => s.user)
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewingPost, setViewingPost] = useState<any | null>(null)

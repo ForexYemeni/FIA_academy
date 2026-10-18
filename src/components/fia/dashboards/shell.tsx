@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Menu, LogOut, Bell } from 'lucide-react'
+import { Menu, LogOut, Bell, Crown, Star, Sparkles } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { NotificationsBell } from '@/components/fia/notifications-bell'
@@ -29,6 +29,11 @@ interface DashboardShellProps {
 
 // Role markers stored in user.password for team members.
 // Format: `__TEAM_MEMBER__:<role>__:<actual_password>` (or `__TEAM_MEMBER__:<role>__`).
+// NOTE: This format lives ONLY in the trainers table password column on the
+// server. The login route reads that marker and exposes it as `user.team_role`
+// (a clean string like 'founder' / 'leader' / 'team') on the client — never
+// the raw password itself. We use `user.team_role` below to render the
+// correct badge.
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
 interface RoleBadge {
@@ -36,24 +41,49 @@ interface RoleBadge {
   color: string
 }
 
-// Derive the role badge from the user's password marker.
-// Returns null if the user is a regular account (no team marker), in which
-// case the caller should fall back to the passed roleLabel/roleColor.
-function deriveRoleBadge(password: string | null | undefined): RoleBadge | null {
-  if (!password || !password.startsWith(TEAM_MARKER_PREFIX)) return null
-  const afterPrefix = password.substring(TEAM_MARKER_PREFIX.length)
-  const roleEnd = afterPrefix.indexOf('__')
-  const role = roleEnd === -1 ? 'team' : (afterPrefix.substring(0, roleEnd) || 'team')
-  switch (role) {
-    case 'founder':
-      return { label: 'المؤسس', color: 'bg-gold/20 text-gold border-gold/40' }
-    case 'leader':
-      return { label: 'قائد', color: 'bg-blue-500/20 text-blue-600 border-blue-500/40' }
-    case 'team':
-      return { label: 'فريق', color: 'bg-gray-500/20 text-gray-600 border-gray-500/40' }
-    default:
-      return null
+// Derive the role badge from `user.team_role` (set at login time by
+// reading the trainers-table marker). Falls back to null for regular
+// admin/trainer/student accounts (no team membership), in which case
+// the caller falls back to the passed roleLabel/roleColor.
+//
+// For backwards-compat with any cached auth state that still has a
+// raw password marker, we also accept the legacy `password` form —
+// but the login route never exposes the password, so this branch is
+// only hit if a developer manually populates the field.
+function deriveRoleBadge(teamRole?: string | null, password?: string | null): RoleBadge | null {
+  // New path: clean team_role string from the login route
+  if (teamRole && typeof teamRole === 'string' && !teamRole.startsWith(TEAM_MARKER_PREFIX)) {
+    switch (teamRole) {
+      case 'founder':
+        return { label: 'المؤسس', color: 'bg-gold/20 text-gold border-gold/40' }
+      case 'leader':
+        return { label: 'قائد', color: 'bg-blue-500/20 text-blue-600 border-blue-500/40' }
+      case 'team':
+        return { label: 'فريق', color: 'bg-gray-500/20 text-gray-600 border-gray-500/40' }
+      default:
+        return null
+    }
   }
+  // Legacy path: parse the marker from the raw password (only if some
+  // older auth cache exposes it). The login route returns password=''
+  // so this branch is effectively dead under normal operation, but we
+  // keep it for safety.
+  if (password && password.startsWith(TEAM_MARKER_PREFIX)) {
+    const afterPrefix = password.substring(TEAM_MARKER_PREFIX.length)
+    const roleEnd = afterPrefix.indexOf('__')
+    const role = roleEnd === -1 ? 'team' : (afterPrefix.substring(0, roleEnd) || 'team')
+    switch (role) {
+      case 'founder':
+        return { label: 'المؤسس', color: 'bg-gold/20 text-gold border-gold/40' }
+      case 'leader':
+        return { label: 'قائد', color: 'bg-blue-500/20 text-blue-600 border-blue-500/40' }
+      case 'team':
+        return { label: 'فريق', color: 'bg-gray-500/20 text-gray-600 border-gray-500/40' }
+      default:
+        return null
+    }
+  }
+  return null
 }
 
 export function DashboardShell({
@@ -68,8 +98,11 @@ export function DashboardShell({
   const logout = useAuth((s) => s.logout)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Override the role badge if the user has a team-member marker in their password.
-  const derived = deriveRoleBadge(user?.password)
+  // Override the role badge if the user is a team member (founder/leader/team).
+  // The login route sets `user.team_role` from the trainers-table marker —
+  // we read it directly here (no need to parse `user.password`, which is
+  // always empty for security reasons).
+  const derived = deriveRoleBadge(user?.team_role, user?.password)
   const effectiveLabel = derived?.label ?? roleLabel
   const effectiveColor = derived?.color ?? roleColor
 
@@ -87,23 +120,49 @@ export function DashboardShell({
 
       <div className="p-4 border-b border-gold/20">
         <div className="flex items-center gap-3">
-          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gold/40 shadow-md flex-shrink-0 bg-navy-light">
-            {user?.avatar ? (
-              <img src={user.avatar} alt={user.name || 'avatar'} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gold font-bold text-lg">
-                {user?.name?.charAt(0) || 'U'}
-              </div>
+          {/* Outer wrapper — relative + NOT overflow-hidden so the
+              founder crown can be pinned to the top-left corner of the
+              avatar without being clipped. */}
+          <div className="relative flex-shrink-0">
+            <div className={`relative w-12 h-12 rounded-full overflow-hidden border-2 shadow-md bg-navy-light ${
+              derived?.label === 'المؤسس'
+                ? 'border-gold shadow-gold/30'
+                : derived
+                  ? 'border-gold/60'
+                  : 'border-gold/40'
+            }`}>
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name || 'avatar'} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gold font-bold text-lg">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+              )}
+              {/* Online indicator */}
+              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-navy-light"></span>
+            </div>
+            {/* Founder / leader / team crown — pinned to the top-left
+                corner of the avatar (top-right in RTL layout). Hidden
+                for regular admin/trainer/student accounts. */}
+            {derived && (
+              <span className="absolute -top-1 -left-1 z-10 w-5 h-5 rounded-full bg-gold flex items-center justify-center shadow-md ring-2 ring-navy">
+                <Crown className="w-3 h-3 text-navy" />
+              </span>
             )}
-            {/* Online indicator */}
-            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-navy-light"></span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-white text-sm font-semibold truncate">{user?.name}</div>
+            <div className="text-white text-sm font-semibold truncate flex items-center gap-1.5">
+              {user?.name}
+              {derived?.label === 'المؤسس' && <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" />}
+            </div>
             <div className="text-white/60 text-xs truncate" dir="ltr">{user?.email}</div>
           </div>
         </div>
-        <Badge className={`mt-3 ${effectiveColor}`}>{effectiveLabel}</Badge>
+        <Badge className={`mt-3 ${effectiveColor} flex items-center gap-1 w-fit`}>
+          {derived?.label === 'المؤسس' && <Crown className="w-3 h-3" />}
+          {derived?.label === 'قائد' && <Star className="w-3 h-3" />}
+          {effectiveLabel}
+        </Badge>
       </div>
 
       <nav className="flex-1 p-2 overflow-y-auto fia-scroll">

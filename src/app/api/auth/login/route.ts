@@ -52,6 +52,29 @@ export async function POST(req: NextRequest) {
           const newHash = await hashPassword(password)
           await supabaseAdmin.from('users').update({ password: newHash }).eq('id', userRow.id)
         }
+        // Detect team_role for this admin/trainer user by looking up the
+        // trainers table with the same email. Team members have a marker
+        // like `__TEAM_MEMBER__:founder__:<password>` in their trainers
+        // password — we read that marker to set `team_role` so the
+        // dashboard shell can render the correct badge (المؤسس / قائد / فريق)
+        // instead of the generic role label. The actual password is never
+        // sent to the client (it stays empty), so the shell reads
+        // `user.team_role` rather than parsing `user.password`.
+        let teamRole: string | undefined
+        try {
+          const { data: trainerRow } = await supabaseAdmin
+            .from('trainers')
+            .select('password')
+            .eq('email', userRow.email)
+            .maybeSingle()
+          if (trainerRow?.password?.startsWith(TEAM_MARKER_PREFIX)) {
+            const afterPrefix = trainerRow.password.substring(TEAM_MARKER_PREFIX.length)
+            const sepIdx = afterPrefix.indexOf('__')
+            if (sepIdx !== -1) {
+              teamRole = afterPrefix.substring(0, sepIdx) || 'team'
+            }
+          }
+        } catch {}
         const user = {
           id: userRow.id,
           email: userRow.email,
@@ -59,6 +82,7 @@ export async function POST(req: NextRequest) {
           phone: userRow.phone || '',
           password: '', // never return password to client
           role: userRow.role as 'admin' | 'trainer' | 'student',
+          team_role: teamRole,
           avatar: userRow.avatar,
           title: userRow.title,
           bio: mergeLegacyBio(userRow.bio),
@@ -104,6 +128,7 @@ export async function POST(req: NextRequest) {
               phone: trainer.phone || '',
               password: '',
               role: 'trainer' as const, // team members get trainer dashboard access
+              team_role: role,
               avatar: trainer.avatar,
               title: trainer.title,
               bio: mergeLegacyBio(trainer.bio),
