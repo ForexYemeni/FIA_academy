@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyForumReplyPosted } from '@/lib/notifications'
 
 // GET /api/forum?topic_id=... — list posts in a topic (with author profiles)
 export async function GET(req: NextRequest) {
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
     // Increment replies_count
     const { data: topic } = await supabaseAdmin
       .from('forum_topics')
-      .select('replies_count')
+      .select('replies_count, title, user_id')
       .eq('id', topic_id)
       .maybeSingle()
     if (topic) {
@@ -137,6 +138,8 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', topic_id)
+      // Send forum reply notifications (in-app + OneSignal push)
+      try { await notifyForumReplyPosted(user_id, topic.title || 'موضوع', topic.user_id) } catch {}
     }
 
     return NextResponse.json(data)
