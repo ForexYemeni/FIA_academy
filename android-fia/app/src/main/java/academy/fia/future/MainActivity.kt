@@ -39,7 +39,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
-    private var loadingOverlay: LinearLayout? = null
+    private var loadingOverlay: FrameLayout? = null
 
     // File picker launcher — registered via the Activity Result API
     // (the deprecated startActivityForResult approach was buggy with
@@ -88,178 +88,257 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(webView)
 
-        // Loading overlay — premium design with multi-layered visual
-        // hierarchy: navy gradient background + radial gold glow +
-        // circular gold ring around the logo + animated spinner +
-        // academy name in gold + English subtitle + slogan.
+        // Loading overlay — premium design with REAL ANIMATIONS:
+        // - Pulsing gold glow behind the logo (alpha animation)
+        // - Rotating outer gold ring (rotating animation)
+        // - Animated loading dots ("جاري التحميل" + dots that appear/disappear)
+        // - Fade-in academy name
+        // - Bottom slogan
         //
-        // This replaces the previous minimal "logo + name + spinner"
-        // design that the user called "سيئة جداً جداً جداً". The new
-        // design uses layered drawables + careful typography + a
-        // subtle gold glow around the logo to convey professionalism.
-        val overlay = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        // This is a complete redesign from the static "logo + name + spinner"
+        // design that the user called "سيئة جداً جداً جداً جداً جداً جداً".
+        // The new design uses:
+        // - ObjectAnimator for the pulse + rotation animations
+        // - Layered FrameLayouts for the ring + glow + logo stack
+        // - A TextView with periodic text updates for the loading dots
+        // - Better typography with shadows + letter spacing
+        // - A subtle bottom-aligned slogan
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        // Root container with the navy gradient background
+        val overlay = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            // Deep navy gradient background — darker at edges,
-            // slightly lighter at center to create depth
+            // Rich navy gradient — darker at edges, with subtle gold tint at center
             background = android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFF06122E.toInt(), 0xFF0A1F44.toInt(), 0xFF060F2E.toInt())
-            ).apply {
-                gradientRadius = 0.5f
-            }
-            gravity = Gravity.CENTER
-            setPadding(48, 48, 48, 48)
-        }
-
-        // === Layer 1: Logo in a circular gold ring with shadow ===
-        // We use a FrameLayout to overlay the gold ring + logo +
-        // drop shadow in a stack
-        val logoContainer = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                (160 * resources.displayMetrics.density).toInt(),
-                (160 * resources.displayMetrics.density).toInt()
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    0xFF06122E.toInt(),  // top-left: deep navy
+                    0xFF0A1F44.toInt(),  // center: navy (academy color)
+                    0xFF060F2E.toInt(),  // bottom-right: deeper navy
+                    0xFF081A3C.toInt()   // subtle variation
+                )
             )
         }
 
-        // Subtle gold glow background (radial gradient as a circle)
+        // === Center container — holds the logo + rings + glow ===
+        val centerContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            )
+        }
+
+        // === Layer 1: Pulsing gold glow behind the logo ===
+        // A large oval with a radial gradient that pulses (alpha
+        // animation 0.3 → 0.7 → 0.3 repeating) — creates a "breathing"
+        // effect that makes the loading screen feel alive.
+        val glowSize = dp(220)
         val glowView = View(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            background = android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP,
-                intArrayOf(0x00D4AF37.toInt(), 0x20D4AF37.toInt(), 0x00D4AF37.toInt())
-            ).apply {
+            layoutParams = FrameLayout.LayoutParams(glowSize, glowSize, Gravity.CENTER)
+            background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
+                colors = intArrayOf(
+                    0x40D4AF37.toInt(),  // center: subtle gold
+                    0x20D4AF37.toInt(),  // mid
+                    0x00D4AF37.toInt()   // edges: transparent
+                )
+                gradientType = android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT
+                gradientRadius = glowSize.toFloat() / 2
             }
+            // Pulse animation: alpha 0.3 → 0.8 → 0.3, 1500ms, infinite
+            alpha = 0.5f
         }
-        logoContainer.addView(glowView)
+        centerContainer.addView(glowView)
+        // Start the pulse animation
+        val pulseAnim = android.animation.ObjectAnimator.ofFloat(glowView, "alpha", 0.3f, 0.85f, 0.3f).apply {
+            duration = 1500
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            start()
+        }
 
-        // Outer gold ring (decorative frame around the logo)
-        val ringSize = (140 * resources.displayMetrics.density).toInt()
-        val ringInset = (10 * resources.displayMetrics.density).toInt()
-        val goldRing = View(this).apply {
+        // === Layer 2: Rotating outer gold ring (with gradient sweep) ===
+        // A circle with a thick gold stroke that rotates slowly — creates
+        // a "loading ring" effect that's much more engaging than a
+        // standard ProgressBar spinner.
+        val ringSize = dp(150)
+        val rotatingRing = View(this).apply {
             layoutParams = FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER)
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setStroke(
-                    (3 * resources.displayMetrics.density).toInt(),
-                    0xFFD4AF37.toInt()
-                )
-                setColor(0x00000000) // transparent fill — ring only
+                // Use a sweep gradient via StrokeColor + multiple arcs
+                // (we approximate via a single gold stroke — Android's
+                // basic GradientDrawable doesn't support sweep gradients
+                // directly, but the rotation animation makes it look
+                // like a loading ring)
+                setStroke(dp(3), 0xFFD4AF37.toInt())
+                setColor(0x00000000)
             }
         }
-        logoContainer.addView(goldRing)
+        centerContainer.addView(rotatingRing)
+        // Rotate animation: 360° in 2000ms, infinite linear
+        val rotateAnim = android.animation.ObjectAnimator.ofFloat(rotatingRing, "rotation", 0f, 360f).apply {
+            duration = 2000
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            interpolator = android.view.animation.LinearInterpolator()
+            start()
+        }
 
-        // Inner ring (slightly thicker, brighter gold)
-        val innerRingSize = (130 * resources.displayMetrics.density).toInt()
+        // === Layer 3: Static inner gold ring ===
+        // A thinner, brighter gold ring inside the rotating one — adds
+        // depth without competing with the rotation.
+        val innerRingSize = dp(140)
         val innerRing = View(this).apply {
             layoutParams = FrameLayout.LayoutParams(innerRingSize, innerRingSize, Gravity.CENTER)
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setStroke(
-                    (1.5 * resources.displayMetrics.density).toInt(),
-                    0xFFE5C158.toInt()
-                )
+                setStroke(dp(1), 0xFFE5C158.toInt())
                 setColor(0x00000000)
             }
+            alpha = 0.6f
         }
-        logoContainer.addView(innerRing)
+        centerContainer.addView(innerRing)
 
-        // The academy logo itself — centered inside the rings
-        val logoSize = (90 * resources.displayMetrics.density).toInt()
+        // === Layer 4: A second inner ring (counterclockwise rotation) ===
+        // Creates a "twin rings rotating opposite" effect — premium look.
+        val ringSize2 = dp(125)
+        val counterRing = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(ringSize2, ringSize2, Gravity.CENTER)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setStroke(dp(2), 0xFFD4AF37.toInt())
+                setColor(0x00000000)
+            }
+            alpha = 0.4f
+        }
+        centerContainer.addView(counterRing)
+        // Counterclockwise rotation
+        val counterRotateAnim = android.animation.ObjectAnimator.ofFloat(counterRing, "rotation", 360f, 0f).apply {
+            duration = 3000
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            interpolator = android.view.animation.LinearInterpolator()
+            start()
+        }
+
+        // === Layer 5: The academy logo ===
+        // Centered inside the rings, with elevation for depth.
+        val logoSize = dp(90)
         val loadingLogo = ImageView(this).apply {
             layoutParams = FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER)
             setImageResource(R.mipmap.ic_launcher)
             scaleType = ImageView.ScaleType.FIT_CENTER
             background = null
-            // Subtle drop shadow under the logo
-            elevation = (8 * resources.displayMetrics.density)
+            elevation = dp(10).toFloat()
         }
-        logoContainer.addView(loadingLogo)
+        centerContainer.addView(loadingLogo)
+        // Logo fade-in (subtle, 800ms)
+        loadingLogo.alpha = 0f
+        loadingLogo.animate().alpha(1f).setDuration(800).start()
 
-        overlay.addView(logoContainer)
+        overlay.addView(centerContainer)
 
-        // === Layer 2: Academy name in gold + English subtitle ===
+        // === Layer 6: Text content (academy name + subtitle + loading text + slogan) ===
+        val textContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+            )
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 0, 0, dp(80))
+        }
+
+        // Academy name in gold
         val nameText = TextView(this).apply {
             text = "أكاديمية المستقبل الدولية"
-            textSize = 20f
-            setTextColor(0xFFD4AF37.toInt()) // gold
-            setPadding(0, (28 * resources.displayMetrics.density).toInt(), 0, 0)
+            textSize = 22f
+            setTextColor(0xFFD4AF37.toInt())
             letterSpacing = 0.05f
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-            // Subtle shadow for depth
-            setShadowLayer(8f, 0f, 2f, 0x66000000.toInt())
+            setShadowLayer(12f, 0f, 3f, 0x66000000.toInt())
+            gravity = Gravity.CENTER
+            alpha = 0f
         }
-        overlay.addView(nameText)
+        textContainer.addView(nameText)
+        // Fade in name after 200ms
+        nameText.animate().alpha(1f).setStartDelay(200).setDuration(600).start()
 
+        // English subtitle
         val subText = TextView(this).apply {
             text = "FUTURE INTERNATIONAL ACADEMY"
             textSize = 9f
             setTextColor(0xFF8B7E3A.toInt())
-            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
+            setPadding(0, dp(6), 0, 0)
             letterSpacing = 0.4f
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            alpha = 0f
         }
-        overlay.addView(subText)
+        textContainer.addView(subText)
+        subText.animate().alpha(1f).setStartDelay(400).setDuration(600).start()
 
-        // === Layer 3: Thin gold divider line ===
+        // Gold gradient divider
         val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                (60 * resources.displayMetrics.density).toInt(),
-                (1 * resources.displayMetrics.density).toInt()
-            ).apply {
-                topMargin = (16 * resources.displayMetrics.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(dp(60), dp(1)).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(14)
+                gravity = Gravity.CENTER
             }
             background = android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
                 intArrayOf(0x00D4AF37.toInt(), 0xFFD4AF37.toInt(), 0x00D4AF37.toInt())
             )
+            alpha = 0f
         }
-        overlay.addView(divider)
+        textContainer.addView(divider)
+        divider.animate().alpha(1f).setStartDelay(600).setDuration(500).start()
 
-        // === Layer 4: Animated spinner ===
-        val loadingSpinner = ProgressBar(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                (28 * resources.displayMetrics.density).toInt(),
-                (28 * resources.displayMetrics.density).toInt()
-            ).apply {
-                topMargin = (20 * resources.displayMetrics.density).toInt()
-            }
-            indeterminateTintList = android.content.res.ColorStateList.valueOf(0xFFD4AF37.toInt())
-            // Add subtle shadow for depth
-            elevation = (4 * resources.displayMetrics.density)
-        }
-        overlay.addView(loadingSpinner)
-
-        // === Layer 5: Loading status text ===
+        // Animated loading text — cycles through "جاري التحميل",
+        // "جاري التحميل.", "جاري التحميل..", "جاري التحميل..."
         val loadingText = TextView(this).apply {
-            text = "جاري التحميل..."
-            textSize = 11f
+            text = "جاري التحميل"
+            textSize = 12f
             setTextColor(0xFFD4AF37.toInt())
-            setPadding(0, (12 * resources.displayMetrics.density).toInt(), 0, 0)
-            letterSpacing = 0.05f
+            setPadding(0, dp(2), 0, 0)
+            letterSpacing = 0.1f
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
-            setAlpha(0.7f)
+            gravity = Gravity.CENTER
+            alpha = 0.7f
         }
-        overlay.addView(loadingText)
+        textContainer.addView(loadingText)
+        // Animate the dots via a Runnable that updates the text every 500ms
+        val dotsRunnable = object : Runnable {
+            var count = 0
+            override fun run() {
+                val dots = ".".repeat(count % 4)
+                loadingText.text = "جاري التحميل$dots"
+                count++
+                loadingText.postDelayed(this, 500)
+            }
+        }
+        loadingText.postDelayed(dotsRunnable, 500)
 
-        // === Layer 6: Slogan at bottom ===
+        // Slogan
         val slogan = TextView(this).apply {
             text = "نحو مستقبل أفضل معاً"
-            textSize = 10f
+            textSize = 11f
             setTextColor(0xFFD4AF37.toInt())
-            setPadding(0, (40 * resources.displayMetrics.density).toInt(), 0, 0)
+            setPadding(0, dp(20), 0, 0)
             letterSpacing = 0.1f
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.ITALIC)
-            setAlpha(0.85f)
+            gravity = Gravity.CENTER
+            alpha = 0f
         }
-        overlay.addView(slogan)
+        textContainer.addView(slogan)
+        slogan.animate().alpha(0.85f).setStartDelay(800).setDuration(600).start()
+
+        overlay.addView(textContainer)
 
         root.addView(overlay)
         loadingOverlay = overlay
@@ -797,7 +876,7 @@ class MainActivity : AppCompatActivity() {
  * - showToast(message, duration) — native Android Toast
  * - vibrate(pattern) — small vibration for haptic feedback
  * - getDeviceId() — unique device ID (for push notif targeting)
- * - getAppVersionName() — "2.3.2"
+ * - getAppVersionName() — "2.3.3"
  * - getAppVersionCode() — 15
  * - saveImageToGallery(base64, mimeType, filename) — saves a base64-
  *   encoded image directly to the public Pictures/FIA folder via
@@ -854,8 +933,8 @@ class FIANativeBridge(private val activity: MainActivity) {
     fun getAppVersionName(): String {
         return try {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
-            pInfo.versionName ?: "2.3.2"
-        } catch (_: Exception) { "2.3.2" }
+            pInfo.versionName ?: "2.3.3"
+        } catch (_: Exception) { "2.3.3" }
     }
 
     @JavascriptInterface
@@ -864,7 +943,7 @@ class FIANativeBridge(private val activity: MainActivity) {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode.toInt()
             else @Suppress("DEPRECATION") pInfo.versionCode
-        } catch (_: Exception) { 17 }
+        } catch (_: Exception) { 18 }
     }
 
     /**
@@ -884,5 +963,71 @@ class FIANativeBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun savePdfToDownloads(base64Data: String, filename: String): Boolean {
         return activity.saveBase64ImageToGallery(base64Data, "application/pdf", filename)
+    }
+
+    /**
+     * Called from JS when the user logs in (or app starts and the
+     * user is already logged in via the web's localStorage auth
+     * store). Sets the OneSignal external_id so the server-side
+     * sendPushNotification(userId, ...) call (from the web's
+     * /api/notifications and notifyX helpers) actually reaches
+     * THIS device.
+     *
+     * Also writes the user_id to SharedPreferences so the
+     * NotificationPollService can fetch notifications for this
+     * user (the polling fallback that fires native OS notifications
+     * even when OneSignal push isn't configured).
+     *
+     * Called from JS as:
+     *   window.FIANativeBridge.setUserId(user.id)
+     */
+    @JavascriptInterface
+    fun setUserId(userId: String) {
+        try {
+            // 1. Write to SharedPreferences so the polling service
+            //    (NotificationPollService) can read it on the next
+            //    poll cycle (within 5 seconds).
+            val prefs = activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString("user_id", userId).apply()
+
+            // 2. Login to OneSignal with the user's external_id.
+            //    This is the CRITICAL step that links this device's
+            //    OneSignal subscription to the user_id on the server.
+            //    Without this, the server-side call to
+            //    OneSignal's API with `external_user_id: userId`
+            //    never reaches this device — the push has no
+            //    subscription to deliver to.
+            //
+            // OneSignal 5.x SDK: OneSignal.login(externalId) is
+            // the recommended way. It creates a OneSignal user
+            // (if not exists) and links this device's subscription
+            // to that user. Subsequent pushes with external_user_id
+            // will reach this device even if the app is force-killed.
+            com.onesignal.OneSignal.login(userId)
+            android.util.Log.i("FIA-Bridge", "OneSignal login successful for user: $userId")
+        } catch (e: Exception) {
+            android.util.Log.w("FIA-Bridge", "setUserId failed", e)
+        }
+    }
+
+    /**
+     * Called from JS when the user logs out. Clears the user_id
+     * from SharedPreferences and logs out of OneSignal so the
+     * device stops receiving notifications for the previous user.
+     */
+    @JavascriptInterface
+    fun clearUserId() {
+        try {
+            val prefs = activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().remove("user_id").apply()
+            // OneSignal 5.x: logout() removes the external_id
+            // association. The device keeps its subscription but
+            // no longer receives pushes targeted to the previous
+            // external_id.
+            com.onesignal.OneSignal.logout()
+            android.util.Log.i("FIA-Bridge", "OneSignal logout successful")
+        } catch (e: Exception) {
+            android.util.Log.w("FIA-Bridge", "clearUserId failed", e)
+        }
     }
 }
