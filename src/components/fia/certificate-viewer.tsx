@@ -7,7 +7,8 @@ import {
   Loader2, CheckCircle2, X, Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { downloadCertificateFile, isAndroidWebView } from '@/lib/certificate-download'
+import * as htmlToImage from 'html-to-image'
+import { isAndroidWebView } from '@/lib/certificate-download'
 
 export function CertificateViewer({ certificate, onClose }: { certificate: any; onClose?: () => void }) {
   const certRef = useRef<HTMLDivElement>(null)
@@ -17,34 +18,118 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
   const issuedAt = certificate.issued_at ? new Date(certificate.issued_at) : null
   const isVerified = certificate.status === 'صالحة'
 
+  /**
+   * Convert the JSX-rendered certificate (the certRef div) into a
+   * high-quality PNG image. We use html-to-image which uses the
+   * standard browser SVG+foreignObject trick:
+   *
+   *   1. Clone the DOM node
+   *   2. Inline all computed styles
+   *   3. Inline all external images (logo, QR) as data: URIs
+   *   4. Render the clone as SVG <foreignObject>
+   *   5. Draw the SVG onto a canvas
+   *   6. Export the canvas as PNG via toDataURL
+   *
+   * Quality: we set pixelRatio=2 (so a 720x508 cert becomes 1440x1016
+   * — high-res). The output PNG is then handed to the APK's
+   * FIANativeBridge.saveImageToGallery() (which writes it to
+   * Pictures/FIA via MediaStore) or downloaded directly via blob+anchor
+   * in a regular browser.
+   *
+   * This GUARANTEES that what the user sees on screen = what gets
+   * saved to gallery — same design, same proportions, same colors.
+   * The previous flow fetched a server-generated PNG that had a
+   * DIFFERENT design than the JSX rendering — the user complained
+   * "الشهادة تظهر مختلفة و سيئة".
+   */
   const downloadAsImage = async () => {
-    if (!certRef.current) return
+    if (!certRef.current) {
+      toast.error('لا يمكن العثور على عنصر الشهادة')
+      return
+    }
     setDownloading(true)
+    const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // Use the shared download helper — works in browsers AND in the
-      // FIA APK (Android WebView). The helper tries blob+anchor first,
-      // falls back to window.open with attachment disposition, and
-      // finally falls back to inline view + manual save. It also calls
-      // the APK's native showToast bridge for in-app confirmation.
-      await downloadCertificateFile({
-        certificateNumber: certificate.certificate_number,
-        format: 'png',
-        onStatus: (msg, kind) => {
-          if (kind === 'success') toast.success(msg)
-          else if (kind === 'error') toast.error(msg)
-          else toast.info(msg)
-        },
+      // Convert JSX cert to PNG via html-to-image
+      // pixelRatio=2 for 2x resolution (high quality)
+      const dataUrl = await htmlToImage.toPng(certRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#ffffff',
+        // Skip fonts that may not load — the JSX uses system fonts
+        // and inline styles, so this should work without font embeds
+        skipFonts: false,
+        // Maximum width / height for the resulting image
+        width: 720,
+        height: 508,
+        style: {
+          margin: '0',
+          transform: 'none',
+        }
       })
-    } catch (e) {
-      toast.error('فشل تحميل الشهادة')
+
+      // The dataUrl is a "data:image/png;base64,..." string
+      // Strip the prefix to get raw base64
+      const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1)
+
+      // If inside FIA APK WebView, use the native bridge to save
+      // directly to the gallery — this is the guaranteed path.
+      if (isAndroidWebView()) {
+        const bridge = (window as any).FIANativeBridge
+        if (bridge && typeof bridge.saveImageToGallery === 'function') {
+          const saved = bridge.saveImageToGallery(base64Data, 'image/png', filename)
+          if (saved) {
+            // Also call showToast via the bridge for instant feedback
+            try {
+              bridge.showToast('تم حفظ الشهادة في المعرض ✓', 'long')
+            } catch {}
+            try {
+              bridge.vibrate('[50]')
+            } catch {}
+            toast.success('تم تنزيل الشهادة إلى المعرض ✓')
+            return
+          } else {
+            toast.error('فشل حفظ الصورة — جاري المحاولة عبر المتصفح')
+            // Fall through to blob+anchor approach below
+          }
+        } else {
+          // Old APK without the bridge — fall through to blob+anchor
+          toast.info('جاري فتح الصورة — اضغط مطولاً واحفظها يدوياً')
+        }
+      }
+
+      // Regular browser path — or fallback in WebView if bridge failed
+      // Convert the data URL to a blob and trigger a download
+      const blob = await (await fetch(dataUrl)).blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      a.rel = 'noopener noreferrer'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        try { URL.revokeObjectURL(blobUrl) } catch {}
+        try { document.body.removeChild(a) } catch {}
+      }, 2000)
+      toast.success('تم تنزيل الشهادة')
+    } catch (e: any) {
+      console.error('[FIA] html-to-image failed:', e)
+      toast.error('فشل إنشاء صورة الشهادة: ' + (e?.message || ''))
     } finally {
       setDownloading(false)
     }
   }
 
+  /**
+   * PDF download — uses the server-generated PDF from /api/certificate-pdf
+   * (since html-to-image can only produce PNG, not PDF).
+   */
   const downloadPdf = async () => {
     setPdfDownloading(true)
     try {
+      const { downloadCertificateFile } = await import('@/lib/certificate-download')
       await downloadCertificateFile({
         certificateNumber: certificate.certificate_number,
         format: 'pdf',
@@ -217,7 +302,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button onClick={downloadAsImage} disabled={downloading} className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50">
           {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {downloading ? 'جاري...' : 'تنزيل (صورة)'}
+          {downloading ? 'جاري إنشاء الصورة...' : 'تنزيل (صورة)'}
         </button>
         <button onClick={copyCertNumber} className="inline-flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
           <Copy className="w-4 h-4" /> نسخ الرقم
@@ -232,9 +317,10 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
           FIA Android WebView. */}
       {isAndroidWebView() && (
         <p className="text-[10px] text-muted-foreground text-center mt-1">
-          💡 تطبيق APK v2.3.0+: سيتم حفظ الصورة في المعرض تلقائياً عند الضغط على زر "تنزيل (صورة)".
+          💡 سيتم حفظ صورة الشهادة في مجلد "FIA" داخل المعرض. الصورة عالية الجودة (2x) بنفس التصميم المعروض.
         </p>
       )}
     </div>
   )
 }
+

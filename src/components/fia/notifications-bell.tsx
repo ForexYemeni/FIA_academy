@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
 import { playSoundForNotification, unlockAudio, isMuted, setMuted, tryUnlockAudio, isAudioReady } from '@/lib/sounds'
 import { showNotificationToast } from '@/lib/notification-toast'
+import { isAndroidWebView } from '@/lib/certificate-download'
 
 const TYPE_ICON: Record<string, any> = {
   enrollment: Users,
@@ -553,8 +554,13 @@ export function NotificationsBell() {
             </div>
           </div>
 
-          {/* === Enable-notifications banner (only if not yet granted) === */}
-          {notifPerm !== 'granted' && (
+          {/* === Enable-notifications banner (only if not yet granted AND
+              we're NOT in the FIA APK WebView — inside the APK, the
+              browser Notification API doesn't work, so we hide this
+              banner entirely. The APK has its own native notification
+              system (NotificationPollService + OneSignal) which is
+              always active when the user installs the app.) === */}
+          {!isAndroidWebView() && notifPerm !== 'granted' && (
             <button
               onClick={(e) => { e.stopPropagation(); requestNotificationPermission() }}
               className="w-full p-3 bg-gradient-to-r from-gold/10 to-gold/5 border-b border-gold/20 hover:bg-gold/15 transition-colors flex items-center gap-3 text-right"
@@ -568,6 +574,20 @@ export function NotificationsBell() {
               </div>
               <span className="text-gold text-xs font-bold">تفعيل ←</span>
             </button>
+          )}
+          {/* === APK-specific banner — replaces the "enable browser
+              notifications" banner inside the FIA APK. Tells the user
+              that notifications are handled natively by the app. === */}
+          {isAndroidWebView() && (
+            <div className="w-full p-3 bg-gradient-to-r from-green-500/10 to-green-500/5 border-b border-green-500/20 flex items-center gap-3 text-right">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                <BellRing className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-navy">الإشعارات مُفعّلة ✓</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">يعمل التطبيق على توصيل الإشعارات تلقائياً عبر نظام الإشعارات الأصلي</p>
+              </div>
+            </div>
           )}
 
           {/* === Audio-unlocked indicator (subtle, only when not unlocked) === */}
