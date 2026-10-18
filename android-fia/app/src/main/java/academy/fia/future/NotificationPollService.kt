@@ -172,7 +172,7 @@ class NotificationPollService : Service() {
 
         val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val notif = NotificationCompat.Builder(this, CHANNEL_NOTIFICATIONS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)  // white bell — proper Android notification icon
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -182,6 +182,7 @@ class NotificationPollService : Service() {
             .setSound(sound)
             .setVibrate(longArrayOf(0, 250, 100, 250))
             .setAutoCancel(true)
+            .setColor(0xFFD4AF37.toInt())  // gold accent for the small icon background
             .setContentIntent(pendingIntent)
             .build()
 
@@ -204,13 +205,25 @@ class NotificationPollService : Service() {
     }
 
     private fun buildServiceNotification(): Notification {
+        // Foreground service notification — Android 14+ requires a
+        // notification for dataSync services. We make it MIN priority
+        // so it doesn't make a sound, doesn't show in the lock screen
+        // as a popup, and just sits quietly in the notification shade.
+        //
+        // The icon is a small white bell (ic_notification vector drawable)
+        // instead of the full-color launcher icon — Android tints small
+        // notification icons to white-on-transparent automatically, so
+        // using the launcher icon (which has gold + navy + cream colors)
+        // looked pixelated and broken in the status bar.
         return NotificationCompat.Builder(this, CHANNEL_SERVICE)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("FIA Service")
-            .setContentText("جاري متابعة الإشعارات")
+            .setSmallIcon(R.drawable.ic_notification)  // white bell — proper Android notification icon
+            .setContentTitle("FIA Academy")
+            .setContentText("الإشعارات مُفعّلة")
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setShowWhen(false)
             .setOngoing(true)
+            .setColor(0xFFD4AF37.toInt())  // gold accent for the small icon background
+            .setColorized(false)
             .build()
     }
 
@@ -218,31 +231,36 @@ class NotificationPollService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Channel 1 — silent service notification (foreground service
-            // requires a notification, but we want it to be silent + not
-            // show in the lock screen as a popup).
+            // Channel 1 — silent foreground service notification.
+            // Required by Android 14+ for dataSync services but should
+            // be invisible to the user (no sound, no popup, just sits
+            // quietly in the shade).
             val serviceChannel = NotificationChannel(
                 CHANNEL_SERVICE,
-                "FIA Service",
+                "خدمة الإشعارات",
                 NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "متابعة الإشعارات في الخلفية"
+                description = "تبقيك على اطلاع بتحديثات الأكاديمية في الخلفية"
                 setShowBadge(false)
                 setSound(null, null)
                 enableVibration(false)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_SECRET
             }
             notifManager.createNotificationChannel(serviceChannel)
 
-            // Channel 2 — actual notifications (popup + sound + vibrate)
+            // Channel 2 — actual notifications (popup + sound + vibrate).
+            // This is what users see when they get a new notification.
             val notifChannel = NotificationChannel(
                 CHANNEL_NOTIFICATIONS,
-                "FIA Notifications",
+                "إشعارات أكاديمية المستقبل الدولية",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "إشعارات الأكاديمية"
+                description = "إشعارات الدفع، طلبات الشهادات، المواضيع، وأحداث الأكاديمية"
                 enableLights(true)
+                lightColor = 0xFFD4AF37.toInt()  // gold LED
                 enableVibration(true)
                 setShowBadge(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
             notifManager.createNotificationChannel(notifChannel)
         }

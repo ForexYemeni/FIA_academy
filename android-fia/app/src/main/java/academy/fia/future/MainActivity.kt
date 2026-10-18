@@ -673,7 +673,7 @@ class MainActivity : AppCompatActivity() {
  * - showToast(message, duration) — native Android Toast
  * - vibrate(pattern) — small vibration for haptic feedback
  * - getDeviceId() — unique device ID (for push notif targeting)
- * - getAppVersionName() — "2.3.0"
+ * - getAppVersionName() — "2.3.1"
  * - getAppVersionCode() — 15
  * - saveImageToGallery(base64, mimeType, filename) — saves a base64-
  *   encoded image directly to the public Pictures/FIA folder via
@@ -730,8 +730,8 @@ class FIANativeBridge(private val activity: MainActivity) {
     fun getAppVersionName(): String {
         return try {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
-            pInfo.versionName ?: "2.3.0"
-        } catch (_: Exception) { "2.3.0" }
+            pInfo.versionName ?: "2.3.1"
+        } catch (_: Exception) { "2.3.1" }
     }
 
     @JavascriptInterface
@@ -740,7 +740,7 @@ class FIANativeBridge(private val activity: MainActivity) {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode.toInt()
             else @Suppress("DEPRECATION") pInfo.versionCode
-        } catch (_: Exception) { 15 }
+        } catch (_: Exception) { 16 }
     }
 
     /**

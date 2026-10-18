@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small white bell icon for notifications. Android requires small
+     notification icons to be white-on-transparent (it tints them
+     automatically for the status bar). The previous APK used the full
+     app launcher icon which appears pixelated + ugly in the status bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <!-- Bell body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2C11.45,2 11,2.45 11,3V3.18C7.61,3.63 5,6.55 5,10V15L3.29,16.71C3.11,16.89 3,17.15 3,17.41V17.59C3,18.14 3.45,18.59 4,18.59H20C20.55,18.59 21,18.14 21,17.59V17.41C21,17.15 20.89,16.89 20.71,16.71L19,15V10C19,6.55 16.39,3.63 13,3.18V3C13,2.45 12.55,2 12,2Z" />
+    <!-- Bell clapper (small dot at bottom) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,20C10,21.1 10.9,22 12,22C13.1,22 14,21.1 14,20Z" />
+</vector>
