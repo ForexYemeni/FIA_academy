@@ -18,8 +18,198 @@ import { toast } from 'sonner'
 import {
   MessageSquare, Plus, ArrowRight, Eye, Reply, Pin, Trash2, Ban,
   Newspaper, HelpCircle, ChevronDown, Clock, Loader2, AlertTriangle,
-  Send, Shield, CheckCircle2, Search, X,
+  Send, Shield, CheckCircle2, Search, X, ThumbsUp, ThumbsDown, Heart, MessageCircle,
 } from 'lucide-react'
+
+// ============================================================================
+// Reusable reaction buttons component (like / dislike)
+// ============================================================================
+function ReactionButtons({ type, targetId, userId, initialLikes, initialDislikes }: {
+  type: 'topic' | 'post' | 'blog'
+  targetId: string
+  userId?: string
+  initialLikes: number
+  initialDislikes: number
+}) {
+  const [likes, setLikes] = useState(initialLikes)
+  const [dislikes, setDislikes] = useState(initialDislikes)
+  const [myReaction, setMyReaction] = useState<'like' | 'dislike' | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const react = async (reaction: 'like' | 'dislike') => {
+    if (!userId || busy) return
+    setBusy(true)
+    try {
+      const apiPath = type === 'blog' ? '/api/blog/react' : '/api/forum/react'
+      const body: any = { user_id: userId, reaction }
+      if (type === 'topic') body.topic_id = targetId
+      else if (type === 'post') body.post_id = targetId
+      else if (type === 'blog') body.blog_post_id = targetId
+
+      const res = await fetch(apiPath, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+
+      if (data.action === 'added') {
+        setMyReaction(reaction)
+        if (reaction === 'like') setLikes(l => l + 1)
+        else setDislikes(d => d + 1)
+      } else if (data.action === 'removed') {
+        setMyReaction(null)
+        if (reaction === 'like') setLikes(l => Math.max(0, l - 1))
+        else setDislikes(d => Math.max(0, d - 1))
+      } else if (data.action === 'switched') {
+        setMyReaction(reaction)
+        if (reaction === 'like') {
+          setLikes(l => l + 1)
+          setDislikes(d => Math.max(0, d - 1))
+        } else {
+          setDislikes(d => d + 1)
+          setLikes(l => Math.max(0, l - 1))
+        }
+      }
+    } catch {} finally { setBusy(false) }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => react('like')}
+        disabled={busy || !userId}
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+          myReaction === 'like'
+            ? 'bg-green-500/15 text-green-600 border border-green-500/30'
+            : 'bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent'
+        }`}
+      >
+        {type === 'blog' ? <Heart className={`w-3.5 h-3.5 ${myReaction === 'like' ? 'fill-green-500 text-green-500' : ''}`} /> : <ThumbsUp className="w-3.5 h-3.5" />}
+        {likes > 0 && <span>{likes}</span>}
+      </button>
+      <button
+        onClick={() => react('dislike')}
+        disabled={busy || !userId}
+        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+          myReaction === 'dislike'
+            ? 'bg-red-500/15 text-red-600 border border-red-500/30'
+            : 'bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent'
+        }`}
+      >
+        <ThumbsDown className="w-3.5 h-3.5" />
+        {dislikes > 0 && <span>{dislikes}</span>}
+      </button>
+    </div>
+  )
+}
+
+// ============================================================================
+// Reusable blog comment component
+// ============================================================================
+function BlogCommentSection({ blogPostId, userId }: { blogPostId: string; userId?: string }) {
+  const [comments, setComments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [commentText, setCommentText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/blog/comments?blog_post_id=${blogPostId}`)
+      const data = await res.json()
+      setComments(Array.isArray(data) ? data : [])
+    } catch {} finally { setLoading(false) }
+  }, [blogPostId])
+
+  useEffect(() => { load() }, [load])
+
+  const submit = async () => {
+    if (!commentText.trim() || !userId) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/blog/comments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blog_post_id: blogPostId, user_id: userId, body: commentText }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setCommentText('')
+        load()
+        toast.success('تم نشر تعليقك')
+      }
+    } catch {} finally { setSubmitting(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch('/api/blog/comments', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      load()
+      toast.success('تم حذف التعليق')
+    } catch {}
+  }
+
+  return (
+    <div className="mt-8 pt-6 border-t border-border">
+      <h3 className="font-bold text-navy mb-4 flex items-center gap-2">
+        <MessageCircle className="w-5 h-5 text-gold" /> التعليقات ({comments.length})
+      </h3>
+
+      {userId && (
+        <div className="mb-6 bg-muted/30 rounded-lg p-3 border border-border">
+          <Textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            rows={3}
+            placeholder="أكتب تعليقك..."
+            dir="rtl"
+            disabled={submitting}
+          />
+          <div className="flex justify-end mt-2">
+            <Button onClick={submit} disabled={submitting || !commentText.trim()} className="bg-navy hover:bg-navy-light text-xs">
+              {submitting ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Send className="w-3.5 h-3.5 ml-1" />}
+              {submitting ? 'جاري...' : 'نشر التعليق'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-4"><Loader2 className="w-5 h-5 mx-auto animate-spin text-navy" /></div>
+      ) : comments.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">لا توجد تعليقات بعد. كن أول من يعلّق!</p>
+      ) : (
+        <div className="space-y-3">
+          {comments.map((c) => (
+            <div key={c.id} className="bg-white border border-border rounded-lg p-3 flex gap-3 group">
+              <Avatar className="w-8 h-8 border border-gold/20 flex-shrink-0">
+                <AvatarImage src={c.author?.avatar || ''} />
+                <AvatarFallback className="bg-navy text-gold text-xs">{c.author?.name?.charAt(0) || '؟'}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-navy">{c.author?.name || 'مستخدم'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      <Clock className="w-2.5 h-2.5 inline" /> {new Date(c.created_at).toLocaleDateString('ar-EG')}
+                    </span>
+                    {c.user_id === userId && (
+                      <button onClick={() => handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-500/10 p-1 rounded transition-opacity" title="حذف">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{c.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ============================================================================
 // Role badge helper
@@ -192,6 +382,10 @@ export function SharedForum({ user }: { user: any }) {
                 </span>
               </div>
               <p className="text-sm text-navy whitespace-pre-wrap leading-relaxed">{viewingTopic.body}</p>
+              {/* Reaction buttons for the topic itself */}
+              <div className="mt-3 pt-2 border-t border-gold/20">
+                <ReactionButtons type="topic" targetId={viewingTopic.id} userId={user?.id} initialLikes={viewingTopic.likes_count || 0} initialDislikes={viewingTopic.dislikes_count || 0} />
+              </div>
             </Card>
           )}
 
@@ -217,6 +411,10 @@ export function SharedForum({ user }: { user: any }) {
                 </div>
               </div>
               <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{p.body}</p>
+              {/* Reaction buttons for forum posts */}
+              <div className="mt-3 pt-2 border-t border-border">
+                <ReactionButtons type="post" targetId={p.id} userId={user?.id} initialLikes={p.likes_count || 0} initialDislikes={p.dislikes_count || 0} />
+              </div>
             </Card>
           ))}
 
@@ -428,6 +626,14 @@ export function SharedBlog() {
           <p className="text-lg text-navy/80 leading-relaxed mb-6 border-r-4 border-gold pr-4">{viewingPost.excerpt}</p>
         )}
         <div className="text-navy whitespace-pre-wrap leading-loose">{viewingPost.body}</div>
+
+        {/* Blog reaction buttons (heart like / thumbs down) */}
+        <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
+          <ReactionButtons type="blog" targetId={viewingPost.id} userId={user?.id} initialLikes={viewingPost.likes_count || 0} initialDislikes={viewingPost.dislikes_count || 0} />
+        </div>
+
+        {/* Blog comments section */}
+        <BlogCommentSection blogPostId={viewingPost.id} userId={user?.id} />
       </SectionCard>
     )
   }
