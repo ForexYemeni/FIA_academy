@@ -1,20 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Small white bell icon for notifications. Android requires small
-     notification icons to be white-on-transparent (it tints them
-     automatically for the status bar). The previous APK used the full
-     app launcher icon which appears pixelated + ugly in the status bar. -->
+<!-- Professional FIA Academy notification icon — a stylized white
+     "FIA" monogram inside a circular seal, designed to look like
+     an official academy emblem. When Android tints this for the
+     status bar, the white silhouette stays recognizable as the
+     academy's logo.
+
+     Design:
+     - Outer ring (circle) — represents the academy seal
+     - Three vertical bars + a horizontal bar — stylized "FIA"
+       monogram (the F is in the left bar group, the I is the
+       middle thin bar, the A is the right bars + diagonal)
+     - Designed at 24x24dp viewport (Android standard for small
+       notification icons)
+
+     Color: solid white on transparent (Android will tint this
+     automatically based on the system theme for the status bar). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFF">
-    <!-- Bell body -->
+
+    <!-- Outer ring (academy seal circle) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12,2C11.45,2 11,2.45 11,3V3.18C7.61,3.63 5,6.55 5,10V15L3.29,16.71C3.11,16.89 3,17.15 3,17.41V17.59C3,18.14 3.45,18.59 4,18.59H20C20.55,18.59 21,18.14 21,17.59V17.41C21,17.15 20.89,16.89 20.71,16.71L19,15V10C19,6.55 16.39,3.63 13,3.18V3C13,2.45 12.55,2 12,2Z" />
-    <!-- Bell clapper (small dot at bottom) -->
+        android:pathData="M12,2C6.48,2 2,6.48 2,12C2,17.52 6.48,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2ZM12,20C7.58,20 4,16.42 4,12C4,7.58 7.58,4 12,4C16.42,4 20,7.58 20,12C20,16.42 16.42,20 12,20Z" />
+
+    <!-- Inner ring (subtle accent) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M10,20C10,21.1 10.9,22 12,22C13.1,22 14,21.1 14,20Z" />
+        android:pathData="M12,5.5C8.41,5.5 5.5,8.41 5.5,12C5.5,15.59 8.41,18.5 12,18.5C15.59,18.5 18.5,15.59 18.5,12C18.5,8.41 15.59,5.5 12,5.5ZM12,17C9.24,17 7,14.76 7,12C7,9.24 9.24,7 12,7C14.76,7 17,9.24 17,12C17,14.76 14.76,17 12,17Z" />
+
+    <!-- "F" letter — left side: vertical bar + two horizontal bars -->
+    <!-- F vertical bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8.5,9H9.8V15H8.5V9Z" />
+    <!-- F top horizontal bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8.5,9H12.5V10.2H8.5V9Z" />
+    <!-- F middle horizontal bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8.5,11.6H11.8V12.8H8.5V11.6Z" />
+
+    <!-- "I" letter — middle: thin vertical bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11.8,9H13V15H11.8V9Z" />
+
+    <!-- "A" letter — right: vertical bars + diagonal crossbar -->
+    <!-- A left vertical bar (slightly tilted) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,9L14.6,9L15.5,15L14.9,15L14,9Z" />
+    <!-- A right vertical bar (slightly tilted) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15.4,9L16,9L15.5,15L14.9,15L15.4,9Z" />
+    <!-- A horizontal crossbar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14.3,11.8L15.7,11.8L15.5,12.8L14.5,12.8L14.3,11.8Z" />
 </vector>

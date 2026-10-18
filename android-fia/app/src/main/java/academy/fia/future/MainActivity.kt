@@ -88,55 +88,179 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(webView)
 
-        // Loading overlay — navy background + FIA logo + name + spinner.
-        // Shown over the WebView for the first 1.5 seconds while the
-        // page loads. Then faded out. No more double-screen (Splash
-        // activity removed in v2.2.0).
+        // Loading overlay — premium design with multi-layered visual
+        // hierarchy: navy gradient background + radial gold glow +
+        // circular gold ring around the logo + animated spinner +
+        // academy name in gold + English subtitle + slogan.
+        //
+        // This replaces the previous minimal "logo + name + spinner"
+        // design that the user called "سيئة جداً جداً جداً". The new
+        // design uses layered drawables + careful typography + a
+        // subtle gold glow around the logo to convey professionalism.
         val overlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(0xFF0A1F44.toInt())
+            // Deep navy gradient background — darker at edges,
+            // slightly lighter at center to create depth
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF06122E.toInt(), 0xFF0A1F44.toInt(), 0xFF060F2E.toInt())
+            ).apply {
+                gradientRadius = 0.5f
+            }
             gravity = Gravity.CENTER
             setPadding(48, 48, 48, 48)
         }
-        val logoSize = (120 * resources.displayMetrics.density).toInt()
+
+        // === Layer 1: Logo in a circular gold ring with shadow ===
+        // We use a FrameLayout to overlay the gold ring + logo +
+        // drop shadow in a stack
+        val logoContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (160 * resources.displayMetrics.density).toInt(),
+                (160 * resources.displayMetrics.density).toInt()
+            )
+        }
+
+        // Subtle gold glow background (radial gradient as a circle)
+        val glowView = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP,
+                intArrayOf(0x00D4AF37.toInt(), 0x20D4AF37.toInt(), 0x00D4AF37.toInt())
+            ).apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+            }
+        }
+        logoContainer.addView(glowView)
+
+        // Outer gold ring (decorative frame around the logo)
+        val ringSize = (140 * resources.displayMetrics.density).toInt()
+        val ringInset = (10 * resources.displayMetrics.density).toInt()
+        val goldRing = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setStroke(
+                    (3 * resources.displayMetrics.density).toInt(),
+                    0xFFD4AF37.toInt()
+                )
+                setColor(0x00000000) // transparent fill — ring only
+            }
+        }
+        logoContainer.addView(goldRing)
+
+        // Inner ring (slightly thicker, brighter gold)
+        val innerRingSize = (130 * resources.displayMetrics.density).toInt()
+        val innerRing = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(innerRingSize, innerRingSize, Gravity.CENTER)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setStroke(
+                    (1.5 * resources.displayMetrics.density).toInt(),
+                    0xFFE5C158.toInt()
+                )
+                setColor(0x00000000)
+            }
+        }
+        logoContainer.addView(innerRing)
+
+        // The academy logo itself — centered inside the rings
+        val logoSize = (90 * resources.displayMetrics.density).toInt()
         val loadingLogo = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(logoSize, logoSize)
+            layoutParams = FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER)
             setImageResource(R.mipmap.ic_launcher)
             scaleType = ImageView.ScaleType.FIT_CENTER
             background = null
+            // Subtle drop shadow under the logo
+            elevation = (8 * resources.displayMetrics.density)
         }
-        overlay.addView(loadingLogo)
+        logoContainer.addView(loadingLogo)
+
+        overlay.addView(logoContainer)
+
+        // === Layer 2: Academy name in gold + English subtitle ===
         val nameText = TextView(this).apply {
             text = "أكاديمية المستقبل الدولية"
-            textSize = 18f
+            textSize = 20f
             setTextColor(0xFFD4AF37.toInt()) // gold
-            setPadding(0, (16 * resources.displayMetrics.density).toInt(), 0, 0)
+            setPadding(0, (28 * resources.displayMetrics.density).toInt(), 0, 0)
             letterSpacing = 0.05f
             typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            // Subtle shadow for depth
+            setShadowLayer(8f, 0f, 2f, 0x66000000.toInt())
         }
         overlay.addView(nameText)
+
         val subText = TextView(this).apply {
-            text = "Future International Academy"
-            textSize = 10f
+            text = "FUTURE INTERNATIONAL ACADEMY"
+            textSize = 9f
             setTextColor(0xFF8B7E3A.toInt())
-            setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, 0)
-            letterSpacing = 0.3f
+            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
+            letterSpacing = 0.4f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
         }
         overlay.addView(subText)
+
+        // === Layer 3: Thin gold divider line ===
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (60 * resources.displayMetrics.density).toInt(),
+                (1 * resources.displayMetrics.density).toInt()
+            ).apply {
+                topMargin = (16 * resources.displayMetrics.density).toInt()
+            }
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0x00D4AF37.toInt(), 0xFFD4AF37.toInt(), 0x00D4AF37.toInt())
+            )
+        }
+        overlay.addView(divider)
+
+        // === Layer 4: Animated spinner ===
         val loadingSpinner = ProgressBar(this).apply {
             layoutParams = LinearLayout.LayoutParams(
-                (32 * resources.displayMetrics.density).toInt(),
-                (32 * resources.displayMetrics.density).toInt()
+                (28 * resources.displayMetrics.density).toInt(),
+                (28 * resources.displayMetrics.density).toInt()
             ).apply {
-                topMargin = (24 * resources.displayMetrics.density).toInt()
+                topMargin = (20 * resources.displayMetrics.density).toInt()
             }
             indeterminateTintList = android.content.res.ColorStateList.valueOf(0xFFD4AF37.toInt())
+            // Add subtle shadow for depth
+            elevation = (4 * resources.displayMetrics.density)
         }
         overlay.addView(loadingSpinner)
+
+        // === Layer 5: Loading status text ===
+        val loadingText = TextView(this).apply {
+            text = "جاري التحميل..."
+            textSize = 11f
+            setTextColor(0xFFD4AF37.toInt())
+            setPadding(0, (12 * resources.displayMetrics.density).toInt(), 0, 0)
+            letterSpacing = 0.05f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            setAlpha(0.7f)
+        }
+        overlay.addView(loadingText)
+
+        // === Layer 6: Slogan at bottom ===
+        val slogan = TextView(this).apply {
+            text = "نحو مستقبل أفضل معاً"
+            textSize = 10f
+            setTextColor(0xFFD4AF37.toInt())
+            setPadding(0, (40 * resources.displayMetrics.density).toInt(), 0, 0)
+            letterSpacing = 0.1f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.ITALIC)
+            setAlpha(0.85f)
+        }
+        overlay.addView(slogan)
+
         root.addView(overlay)
         loadingOverlay = overlay
 
@@ -673,7 +797,7 @@ class MainActivity : AppCompatActivity() {
  * - showToast(message, duration) — native Android Toast
  * - vibrate(pattern) — small vibration for haptic feedback
  * - getDeviceId() — unique device ID (for push notif targeting)
- * - getAppVersionName() — "2.3.1"
+ * - getAppVersionName() — "2.3.2"
  * - getAppVersionCode() — 15
  * - saveImageToGallery(base64, mimeType, filename) — saves a base64-
  *   encoded image directly to the public Pictures/FIA folder via
@@ -730,8 +854,8 @@ class FIANativeBridge(private val activity: MainActivity) {
     fun getAppVersionName(): String {
         return try {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
-            pInfo.versionName ?: "2.3.1"
-        } catch (_: Exception) { "2.3.1" }
+            pInfo.versionName ?: "2.3.2"
+        } catch (_: Exception) { "2.3.2" }
     }
 
     @JavascriptInterface
@@ -740,7 +864,7 @@ class FIANativeBridge(private val activity: MainActivity) {
             val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode.toInt()
             else @Suppress("DEPRECATION") pInfo.versionCode
-        } catch (_: Exception) { 16 }
+        } catch (_: Exception) { 17 }
     }
 
     /**
