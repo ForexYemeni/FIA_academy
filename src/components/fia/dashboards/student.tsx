@@ -30,6 +30,7 @@ import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CertificateRequest } from '@/components/fia/certificate-request'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
+import { downloadCertificateFile } from '@/lib/certificate-download'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -1398,8 +1399,16 @@ function Certificates({ certificates }: any) {
                   <Button size="sm" className="flex-1 bg-navy hover:bg-navy-light" onClick={() => handleDownload(c)} disabled={downloading === c.id}>
                     <Download className="w-3.5 h-3.5 ml-1" /> PDF
                   </Button>
-                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(c.certificate_number)}&format=png`, '_blank')}>
-                    صورة
+                  <Button size="sm" variant="outline" className="flex-1 border-gold/30 text-navy hover:bg-gold/10" onClick={() => downloadCertificateFile({
+                    certificateNumber: c.certificate_number,
+                    format: 'png',
+                    onStatus: (msg, kind) => {
+                      if (kind === 'success') toast.success(msg)
+                      else if (kind === 'error') toast.error(msg)
+                      else toast.info(msg)
+                    },
+                  })}>
+                    <Download className="w-3.5 h-3.5 ml-1" /> صورة
                   </Button>
                 </div>
               </div>
