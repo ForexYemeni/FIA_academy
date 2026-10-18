@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Tag, Users, FileText, Star, MessageSquare,
   Newspaper, Mail, HelpCircle, ExternalLink, Clock, CheckCircle2, X,
-  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight, Copy,
+  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight, Copy, ImagePlus, Upload, Link as LinkIcon,
 } from 'lucide-react'
 
 // ============================================================================
@@ -1322,7 +1322,88 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' })
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState(false)
+  // Cover image source mode: 'upload' (default, user picks a file) or
+  // 'url' (advanced users paste an external URL). Toggle between them
+  // with two pill buttons below the preview.
+  const [coverMode, setCoverMode] = useState<'upload' | 'url'>(initial?.cover ? 'url' : 'upload')
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => { setForm(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' }) }, [initial])
+
+  // Client-side cover image compression — covers are displayed wide
+  // (up to 1200px wide in the hero section), so we keep a larger
+  // max dimension than the avatar uploader (which uses 512). The
+  // quality is slightly lower to keep the file size under 1MB for
+  // fast page loads on slow Yemeni mobile connections.
+  const compressCoverImage = (file: File, maxW = 1600, maxH = 900, quality = 0.82): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          let { width, height } = img
+          // Preserve aspect ratio — scale to fit within maxW × maxH
+          const scaleW = maxW / width
+          const scaleH = maxH / height
+          const scale = Math.min(scaleW, scaleH, 1) // never upscale
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, width, height)
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { reject(new Error('فشل ضغط الصورة')); return }
+              const compressed = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' })
+              resolve(compressed)
+            },
+            'image/jpeg',
+            quality
+          )
+        }
+        img.onerror = () => reject(new Error('فشل تحميل الصورة'))
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('فشل قراءة الملف'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleCoverUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('الرجاء اختيار صورة (JPG / PNG / WebP)')
+      return
+    }
+    // 10 MB raw limit — after compression it'll be much smaller
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير جداً (حد أقصى 10 ميجابايت)')
+      return
+    }
+    setUploadingCover(true)
+    try {
+      // Compress on the client first so the upload is fast even on
+      // slow connections.
+      const compressed = await compressCoverImage(file)
+      const fd = new FormData()
+      fd.append('file', compressed)
+      fd.append('folder', 'blog-covers')
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل رفع الصورة')
+        return
+      }
+      setForm((prev: any) => ({ ...prev, cover: data.url }))
+      toast.success('تم رفع صورة الغلاف')
+    } catch (e: any) {
+      toast.error(e?.message || 'خطأ في رفع الصورة')
+    } finally {
+      setUploadingCover(false)
+    }
+  }
 
   const save = async () => {
     if (!form.title || !form.body) { toast.error('العنوان والمحتوى مطلوبان'); return }
@@ -1394,11 +1475,89 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
               <p className="text-[10px] text-muted-foreground mt-1">💡 استخدم أسطر فارغة لفصل الفقرات. سيتم الحفاظ على التنسيق عند العرض.</p>
             </div>
             <div>
-              <Label>رابط صورة الغلاف</Label>
-              <Input value={form.cover} onChange={(e) => setForm({ ...form, cover: e.target.value })} dir="ltr" className="mt-1" placeholder="https://..." />
-              {form.cover && (
-                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-border">
-                  <img src={form.cover} alt="cover preview" className="w-full h-full object-cover" />
+              <Label>صورة الغلاف</Label>
+              {/* Mode toggle — upload (default) vs URL (advanced) */}
+              <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 mt-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setCoverMode('upload')}
+                  className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1.5 ${coverMode === 'upload' ? 'bg-navy text-gold' : 'text-muted-foreground hover:text-navy'}`}
+                >
+                  <Upload className="w-3.5 h-3.5" /> رفع صورة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverMode('url')}
+                  className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1.5 ${coverMode === 'url' ? 'bg-navy text-gold' : 'text-muted-foreground hover:text-navy'}`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" /> لصق رابط
+                </button>
+              </div>
+
+              {coverMode === 'upload' ? (
+                <div className="mt-2 space-y-2">
+                  {/* Click-to-upload dropzone */}
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={uploadingCover}
+                    className="w-full aspect-video rounded-lg border-2 border-dashed border-border hover:border-gold hover:bg-gold/5 transition-all flex flex-col items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingCover ? (
+                      <>
+                        <Loader2 className="w-8 h-8 text-gold animate-spin" />
+                        <span className="text-xs font-bold text-muted-foreground">جاري الرفع...</span>
+                      </>
+                    ) : form.cover ? (
+                      <>
+                        <div className="relative w-full h-full rounded-lg overflow-hidden">
+                          <img src={form.cover} alt="cover preview" className="w-full h-full object-cover" />
+                          {/* Hover overlay — click to replace */}
+                          <div className="absolute inset-0 bg-navy/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                            <ImagePlus className="w-7 h-7 text-gold" />
+                            <span className="text-xs text-gold font-bold">تغيير الصورة</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-14 h-14 rounded-full bg-gold/15 flex items-center justify-center group-hover:bg-gold/25 transition-colors">
+                          <ImagePlus className="w-7 h-7 text-gold" />
+                        </div>
+                        <span className="text-sm font-bold text-navy">انقر لاختيار صورة</span>
+                        <span className="text-[10px] text-muted-foreground">JPG / PNG / WebP — حد أقصى 10MB</span>
+                        <span className="text-[10px] text-muted-foreground">سيتم ضغطها تلقائياً قبل الرفع</span>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }}
+                  />
+                  {/* If a cover is set, show a small "remove" link so the
+                      admin can clear the cover without switching to URL mode. */}
+                  {form.cover && !uploadingCover && (
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, cover: '' })}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> حذف صورة الغلاف
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <Input value={form.cover} onChange={(e) => setForm({ ...form, cover: e.target.value })} dir="ltr" className="mt-1" placeholder="https://..." />
+                  {form.cover && (
+                    <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-border">
+                      <img src={form.cover} alt="cover preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-1">💡 الصق رابط صورة خارجية. يُفضّل أبعاد 1200×630.</p>
                 </div>
               )}
             </div>
