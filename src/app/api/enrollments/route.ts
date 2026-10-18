@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     // Check if already enrolled (payment record exists for this user+course)
+    // But allow re-subscription if the previous enrollment was REJECTED ('ملغي')
     const { data: existing } = await supabaseAdmin
       .from('payments')
       .select('id, status')
@@ -143,7 +144,14 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (existing) {
-      return NextResponse.json({ already_enrolled: true, ...toEnrollment(existing as StoredEnrollment) })
+      // If the existing enrollment is REJECTED ('ملغي'), delete it
+      // so the student can re-submit a new payment proof.
+      if (existing.status === 'ملغي' || existing.status === 'cancelled' || existing.status === 'failed') {
+        await supabaseAdmin.from('payments').delete().eq('id', existing.id)
+      } else {
+        // Existing enrollment is active/pending — don't allow duplicate
+        return NextResponse.json({ already_enrolled: true, ...toEnrollment(existing as StoredEnrollment) })
+      }
     }
 
     const isFree = body.payment_status === 'free' || !body.amount_paid || body.amount_paid === 0

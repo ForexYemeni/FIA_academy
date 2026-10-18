@@ -720,25 +720,19 @@ function AdminPayments() {
   }
   useEffect(() => { load() }, [])
 
-  const updateStatus = async (id: string, status: string) => {
-    // The /api/payments PUT handler now:
-    //   1) Updates the targeted payment row
-    //   2) Updates ALL duplicate rows for the same user+course to the
-    //      same status (legacy dedupe fix)
-    //   3) Sends a notification to the student
-    // So we only need to make ONE call here.
+  const updateStatus = async (id: string, status: string, reason?: string) => {
     try {
       const res = await fetch('/api/payments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, rejection_reason: reason }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error || 'فشل تحديث حالة الدفع')
         return
       }
-      toast.success(status === 'مكتمل' ? 'تم قبول الدفع — تم تفعيل الدورة للمتدرب' : status === 'ملغي' ? 'تم رفض الدفع' : 'تم التحديث')
+      toast.success(status === 'مكتمل' ? 'تم قبول الدفع — تم تفعيل الدورة للمتدرب' : status === 'ملغي' ? 'تم رفض الدفع — تم إشعار المتدرب' : 'تم التحديث')
       load()
       setSelectedPayment(null)
     } catch {
@@ -859,7 +853,7 @@ function AdminPayments() {
                     <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => updateStatus(p.id, 'ملغي')}>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => { const reason = prompt('سبب الرفض (اختياري):') || ''; updateStatus(p.id, 'ملغي', reason) }}>
                       <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
                     </Button>
                   </>
@@ -940,7 +934,7 @@ function AdminPayments() {
                   <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
                     <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
                   </Button>
-                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => updateStatus(selectedPayment.id, 'ملغي')}>
+                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { const reason = prompt('سبب الرفض (اختياري):') || ''; updateStatus(selectedPayment.id, 'ملغي', reason) }}>
                     <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
                   </Button>
                 </div>
