@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FIA Academy</string>
+    <string name="service_channel_name">FIA Service</string>
+    <string name="service_channel_desc">متابعة الإشعارات في الخلفية</string>
+    <string name="notif_channel_name">FIA Notifications</string>
+    <string name="notif_channel_desc">إشعارات الأكاديمية</string>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash background — solid navy with a centered FIA logo. The logo
+     is rendered programmatically inside MainActivity (loadingLogo
+     ImageView), so this drawable just provides the navy background
+     for the initial window before the activity layout takes over. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/navy" />
+    <item android:gravity="center">
+        <bitmap
+            android:src="@mipmap/ic_launcher"
+            android:gravity="center" />
+    </item>
+</layer-list>

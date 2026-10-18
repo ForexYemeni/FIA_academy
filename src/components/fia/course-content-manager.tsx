@@ -755,6 +755,12 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                   // gallery picker. Listing both MIME types AND the .pdf
                   // extension gives the system file picker more chances
                   // to recognize that we want a PDF document.
+                  //
+                  // The APK v2.3.0+ now properly respects this attribute
+                  // via the fixed onShowFileChooser (uses ACTION_GET_CONTENT
+                  // with EXTRA_MIME_TYPES instead of always setType("*/*")),
+                  // so PDFs will be picked from real file managers on
+                  // Android — not just the gallery.
                   accept=".pdf,application/pdf,application/octet-stream,application/x-pdf"
                   className="hidden"
                   id="pdf-upload"
@@ -770,33 +776,15 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                   {savingPdf ? 'جاري الرفع...' : 'اختر PDF من الجهاز'}
                 </Button>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  💡 إذا فتح المتصفّح معرض الصور بدلاً من اختيار PDF، جرّب "لصق رابط PDF" بالأسفل.
+                  💡 يتطلب تطبيق APK v2.3.0+ لاختيار ملفات PDF الصحيحة. تأكد من تحديث التطبيق.
                 </p>
               </div>
-              {/* URL-paste fallback for PDF — same pattern as videos.
-                  This is the escape hatch when the device's file
-                  picker refuses to honor accept="application/pdf"
-                  and only shows the gallery. The trainer uploads the
-                  PDF to a file host (or already has it on Telegram
-                  from a previous upload) and pastes the URL directly. */}
-              <div>
-                <Label>أو الصق رابط PDF مباشر</Label>
-                <Input
-                  value={pdfUrl.startsWith('tg://') ? '' : pdfUrl}
-                  onChange={(e) => setPdfUrl(e.target.value)}
-                  placeholder="https://.../lesson.pdf"
-                  dir="ltr"
-                  className="mt-1"
-                />
-                {pdfUrl && (
-                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2">
-                    <FileUp className="w-3 h-3" /> رابط PDF جاهز
-                    <button onClick={() => setPdfUrl('')} className="text-red-500 hover:text-red-700">
-                      <X className="w-3 h-3" /> إزالة
-                    </button>
-                  </div>
-                )}
-              </div>
+              {pdfUrl && (
+                <div className="text-xs text-green-600 flex items-center gap-2">
+                  <FileUp className="w-3 h-3" /> {pdfUrl.split('/').pop()}
+                  <button onClick={() => setPdfUrl('')} className="text-red-500"><X className="w-3 h-3" /></button>
+                </div>
+              )}
             </div>
           )}
 
