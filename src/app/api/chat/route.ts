@@ -31,15 +31,55 @@ export async function GET(req: NextRequest) {
     }
 
     if (userId) {
+      // Look up the founder/team member's linked trainer ID by email.
+      // If the user is an admin with a corresponding trainers table
+      // entry (team marker), they have TWO IDs — the admin ID (used
+      // for login + chat) and the trainer ID (legacy, what students
+      // used to send messages to before the fix). We need to fetch
+      // conversations for BOTH IDs so the founder sees all their
+      // historical + current chats.
+      const adminRow = await supabaseAdmin
+        .from('users')
+        .select('id, email, role')
+        .eq('id', userId)
+        .maybeSingle()
+      let linkedTrainerId: string | null = null
+      if (adminRow.data?.role === 'admin' && adminRow.data?.email) {
+        try {
+          const { data: trainerRow } = await supabaseAdmin
+            .from('trainers')
+            .select('id, password')
+            .eq('email', adminRow.data.email)
+            .maybeSingle()
+          if (trainerRow?.password?.startsWith('__TEAM_MEMBER__:')) {
+            linkedTrainerId = trainerRow.id
+          }
+        } catch {}
+      }
+
+      // Build the OR filter for all the user's IDs (admin ID + trainer
+      // ID if applicable). Supabase's `.or()` accepts multiple clauses.
+      const participantIds = [userId]
+      if (linkedTrainerId && linkedTrainerId !== userId) {
+        participantIds.push(linkedTrainerId)
+      }
+      const orClause = participantIds
+        .flatMap((id) => [`participant_1.eq.${id}`, `participant_2.eq.${id}`])
+        .join(',')
+
       const { data, error } = await supabaseAdmin
         .from('chat_conversations')
         .select('*')
-        .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+        .or(orClause)
         .order('last_message_at', { ascending: false, nullsFirst: false })
       if (error) throw error
 
-      // Enrich the OTHER participant with their profile
-      const otherIds = (data || []).map((c: any) => c.participant_1 === userId ? c.participant_2 : c.participant_1)
+      // Enrich the OTHER participant with their profile. For each
+      // conversation, the "other" participant is whoever isn't in
+      // the user's ID set.
+      const userIdSet = new Set(participantIds)
+      const otherIds = (data || [])
+        .map((c: any) => userIdSet.has(c.participant_1) ? c.participant_2 : c.participant_1)
       const uniqueOtherIds = Array.from(new Set(otherIds))
       let otherMap: Record<string, any> = {}
       if (uniqueOtherIds.length > 0) {
@@ -69,7 +109,7 @@ export async function GET(req: NextRequest) {
         }
       }
       return NextResponse.json((data || []).map((c: any) => {
-        const otherId = c.participant_1 === userId ? c.participant_2 : c.participant_1
+        const otherId = userIdSet.has(c.participant_1) ? c.participant_2 : c.participant_1
         return { ...c, other_id: otherId, other: otherMap[otherId] || null }
       }))
     }
@@ -91,16 +131,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لا يمكن مراسلة نفسك' }, { status: 400 })
     }
 
-    // Find or create conversation (unique constraint on the pair)
-    const p1 = sender_id < recipient_id ? sender_id : recipient_id
-    const p2 = sender_id < recipient_id ? recipient_id : sender_id
+    // If the sender OR recipient is an admin who is ALSO a team member
+    // (founder/leader/team), they have a linked trainer-table ID. Users
+    // who messaged them BEFORE this fix would have sent to the trainer
+    // ID (because that's what users-search returned at the time). To
+    // avoid creating duplicate conversations, we look for an existing
+    // conversation using EITHER the admin ID or the linked trainer ID
+    // for BOTH the sender and the recipient.
+    const allAliasMap: Record<string, string[]> = {}
+    async function getAliasIds(uid: string): Promise<string[]> {
+      if (allAliasMap[uid]) return allAliasMap[uid]
+      const aliases = [uid]
+      try {
+        const { data: adminRow } = await supabaseAdmin
+          .from('users')
+          .select('id, email, role')
+          .eq('id', uid)
+          .maybeSingle()
+        if (adminRow?.role === 'admin' && adminRow?.email) {
+          const { data: trainerRow } = await supabaseAdmin
+            .from('trainers')
+            .select('id, password')
+            .eq('email', adminRow.email)
+            .maybeSingle()
+          if (trainerRow?.password?.startsWith('__TEAM_MEMBER__:') && trainerRow.id !== uid) {
+            aliases.push(trainerRow.id)
+          }
+        }
+      } catch {}
+      allAliasMap[uid] = aliases
+      return aliases
+    }
 
-    const { data: existing } = await supabaseAdmin
-      .from('chat_conversations')
-      .select('*')
-      .eq('participant_1', p1)
-      .eq('participant_2', p2)
-      .maybeSingle()
+    // Also handle the recipient being a founder (student → founder).
+    // The student's client may have selected the founder by the OLD
+    // trainer ID (from a stale search cache). Resolve the canonical
+    // admin ID for the recipient so the new conversation is created
+    // with the canonical admin ID, not the legacy trainer ID.
+    let canonicalRecipientId = recipient_id
+    try {
+      const { data: trainerRow } = await supabaseAdmin
+        .from('trainers')
+        .select('id, email, password')
+        .eq('id', recipient_id)
+        .maybeSingle()
+      if (trainerRow?.password?.startsWith('__TEAM_MEMBER__:') && trainerRow.email) {
+        const { data: adminRow } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', trainerRow.email)
+          .eq('role', 'admin')
+          .maybeSingle()
+        if (adminRow?.id) canonicalRecipientId = adminRow.id
+      }
+    } catch {}
+
+    const senderAliases = await getAliasIds(sender_id)
+    const recipientAliases = await getAliasIds(canonicalRecipientId)
+
+    // Try to find an existing conversation for ANY combination of
+    // sender aliases × recipient aliases.
+    let existing: any = null
+    for (const sid of senderAliases) {
+      for (const rid of recipientAliases) {
+        if (sid === rid) continue
+        const p1a = sid < rid ? sid : rid
+        const p2a = sid < rid ? rid : sid
+        const { data } = await supabaseAdmin
+          .from('chat_conversations')
+          .select('*')
+          .eq('participant_1', p1a)
+          .eq('participant_2', p2a)
+          .maybeSingle()
+        if (data) { existing = data; break }
+      }
+      if (existing) break
+    }
 
     let conversationId: string
     if (existing) {
@@ -114,6 +220,10 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', conversationId)
     } else {
+      // Create new conversation using canonical IDs (admin ID for
+      // team members, the user's own ID otherwise).
+      const p1 = sender_id < canonicalRecipientId ? sender_id : canonicalRecipientId
+      const p2 = sender_id < canonicalRecipientId ? canonicalRecipientId : sender_id
       const { data: newConv, error } = await supabaseAdmin
         .from('chat_conversations')
         .insert({
@@ -145,10 +255,13 @@ export async function POST(req: NextRequest) {
     const senderProfile = await resolveProfile(sender_id)
     const msgWithSender = { ...msg, sender: senderProfile }
 
-    // Create a notification for the recipient
+    // Create a notification for the recipient — use the CANONICAL
+    // recipient ID (admin ID for founders) so the notification lands
+    // in the inbox they actually check (the founder logs in via the
+    // admin ID and the notifications table is keyed by that ID).
     try {
       await supabaseAdmin.from('notifications').insert({
-        user_id: recipient_id,
+        user_id: canonicalRecipientId,
         type: 'message',
         title: `رسالة جديدة من ${senderProfile?.name || 'مستخدم'}`,
         body: body.substring(0, 120),
@@ -202,17 +315,57 @@ export async function DELETE(req: NextRequest) {
 }
 
 async function resolveProfile(userId: string): Promise<any | null> {
-  const { data: u } = await supabaseAdmin.from('users').select('id, name, avatar, role').eq('id', userId).maybeSingle()
-  if (u) return { user_id: userId, name: u.name, avatar: u.avatar, role: u.role }
+  const { data: u } = await supabaseAdmin.from('users').select('id, name, avatar, role, email').eq('id', userId).maybeSingle()
+  if (u) {
+    // For admin users, also check the trainers table by email — if they
+    // have a team marker (founder/leader/team), override the role label
+    // so chat recipients see "المؤسس" instead of "مدير" in the message
+    // header. We use the admin's name + avatar (which they actively
+    // maintain), but pull the team_role from the trainers table marker.
+    let teamRole: string | undefined
+    if (u.role === 'admin' && u.email) {
+      try {
+        const { data: trainerRow } = await supabaseAdmin
+          .from('trainers')
+          .select('password')
+          .eq('email', u.email)
+          .maybeSingle()
+        if (trainerRow?.password?.startsWith('__TEAM_MEMBER__:')) {
+          const after = trainerRow.password.substring('__TEAM_MEMBER__:'.length)
+          const sep = after.indexOf('__')
+          if (sep !== -1) teamRole = after.substring(0, sep) || 'team'
+        }
+      } catch {}
+    }
+    return {
+      user_id: userId,
+      name: u.name,
+      avatar: u.avatar,
+      role: teamRole || u.role,
+      team_role: teamRole,
+    }
+  }
+  // Fall back to trainers table (the user wasn't in users — could be a
+  // team member who hasn't been linked to an admin account yet).
   const { data: t } = await supabaseAdmin.from('trainers').select('id, name, avatar, password').eq('id', userId).maybeSingle()
   if (t) {
     let r = 'trainer'
+    let teamRole: string | undefined
     if (t.password?.startsWith('__TEAM_MEMBER__')) {
       const after = t.password.substring('__TEAM_MEMBER__:'.length)
       const sep = after.indexOf('__')
-      if (sep !== -1) r = after.substring(0, sep) || 'team'
+      if (sep !== -1) {
+        r = after.substring(0, sep) || 'team'
+        teamRole = r
+      }
     }
-    return { user_id: userId, name: t.name, avatar: t.avatar, role: r }
+    return {
+      user_id: userId,
+      name: t.name,
+      avatar: t.avatar,
+      role: r,
+      team_role: teamRole,
+    }
   }
   return null
 }
