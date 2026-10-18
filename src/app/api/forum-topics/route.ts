@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyForumTopicCreated, notifyForumReplyPosted } from '@/lib/notifications'
 
 // Batch-fetch profiles for a list of user IDs
 async function fetchProfiles(userIds: string[]): Promise<Record<string, any>> {
@@ -116,6 +117,8 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
     if (error) throw error
+    // Send forum notifications (in-app + OneSignal push)
+    try { await notifyForumTopicCreated(user_id, title, data.id) } catch {}
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
