@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
         type: 'message',
         title: `رسالة جديدة من ${senderProfile?.name || 'مستخدم'}`,
         body: body.substring(0, 120),
-        link: '/chat',
+        link: '/',
       })
     } catch {}
 
