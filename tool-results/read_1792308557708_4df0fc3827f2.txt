@@ -1,0 +1,1654 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState } from 'react'
+     4→import { Card } from '@/components/ui/card'
+     5→import { Badge } from '@/components/ui/badge'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Input } from '@/components/ui/input'
+     8→import { Label } from '@/components/ui/label'
+     9→import { Textarea } from '@/components/ui/textarea'
+    10→import { Switch } from '@/components/ui/switch'
+    11→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+    12→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    13→import { SectionCard } from './shell'
+    14→import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+    15→import { toast } from 'sonner'
+    16→import {
+    17→  Plus, Edit, Trash2, Tag, Users, FileText, Star, MessageSquare,
+    18→  Newspaper, Mail, HelpCircle, ExternalLink, Clock, CheckCircle2, X,
+    19→  Loader2, Gift, Award, Eye, Ban, Send, ArrowRight, Copy,
+    20→} from 'lucide-react'
+    21→
+    22→// ============================================================================
+    23→// 1) COUPONS — Discount codes management
+    24→// ============================================================================
+    25→export function AdminCoupons() {
+    26→  const [items, setItems] = useState<any[]>([])
+    27→  const [open, setOpen] = useState(false)
+    28→  const [editing, setEditing] = useState<any | null>(null)
+    29→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+    30→  const [deleting, setDeleting] = useState(false)
+    31→
+    32→  const load = () => fetch('/api/coupons').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+    33→  useEffect(() => { load() }, [])
+    34→
+    35→  const handleDelete = async () => {
+    36→    if (!deleteTarget) return
+    37→    setDeleting(true)
+    38→    try {
+    39→      await fetch('/api/coupons', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+    40→      toast.success('تم حذف الكوبون')
+    41→      setDeleteTarget(null)
+    42→      load()
+    43→    } finally { setDeleting(false) }
+    44→  }
+    45→
+    46→  const toggleStatus = async (c: any) => {
+    47→    const newStatus = c.status === 'نشط' ? 'متوقف' : 'نشط'
+    48→    await fetch('/api/coupons', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id, status: newStatus }) })
+    49→    toast.success(newStatus === 'نشط' ? 'تم تنشيط الكوبون' : 'تم إيقاف الكوبون')
+    50→    load()
+    51→  }
+    52→
+    53→  return (
+    54→    <SectionCard title="كوبونات الخصم" description={`${items.length} كوبون`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> كوبون جديد</Button>}>
+    55→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    56→        {items.map((c) => (
+    57→          <Card key={c.id} className="p-5">
+    58→            <div className="flex items-start justify-between mb-3">
+    59→              <div>
+    60→                <div className="font-bold text-navy text-lg font-mono" dir="ltr">{c.code}</div>
+    61→                <Badge className={c.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30 mt-1' : 'bg-red-500/15 text-red-600 border-red-500/30 mt-1'}>
+    62→                  {c.status === 'نشط' ? '● نشط' : '● متوقف'}
+    63→                </Badge>
+    64→              </div>
+    65→              <Tag className="w-5 h-5 text-gold" />
+    66→            </div>
+    67→            {c.description && <div className="text-xs text-muted-foreground mb-2">{c.description}</div>}
+    68→            <div className="text-sm mb-2">
+    69→              <span className="font-bold text-gold">{c.discount_type === 'percentage' ? `${c.discount_value}%` : `${c.discount_value} ر.ي`}</span>
+    70→              <span className="text-muted-foreground"> خصم</span>
+    71→            </div>
+    72→            <div className="text-xs text-muted-foreground space-y-1 mb-3">
+    73→              <div>الاستخدام: {c.used_count || 0}{c.max_uses ? ` / ${c.max_uses}` : ' (غير محدود)'}</div>
+    74→              {c.expires_at && <div>ينتهي: {new Date(c.expires_at).toLocaleDateString('ar-EG')}</div>}
+    75→            </div>
+    76→            <div className="flex gap-2">
+    77→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+    78→              <Button size="sm" variant="outline" className={c.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(c)}>
+    79→                {c.status === 'نشط' ? 'إيقاف' : 'تنشيط'}
+    80→              </Button>
+    81→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)}><Trash2 className="w-3.5 h-3.5" /></Button>
+    82→            </div>
+    83→          </Card>
+    84→        ))}
+    85→      </div>
+    86→      {open && <CouponDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+    87→
+    88→      <ConfirmDialog
+    89→        open={!!deleteTarget}
+    90→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+    91→        title="تأكيد حذف الكوبون"
+    92→        message="هل أنت متأكد من الحذف؟"
+    93→        itemLabel="سيتم حذف الكوبون التالي:"
+    94→        itemName={deleteTarget?.code}
+    95→        confirmLabel="حذف"
+    96→        cancelLabel="إلغاء"
+    97→        variant="danger"
+    98→        onConfirm={handleDelete}
+    99→        loading={deleting}
+   100→      />
+   101→    </SectionCard>
+   102→  )
+   103→}
+   104→
+   105→function CouponDialog({ open, onOpenChange, initial, onSaved }: any) {
+   106→  const [form, setForm] = useState<any>(initial || { code: '', description: '', discount_type: 'percentage', discount_value: 10, max_uses: '', expires_at: '', status: 'نشط' })
+   107→  const [saving, setSaving] = useState(false)
+   108→  useEffect(() => {
+   109→    setForm(initial || { code: '', description: '', discount_type: 'percentage', discount_value: 10, max_uses: '', expires_at: '', status: 'نشط' })
+   110→  }, [initial])
+   111→
+   112→  const save = async () => {
+   113→    if (!form.discount_value) { toast.error('قيمة الخصم مطلوبة'); return }
+   114→    setSaving(true)
+   115→    try {
+   116→      const payload = { ...form, max_uses: form.max_uses ? parseInt(form.max_uses) : null, expires_at: form.expires_at || null }
+   117→      const res = await fetch('/api/coupons', {
+   118→        method: initial ? 'PUT' : 'POST',
+   119→        headers: { 'Content-Type': 'application/json' },
+   120→        body: JSON.stringify(initial ? { id: initial.id, ...payload } : payload),
+   121→      })
+   122→      if (res.ok) {
+   123→        toast.success(initial ? 'تم التحديث' : 'تم إنشاء الكوبون')
+   124→        onSaved(); onOpenChange(false)
+   125→      } else {
+   126→        const d = await res.json(); toast.error(d.error || 'فشل')
+   127→      }
+   128→    } finally { setSaving(false) }
+   129→  }
+   130→
+   131→  return (
+   132→    <Dialog open={open} onOpenChange={onOpenChange}>
+   133→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+   134→        <DialogHeader><DialogTitle>{initial ? 'تعديل كوبون' : 'كوبون جديد'}</DialogTitle></DialogHeader>
+   135→        <div className="space-y-4 py-4">
+   136→          <div>
+   137→            <Label>الكود (اتركه فارغاً للتوليد التلقائي)</Label>
+   138→            <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} dir="ltr" className="mt-1 font-mono" placeholder="FIA-XXXXXX" />
+   139→          </div>
+   140→          <div>
+   141→            <Label>الوصف</Label>
+   142→            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1" />
+   143→          </div>
+   144→          <div className="grid grid-cols-2 gap-3">
+   145→            <div>
+   146→              <Label>نوع الخصم</Label>
+   147→              <select value={form.discount_type} onChange={(e) => setForm({ ...form, discount_type: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+   148→                <option value="percentage">نسبة مئوية %</option>
+   149→                <option value="fixed">مبلغ ثابت</option>
+   150→              </select>
+   151→            </div>
+   152→            <div>
+   153→              <Label>القيمة</Label>
+   154→              <Input type="number" value={form.discount_value || ''} onChange={(e) => setForm({ ...form, discount_value: e.target.value === '' ? 0 : parseFloat(e.target.value) })} className="mt-1" />
+   155→            </div>
+   156→          </div>
+   157→          <div className="grid grid-cols-2 gap-3">
+   158→            <div>
+   159→              <Label>حد الاستخدام</Label>
+   160→              <Input type="number" value={form.max_uses || ''} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} className="mt-1" placeholder="فارغ = غير محدود" />
+   161→            </div>
+   162→            <div>
+   163→              <Label>تاريخ الانتهاء</Label>
+   164→              <Input type="date" value={form.expires_at ? form.expires_at.split('T')[0] : ''} onChange={(e) => setForm({ ...form, expires_at: e.target.value ? new Date(e.target.value).toISOString() : '' })} className="mt-1" />
+   165→            </div>
+   166→          </div>
+   167→        </div>
+   168→        <DialogFooter>
+   169→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   170→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+   171→            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} حفظ
+   172→          </Button>
+   173→        </DialogFooter>
+   174→      </DialogContent>
+   175→    </Dialog>
+   176→  )
+   177→}
+   178→
+   179→// ============================================================================
+   180→// 2) AFFILIATES — Marketers & referral program
+   181→// ============================================================================
+   182→export function AdminAffiliates() {
+   183→  const [items, setItems] = useState<any[]>([])
+   184→  const [open, setOpen] = useState(false)
+   185→  const [editing, setEditing] = useState<any | null>(null)
+   186→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   187→  const [deleting, setDeleting] = useState(false)
+   188→
+   189→  const load = () => fetch('/api/affiliates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   190→  useEffect(() => { load() }, [])
+   191→
+   192→  const handleDelete = async () => {
+   193→    if (!deleteTarget) return
+   194→    setDeleting(true)
+   195→    try {
+   196→      await fetch('/api/affiliates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   197→      toast.success('تم حذف المسوّق')
+   198→      setDeleteTarget(null)
+   199→      load()
+   200→    } finally { setDeleting(false) }
+   201→  }
+   202→
+   203→  const toggleStatus = async (a: any) => {
+   204→    const newStatus = a.status === 'نشط' ? 'متوقف' : 'نشط'
+   205→    await fetch('/api/affiliates', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, status: newStatus }) })
+   206→    toast.success(newStatus === 'نشط' ? 'تم تنشيط المسوّق' : 'تم إيقاف المسوّق')
+   207→    load()
+   208→  }
+   209→
+   210→  return (
+   211→    <SectionCard title="المسوّقون بالعمولة" description={`${items.length} مسوّق`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> مسوّق جديد</Button>}>
+   212→      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   213→        {items.map((a) => (
+   214→          <Card key={a.id} className="p-5">
+   215→            <div className="flex items-start justify-between mb-3">
+   216→              <div>
+   217→                <div className="font-bold text-navy">{a.name}</div>
+   218→                <div className="text-xs text-muted-foreground" dir="ltr">{a.email}</div>
+   219→                {a.phone && <div className="text-xs text-muted-foreground" dir="ltr">{a.phone}</div>}
+   220→              </div>
+   221→              <Users className="w-5 h-5 text-gold" />
+   222→            </div>
+   223→            <div className="bg-gold/10 rounded-md p-3 mb-3 text-center border border-gold/20">
+   224→              <div className="text-[10px] text-muted-foreground mb-1">كود الإحالة</div>
+   225→              <div className="font-mono font-bold text-navy text-lg" dir="ltr">{a.unique_code}</div>
+   226→              <div className="mt-2 pt-2 border-t border-gold/20">
+   227→                <div className="text-[10px] text-muted-foreground mb-1">رابط الدعوة</div>
+   228→                <div className="font-mono text-[10px] text-navy/80 truncate" dir="ltr">
+   229→                  https://fiaacademy.vercel.app/?ref={a.unique_code}
+   230→                </div>
+   231→              </div>
+   232→              <button
+   233→                onClick={async () => {
+   234→                  const url = `https://fiaacademy.vercel.app/?ref=${a.unique_code}`
+   235→                  try {
+   236→                    await navigator.clipboard.writeText(url)
+   237→                    toast.success('تم نسخ رابط الدعوة')
+   238→                  } catch {
+   239→                    // Fallback — select the URL via a temporary input
+   240→                    const ta = document.createElement('textarea')
+   241→                    ta.value = url
+   242→                    document.body.appendChild(ta)
+   243→                    ta.select()
+   244→                    document.execCommand('copy')
+   245→                    document.body.removeChild(ta)
+   246→                    toast.success('تم نسخ رابط الدعوة')
+   247→                  }
+   248→                }}
+   249→                className="mt-2 w-full bg-navy hover:bg-navy-light text-gold px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1"
+   250→              >
+   251→                <Copy className="w-3 h-3" /> نسخ الرابط
+   252→              </button>
+   253→            </div>
+   254→            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+   255→              <div className="text-center p-2 bg-muted/30 rounded">
+   256→                <div className="font-bold text-navy text-lg">{a.total_referrals || 0}</div>
+   257→                <div className="text-muted-foreground">إحالات</div>
+   258→              </div>
+   259→              <div className="text-center p-2 bg-muted/30 rounded">
+   260→                <div className="font-bold text-gold text-lg">{(a.total_earnings || 0).toLocaleString()}</div>
+   261→                <div className="text-muted-foreground">ر.ي</div>
+   262→              </div>
+   263→            </div>
+   264→            <div className="flex items-center justify-between mb-3">
+   265→              <span className="text-xs text-muted-foreground">العمولة: <span className="font-bold text-navy">{a.commission_percent}%</span></span>
+   266→              <Badge className={a.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
+   267→                {a.status === 'نشط' ? '● نشط' : '● متوقف'}
+   268→              </Badge>
+   269→            </div>
+   270→            <div className="flex gap-2">
+   271→              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(a); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+   272→              <Button size="sm" variant="outline" className={a.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(a)}>
+   273→                {a.status === 'نشط' ? 'إيقاف' : 'تنشيط'}
+   274→              </Button>
+   275→              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(a)}><Trash2 className="w-3.5 h-3.5" /></Button>
+   276→            </div>
+   277→          </Card>
+   278→        ))}
+   279→      </div>
+   280→      {open && <AffiliateDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+   281→
+   282→      <ConfirmDialog
+   283→        open={!!deleteTarget}
+   284→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+   285→        title="تأكيد حذف المسوّق"
+   286→        message="هل أنت متأكد من الحذف؟"
+   287→        itemLabel="سيتم حذف المسوّق التالي:"
+   288→        itemName={deleteTarget?.name}
+   289→        confirmLabel="حذف"
+   290→        cancelLabel="إلغاء"
+   291→        variant="danger"
+   292→        onConfirm={handleDelete}
+   293→        loading={deleting}
+   294→      />
+   295→    </SectionCard>
+   296→  )
+   297→}
+   298→
+   299→function AffiliateDialog({ open, onOpenChange, initial, onSaved }: any) {
+   300→  const [form, setForm] = useState<any>(initial || { name: '', email: '', phone: '', unique_code: '', commission_percent: 10, status: 'نشط' })
+   301→  const [saving, setSaving] = useState(false)
+   302→  useEffect(() => {
+   303→    setForm(initial || { name: '', email: '', phone: '', unique_code: '', commission_percent: 10, status: 'نشط' })
+   304→  }, [initial])
+   305→
+   306→  const save = async () => {
+   307→    if (!form.name || !form.email) { toast.error('الاسم والبريد مطلوبان'); return }
+   308→    setSaving(true)
+   309→    try {
+   310→      const res = await fetch('/api/affiliates', {
+   311→        method: initial ? 'PUT' : 'POST',
+   312→        headers: { 'Content-Type': 'application/json' },
+   313→        body: JSON.stringify(initial ? { id: initial.id, ...form } : form),
+   314→      })
+   315→      if (res.ok) {
+   316→        toast.success(initial ? 'تم التحديث' : 'تم إنشاء المسوّق')
+   317→        onSaved(); onOpenChange(false)
+   318→      } else {
+   319→        const d = await res.json(); toast.error(d.error || 'فشل')
+   320→      }
+   321→    } finally { setSaving(false) }
+   322→  }
+   323→
+   324→  return (
+   325→    <Dialog open={open} onOpenChange={onOpenChange}>
+   326→      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+   327→        <DialogHeader><DialogTitle>{initial ? 'تعديل مسوّق' : 'مسوّق جديد'}</DialogTitle></DialogHeader>
+   328→        <div className="space-y-4 py-4">
+   329→          <div><Label>الاسم *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" /></div>
+   330→          <div><Label>البريد *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" /></div>
+   331→          <div><Label>الهاتف</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
+   332→          <div><Label>كود الإحالة (اتركه فارغاً للتوليد التلقائي)</Label><Input value={form.unique_code} onChange={(e) => setForm({ ...form, unique_code: e.target.value })} dir="ltr" className="mt-1 font-mono" /></div>
+   333→          <div><Label>نسبة العمولة (%)</Label><Input type="number" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: parseFloat(e.target.value) || 0 })} className="mt-1" /></div>
+   334→        </div>
+   335→        <DialogFooter>
+   336→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   337→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+   338→            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} حفظ
+   339→          </Button>
+   340→        </DialogFooter>
+   341→      </DialogContent>
+   342→    </Dialog>
+   343→  )
+   344→}
+   345→
+   346→// ============================================================================
+   347→// 3) EXAM QUESTIONS — Question bank
+   348→// ============================================================================
+   349→export function AdminExamQuestions() {
+   350→  const [courses, setCourses] = useState<any[]>([])
+   351→  const [selectedCourse, setSelectedCourse] = useState<string>('')
+   352→  const [items, setItems] = useState<any[]>([])
+   353→  const [open, setOpen] = useState(false)
+   354→  const [editing, setEditing] = useState<any | null>(null)
+   355→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   356→  const [deleting, setDeleting] = useState(false)
+   357→
+   358→  useEffect(() => {
+   359→    fetch('/api/courses').then((r) => r.json()).then((d) => {
+   360→      const arr = Array.isArray(d) ? d : []
+   361→      setCourses(arr)
+   362→      if (arr.length > 0 && !selectedCourse) setSelectedCourse(arr[0].id)
+   363→    }).catch(() => {})
+   364→  }, [])
+   365→
+   366→  useEffect(() => {
+   367→    if (selectedCourse) {
+   368→      fetch(`/api/exam-questions?course_id=${selectedCourse}`).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => setItems([]))
+   369→    } else {
+   370→      setItems([])
+   371→    }
+   372→  }, [selectedCourse])
+   373→
+   374→  const handleDelete = async () => {
+   375→    if (!deleteTarget) return
+   376→    setDeleting(true)
+   377→    try {
+   378→      await fetch('/api/exam-questions', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   379→      toast.success('تم حذف السؤال')
+   380→      setDeleteTarget(null)
+   381→      if (selectedCourse) {
+   382→        fetch(`/api/exam-questions?course_id=${selectedCourse}`).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   383→      }
+   384→    } finally { setDeleting(false) }
+   385→  }
+   386→
+   387→  return (
+   388→    <SectionCard title="بنك الأسئلة" description={`${items.length} سؤال`} action={
+   389→      <div className="flex gap-2 items-center">
+   390→        <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+   391→          <option value="">— اختر دورة —</option>
+   392→          {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+   393→        </select>
+   394→        <Button className="bg-navy hover:bg-navy-light" disabled={!selectedCourse} onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> سؤال جديد</Button>
+   395→      </div>
+   396→    }>
+   397→      {!selectedCourse ? (
+   398→        <div className="text-center py-12 text-muted-foreground">اختر دورة لعرض أسئلتها أو إضافة سؤال جديد</div>
+   399→      ) : items.length === 0 ? (
+   400→        <div className="text-center py-12 text-muted-foreground">لا توجد أسئلة في هذه الدورة بعد</div>
+   401→      ) : (
+   402→        <div className="space-y-3">
+   403→          {items.map((q, i) => (
+   404→            <Card key={q.id} className="p-4">
+   405→              <div className="flex items-start justify-between gap-3">
+   406→                <div className="flex-1">
+   407→                  <div className="flex items-center gap-2 mb-2">
+   408→                    <Badge variant="outline" className="text-xs">
+   409→                      {q.question_type === 'mcq' ? 'اختيارات' : q.question_type === 'truefalse' ? 'صح/خطأ' : q.question_type === 'matching' ? 'مطابقة' : 'إجابة قصيرة'}
+   410→                    </Badge>
+   411→                    <Badge variant="outline" className="text-xs">{q.difficulty}</Badge>
+   412→                    <span className="text-xs text-muted-foreground">{q.points} نقطة</span>
+   413→                  </div>
+   414→                  <p className="font-bold text-navy text-sm mb-2">{i + 1}. {q.prompt}</p>
+   415→                  {q.options && (
+   416→                    <div className="text-xs text-muted-foreground space-y-1 mb-2">
+   417→                      {Array.isArray(q.options) && q.options.map((o: any, idx: number) => (
+   418→                        <div key={idx} className={q.correct_answer === idx ? 'text-green-600 font-bold' : ''}>
+   419→                          {String.fromCharCode(65 + idx)}) {o}
+   420→                          {q.correct_answer === idx && <CheckCircle2 className="w-3 h-3 inline mr-2" />}
+   421→                        </div>
+   422→                      ))}
+   423→                    </div>
+   424→                  )}
+   425→                  {q.explanation && <p className="text-xs text-muted-foreground italic mt-2">💡 {q.explanation}</p>}
+   426→                </div>
+   427→                <div className="flex flex-col gap-1">
+   428→                  <Button size="sm" variant="outline" onClick={() => { setEditing(q); setOpen(true) }}><Edit className="w-3.5 h-3.5" /></Button>
+   429→                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(q)}><Trash2 className="w-3.5 h-3.5" /></Button>
+   430→                </div>
+   431→              </div>
+   432→            </Card>
+   433→          ))}
+   434→        </div>
+   435→      )}
+   436→
+   437→      {open && <ExamQuestionDialog open={open} onOpenChange={setOpen} initial={editing} courseId={selectedCourse} onSaved={() => {
+   438→        setOpen(false)
+   439→        if (selectedCourse) {
+   440→          fetch(`/api/exam-questions?course_id=${selectedCourse}`).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+   441→        }
+   442→      }} />}
+   443→
+   444→      <ConfirmDialog
+   445→        open={!!deleteTarget}
+   446→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+   447→        title="تأكيد حذف السؤال"
+   448→        message="هل أنت متأكد من الحذف؟"
+   449→        itemLabel="سيتم حذف السؤال التالي:"
+   450→        itemName={deleteTarget?.prompt}
+   451→        confirmLabel="حذف"
+   452→        cancelLabel="إلغاء"
+   453→        variant="danger"
+   454→        onConfirm={handleDelete}
+   455→        loading={deleting}
+   456→      />
+   457→    </SectionCard>
+   458→  )
+   459→}
+   460→
+   461→function ExamQuestionDialog({ open, onOpenChange, initial, courseId, onSaved }: any) {
+   462→  const [form, setForm] = useState<any>(initial || {
+   463→    course_id: courseId,
+   464→    question_type: 'mcq',
+   465→    prompt: '',
+   466→    options: ['', '', '', ''],
+   467→    correct_answer: 0,
+   468→    explanation: '',
+   469→    difficulty: 'متوسط',
+   470→    points: 1,
+   471→  })
+   472→  const [saving, setSaving] = useState(false)
+   473→  useEffect(() => {
+   474→    setForm(initial || {
+   475→      course_id: courseId,
+   476→      question_type: 'mcq',
+   477→      prompt: '',
+   478→      options: ['', '', '', ''],
+   479→      correct_answer: 0,
+   480→      explanation: '',
+   481→      difficulty: 'متوسط',
+   482→      points: 1,
+   483→    })
+   484→  }, [initial, courseId])
+   485→
+   486→  const save = async () => {
+   487→    if (!form.prompt) { toast.error('نص السؤال مطلوب'); return }
+   488→    setSaving(true)
+   489→    try {
+   490→      const payload = {
+   491→        course_id: form.course_id,
+   492→        question_type: form.question_type,
+   493→        prompt: form.prompt,
+   494→        options: form.question_type === 'mcq' ? form.options.filter((o: string) => o.trim()) : null,
+   495→        correct_answer: form.question_type === 'truefalse' ? form.correct_answer === 'true' : form.correct_answer,
+   496→        explanation: form.explanation || null,
+   497→        difficulty: form.difficulty,
+   498→        points: parseInt(form.points) || 1,
+   499→      }
+   500→      const res = await fetch('/api/exam-questions', {
+   501→        method: initial ? 'PUT' : 'POST',
+   502→        headers: { 'Content-Type': 'application/json' },
+   503→        body: JSON.stringify(initial ? { id: initial.id, ...payload } : payload),
+   504→      })
+   505→      if (res.ok) {
+   506→        toast.success(initial ? 'تم التحديث' : 'تم إضافة السؤال')
+   507→        onSaved()
+   508→      } else {
+   509→        const d = await res.json(); toast.error(d.error || 'فشل')
+   510→      }
+   511→    } finally { setSaving(false) }
+   512→  }
+   513→
+   514→  return (
+   515→    <Dialog open={open} onOpenChange={onOpenChange}>
+   516→      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+   517→        <DialogHeader><DialogTitle>{initial ? 'تعديل سؤال' : 'سؤال جديد'}</DialogTitle></DialogHeader>
+   518→        <div className="space-y-4 py-4">
+   519→          <div className="grid grid-cols-3 gap-3">
+   520→            <div>
+   521→              <Label>نوع السؤال</Label>
+   522→              <select value={form.question_type} onChange={(e) => setForm({ ...form, question_type: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+   523→                <option value="mcq">اختيارات متعددة</option>
+   524→                <option value="truefalse">صح / خطأ</option>
+   525→                <option value="short_answer">إجابة قصيرة</option>
+   526→              </select>
+   527→            </div>
+   528→            <div>
+   529→              <Label>الصعوبة</Label>
+   530→              <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+   531→                <option value="سهل">سهل</option>
+   532→                <option value="متوسط">متوسط</option>
+   533→                <option value="صعب">صعب</option>
+   534→              </select>
+   535→            </div>
+   536→            <div>
+   537→              <Label>النقاط</Label>
+   538→              <Input type="number" value={form.points || ''} onChange={(e) => setForm({ ...form, points: e.target.value })} className="mt-1" />
+   539→            </div>
+   540→          </div>
+   541→          <div>
+   542→            <Label>نص السؤال *</Label>
+   543→            <Textarea value={form.prompt} onChange={(e) => setForm({ ...form, prompt: e.target.value })} rows={3} className="mt-1" />
+   544→          </div>
+   545→          {form.question_type === 'mcq' && (
+   546→            <div>
+   547→              <Label>الخيارات (اضغط على الخيار الصحيح)</Label>
+   548→              <div className="space-y-2 mt-1">
+   549→                {form.options.map((opt: string, idx: number) => (
+   550→                  <div key={idx} className="flex items-center gap-2">
+   551→                    <button
+   552→                      type="button"
+   553→                      onClick={() => setForm({ ...form, correct_answer: idx })}
+   554→                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${form.correct_answer === idx ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}
+   555→                    >
+   556→                      {String.fromCharCode(65 + idx)}
+   557→                    </button>
+   558→                    <Input value={opt} onChange={(e) => {
+   559→                      const newOpts = [...form.options]; newOpts[idx] = e.target.value; setForm({ ...form, options: newOpts })
+   560→                    }} dir="rtl" placeholder={`الخيار ${String.fromCharCode(65 + idx)}`} />
+   561→                    {form.options.length > 2 && (
+   562→                      <button onClick={() => setForm({ ...form, options: form.options.filter((_: any, i: number) => i !== idx) })}>
+   563→                        <X className="w-4 h-4 text-red-500" />
+   564→                      </button>
+   565→                    )}
+   566→                  </div>
+   567→                ))}
+   568→                {form.options.length < 6 && (
+   569→                  <Button size="sm" variant="outline" onClick={() => setForm({ ...form, options: [...form.options, ''] })}>
+   570→                    <Plus className="w-3.5 h-3.5 ml-1" /> إضافة خيار
+   571→                  </Button>
+   572→                )}
+   573→              </div>
+   574→            </div>
+   575→          )}
+   576→          {form.question_type === 'truefalse' && (
+   577→            <div>
+   578→              <Label>الإجابة الصحيحة</Label>
+   579→              <div className="flex gap-2 mt-1">
+   580→                <button type="button" onClick={() => setForm({ ...form, correct_answer: 'true' })} className={`flex-1 py-2 rounded-md border-2 ${form.correct_answer === 'true' ? 'border-green-500 bg-green-50 text-green-700' : 'border-input'}`}>صح ✓</button>
+   581→                <button type="button" onClick={() => setForm({ ...form, correct_answer: 'false' })} className={`flex-1 py-2 rounded-md border-2 ${form.correct_answer === 'false' ? 'border-red-500 bg-red-50 text-red-700' : 'border-input'}`}>خطأ ✗</button>
+   582→              </div>
+   583→            </div>
+   584→          )}
+   585→          {form.question_type === 'short_answer' && (
+   586→            <div>
+   587→              <Label>الإجابة الصحيحة (نصية — تتم مقارنتها بدون حساسية لحالة الأحرف)</Label>
+   588→              <Input value={typeof form.correct_answer === 'string' ? form.correct_answer : ''} onChange={(e) => setForm({ ...form, correct_answer: e.target.value })} className="mt-1" />
+   589→            </div>
+   590→          )}
+   591→          <div>
+   592→            <Label>الشرح (يظهر بعد الإجابة)</Label>
+   593→            <Textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} rows={2} className="mt-1" />
+   594→          </div>
+   595→        </div>
+   596→        <DialogFooter>
+   597→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+   598→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+   599→            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} حفظ
+   600→          </Button>
+   601→        </DialogFooter>
+   602→      </DialogContent>
+   603→    </Dialog>
+   604→  )
+   605→}
+   606→
+   607→// ============================================================================
+   608→// 4) REVIEWS — Read-only list of student reviews. NO moderation actions
+   609→//    are exposed to the admin — reviews cannot be deleted, hidden, or
+   610→//    suspended. This is by design: student feedback is sacred and must
+   611→//    flow unfiltered to the academy's leadership.
+   612→// ============================================================================
+   613→export function AdminReviews() {
+   614→  const [items, setItems] = useState<any[]>([])
+   615→  const [courseFilter, setCourseFilter] = useState<string>('')
+   616→  const [courses, setCourses] = useState<any[]>([])
+   617→
+   618→  const load = () => {
+   619→    const url = courseFilter ? `/api/reviews?course_id=${courseFilter}` : '/api/reviews'
+   620→    fetch(url).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {})
+   621→  }
+   622→  useEffect(() => {
+   623→    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+   624→  }, [])
+   625→  useEffect(() => { load() }, [courseFilter])
+   626→
+   627→  // Aggregate stats
+   628→  const total = items.length
+   629→  const avg = total > 0 ? (items.reduce((s, r) => s + (r.rating || 0), 0) / total) : 0
+   630→  const byStar = [5, 4, 3, 2, 1].map((star) => ({
+   631→    star,
+   632→    count: items.filter((r) => r.rating === star).length,
+   633→  }))
+   634→
+   635→  return (
+   636→    <SectionCard title="تقييمات المتدربين" description={`${total} تقييم · معدل ${avg.toFixed(1)} من 5`} action={
+   637→      <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+   638→        <option value="">كل الدورات</option>
+   639→        {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+   640→      </select>
+   641→    }>
+   642→      {/* Aggregate summary */}
+   643→      {total > 0 && (
+   644→        <Card className="p-5 mb-5 bg-gradient-to-br from-navy/5 to-gold/5 border-gold/20">
+   645→          <div className="grid grid-cols-3 gap-4 items-center">
+   646→            <div className="text-center">
+   647→              <div className="text-4xl font-bold text-navy mb-1">{avg.toFixed(1)}</div>
+   648→              <div className="flex justify-center gap-0.5">
+   649→                {[1, 2, 3, 4, 5].map((s) => (
+   650→                  <Star key={s} className={`w-4 h-4 ${s <= Math.round(avg) ? 'fill-gold text-gold' : 'text-gray-300'}`} />
+   651→                ))}
+   652→              </div>
+   653→              <p className="text-xs text-muted-foreground mt-1">{total} تقييم</p>
+   654→            </div>
+   655→            <div className="col-span-2 space-y-1.5">
+   656→              {byStar.map((d) => {
+   657→                const pct = total > 0 ? (d.count / total) * 100 : 0
+   658→                return (
+   659→                  <div key={d.star} className="flex items-center gap-3 text-xs">
+   660→                    <span className="w-12 flex items-center gap-1">{d.star} <Star className="w-3 h-3 fill-gold text-gold" /></span>
+   661→                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+   662→                      <div className="bg-gold h-full transition-all" style={{ width: `${pct}%` }} />
+   663→                    </div>
+   664→                    <span className="w-8 text-left text-muted-foreground">{d.count}</span>
+   665→                  </div>
+   666→                )
+   667→              })}
+   668→            </div>
+   669→          </div>
+   670→        </Card>
+   671→      )}
+   672→
+   673→      {total === 0 ? (
+   674→        <div className="text-center py-16 text-muted-foreground">
+   675→          <Star className="w-16 h-16 mx-auto mb-3 opacity-30" />
+   676→          <p>لا توجد تقييمات بعد</p>
+   677→          <p className="text-xs mt-2">سيظهر هنا ما يقيّمه المتدربون عن دوراتهم تلقائياً</p>
+   678→        </div>
+   679→      ) : (
+   680→        <div className="space-y-3">
+   681→          {items.map((r) => (
+   682→            <Card key={r.id} className="p-4">
+   683→              <div className="flex items-start gap-3">
+   684→                {/* Author avatar */}
+   685→                <Avatar className="w-10 h-10 border border-gold/20 flex-shrink-0">
+   686→                  <AvatarImage src={r.author?.avatar || ''} />
+   687→                  <AvatarFallback className="bg-navy text-gold text-sm">
+   688→                    {r.author?.name?.charAt(0) || '؟'}
+   689→                  </AvatarFallback>
+   690→                </Avatar>
+   691→
+   692→                <div className="flex-1 min-w-0">
+   693→                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+   694→                    <span className="font-bold text-navy text-sm">{r.author?.name || 'متدرب'}</span>
+   695→                    {r.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+   696→                    {r.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+   697→                    {r.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+   698→                    {r.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+   699→                    {r.author?.role === 'leader' && <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">🛡️ قائد</Badge>}
+   700→                    {r.author?.role === 'team' && <Badge className="bg-gray-500/15 text-gray-600 border-gray-500/30 text-[10px]">🤝 فريق</Badge>}
+   701→                    <span className="text-[10px] text-muted-foreground">
+   702→                      · {r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+   703→                    </span>
+   704→                  </div>
+   705→
+   706→                  <div className="flex items-center gap-2 mb-2">
+   707→                    <div className="flex gap-0.5" dir="ltr">
+   708→                      {[1, 2, 3, 4, 5].map((s) => (
+   709→                        <Star key={s} className={`w-4 h-4 ${s <= r.rating ? 'fill-gold text-gold' : 'text-gray-300'}`} />
+   710→                      ))}
+   711→                    </div>
+   712→                  </div>
+   713→
+   714→                  {r.title && <h4 className="font-bold text-navy text-sm mb-1">{r.title}</h4>}
+   715→                  {r.body && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{r.body}</p>}
+   716→
+   717→                  {/* Show course name when not filtered */}
+   718→                  {!courseFilter && (() => {
+   719→                    const course = courses.find((c) => c.id === r.course_id)
+   720→                    return course ? (
+   721→                      <p className="text-[10px] text-muted-foreground mt-3 pt-2 border-t border-border">
+   722→                        📚 الدورة: <span className="text-navy font-medium">{course.title}</span>
+   723→                      </p>
+   724→                    ) : null
+   725→                  })()}
+   726→                </div>
+   727→              </div>
+   728→            </Card>
+   729→          ))}
+   730→        </div>
+   731→      )}
+   732→    </SectionCard>
+   733→  )
+   734→}
+   735→
+   736→// ============================================================================
+   737→// 5) FORUM — Categories + Topics moderation
+   738→// ============================================================================
+   739→export function AdminForum() {
+   740→  const [tab, setTab] = useState<'categories' | 'topics'>('categories')
+   741→  const [cats, setCats] = useState<any[]>([])
+   742→  const [topics, setTopics] = useState<any[]>([])
+   743→  const [openCat, setOpenCat] = useState(false)
+   744→  const [editingCat, setEditingCat] = useState<any | null>(null)
+   745→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+   746→  const [deleting, setDeleting] = useState(false)
+   747→  // NEW: topic viewing + reply + new topic creation
+   748→  const [viewingTopic, setViewingTopic] = useState<any | null>(null)
+   749→  const [posts, setPosts] = useState<any[]>([])
+   750→  const [replyText, setReplyText] = useState('')
+   751→  const [replying, setReplying] = useState(false)
+   752→  const [newTopicOpen, setNewTopicOpen] = useState(false)
+   753→  const [newTopicCat, setNewTopicCat] = useState<string>('')
+   754→  const [newTopicTitle, setNewTopicTitle] = useState('')
+   755→  const [newTopicBody, setNewTopicBody] = useState('')
+   756→  const [savingTopic, setSavingTopic] = useState(false)
+   757→  // NEW: ban a user from inside the topic view
+   758→  const [banTarget, setBanTarget] = useState<any | null>(null)
+   759→  const [banReason, setBanReason] = useState('')
+   760→  const [banning, setBanning] = useState(false)
+   761→
+   762→  const loadCats = () => fetch('/api/forum-categories').then((r) => r.json()).then((d) => setCats(Array.isArray(d) ? d : []))
+   763→  const loadTopics = () => fetch('/api/forum-topics').then((r) => r.json()).then((d) => setTopics(Array.isArray(d) ? d : []))
+   764→  useEffect(() => { loadCats(); loadTopics() }, [])
+   765→
+   766→  const handleDeleteCat = async () => {
+   767→    if (!deleteTarget) return
+   768→    setDeleting(true)
+   769→    try {
+   770→      await fetch('/api/forum-categories', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+   771→      toast.success('تم حذف الفئة')
+   772→      setDeleteTarget(null); loadCats()
+   773→    } finally { setDeleting(false) }
+   774→  }
+   775→
+   776→  // NEW: open a topic to view its full body + all replies
+   777→  const openTopic = async (t: any) => {
+   778→    setViewingTopic(t)
+   779→    const res = await fetch(`/api/forum?topic_id=${t.id}`)
+   780→    const data = await res.json()
+   781→    setPosts(Array.isArray(data) ? data : [])
+   782→  }
+   783→
+   784→  // NEW: post a reply as the admin (uses admin's user.id)
+   785→  const submitReply = async (adminUser: any) => {
+   786→    if (!replyText.trim() || !viewingTopic || !adminUser?.id) return
+   787→    setReplying(true)
+   788→    try {
+   789→      const res = await fetch('/api/forum', {
+   790→        method: 'POST',
+   791→        headers: { 'Content-Type': 'application/json' },
+   792→        body: JSON.stringify({ topic_id: viewingTopic.id, user_id: adminUser.id, body: replyText }),
+   793→      })
+   794→      const data = await res.json()
+   795→      if (!res.ok) { toast.error(data.error || 'فشل الإرسال'); return }
+   796→      // Refresh posts (with author profiles)
+   797→      const postsRes = await fetch(`/api/forum?topic_id=${viewingTopic.id}`)
+   798→      const postsData = await postsRes.json()
+   799→      setPosts(Array.isArray(postsData) ? postsData : [])
+   800→      setReplyText('')
+   801→      loadTopics()
+   802→      toast.success('تم نشر ردك')
+   803→    } finally { setReplying(false) }
+   804→  }
+   805→
+   806→  // NEW: create a new topic (admin can post in any category)
+   807→  const submitNewTopic = async (adminUser: any) => {
+   808→    if (!newTopicTitle.trim() || !newTopicCat || !adminUser?.id) {
+   809→      toast.error('الفئة والعنوان مطلوبان'); return
+   810→    }
+   811→    setSavingTopic(true)
+   812→    try {
+   813→      const res = await fetch('/api/forum-topics', {
+   814→        method: 'POST',
+   815→        headers: { 'Content-Type': 'application/json' },
+   816→        body: JSON.stringify({
+   817→          category_id: newTopicCat,
+   818→          user_id: adminUser.id,
+   819→          title: newTopicTitle,
+   820→          body: newTopicBody,
+   821→        }),
+   822→      })
+   823→      const data = await res.json()
+   824→      if (!res.ok) { toast.error(data.error || 'فشل النشر'); return }
+   825→      toast.success('تم نشر الموضوع')
+   826→      setNewTopicOpen(false)
+   827→      setNewTopicTitle(''); setNewTopicBody('')
+   828→      loadTopics()
+   829→      openTopic(data)
+   830→    } finally { setSavingTopic(false) }
+   831→  }
+   832→
+   833→  // NEW: ban a user from inside the topic view
+   834→  const handleBanUser = async (adminUser: any) => {
+   835→    if (!banTarget || !adminUser?.id) return
+   836→    setBanning(true)
+   837→    try {
+   838→      const res = await fetch('/api/forum-bans', {
+   839→        method: 'POST',
+   840→        headers: { 'Content-Type': 'application/json' },
+   841→        body: JSON.stringify({
+   842→          banned_user_id: banTarget.userId,
+   843→          banned_by_user_id: adminUser.id,
+   844→          reason: banReason || 'مخالفة قواعد المنتدى',
+   845→          scope: 'all',
+   846→        }),
+   847→      })
+   848→      const data = await res.json()
+   849→      if (!res.ok) { toast.error(data.error || 'فشل الحظر'); return }
+   850→      toast.success(`تم حظر ${banTarget.name} من المنتدى`)
+   851→      setBanTarget(null); setBanReason('')
+   852→    } finally { setBanning(false) }
+   853→  }
+   854→
+   855→  const adminUser = (typeof window !== 'undefined') ? (window as any).__fia_auth_user : null
+   856→  // Better: pull admin user from the auth store via the localStorage value
+   857→  // We avoid importing useAuth here (already in admin.tsx); pass via window hack
+   858→  const getAdminUser = () => {
+   859→    try {
+   860→      const stored = localStorage.getItem('fia-auth')
+   861→      if (stored) {
+   862→        const parsed = JSON.parse(stored)
+   863→        return parsed?.state?.user || null
+   864→      }
+   865→    } catch {}
+   866→    return null
+   867→  }
+   868→  const currentUser = getAdminUser()
+   869→
+   870→  // NEW: topic detail view (full topic + all replies + reply box)
+   871→  if (viewingTopic) {
+   872→    return (
+   873→      <SectionCard
+   874→        title={viewingTopic.title}
+   875→        description={`${posts.length} رد · ${viewingTopic.replies_count || 0}`}
+   876→        action={
+   877→          <Button variant="outline" onClick={() => setViewingTopic(null)}>
+   878→            <ArrowRight className="w-4 h-4 ml-1" /> رجوع للقائمة
+   879→          </Button>
+   880→        }
+   881→      >
+   882→        <div className="space-y-3">
+   883→          {/* Original topic body */}
+   884→          {viewingTopic.body && (
+   885→            <Card className="p-4 border-gold/30 bg-gold/5">
+   886→              <div className="flex items-center justify-between mb-3">
+   887→                <div className="flex items-center gap-2">
+   888→                  <Avatar className="w-7 h-7 border border-gold/20">
+   889→                    <AvatarImage src={viewingTopic.author?.avatar || ''} />
+   890→                    <AvatarFallback className="bg-navy text-gold text-xs">
+   891→                      {viewingTopic.author?.name?.charAt(0) || '؟'}
+   892→                    </AvatarFallback>
+   893→                  </Avatar>
+   894→                  <div className="flex items-center gap-2">
+   895→                    <span className="text-xs font-bold text-navy">{viewingTopic.author?.name || 'مستخدم'}</span>
+   896→                    {viewingTopic.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+   897→                    {viewingTopic.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+   898→                    {viewingTopic.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+   899→                    {viewingTopic.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+   900→                    {viewingTopic.author?.role === 'leader' && <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">🛡️ قائد</Badge>}
+   901→                    {viewingTopic.author?.role === 'team' && <Badge className="bg-gray-500/15 text-gray-600 border-gray-500/30 text-[10px]">🤝 فريق</Badge>}
+   902→                  </div>
+   903→                </div>
+   904→                <span className="text-xs text-muted-foreground">
+   905→                  <Clock className="w-3 h-3 inline" /> {new Date(viewingTopic.created_at).toLocaleDateString('ar-EG')}
+   906→                </span>
+   907→              </div>
+   908→              <p className="text-sm text-navy whitespace-pre-wrap leading-relaxed">{viewingTopic.body}</p>
+   909→            </Card>
+   910→          )}
+   911→
+   912→          {/* Replies */}
+   913→          {posts.map((p) => (
+   914→            <Card key={p.id} className={`p-4 ${p.is_solution ? 'border-green-500/40 bg-green-500/5' : ''}`}>
+   915→              <div className="flex items-start justify-between gap-3 mb-3">
+   916→                <div className="flex items-center gap-2">
+   917→                  <Avatar className="w-7 h-7 border border-border">
+   918→                    <AvatarImage src={p.author?.avatar || ''} />
+   919→                    <AvatarFallback className="bg-navy text-gold text-xs">
+   920→                      {p.author?.name?.charAt(0) || '؟'}
+   921→                    </AvatarFallback>
+   922→                  </Avatar>
+   923→                  <div className="flex items-center gap-2">
+   924→                    <span className="text-xs font-bold text-navy">{p.author?.name || 'مستخدم'}</span>
+   925→                    {p.author?.role === 'admin' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px]">🔐 مدير</Badge>}
+   926→                    {p.author?.role === 'trainer' && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">🎓 مدرب</Badge>}
+   927→                    {p.author?.role === 'student' && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]">📚 متدرب</Badge>}
+   928→                    {p.author?.role === 'founder' && <Badge className="bg-gold/15 text-gold border-gold/30 text-[10px]">👑 المؤسس</Badge>}
+   929→                  </div>
+   930→                </div>
+   931→                <div className="flex items-center gap-2">
+   932→                  <span className="text-xs text-muted-foreground">
+   933→                    <Clock className="w-3 h-3 inline" /> {new Date(p.created_at).toLocaleDateString('ar-EG')}
+   934→                  </span>
+   935→                  {/* Ban button (not on self, not on admins) */}
+   936→                  {currentUser && p.user_id !== currentUser.id && p.author?.role !== 'admin' && (
+   937→                    <button
+   938→                      onClick={() => setBanTarget({ userId: p.user_id, name: p.author?.name || 'مستخدم' })}
+   939→                      className="text-xs text-red-500 hover:bg-red-500/10 px-2 py-1 rounded"
+   940→                      title="حظر من المنتدى"
+   941→                    >
+   942→                      <Ban className="w-3.5 h-3.5" />
+   943→                    </button>
+   944→                  )}
+   945→                  {p.is_solution && <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">✓ حل</Badge>}
+   946→                </div>
+   947→              </div>
+   948→              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{p.body}</p>
+   949→            </Card>
+   950→          ))}
+   951→
+   952→          {/* Reply box */}
+   953→          <Card className="p-4 bg-muted/30">
+   954→            <Label className="mb-2 block">أضف رداً (بصفتك مدير النظام)</Label>
+   955→            <Textarea
+   956→              value={replyText}
+   957→              onChange={(e) => setReplyText(e.target.value)}
+   958→              rows={3}
+   959→              placeholder="اكتب ردك هنا..."
+   960→              dir="rtl"
+   961→              disabled={replying}
+   962→            />
+   963→            <div className="flex justify-end mt-2">
+   964→              <Button onClick={() => submitReply(currentUser)} disabled={replying || !replyText.trim()} className="bg-navy hover:bg-navy-light">
+   965→                {replying ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
+   966→                {replying ? 'جاري الإرسال...' : 'نشر الرد'}
+   967→              </Button>
+   968→            </div>
+   969→          </Card>
+   970→        </div>
+   971→
+   972→        {/* Ban confirmation dialog */}
+   973→        <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o) { setBanTarget(null); setBanReason('') } }}>
+   974→          <DialogContent className="sm:max-w-md">
+   975→            <DialogHeader>
+   976→              <DialogTitle className="text-red-600 flex items-center gap-2">
+   977→                <Ban className="w-5 h-5" /> حظر {banTarget?.name} من المنتدى
+   978→              </DialogTitle>
+   979→            </DialogHeader>
+   980→            <div className="space-y-4 py-4">
+   981→              <p className="text-sm text-muted-foreground">
+   982→                سيتم منع هذا المستخدم من نشر المواضيع والردود في المنتدى. يمكن رفع الحظر لاحقاً من شاشة "حظر المنتدى".
+   983→              </p>
+   984→              <div>
+   985→                <Label>السبب (اختياري)</Label>
+   986→                <Input value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مخالفة قواعد المنتدى" className="mt-1" />
+   987→              </div>
+   988→            </div>
+   989→            <DialogFooter>
+   990→              <Button variant="outline" onClick={() => { setBanTarget(null); setBanReason('') }}>إلغاء</Button>
+   991→              <Button onClick={() => handleBanUser(currentUser)} disabled={banning} className="bg-red-500 hover:bg-red-600">
+   992→                {banning ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Ban className="w-4 h-4 ml-1" />}
+   993→                تأكيد الحظر
+   994→              </Button>
+   995→            </DialogFooter>
+   996→          </DialogContent>
+   997→        </Dialog>
+   998→      </SectionCard>
+   999→    )
+  1000→  }
+  1001→
+  1002→  return (
+  1003→    <SectionCard title="إدارة المنتدى" description={`${cats.length} فئة · ${topics.length} موضوع`} action={
+  1004→      <div className="flex gap-2 items-center">
+  1005→        <Button size="sm" variant={tab === 'categories' ? 'default' : 'outline'} onClick={() => setTab('categories')} className={tab === 'categories' ? 'bg-navy' : ''}>الفئات</Button>
+  1006→        <Button size="sm" variant={tab === 'topics' ? 'default' : 'outline'} onClick={() => setTab('topics')} className={tab === 'topics' ? 'bg-navy' : ''}>المواضيع</Button>
+  1007→        {tab === 'topics' && (
+  1008→          <Button size="sm" className="bg-gold hover:bg-gold-light text-navy ml-2" onClick={() => {
+  1009→            if (cats.length === 0) { toast.error('أضف فئة أولاً'); return }
+  1010→            setNewTopicCat(cats[0].id)
+  1011→            setNewTopicOpen(true)
+  1012→          }}>
+  1013→            <Plus className="w-3.5 h-3.5 ml-1" /> موضوع جديد
+  1014→          </Button>
+  1015→        )}
+  1016→      </div>
+  1017→    }>
+  1018→      {tab === 'categories' ? (
+  1019→        <>
+  1020→          <div className="flex justify-end mb-3">
+  1021→            <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditingCat(null); setOpenCat(true) }}><Plus className="w-4 h-4 ml-1" /> فئة جديدة</Button>
+  1022→          </div>
+  1023→          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  1024→            {cats.map((c) => (
+  1025→              <Card key={c.id} className="p-4">
+  1026→                <div className="flex items-start gap-3">
+  1027→                  <div className="text-3xl">{c.icon}</div>
+  1028→                  <div className="flex-1">
+  1029→                    <div className="font-bold text-navy">{c.name}</div>
+  1030→                    {c.description && <div className="text-xs text-muted-foreground mt-1">{c.description}</div>}
+  1031→                    <div className="text-xs text-muted-foreground mt-1 font-mono" dir="ltr">{c.slug}</div>
+  1032→                  </div>
+  1033→                </div>
+  1034→                <div className="flex gap-2 mt-3">
+  1035→                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditingCat(c); setOpenCat(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
+  1036→                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1037→                </div>
+  1038→              </Card>
+  1039→            ))}
+  1040→          </div>
+  1041→          {openCat && <CategoryDialog open={openCat} onOpenChange={setOpenCat} initial={editingCat} onSaved={() => { setOpenCat(false); loadCats() }} />}
+  1042→          <ConfirmDialog
+  1043→            open={!!deleteTarget}
+  1044→            onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1045→            title="حذف الفئة"
+  1046→            message="سيتم حذف الفئة وكل مواضيعها ومنشوراتها. متأكد؟"
+  1047→            itemLabel="الفئة:"
+  1048→            itemName={deleteTarget?.name}
+  1049→            confirmLabel="حذف"
+  1050→            cancelLabel="إلغاء"
+  1051→            variant="danger"
+  1052→            onConfirm={handleDeleteCat}
+  1053→            loading={deleting}
+  1054→          />
+  1055→        </>
+  1056→      ) : (
+  1057→        <div className="space-y-3">
+  1058→          {topics.length === 0 ? (
+  1059→            <div className="text-center py-12 text-muted-foreground">
+  1060→              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+  1061→              <p>لا توجد مواضيع بعد. اضغط "موضوع جديد" لإضافة أول موضوع.</p>
+  1062→            </div>
+  1063→          ) : topics.map((t) => (
+  1064→            <Card key={t.id} className="p-4 hover:shadow-md transition-all">
+  1065→              <button onClick={() => openTopic(t)} className="w-full text-right">
+  1066→                <div className="flex items-start justify-between gap-3">
+  1067→                  <div className="flex-1 min-w-0">
+  1068→                    {t.pinned && <Badge className="bg-gold/15 text-gold border-gold/30 mb-1 text-[10px]">📌 مثبت</Badge>}
+  1069→                    <h4 className="font-bold text-navy text-sm mb-1">{t.title}</h4>
+  1070→                    {t.body && <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>}
+  1071→                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
+  1072→                      <span><Eye className="w-3 h-3 inline" /> {t.views || 0}</span>
+  1073→                      <span><MessageSquare className="w-3 h-3 inline" /> {t.replies_count || 0}</span>
+  1074→                      <span><Clock className="w-3 h-3 inline" /> {t.created_at ? new Date(t.created_at).toLocaleDateString('ar-EG') : ''}</span>
+  1075→                    </div>
+  1076→                  </div>
+  1077→                  <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+  1078→                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openTopic(t) }}>
+  1079→                      <Eye className="w-3.5 h-3.5" />
+  1080→                    </Button>
+  1081→                    <Button size="sm" variant="outline" onClick={async (e) => {
+  1082→                      e.stopPropagation()
+  1083→                      await fetch('/api/forum-topics', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, pinned: !t.pinned }) })
+  1084→                      toast.success(t.pinned ? 'تم إلغاء التثبيت' : 'تم التثبيت'); loadTopics()
+  1085→                    }}><Award className="w-3.5 h-3.5" /></Button>
+  1086→                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={async (e) => {
+  1087→                      e.stopPropagation()
+  1088→                      await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+  1089→                      toast.success('تم حذف الموضوع'); loadTopics()
+  1090→                    }}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1091→                  </div>
+  1092→                </div>
+  1093→              </button>
+  1094→            </Card>
+  1095→          ))}
+  1096→        </div>
+  1097→      )}
+  1098→
+  1099→      {/* New topic dialog */}
+  1100→      <Dialog open={newTopicOpen} onOpenChange={setNewTopicOpen}>
+  1101→        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+  1102→          <DialogHeader><DialogTitle>موضوع جديد</DialogTitle></DialogHeader>
+  1103→          <div className="space-y-4 py-4">
+  1104→            <div>
+  1105→              <Label>الفئة *</Label>
+  1106→              <select value={newTopicCat} onChange={(e) => setNewTopicCat(e.target.value)} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+  1107→                <option value="">— اختر فئة —</option>
+  1108→                {cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+  1109→              </select>
+  1110→            </div>
+  1111→            <div>
+  1112→              <Label>العنوان *</Label>
+  1113→              <Input value={newTopicTitle} onChange={(e) => setNewTopicTitle(e.target.value)} className="mt-1" placeholder="عنوان جذاب يلخص الموضوع" />
+  1114→            </div>
+  1115→            <div>
+  1116→              <Label>المحتوى</Label>
+  1117→              <Textarea value={newTopicBody} onChange={(e) => setNewTopicBody(e.target.value)} rows={8} className="mt-1" placeholder="اكتب محتوى الموضوع هنا..." />
+  1118→            </div>
+  1119→          </div>
+  1120→          <DialogFooter>
+  1121→            <Button variant="outline" onClick={() => setNewTopicOpen(false)}>إلغاء</Button>
+  1122→            <Button onClick={() => submitNewTopic(currentUser)} disabled={savingTopic} className="bg-navy hover:bg-navy-light">
+  1123→              {savingTopic ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
+  1124→              نشر الموضوع
+  1125→            </Button>
+  1126→          </DialogFooter>
+  1127→        </DialogContent>
+  1128→      </Dialog>
+  1129→    </SectionCard>
+  1130→  )
+  1131→}
+  1132→
+  1133→function CategoryDialog({ open, onOpenChange, initial, onSaved }: any) {
+  1134→  const [form, setForm] = useState<any>(initial || { name: '', description: '', slug: '', icon: '💬', display_order: 0 })
+  1135→  const [saving, setSaving] = useState(false)
+  1136→  useEffect(() => { setForm(initial || { name: '', description: '', slug: '', icon: '💬', display_order: 0 }) }, [initial])
+  1137→
+  1138→  const save = async () => {
+  1139→    if (!form.name) { toast.error('الاسم مطلوب'); return }
+  1140→    if (!form.slug) form.slug = form.name.replace(/\s+/g, '-').toLowerCase()
+  1141→    setSaving(true)
+  1142→    try {
+  1143→      const res = await fetch('/api/forum-categories', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : form) })
+  1144→      if (res.ok) { toast.success(initial ? 'تم التحديث' : 'تم الإنشاء'); onSaved() }
+  1145→      else { const d = await res.json(); toast.error(d.error || 'فشل') }
+  1146→    } finally { setSaving(false) }
+  1147→  }
+  1148→
+  1149→  return (
+  1150→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1151→      <DialogContent className="sm:max-w-md">
+  1152→        <DialogHeader><DialogTitle>{initial ? 'تعديل فئة' : 'فئة جديدة'}</DialogTitle></DialogHeader>
+  1153→        <div className="space-y-4 py-4">
+  1154→          <div><Label>الاسم</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1" /></div>
+  1155→          <div><Label>الوصف</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="mt-1" /></div>
+  1156→          <div><Label>الـ slug (URL)</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} dir="ltr" className="mt-1 font-mono" /></div>
+  1157→          <div className="grid grid-cols-2 gap-3">
+  1158→            <div><Label>الأيقونة</Label><Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="mt-1 text-center text-2xl" /></div>
+  1159→            <div><Label>ترتيب العرض</Label><Input type="number" value={form.display_order || ''} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} className="mt-1" /></div>
+  1160→          </div>
+  1161→        </div>
+  1162→        <DialogFooter>
+  1163→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1164→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} حفظ</Button>
+  1165→        </DialogFooter>
+  1166→      </DialogContent>
+  1167→    </Dialog>
+  1168→  )
+  1169→}
+  1170→
+  1171→// ============================================================================
+  1172→// 6) BLOG — Posts management
+  1173→// ============================================================================
+  1174→export function AdminBlog() {
+  1175→  const [items, setItems] = useState<any[]>([])
+  1176→  const [open, setOpen] = useState(false)
+  1177→  const [viewingPost, setViewingPost] = useState<any | null>(null)
+  1178→  const [editing, setEditing] = useState<any | null>(null)
+  1179→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1180→  const [deleting, setDeleting] = useState(false)
+  1181→
+  1182→  const load = () => fetch('/api/blog').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1183→  useEffect(() => { load() }, [])
+  1184→
+  1185→  const handleDelete = async () => {
+  1186→    if (!deleteTarget) return
+  1187→    setDeleting(true)
+  1188→    try {
+  1189→      await fetch('/api/blog', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+  1190→      toast.success('تم حذف المقال')
+  1191→      setDeleteTarget(null); load()
+  1192→    } finally { setDeleting(false) }
+  1193→  }
+  1194→
+  1195→  // In-place article preview view
+  1196→  if (viewingPost) {
+  1197→    return (
+  1198→      <SectionCard
+  1199→        title={viewingPost.title}
+  1200→        description={viewingPost.published_at ? new Date(viewingPost.published_at).toLocaleDateString('ar-EG') : ''}
+  1201→        action={
+  1202→          <div className="flex gap-2">
+  1203→            <Button variant="outline" size="sm" onClick={() => { setEditing(viewingPost); setOpen(true) }}>
+  1204→              <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+  1205→            </Button>
+  1206→            <Button variant="outline" size="sm" onClick={() => setViewingPost(null)}>
+  1207→              <ArrowRight className="w-4 h-4 ml-1" /> رجوع للقائمة
+  1208→            </Button>
+  1209→          </div>
+  1210→        }
+  1211→      >
+  1212→        <article className="max-w-3xl mx-auto">
+  1213→          {viewingPost.cover && (
+  1214→            <div className="aspect-video rounded-2xl overflow-hidden shadow-xl mb-6">
+  1215→              <img src={viewingPost.cover} alt={viewingPost.title} className="w-full h-full object-cover" />
+  1216→            </div>
+  1217→          )}
+  1218→          {viewingPost.tags && (
+  1219→            <div className="flex flex-wrap gap-2 mb-4">
+  1220→              {viewingPost.tags.split(',').map((t: string, i: number) => (
+  1221→                <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
+  1222→              ))}
+  1223→            </div>
+  1224→          )}
+  1225→          {viewingPost.excerpt && (
+  1226→            <p className="text-lg text-navy/80 leading-relaxed mb-6 border-r-4 border-gold pr-4">
+  1227→              {viewingPost.excerpt}
+  1228→            </p>
+  1229→          )}
+  1230→          <div className="prose prose-lg max-w-none text-navy/90 leading-loose whitespace-pre-wrap">
+  1231→            {viewingPost.body}
+  1232→          </div>
+  1233→          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border text-xs text-muted-foreground">
+  1234→            <span className="flex items-center gap-1">
+  1235→              <Eye className="w-3.5 h-3.5" /> {viewingPost.views || 0} قراءة
+  1236→            </span>
+  1237→            <a
+  1238→              href={`/blog/${viewingPost.slug}`}
+  1239→              target="_blank"
+  1240→              rel="noopener noreferrer"
+  1241→              className="inline-flex items-center gap-1 text-gold hover:underline"
+  1242→            >
+  1243→              <ExternalLink className="w-3.5 h-3.5" /> فتح الرابط العام
+  1244→            </a>
+  1245→          </div>
+  1246→        </article>
+  1247→      </SectionCard>
+  1248→    )
+  1249→  }
+  1250→
+  1251→  return (
+  1252→    <SectionCard title="المدونة" description={`${items.length} مقال`} action={
+  1253→      <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}>
+  1254→        <Plus className="w-4 h-4 ml-1" /> مقال جديد
+  1255→      </Button>
+  1256→    }>
+  1257→      {items.length === 0 ? (
+  1258→        <div className="text-center py-12 text-muted-foreground">
+  1259→          <Newspaper className="w-12 h-12 mx-auto mb-3 opacity-30" />
+  1260→          <p>لا توجد مقالات بعد. اضغط "مقال جديد" لنشر أول مقال.</p>
+  1261→        </div>
+  1262→      ) : (
+  1263→        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+  1264→          {items.map((p) => (
+  1265→            <Card key={p.id} className="overflow-hidden hover:shadow-lg transition-all group flex flex-col">
+  1266→              {p.cover ? (
+  1267→                <div className="aspect-video overflow-hidden bg-navy/10">
+  1268→                  <img src={p.cover} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+  1269→                </div>
+  1270→              ) : (
+  1271→                <div className="aspect-video bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+  1272→                  <Newspaper className="w-12 h-12 text-gold/40" />
+  1273→                </div>
+  1274→              )}
+  1275→              <div className="p-5 flex-1 flex flex-col">
+  1276→                <div className="flex items-center gap-2 mb-2">
+  1277→                  <Badge variant="outline" className="text-[10px]">{p.status || 'منشور'}</Badge>
+  1278→                  {p.tags && <Badge variant="outline" className="text-[10px] text-gold border-gold/30">{p.tags.split(',')[0].trim()}</Badge>}
+  1279→                </div>
+  1280→                <h4 className="font-bold text-navy text-base mb-2 line-clamp-2">{p.title}</h4>
+  1281→                {p.excerpt && <p className="text-xs text-muted-foreground line-clamp-3 mb-3 flex-1">{p.excerpt}</p>}
+  1282→                <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-3 border-t border-border">
+  1283→                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.published_at ? new Date(p.published_at).toLocaleDateString('ar-EG') : ''}</span>
+  1284→                  <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {p.views || 0}</span>
+  1285→                </div>
+  1286→                <div className="flex gap-1.5 mt-3">
+  1287→                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setViewingPost(p)}>
+  1288→                    <Eye className="w-3.5 h-3.5 ml-1" /> عرض
+  1289→                  </Button>
+  1290→                  <Button size="sm" variant="outline" onClick={() => { setEditing(p); setOpen(true) }}>
+  1291→                    <Edit className="w-3.5 h-3.5" />
+  1292→                  </Button>
+  1293→                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}>
+  1294→                    <Trash2 className="w-3.5 h-3.5" />
+  1295→                  </Button>
+  1296→                </div>
+  1297→              </div>
+  1298→            </Card>
+  1299→          ))}
+  1300→        </div>
+  1301→      )}
+  1302→      {open && <BlogPostDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={() => { setOpen(false); load() }} />}
+  1303→
+  1304→      <ConfirmDialog
+  1305→        open={!!deleteTarget}
+  1306→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1307→        title="حذف المقال"
+  1308→        message="هل أنت متأكد؟"
+  1309→        itemLabel="المقال:"
+  1310→        itemName={deleteTarget?.title}
+  1311→        confirmLabel="حذف"
+  1312→        cancelLabel="إلغاء"
+  1313→        variant="danger"
+  1314→        onConfirm={handleDelete}
+  1315→        loading={deleting}
+  1316→      />
+  1317→    </SectionCard>
+  1318→  )
+  1319→}
+  1320→
+  1321→function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
+  1322→  const [form, setForm] = useState<any>(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' })
+  1323→  const [saving, setSaving] = useState(false)
+  1324→  const [preview, setPreview] = useState(false)
+  1325→  useEffect(() => { setForm(initial || { title: '', excerpt: '', body: '', cover: '', tags: '' }) }, [initial])
+  1326→
+  1327→  const save = async () => {
+  1328→    if (!form.title || !form.body) { toast.error('العنوان والمحتوى مطلوبان'); return }
+  1329→    setSaving(true)
+  1330→    try {
+  1331→      const res = await fetch('/api/blog', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : form) })
+  1332→      if (res.ok) { toast.success(initial ? 'تم التحديث' : 'تم النشر'); onSaved() }
+  1333→      else { const d = await res.json(); toast.error(d.error || 'فشل') }
+  1334→    } finally { setSaving(false) }
+  1335→  }
+  1336→
+  1337→  return (
+  1338→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1339→      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+  1340→        <DialogHeader>
+  1341→          <div className="flex items-center justify-between">
+  1342→            <DialogTitle>{initial ? 'تعديل مقال' : 'مقال جديد'}</DialogTitle>
+  1343→            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+  1344→              <button
+  1345→                onClick={() => setPreview(false)}
+  1346→                className={`px-3 py-1 text-xs font-bold rounded ${!preview ? 'bg-navy text-gold' : 'text-muted-foreground'}`}
+  1347→              >تحرير</button>
+  1348→              <button
+  1349→                onClick={() => setPreview(true)}
+  1350→                className={`px-3 py-1 text-xs font-bold rounded ${preview ? 'bg-navy text-gold' : 'text-muted-foreground'}`}
+  1351→              >معاينة</button>
+  1352→            </div>
+  1353→          </div>
+  1354→        </DialogHeader>
+  1355→
+  1356→        {preview ? (
+  1357→          /* Live preview — exactly what readers will see */
+  1358→          <div className="overflow-y-auto py-4 max-h-[70vh]">
+  1359→            <article>
+  1360→              {form.cover && (
+  1361→                <div className="aspect-video rounded-xl overflow-hidden shadow-md mb-4">
+  1362→                  <img src={form.cover} alt={form.title} className="w-full h-full object-cover" />
+  1363→                </div>
+  1364→              )}
+  1365→              {form.tags && (
+  1366→                <div className="flex flex-wrap gap-2 mb-3">
+  1367→                  {form.tags.split(',').map((t: string, i: number) => (
+  1368→                    <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
+  1369→                  ))}
+  1370→                </div>
+  1371→              )}
+  1372→              <h1 className="text-2xl font-bold text-navy mb-3">{form.title || 'العنوان غير مكتوب'}</h1>
+  1373→              {form.excerpt && (
+  1374→                <p className="text-base text-navy/80 leading-relaxed mb-4 border-r-4 border-gold pr-3">{form.excerpt}</p>
+  1375→              )}
+  1376→              <div className="text-navy/90 leading-loose whitespace-pre-wrap">
+  1377→                {form.body || 'المحتوى فارغ'}
+  1378→              </div>
+  1379→            </article>
+  1380→          </div>
+  1381→        ) : (
+  1382→          <div className="space-y-4 py-4 overflow-y-auto max-h-[70vh]">
+  1383→            <div>
+  1384→              <Label>العنوان *</Label>
+  1385→              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" placeholder="عنوان جذاب للمقال" />
+  1386→            </div>
+  1387→            <div>
+  1388→              <Label>مقتطف (مقدمة قصيرة تظهر في قائمة المقالات)</Label>
+  1389→              <Textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} className="mt-1" placeholder="جملة أو جملتان تلخصان المقال" />
+  1390→            </div>
+  1391→            <div>
+  1392→              <Label>المحتوى *</Label>
+  1393→              <Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={12} className="mt-1 leading-relaxed" placeholder="اكتب محتوى المقال هنا... استخدم أسطر فارغة لفصل الفقرات." />
+  1394→              <p className="text-[10px] text-muted-foreground mt-1">💡 استخدم أسطر فارغة لفصل الفقرات. سيتم الحفاظ على التنسيق عند العرض.</p>
+  1395→            </div>
+  1396→            <div>
+  1397→              <Label>رابط صورة الغلاف</Label>
+  1398→              <Input value={form.cover} onChange={(e) => setForm({ ...form, cover: e.target.value })} dir="ltr" className="mt-1" placeholder="https://..." />
+  1399→              {form.cover && (
+  1400→                <div className="mt-2 aspect-video rounded-lg overflow-hidden border border-border">
+  1401→                  <img src={form.cover} alt="cover preview" className="w-full h-full object-cover" />
+  1402→                </div>
+  1403→              )}
+  1404→            </div>
+  1405→            <div>
+  1406→              <Label>الوسوم (مفصولة بفاصلة)</Label>
+  1407→              <Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className="mt-1" placeholder="تعليم، طب، تدريب" />
+  1408→            </div>
+  1409→          </div>
+  1410→        )}
+  1411→
+  1412→        <DialogFooter>
+  1413→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1414→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
+  1415→            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} نشر
+  1416→          </Button>
+  1417→        </DialogFooter>
+  1418→      </DialogContent>
+  1419→    </Dialog>
+  1420→  )
+  1421→}
+  1422→
+  1423→// ============================================================================
+  1424→// 7) CONTACT MESSAGES — Inbox
+  1425→// ============================================================================
+  1426→export function AdminContact() {
+  1427→  const [items, setItems] = useState<any[]>([])
+  1428→  const [selected, setSelected] = useState<any | null>(null)
+  1429→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1430→  const [deleting, setDeleting] = useState(false)
+  1431→
+  1432→  const load = () => fetch('/api/contact').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1433→  useEffect(() => { load() }, [])
+  1434→
+  1435→  const updateStatus = async (m: any, newStatus: string) => {
+  1436→    await fetch('/api/contact', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id, status: newStatus }) })
+  1437→    load()
+  1438→    if (selected?.id === m.id) setSelected({ ...m, status: newStatus })
+  1439→  }
+  1440→
+  1441→  const confirmDelete = async () => {
+  1442→    if (!deleteTarget) return
+  1443→    setDeleting(true)
+  1444→    try {
+  1445→      const res = await fetch('/api/contact', {
+  1446→        method: 'DELETE',
+  1447→        headers: { 'Content-Type': 'application/json' },
+  1448→        body: JSON.stringify({ id: deleteTarget.id }),
+  1449→      })
+  1450→      if (res.ok) {
+  1451→        toast.success('تم حذف الرسالة')
+  1452→        if (selected?.id === deleteTarget.id) setSelected(null)
+  1453→        setDeleteTarget(null)
+  1454→        load()
+  1455→      } else {
+  1456→        const err = await res.json().catch(() => ({}))
+  1457→        toast.error(err.error || 'فشل الحذف')
+  1458→      }
+  1459→    } catch {
+  1460→      toast.error('خطأ في الاتصال')
+  1461→    } finally {
+  1462→      setDeleting(false)
+  1463→    }
+  1464→  }
+  1465→
+  1466→  return (
+  1467→    <SectionCard title="صندوق الرسائل" description={`${items.filter(i => i.status === 'جديد').length} جديدة من ${items.length}`}>
+  1468→      {items.length === 0 ? (
+  1469→        <div className="text-center py-12 text-muted-foreground">
+  1470→          <Mail className="w-12 h-12 mx-auto mb-3 opacity-30" />
+  1471→          <p>لا توجد رسائل بعد</p>
+  1472→        </div>
+  1473→      ) : (
+  1474→        <div className="grid md:grid-cols-2 gap-4">
+  1475→          <div className="space-y-2">
+  1476→            {items.map((m) => (
+  1477→              <div
+  1478→                key={m.id}
+  1479→                className={`group relative p-3 rounded-lg border transition-all ${selected?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:bg-muted/50'}`}
+  1480→              >
+  1481→                <button
+  1482→                  onClick={() => {
+  1483→                    setSelected(m)
+  1484→                    if (m.status === 'جديد') updateStatus(m, 'مقروء')
+  1485→                  }}
+  1486→                  className="w-full text-right"
+  1487→                >
+  1488→                  <div className="flex items-center justify-between mb-1">
+  1489→                    <span className={`text-sm font-bold ${m.status === 'جديد' ? 'text-navy' : 'text-muted-foreground'}`}>{m.name}</span>
+  1490→                    <Badge className={
+  1491→                      m.status === 'جديد' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' :
+  1492→                      m.status === 'مقروء' ? 'bg-gray-500/15 text-gray-600 border-gray-500/30' :
+  1493→                      m.status === 'مُجاب' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
+  1494→                      'bg-muted text-muted-foreground'
+  1495→                    }>{m.status}</Badge>
+  1496→                  </div>
+  1497→                  <div className="text-xs text-muted-foreground" dir="ltr">{m.email}</div>
+  1498→                  {m.subject && <div className="text-xs text-muted-foreground mt-1 truncate">{m.subject}</div>}
+  1499→                  <div className="text-xs text-muted-foreground mt-1">{new Date(m.created_at).toLocaleDateString('ar-EG')}</div>
+  1500→                </button>
+  1501→                {/* Per-row delete button — appears on hover */}
+  1502→                <button
+  1503→                  type="button"
+  1504→                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(m) }}
+  1505→                  title="حذف الرسالة"
+  1506→                  className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-md border border-red-500/30 bg-white hover:bg-red-500/10 flex items-center justify-center text-red-500"
+  1507→                >
+  1508→                  <Trash2 className="w-3.5 h-3.5" />
+  1509→                </button>
+  1510→              </div>
+  1511→            ))}
+  1512→          </div>
+  1513→          {selected && (
+  1514→            <Card className="p-4 sticky top-4">
+  1515→              <div className="flex items-start justify-between mb-3">
+  1516→                <div>
+  1517→                  <h4 className="font-bold text-navy">{selected.name}</h4>
+  1518→                  <a href={`mailto:${selected.email}`} className="text-xs text-gold" dir="ltr">{selected.email}</a>
+  1519→                </div>
+  1520→                <div className="flex gap-1">
+  1521→                  <Button size="sm" variant="outline" onClick={() => setDeleteTarget(selected)} title="حذف هذه الرسالة"
+  1522→                    className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+  1523→                    <Trash2 className="w-3.5 h-3.5" />
+  1524→                  </Button>
+  1525→                  <Button size="sm" variant="outline" onClick={() => setSelected(null)}><X className="w-4 h-4" /></Button>
+  1526→                </div>
+  1527→              </div>
+  1528→              {selected.subject && <h5 className="font-bold text-navy text-sm mb-2">{selected.subject}</h5>}
+  1529→              <div className="bg-muted/30 rounded p-3 text-sm text-gray-700 leading-relaxed mb-4">{selected.message}</div>
+  1530→              <div className="flex flex-wrap gap-2">
+  1531→                <Button size="sm" variant="outline" onClick={() => updateStatus(selected, 'مُجاب')}><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تم الرد</Button>
+  1532→                <Button size="sm" variant="outline" onClick={() => updateStatus(selected, 'مغلق')}>إغلاق</Button>
+  1533→                <a href={`mailto:${selected.email}?subject=رد: ${encodeURIComponent(selected.subject || '')}`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-navy hover:bg-navy-light text-white text-sm">
+  1534→                  <Mail className="w-3.5 h-3.5" /> رد عبر البريد
+  1535→                </a>
+  1536→              </div>
+  1537→            </Card>
+  1538→          )}
+  1539→        </div>
+  1540→      )}
+  1541→
+  1542→      <ConfirmDialog
+  1543→        open={!!deleteTarget}
+  1544→        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+  1545→        title="حذف الرسالة"
+  1546→        message={`سيتم حذف الرسالة من "${deleteTarget?.name || ''}" نهائياً. هذا الإجراء لا يمكن التراجع عنه.`}
+  1547→        confirmLabel="حذف"
+  1548→        onConfirm={confirmDelete}
+  1549→        loading={deleting}
+  1550→      />
+  1551→    </SectionCard>
+  1552→  )
+  1553→}
+  1554→
+  1555→// ============================================================================
+  1556→// 8) FAQS — Frequently asked questions
+  1557→// ============================================================================
+  1558→export function AdminFaqs() {
+  1559→  const [items, setItems] = useState<any[]>([])
+  1560→  const [open, setOpen] = useState(false)
+  1561→  const [editing, setEditing] = useState<any | null>(null)
+  1562→  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  1563→  const [deleting, setDeleting] = useState(false)
+  1564→
+  1565→  const load = () => fetch('/api/faqs').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  1566→  useEffect(() => { load() }, [])
+  1567→
+  1568→  const handleDelete = async () => {
+  1569→    if (!deleteTarget) return
+  1570→    setDeleting(true)
+  1571→    try {
+  1572→      await fetch('/api/faqs', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+  1573→      toast.success('تم حذف السؤال')
+  1574→      setDeleteTarget(null); load()
+  1575→    } finally { setDeleting(false) }
+  1576→  }
+  1577→
+  1578→  return (
+  1579→    <SectionCard title="الأسئلة الشائعة" description={`${items.length} سؤال`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> سؤال جديد</Button>}>
+  1580→      <div className="space-y-3">
+  1581→        {items.map((f) => (
+  1582→          <Card key={f.id} className="p-4">
+  1583→            <div className="flex items-start justify-between gap-3">
+  1584→              <div className="flex-1">
+  1585→                <div className="flex items-center gap-2 mb-1">
+  1586→                  <HelpCircle className="w-4 h-4 text-gold flex-shrink-0" />
+  1587→                  <h4 className="font-bold text-navy text-sm">{f.question}</h4>
+  1588→                  <Badge variant="outline" className="text-xs">{f.category}</Badge>
+  1589→                </div>
+  1590→                <p className="text-sm text-muted-foreground mt-1 pr-6">{f.answer}</p>
+  1591→              </div>
+  1592→              <div className="flex gap-1">
+  1593→                <Button size="sm" variant="outline" onClick={() => { setEditing(f); setOpen(true) }}><Edit className="w-3.5 h-3.5" /></Button>
+  1594→                <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(f)}><Trash2 className="w-3.5 h-3.5" /></Button>
+  1595→              </div>
+  1596→            </div>
+  1597→          </Card>
+  1598→        ))}
+  1599→      </div>
+  1600→      {open && <FaqDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={() => { setOpen(false); load() }} />}
+  1601→
+  1602→      <ConfirmDialog
+  1603→        open={!!deleteTarget}
+  1604→        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+  1605→        title="حذف السؤال"
+  1606→        message="هل أنت متأكد؟"
+  1607→        itemLabel="السؤال:"
+  1608→        itemName={deleteTarget?.question}
+  1609→        confirmLabel="حذف"
+  1610→        cancelLabel="إلغاء"
+  1611→        variant="danger"
+  1612→        onConfirm={handleDelete}
+  1613→        loading={deleting}
+  1614→      />
+  1615→    </SectionCard>
+  1616→  )
+  1617→}
+  1618→
+  1619→function FaqDialog({ open, onOpenChange, initial, onSaved }: any) {
+  1620→  const [form, setForm] = useState<any>(initial || { question: '', answer: '', category: 'عام', display_order: 0 })
+  1621→  const [saving, setSaving] = useState(false)
+  1622→  useEffect(() => { setForm(initial || { question: '', answer: '', category: 'عام', display_order: 0 }) }, [initial])
+  1623→
+  1624→  const save = async () => {
+  1625→    if (!form.question || !form.answer) { toast.error('السؤال والإجابة مطلوبان'); return }
+  1626→    setSaving(true)
+  1627→    try {
+  1628→      const res = await fetch('/api/faqs', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : form) })
+  1629→      if (res.ok) { toast.success(initial ? 'تم التحديث' : 'تمت الإضافة'); onSaved() }
+  1630→      else { const d = await res.json(); toast.error(d.error || 'فشل') }
+  1631→    } finally { setSaving(false) }
+  1632→  }
+  1633→
+  1634→  return (
+  1635→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1636→      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+  1637→        <DialogHeader><DialogTitle>{initial ? 'تعديل سؤال' : 'سؤال جديد'}</DialogTitle></DialogHeader>
+  1638→        <div className="space-y-4 py-4">
+  1639→          <div><Label>السؤال *</Label><Input value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} className="mt-1" /></div>
+  1640→          <div><Label>الإجابة *</Label><Textarea value={form.answer} onChange={(e) => setForm({ ...form, answer: e.target.value })} rows={4} className="mt-1" /></div>
+  1641→          <div className="grid grid-cols-2 gap-3">
+  1642→            <div><Label>الفئة</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="mt-1" /></div>
+  1643→            <div><Label>ترتيب العرض</Label><Input type="number" value={form.display_order || ''} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} className="mt-1" /></div>
+  1644→          </div>
+  1645→        </div>
+  1646→        <DialogFooter>
+  1647→          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+  1648→          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null} حفظ</Button>
+  1649→        </DialogFooter>
+  1650→      </DialogContent>
+  1651→    </Dialog>
+  1652→  )
+  1653→}
+  1654→
