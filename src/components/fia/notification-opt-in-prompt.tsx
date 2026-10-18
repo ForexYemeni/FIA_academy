@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { unlockAudio, setMuted, isMuted } from '@/lib/sounds'
+import { isAndroidWebView } from '@/lib/certificate-download'
 
 const STORAGE_KEY = 'fia-notifications-opted-in'
 // We show the prompt after a short delay so the user isn't bombarded
@@ -23,13 +24,28 @@ const PROMPT_DELAY_MS = 4000
  * unlocks audio, and saves the preference so the prompt doesn't show
  * again. The actual notification delivery still happens via the
  * NotificationsBell component (which uses Supabase Realtime + polling).
+ *
+ * IMPORTANT: In the FIA Android APK (WebView), the browser Notification
+ * API is NOT supported — `Notification.requestPermission()` returns
+ * 'denied' or throws, and `new Notification(...)` silently fails. The
+ * APK has its own native notification system (NotificationPollService +
+ * OneSignal SDK). So we skip this prompt entirely inside the APK to
+ * avoid asking for a permission that doesn't work and showing the user
+ * an error. In regular browsers (Chrome / Firefox / Safari / Edge on
+ * desktop), the prompt works as expected.
  */
 export function NotificationOptInPrompt() {
   const [open, setOpen] = useState(false)
 
-  // Show the prompt after a delay, but only if the user hasn't
-  // previously opted-in or dismissed.
+  // Show the prompt after a delay, but only if:
+  //   - The user hasn't opted-in/dismissed previously
+  //   - We're NOT running inside the FIA APK WebView (where the
+  //     browser Notification API doesn't work anyway)
   useEffect(() => {
+    // Skip entirely inside the APK — the APK has its own native
+    // notification system (NotificationPollService + OneSignal) and
+    // the browser Notification API just shows an error popup.
+    if (isAndroidWebView()) return
     let opted = '0'
     try { opted = localStorage.getItem(STORAGE_KEY) || '0' } catch {}
     if (opted === '1') {
@@ -41,10 +57,12 @@ export function NotificationOptInPrompt() {
     return () => clearTimeout(t)
   }, [])
 
-  // If the user previously opted in, also try to request Notification
-  // permission on first load (silently — if already granted, this is
-  // a no-op).
+  // If the user previously opted in (in a regular browser), also try
+  // to request Notification permission on first load (silently — if
+  // already granted, this is a no-op). Skip this entirely inside the
+  // APK WebView where the API doesn't work.
   useEffect(() => {
+    if (isAndroidWebView()) return
     let opted = '0'
     try { opted = localStorage.getItem(STORAGE_KEY) || '0' } catch {}
     if (opted === '1' && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -59,9 +77,11 @@ export function NotificationOptInPrompt() {
     unlockAudio()
     // 2) Un-mute sounds (in case the user previously muted).
     setMuted(false)
-    // 3) Request browser notification permission. The browser shows
-    //    its native permission popup at this point.
-    if (typeof Notification !== 'undefined') {
+    // 3) Request browser notification permission. In a regular
+    //    browser, this shows the native permission popup. Inside
+    //    the APK WebView, this call is skipped because the prompt
+    //    itself is never shown there.
+    if (!isAndroidWebView() && typeof Notification !== 'undefined') {
       try {
         const perm = await Notification.requestPermission()
         if (perm === 'granted') {
@@ -160,3 +180,4 @@ export function NotificationOptInPrompt() {
     </Dialog>
   )
 }
+

@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import {
   Download, Calendar, Award, Shield, FileText, Copy,
-  Loader2, CheckCircle2, X, Sparkles, ExternalLink,
+  Loader2, CheckCircle2, X, Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { downloadCertificateFile, isAndroidWebView } from '@/lib/certificate-download'
@@ -13,28 +13,9 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
   const certRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
   const [pdfDownloading, setPdfDownloading] = useState(false)
-  // Image loading state — we show a spinner until the server PNG is
-  // fully loaded into the <img> tag. This is critical because the
-  // PNG generation on the server is expensive (canvas drawing of
-  // fonts + ornaments + QR), and a slow-loading image looks broken.
-  const [imgLoading, setImgLoading] = useState(true)
 
   const issuedAt = certificate.issued_at ? new Date(certificate.issued_at) : null
   const isVerified = certificate.status === 'صالحة'
-
-  // The PNG URL is the SAME image the user will download — we render
-  // it directly as an <img>. This ensures:
-  // 1. What the user sees in the dashboard = exactly what they
-  //    download (no more "different design" complaints).
-  // 2. Long-press on the <img> works correctly in the WebView
-  //    because it's a real <img> element in the dashboard's WebView
-  //    (which has the system long-press → save context menu enabled
-  //    by default), NOT a separate WebView window.
-  // 3. The image has a transparent background only at the rounded
-  //    corners — we wrap it in a card with a solid background to
-  //    avoid any visual artifacts.
-  const pngUrl = `/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png&t=${Date.now()}`
-  const inWebView = isAndroidWebView()
 
   const downloadAsImage = async () => {
     if (!certRef.current) return
@@ -95,13 +76,14 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     }
   }
 
-  // Open the PNG in a new view — used as the last-resort fallback
-  // when the user wants a direct view (instead of triggering a
-  // download via the blob approach). Useful in WebView where
-  // long-press → save is the only path.
-  const openInNewView = () => {
-    window.open(pngUrl, '_blank')
-  }
+  // Reduced ~6% for tighter professional proportions
+  // 720×508 → export at 2x = 1440×1016 (still landscape, ratio 1.417)
+  const NAVY = '#0A1F44'
+  const NAVY_DEEP = '#060F2E'
+  const GOLD = '#D4AF37'
+  const GOLD_BRIGHT = '#E5C158'
+  const GOLD_L = '#F0D070'
+  const CREAM = '#FCF9F0'
 
   return (
     <div className="space-y-4">
@@ -113,76 +95,122 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         </div>
       </div>
 
-      {/* Server-rendered certificate PNG — EXACTLY what will be
-          downloaded. Wrapped in a navy background so the
-          transparent rounded corners look intentional. */}
-      <div className="overflow-x-auto bg-navy/5 rounded-lg p-3" ref={certRef}>
-        <div className="relative mx-auto" style={{ maxWidth: 900 }}>
-          {/* Loading spinner overlay — shown until the <img> fires
-              its onLoad event. The PNG generation on the server
-              involves canvas drawing of Arabic text + ornaments + QR,
-              which can take 1-2 seconds on a cold Vercel function. */}
-          {imgLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-navy/90 rounded-lg z-10" style={{ aspectRatio: '842 / 595' }}>
-              <Loader2 className="w-10 h-10 text-gold animate-spin mb-3" />
-              <span className="text-white/80 text-sm font-bold">جاري توليد الشهادة...</span>
-              <span className="text-white/40 text-xs mt-1">قد يستغرق هذا ثوانٍ</span>
+      {/* Fixed landscape certificate — 768×542 (export 2x = 1536×1084) */}
+      <div className="overflow-x-auto">
+        <div ref={certRef} style={{ width: 720, height: 508, margin: '0 auto', position: 'relative' }}>
+          {/* Gold frame — thicker + brighter */}
+          <div style={{ width: '100%', height: '100%', padding: '5px', background: `linear-gradient(135deg, ${GOLD}, ${GOLD_BRIGHT}, ${GOLD_L}, ${GOLD})`, borderRadius: '8px', boxShadow: `0 4px 20px ${GOLD}40` }}>
+            {/* Navy frame — deeper */}
+            <div style={{ width: '100%', height: '100%', padding: '3px', borderRadius: '6px', background: `linear-gradient(135deg, ${NAVY_DEEP}, ${NAVY}, #102a63, ${NAVY})` }}>
+              {/* Cream content */}
+              <div style={{ width: '100%', height: '100%', borderRadius: '4px', overflow: 'hidden', background: `linear-gradient(135deg, #FFFEFA, ${CREAM} 50%, #FFFEFA)`, position: 'relative' }}>
+
+                <div style={{
+                  width: '100%', height: '100%', padding: '18px 34px',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                  textAlign: 'center',
+                  backgroundImage: 'radial-gradient(circle at 10% 10%, rgba(212,175,55,0.06) 0%, transparent 40%), radial-gradient(circle at 90% 90%, rgba(10,31,68,0.05) 0%, transparent 40%)',
+                }}>
+
+                  {/* ===== TOP: Logo CENTERED + Academy name CENTERED ===== */}
+                  <div>
+                    <img src="/fia/logo-certificate.png" alt="FIA" style={{ width: '50px', height: '50px', objectFit: 'contain', margin: '0 auto 3px', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '1px' }}>
+                      <div style={{ width: '22px', height: '2px', background: `linear-gradient(to right, ${GOLD}, transparent)`, borderRadius: '1px' }} />
+                      <span style={{ fontSize: '17px', fontWeight: 900, color: NAVY, lineHeight: 1.2, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>أكاديمية المستقبل الدولية</span>
+                      <div style={{ width: '22px', height: '2px', background: `linear-gradient(to left, ${GOLD}, transparent)`, borderRadius: '1px' }} />
+                    </div>
+                    <p style={{ fontSize: '8px', color: GOLD, fontWeight: 800, letterSpacing: '0.3em', margin: 0, textTransform: 'uppercase' }}>Future International Academy</p>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 14px', borderRadius: '16px', background: `rgba(10,31,68,0.06)`, border: `1.5px solid ${GOLD}60`, marginTop: '6px' }}>
+                      <Award style={{ width: '12px', height: '12px', color: GOLD }} />
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: NAVY }}>شهادة إكمال معتمدة</span>
+                      <Award style={{ width: '12px', height: '12px', color: GOLD }} />
+                    </div>
+                  </div>
+
+                  {/* Gold separator — thicker */}
+                  <div style={{ height: '1.5px', background: `linear-gradient(to right, transparent, ${GOLD}, transparent)`, borderRadius: '1px' }} />
+
+                  {/* ===== CENTER: Student + Course ===== */}
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1 }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(10,31,68,0.65)', margin: '0 0 4px 0', fontWeight: 600 }}>تشهد أكاديمية المستقبل الدولية بأن</p>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, color: NAVY, margin: '0 0 6px 0', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>{certificate.student_name}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <div style={{ width: '48px', height: '1.5px', background: `linear-gradient(to right, ${GOLD}, transparent)`, borderRadius: '1px' }} />
+                      <Sparkles style={{ width: '13px', height: '13px', color: GOLD }} />
+                      <div style={{ width: '48px', height: '1.5px', background: `linear-gradient(to left, ${GOLD}, transparent)`, borderRadius: '1px' }} />
+                    </div>
+                    <p style={{ fontSize: '10px', color: 'rgba(10,31,68,0.65)', margin: '0 0 3px 0', fontWeight: 600 }}>قد أتمّ بنجاح جميع متطلبات دورة</p>
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, color: GOLD, margin: 0, textShadow: `0 1px 3px ${GOLD}50` }}>{certificate.course_title || 'دورة معتمدة'}</h3>
+                    {certificate.has_external_accreditation && certificate.external_accreditation_body && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 8px', borderRadius: '10px', background: `rgba(10,31,68,0.05)`, border: `1px solid ${GOLD}40`, marginTop: '5px' }}>
+                        <Shield style={{ width: '9px', height: '9px', color: GOLD }} />
+                        <span style={{ fontSize: '8px', color: NAVY }}>{certificate.external_accreditation_body}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dot divider */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ flex: 1, height: '1.5px', background: `linear-gradient(to right, ${GOLD}60, transparent)`, borderRadius: '1px' }} />
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: `${GOLD}88` }} />
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: GOLD }} />
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: `${GOLD}88` }} />
+                    <div style={{ flex: 1, height: '1.5px', background: `linear-gradient(to left, ${GOLD}60, transparent)`, borderRadius: '1px' }} />
+                  </div>
+
+                  {/* ===== BOTTOM: QR (left) + info (center) + signature (right) ===== */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px' }}>
+                    {/* QR — visually on the left in LTR, which is correct */}
+                    <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                      <img src={`/api/qr-code?text=${encodeURIComponent('fiaacademy.vercel.app/verify/' + certificate.certificate_number)}`} alt="QR" style={{ width: '46px', height: '46px', border: `1px solid ${GOLD}33`, borderRadius: '4px', padding: '2px', background: 'white' }} />
+                      <div style={{ fontSize: '7px', color: 'rgba(10,31,68,0.4)', marginTop: '2px' }}>امسح للتحقق</div>
+                    </div>
+                    {/* Info */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '4px', background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2px', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
+                          <FileText style={{ width: '10px', height: '10px', color: GOLD }} />
+                        </div>
+                        <div style={{ fontSize: '6px', color: 'rgba(10,31,68,0.6)', textTransform: 'uppercase', fontWeight: 700 }}>الرقم</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '8px', color: NAVY }} dir="ltr">{certificate.certificate_number}</div>
+                      </div>
+                      <div style={{ width: '1px', height: '28px', background: `${GOLD}40` }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '4px', background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2px', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
+                          <Calendar style={{ width: '10px', height: '10px', color: GOLD }} />
+                        </div>
+                        <div style={{ fontSize: '6px', color: 'rgba(10,31,68,0.6)', textTransform: 'uppercase', fontWeight: 700 }}>التاريخ</div>
+                        <div style={{ fontWeight: 800, fontSize: '8px', color: NAVY }}>{issuedAt ? issuedAt.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</div>
+                      </div>
+                      <div style={{ width: '1px', height: '28px', background: `${GOLD}40` }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '4px', background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2px', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
+                          <Shield style={{ width: '10px', height: '10px', color: GOLD }} />
+                        </div>
+                        <div style={{ fontSize: '6px', color: 'rgba(10,31,68,0.6)', textTransform: 'uppercase', fontWeight: 700 }}>الحالة</div>
+                        <div style={{ fontWeight: 800, fontSize: '8px', color: isVerified ? '#16a34a' : '#dc2626' }}>{certificate.status}</div>
+                      </div>
+                    </div>
+                    {/* Signature */}
+                    <div style={{ textAlign: 'center', flexShrink: 0, minWidth: '80px' }}>
+                      <div style={{ fontSize: '7px', color: 'rgba(10,31,68,0.6)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px', fontWeight: 700 }}>صادر عن</div>
+                      <div style={{ fontWeight: 800, fontSize: '8px', color: NAVY, marginBottom: '3px' }}>{certificate.issued_by || 'أكاديمية المستقبل الدولية'}</div>
+                      <div style={{ width: '80px', height: '1.5px', background: `${NAVY}44`, margin: '0 auto', borderRadius: '1px' }} />
+                      <div style={{ fontSize: '6px', color: 'rgba(10,31,68,0.5)', marginTop: '2px', fontWeight: 600 }}>التوقيع</div>
+                    </div>
+                  </div>
+
+                  {/* Slogan */}
+                  <div style={{ textAlign: 'center', paddingTop: '6px', borderTop: `1px solid ${GOLD}20` }}>
+                    <span style={{ fontSize: '9px', color: GOLD, fontWeight: 800, letterSpacing: '0.5px' }}>نحو مستقبل أفضل معاً</span>
+                  </div>
+
+                </div>
+              </div>
             </div>
-          )}
-          {/* The actual server-rendered PNG. We use object-contain
-              to preserve the 842×595 aspect ratio at any width.
-              The 'select-none' CSS hint prevents accidental text
-              selection on the wrapper, and 'pointer-events-auto'
-              on the <img> ensures long-press works in WebView. */}
-          <img
-            src={pngUrl}
-            alt={`شهادة ${certificate.student_name} - ${certificate.course_title || ''}`}
-            className="block w-full h-auto rounded-lg shadow-2xl select-none"
-            style={{ aspectRatio: '842 / 595', objectFit: 'contain' }}
-            draggable={true}
-            onLoad={() => setImgLoading(false)}
-            onError={() => {
-              setImgLoading(false)
-              toast.error('فشل تحميل صورة الشهادة — تحقق من اتصالك بالإنترنت')
-            }}
-          />
+          </div>
         </div>
-      </div>
-
-      {/* APK-specific hint — shown only when actually running in
-          the FIA Android WebView. We give the user clear instructions
-          on the long-press → save path since automatic download
-          isn't possible without an APK upgrade. */}
-      {inWebView && (
-        <div className="bg-gold/10 border border-gold/30 rounded-lg p-3 text-center">
-          <p className="text-xs font-bold text-navy mb-1">💡 كيفية حفظ الشهادة في المعرض:</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            اضغط <span className="font-bold text-navy">مطولاً</span> على الصورة أعلاه، ثم اختر{' '}
-            <span className="font-bold text-navy">"حفظ الصورة"</span> أو{' '}
-            <span className="font-bold text-navy">"Download image"</span> من القائمة المنبثقة. ستظهر الشهادة في معرض الصور (Gallery) ضمن مجلد "Download" أو "Pictures".
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-2">
-            أو استخدم زر "تنزيل (صورة)" أدناه لمحاولة الحفظ التلقائي.
-          </p>
-        </div>
-      )}
-
-      {/* Quick info row */}
-      <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <FileText className="w-3.5 h-3.5" />
-          <span className="font-mono font-bold text-navy" dir="ltr">{certificate.certificate_number}</span>
-        </span>
-        {issuedAt && (
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" />
-            {issuedAt.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </span>
-        )}
-        <span className="flex items-center gap-1">
-          <Shield className="w-3.5 h-3.5" />
-          {certificate.issued_by || 'أكاديمية المستقبل الدولية'}
-        </span>
       </div>
 
       {/* Buttons */}
@@ -198,12 +226,15 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
           {pdfDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
           {pdfDownloading ? 'جاري...' : 'تنزيل PDF'}
         </button>
-        {inWebView && (
-          <button onClick={openInNewView} className="inline-flex items-center gap-1.5 border border-muted-foreground/30 text-muted-foreground hover:bg-muted/40 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
-            <ExternalLink className="w-4 h-4" /> فتح في نافذة
-          </button>
-        )}
       </div>
+
+      {/* APK-specific hint — only shown when actually running in the
+          FIA Android WebView. */}
+      {isAndroidWebView() && (
+        <p className="text-[10px] text-muted-foreground text-center mt-1">
+          💡 تطبيق APK v2.3.0+: سيتم حفظ الصورة في المعرض تلقائياً عند الضغط على زر "تنزيل (صورة)".
+        </p>
+      )}
     </div>
   )
 }
