@@ -1,9 +1,10 @@
 // Shared notification helper used by all API routes.
 // Each function sends a notification to a user via the `notifications`
-// table. The notifications appear instantly in the user's bell icon
-// (the bell auto-refreshes via Supabase Realtime).
+// table (in-app) AND via OneSignal push (instant external OS-level
+// popup, even when the app is closed/force-killed).
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/onesignal'
 
 // =========================================================================
 // Internal helpers
@@ -11,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 async function send(userId: string, type: string, title: string, body?: string, link?: string) {
   if (!userId || !type || !title) return
+  // 1) Insert into the notifications table (in-app bell)
   try {
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
@@ -21,7 +23,14 @@ async function send(userId: string, type: string, title: string, body?: string, 
     })
   } catch {
     // Non-fatal — don't fail the parent operation because the
-    // notification couldn't be sent.
+    // notification couldn't be inserted.
+  }
+  // 2) Send OneSignal push notification (instant external OS-level
+  //    popup, works even when the app is closed/force-killed)
+  try {
+    await sendPushNotification(userId, title, body || '', { type, link: link || '/' })
+  } catch {
+    // Non-fatal — in-app notification still works even if push fails
   }
 }
 
