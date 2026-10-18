@@ -222,14 +222,23 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
         specialization: form.specialization || form.category || null,
         level: form.level,
         price_type: form.price_type,
+        // price = the ACTUAL selling price (required for paid courses).
+        // If not entered, default to 0 — but this should only happen
+        // for free courses.
         price: Number(form.price) || 0,
-        original_price: Number(form.original_price) || 0,
+        // original_price = the "was" price shown struck through.
+        // ONLY send if it's > 0 AND > price. If 0 or empty, send null
+        // so no strikethrough is shown.
+        original_price: (Number(form.original_price) || 0) > (Number(form.price) || 0)
+          ? Number(form.original_price)
+          : null,
         currency: form.currency || 'ر.ي',
         auto_coupon_code: form.auto_coupon_code?.trim() || null,
         // Promotional offer fields
         offer_type: form.offer_type || 'none',
         offer_duration_value: Number(form.offer_duration_value) || 0,
         offer_duration_unit: form.offer_duration_unit || 'days',
+        // offer_price = optional promotional price. 0 = use regular price.
         offer_price: Number(form.offer_price) || 0,
         offer_headline: form.offer_headline?.trim() || null,
         duration_hours: Number(form.duration_hours) || 0,

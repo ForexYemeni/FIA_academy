@@ -70,7 +70,9 @@ export async function PUT(req: NextRequest) {
 
     // 2) If this is an approval, also update duplicate rows for same
     //    user+course so the student's enrollment reflects the new status.
-    if (updated?.user_id && updated?.course_id) {
+    //    (Only for approval, not rejection — rejection should NOT
+    //    update other rows.)
+    if (status === 'مكتمل' && updated?.user_id && updated?.course_id) {
       try {
         await supabaseAdmin
           .from('payments')
