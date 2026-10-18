@@ -853,7 +853,7 @@ function AdminPayments() {
                     <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => { const reason = prompt('سبب الرفض (اختياري):') || ''; updateStatus(p.id, 'ملغي', reason) }}>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(p.id, 'ملغي', reason || undefined) }}>
                       <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
                     </Button>
                   </>
@@ -934,7 +934,7 @@ function AdminPayments() {
                   <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
                     <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
                   </Button>
-                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { const reason = prompt('سبب الرفض (اختياري):') || ''; updateStatus(selectedPayment.id, 'ملغي', reason) }}>
+                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(selectedPayment.id, 'ملغي', reason || undefined) }}>
                     <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
                   </Button>
                 </div>

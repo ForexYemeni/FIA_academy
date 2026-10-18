@@ -19,28 +19,15 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     if (!certRef.current) return
     setDownloading(true)
     try {
-      // Try html-to-image first
-      const htmlToImage = await import('html-to-image')
-      const dataUrl = await htmlToImage.toPng(certRef.current, {
-        quality: 0.95,
-        pixelRatio: 2,
-        backgroundColor: '#FBF7EC',
-        cacheBust: true,
-      })
-      // Create a proper download link and trigger it
-      const link = document.createElement('a')
-      link.download = `FIA-Certificate-${certificate.certificate_number}.png`
-      link.href = dataUrl
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      toast.success('تم تنزيل الشهادة كصورة ✓')
+      // Direct approach: use the server-side certificate PDF/PNG generator
+      // which produces a consistent, high-quality image that matches
+      // what's displayed on screen.
+      const pngUrl = `/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png`
+      // Open in new tab — user can long-press to save
+      window.open(pngUrl, '_blank')
+      toast.success('تم فتح الشهادة في تبويب جديد — احفظها من هناك')
     } catch (e) {
-      // Fallback: open the certificate PDF endpoint in a new tab
-      // The user can then right-click → Save Image As
-      const pdfUrl = `/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png`
-      window.open(pdfUrl, '_blank')
-      toast.info('تم فتح الشهادة في تبويب جديد — اضغط مطولاً على الصورة وحفظها')
+      toast.error('فشل تحميل الشهادة')
     } finally {
       setDownloading(false)
     }
@@ -207,8 +194,8 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         <button onClick={copyCertNumber} className="inline-flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
           <Copy className="w-4 h-4" /> نسخ الرقم
         </button>
-        <button onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png`, '_blank')} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
-          <FileText className="w-4 h-4" /> عرض / طباعة
+        <button onClick={() => window.open(`/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=pdf`, '_blank')} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
+          <FileText className="w-4 h-4" /> تنزيل PDF
         </button>
       </div>
     </div>

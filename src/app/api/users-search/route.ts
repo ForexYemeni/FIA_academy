@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
     const { data: users } = await userQuery
     if (users) {
       for (const u of users) {
+        // Skip admin-role users — they show up as "مدير" in chat search
+        // which duplicates with the founder entry from trainers table.
+        // The founder should only appear once (from the team/trainers search).
+        if (u.role === 'admin') continue
         results.push({
           id: u.id,
           name: u.name,
