@@ -2,42 +2,41 @@
  * Certificate download helper — works in regular browsers AND in the
  * FIA Academy Android APK (which wraps the site in a WebView).
  *
- * THE PROBLEM
- * ==========
- * The previous flow used `window.open(pngUrl, '_blank')`. In a browser
- * this opens a new tab where the user can long-press → save. In the
- * Android WebView, however, `window.open()` opens a separate WebView
- * window — there's no "save to gallery" affordance and the user is
- * stuck with no way to actually keep the certificate file.
+ * HONEST STATUS (verified by inspecting classes.dex in
+ * FIA-Academy-v2.2.0.apk)
+ * =========================================================
+ * The APK has WebViewClient + WebChromeClient (with
+ * onShowFileChooser for file uploads), but NO DownloadListener.
  *
- * THE FIX (multi-layered)
- * =======================
- * 1. Server side (`/api/certificate-pdf?...&download=1`):
- *    Sets `Content-Disposition: attachment` instead of `inline`.
- *    This triggers the Android WebView's `DownloadListener` (if the
- *    APK registered one — the FIA APK does, via MainActivity) which
- *    funnels the request through `android.app.DownloadManager` →
- *    the file lands in the public Downloads folder + gets indexed
- *    into MediaStore → shows up in the Gallery app.
+ * What this means:
+ * - File UPLOADS via `<input type="file">` work — the WebChromeClient
+ *   intercepts the chooser and shows the system file picker.
+ * - File DOWNLOADS via clicking links/blobs do NOT work — without
+ *   a DownloadListener registered, the WebView silently ignores the
+ *   download request. The blob+anchor approach also fails because
+ *   there's no listener to catch the blob URL navigation.
  *
- * 2. Client side (this helper):
- *    Three-tier download attempt, with graceful degradation:
- *      (a) Fetch + Blob + `<a download>` click — works in modern
- *          Chromium-based WebViews (Android 8+) where blob: URLs are
- *          intercepted by the DownloadListener. Most reliable.
- *      (b) Fallback: same URL with `&download=1` via `window.open()`.
- *          The server response has `Content-Disposition: attachment`
- *          which forces the WebView to download (not navigate).
- *      (c) Last resort: open without `download=1` (legacy inline
- *          behavior) and toast-instruct the user to long-press →
- *          save manually.
+ * Until the APK is upgraded to add `webView.setDownloadListener { ... }`
+ * (or a JS bridge method like `FIANativeBridge.saveImage(base64,
+ * filename)`), the only path for the user is:
+ *   1. Open the PNG in a new window via `window.open(inlineUrl)`
+ *   2. The user long-presses the image and selects "Save image"
+ *   3. The image is then saved to the gallery by the system's
+ *      long-press save handler (this IS built into Android).
  *
- * 3. APK toast bridge:
- *    The FIA APK exposes `window.FIANativeBridge.showToast(msg)` via
- *    `@JavascriptInterface`. We call it (when available) to give the
- *    user an instant in-app confirmation that the download started —
- *    this is especially important in the WebView because there's no
- *    visible "Downloads" UI otherwise.
+ * This helper implements the realistic behavior:
+ * - In a regular browser: try blob+anchor first (works for modern
+ *   Chrome/Firefox/Safari), fall back to window.open.
+ * - In the FIA APK WebView: skip the blob attempt (we know it won't
+ *   work without a DownloadListener), go straight to window.open +
+ *   show an honest "long-press to save" toast. The user gets the
+ *   image OPENED in a separate view where the system's long-press
+ *   → save context menu works.
+ *
+ * The previous version of this helper lied — it called
+ * `FIANativeBridge.showToast('تم التنزيل إلى المعرض ✓')` even when
+ * the download silently failed in the WebView. That was misleading
+ * and is fixed here.
  */
 
 /**
@@ -49,6 +48,9 @@
 export function isAndroidWebView(): boolean {
   if (typeof window === 'undefined') return false
   const ua = window.navigator.userAgent || ''
+  // The 'wv' marker is the most reliable signal — Chrome on Android
+  // (used as the system browser) does NOT include 'wv'; only the
+  // embedded WebView does.
   return /Android/i.test(ua) && /wv|WebView/i.test(ua)
 }
 
@@ -62,24 +64,20 @@ function showNativeToast(message: string, duration: 'short' | 'long' = 'long'): 
   try {
     const bridge = (window as any).FIANativeBridge
     if (bridge && typeof bridge.showToast === 'function') {
-      // Android-side signature: showToast(message: String, duration: String)
       bridge.showToast(message, duration)
     }
-  } catch {
-    // Silently ignore — bridge may not be available (regular browser)
-  }
+  } catch {}
 }
 
 /**
- * Triggers a small vibration via the APK bridge (if available) to
- * give haptic feedback when the download starts. No-op in browsers.
+ * Triggers a small vibration via the APK bridge (if available). No-op
+ * in browsers.
  */
 function vibrateNative(): void {
   if (typeof window === 'undefined') return
   try {
     const bridge = (window as any).FIANativeBridge
     if (bridge && typeof bridge.vibrate === 'function') {
-      // 50ms short vibration — pattern of one element
       bridge.vibrate('[50]')
     }
   } catch {}
@@ -95,10 +93,15 @@ export interface DownloadCertificateOptions {
 }
 
 /**
- * Downloads a certificate file to the device. In the FIA APK this
- * triggers the Android DownloadManager → file appears in Gallery /
- * Downloads. In a regular browser it triggers the standard browser
- * download UI.
+ * Downloads a certificate file to the device.
+ *
+ * BEHAVIOR:
+ * - In a regular browser: tries blob+anchor first (gives instant
+ *   download with the requested filename), falls back to window.open
+ *   with attachment disposition, finally to inline view.
+ * - In the FIA APK WebView (no DownloadListener): goes straight to
+ *   window.open + shows an honest toast telling the user to long-press
+ *   to save manually. Does NOT claim "downloaded to gallery".
  *
  * Returns the chosen strategy so the caller can show a more specific
  * toast if needed.
@@ -113,83 +116,98 @@ export async function downloadCertificateFile(
   const inlineUrl = `${baseUrl}/api/certificate-pdf?number=${encodeURIComponent(certificateNumber)}&format=${format}`
   // Attachment URL (for fallback b): forces Content-Disposition: attachment
   const attachmentUrl = `${inlineUrl}&download=1`
-  // Filename for the `a.download` attribute
   const filename = `FIA-Certificate-${certificateNumber}.${format}`
+  const inWebView = isAndroidWebView()
 
-  // ===== Strategy (a): fetch + blob + a.download =====
-  try {
-    const res = await fetch(attachmentUrl, { credentials: 'omit' })
-    if (res.ok) {
-      const blob = await res.blob()
-      // Sanity check: ensure the response is actually an image/pdf,
-      // not an HTML error page (which would be `text/html`)
-      const mime = blob.type
-      if ((format === 'png' && mime.startsWith('image/')) ||
-          (format === 'pdf' && mime === 'application/pdf')) {
-        const blobUrl = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = blobUrl
-        a.download = filename
-        a.rel = 'noopener noreferrer'
-        a.style.display = 'none'
-        document.body.appendChild(a)
-        a.click()
-        // Give the WebView a tick to start the download before we
-        // revoke the blob URL (revoking too early cancels the download
-        // on some Android versions).
-        setTimeout(() => {
-          try { URL.revokeObjectURL(blobUrl) } catch {}
-          try { document.body.removeChild(a) } catch {}
-        }, 2000)
-
-        vibrateNative()
-        showNativeToast(format === 'png'
-          ? 'تم تنزيل الشهادة إلى المعرض ✓'
-          : 'تم تنزيل ملف PDF إلى مجلد التنزيلات ✓')
-        onStatus('تم تنزيل الشهادة', 'success')
-        return 'blob'
+  // ====================================================================
+  // PATH 1: Regular browser — try blob + <a download>.click() first.
+  // This is the modern way to trigger a real file download with a
+  // custom filename. Works in Chrome / Firefox / Safari / Edge.
+  // ====================================================================
+  if (!inWebView) {
+    try {
+      const res = await fetch(attachmentUrl, { credentials: 'omit' })
+      if (res.ok) {
+        const blob = await res.blob()
+        const mime = blob.type
+        if ((format === 'png' && mime.startsWith('image/')) ||
+            (format === 'pdf' && (mime === 'application/pdf' || mime === 'application/octet-stream'))) {
+          const blobUrl = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = blobUrl
+          a.download = filename
+          a.rel = 'noopener noreferrer'
+          a.style.display = 'none'
+          document.body.appendChild(a)
+          a.click()
+          setTimeout(() => {
+            try { URL.revokeObjectURL(blobUrl) } catch {}
+            try { document.body.removeChild(a) } catch {}
+          }, 2000)
+          onStatus('تم تنزيل الشهادة', 'success')
+          return 'blob'
+        }
       }
-      console.warn('[FIA] certificate-pdf returned wrong MIME:', mime)
-    } else {
-      console.warn('[FIA] certificate-pdf fetch failed:', res.status, res.statusText)
+    } catch (e: any) {
+      console.warn('[FIA] blob download failed:', e?.message)
     }
-  } catch (e: any) {
-    // Likely a network error or CORS issue — fall through to strategy (b)
-    console.warn('[FIA] blob download failed, falling back to window.open:', e?.message)
+
+    // Fallback b: window.open with attachment disposition
+    try {
+      const w = window.open(attachmentUrl, '_blank')
+      if (w) {
+        onStatus('تم فتح نافذة التنزيل', 'info')
+        return 'open-attachment'
+      }
+    } catch {}
+
+    // Fallback c: inline view
+    try {
+      const w = window.open(inlineUrl, '_blank')
+      if (w) {
+        onStatus('تم فتح الشهادة — احفظها يدوياً', 'info')
+        return 'open-inline'
+      }
+    } catch {}
+
+    onStatus('فشل فتح الشهادة — تحقق من إعدادات المتصفح', 'error')
+    return 'open-inline'
   }
 
-  // ===== Strategy (b): window.open with attachment disposition =====
-  try {
-    // Some Android WebViews block multiple windows — use _top to
-    // replace the current view if popup fails.
-    const w = window.open(attachmentUrl, '_blank')
-    if (w) {
-      // A new view opened — the server's Content-Disposition: attachment
-      // should make the WebView's DownloadListener fire automatically
-      // and trigger a system download to the Gallery.
-      vibrateNative()
-      showNativeToast('جاري تنزيل الشهادة إلى المعرض...')
-      onStatus('جاري التنزيل — قد يظهر في "التنزيلات" أو "المعرض"', 'info')
-      return 'open-attachment'
-    }
-  } catch (e: any) {
-    console.warn('[FIA] window.open(attachment) failed:', e?.message)
-  }
-
-  // ===== Strategy (c): last resort — inline view + manual save =====
+  // ====================================================================
+  // PATH 2: FIA APK WebView — NO DownloadListener registered. The
+  // blob+anchor approach silently fails (the WebView just ignores the
+  // navigation). The only honest path is to OPEN the image in a new
+  // view and tell the user to long-press → save manually. The system's
+  // long-press context menu IS built into Android and works in any
+  // WebView window — that's how users save images from any webview-
+  // based app.
+  // ====================================================================
+  vibrateNative()
+  // Use the inline URL — no point adding &download=1 since the
+  // WebView has no listener to honor the Content-Disposition header.
+  // The image just needs to be VIEWABLE for long-press → save to work.
   try {
     const w = window.open(inlineUrl, '_blank')
     if (w) {
-      showNativeToast('اضغط مطولاً على الصورة ثم اختر "حفظ الصورة"')
-      onStatus('افتح الصورة مطولاً واحفظها يدوياً', 'info')
+      // Honest toast — the user needs to manually save.
+      showNativeToast('افتح الصورة واضغط مطولاً عليها ثم اختر "حفظ الصورة"')
+      onStatus('اضغط مطولاً على الصورة ثم اختر "حفظ الصورة" للمعرض', 'info')
       return 'open-inline'
     }
+    // window.open itself failed (popup blocked) — try attachment URL
+    const w2 = window.open(attachmentUrl, '_blank')
+    if (w2) {
+      showNativeToast('اضغط مطولاً على الصورة واحفظها للمعرض')
+      onStatus('اضغط مطولاً على الصورة واحفظها للمعرض', 'info')
+      return 'open-attachment'
+    }
   } catch (e: any) {
-    console.warn('[FIA] window.open(inline) failed:', e?.message)
+    console.warn('[FIA] WebView open failed:', e?.message)
   }
 
   // Total failure — couldn't even open a window
-  onStatus('فشل تحميل الشهادة — تحقق من اتصالك بالإنترنت', 'error')
-  showNativeToast('فشل تنزيل الشهادة')
+  showNativeToast('فشل فتح الشهادة — تحقق من اتصالك بالإنترنت')
+  onStatus('فشل فتح الشهادة', 'error')
   return 'open-inline'
 }

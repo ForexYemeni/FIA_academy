@@ -981,6 +981,16 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
   }
 
   const handleProofUpload = async (file: File) => {
+    // Validate on the JS side — Android WebView's accept attribute
+    // isn't always honored, so a non-image file could slip through.
+    if (!file.type.startsWith('image/')) {
+      toast.error(`الملف المختار ليس صورة (النوع: ${file.type || 'غير معروف'}). يرجى اختيار صورة لإثبات الدفع.`)
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير جداً (حد أقصى 10 ميجابايت)')
+      return
+    }
     setUploadingProof(true)
     try {
       // 1) Read the file as a data URL so we can draw it onto a canvas.
