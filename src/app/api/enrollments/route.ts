@@ -144,12 +144,12 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (existing) {
-      // If the existing enrollment is REJECTED ('ملغي'), delete it
-      // so the student can re-submit a new payment proof.
+      // If the existing enrollment is REJECTED ('ملغي'), allow re-subscription
+      // by deleting the rejected record so the student can submit a new
+      // payment proof immediately.
       if (existing.status === 'ملغي' || existing.status === 'cancelled' || existing.status === 'failed') {
         await supabaseAdmin.from('payments').delete().eq('id', existing.id)
       } else {
-        // Existing enrollment is active/pending — don't allow duplicate
         return NextResponse.json({ already_enrolled: true, ...toEnrollment(existing as StoredEnrollment) })
       }
     }

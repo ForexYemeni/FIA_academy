@@ -93,18 +93,18 @@ export async function notifyPaymentRequest(userId: string, courseId: string, amo
   const userName = await getUserName(userId)
   // Notify student
   await send(userId, 'payment', 'تم استلام إثبات الدفع',
-    `تم استلام طلب اشتراك في دورة "${courseTitle}" بمبلغ ${amount.toLocaleString()} ${currency}. سيتم تفعيل الدورة بعد مراجعة الإدارة وتأكيد الدفع.`, '#payments')
+    `تم استلام طلب اشتراك في دورة "${courseTitle}" بمبلغ ${amount.toLocaleString()} ${currency}. سيتم تفعيل الدورة بعد مراجعة الإدارة وتأكيد الدفع.`, '/#payments')
   // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'payment', 'طلب تأكيد دفع جديد',
-    `طلب جديد من "${userName}" للاشتراك في دورة "${courseTitle}" — المبلغ ${amount.toLocaleString()} ${currency}. ينتظر المراجعة والموافقة.`, '#payments')
+    `طلب جديد من "${userName}" للاشتراك في دورة "${courseTitle}" — المبلغ ${amount.toLocaleString()} ${currency}. ينتظر المراجعة والموافقة.`, '/#payments')
 }
 
 /** Admin approved a payment. Notify student + trainer. */
 export async function notifyPaymentApproved(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   await send(userId, 'payment', 'تم تأكيد الدفع ✓',
-    `تم تأكيد دفعك لدورة "${courseTitle}". يمكنك الآن الوصول إلى محتوى الدورة. ابدأ التعلم!`, '#courses')
+    `تم تأكيد دفعك لدورة "${courseTitle}". يمكنك الآن الوصول إلى محتوى الدورة. ابدأ التعلم!`, '/#courses')
   // Notify the course trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
@@ -129,7 +129,7 @@ export async function notifyCourseCompleted(userId: string, courseId: string) {
   const userName = await getUserName(userId)
   // Notify student
   await send(userId, 'completion', '🎉 أكملت الدورة بنجاح!',
-    `أحسنت! لقد أكملت دورة "${courseTitle}" بنجاح. يمكنك الآن طلب الشهادة من صفحة دوراتك.`, '#profile')
+    `أحسنت! لقد أكملت دورة "${courseTitle}" بنجاح. يمكنك الآن طلب الشهادة من صفحة دوراتك.`, '/#profile')
   // Notify trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
@@ -177,7 +177,7 @@ export async function notifyTrainerApprovedCertificate(userId: string, courseId:
 export async function notifyCertificateApproved(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   await send(userId, 'certificate', '🎉 تمت الموافقة على شهادتك!',
-    `تمت الموافقة على طلب شهادتك لدورة "${courseTitle}". يمكنك تحميل الشهادة من صفحة شهاداتك.`, '#profile')
+    `تمت الموافقة على طلب شهادتك لدورة "${courseTitle}". يمكنك تحميل الشهادة من صفحة شهاداتك.`, '/#profile')
 }
 
 /** Admin rejected a certificate request. Notify student. */
@@ -211,12 +211,12 @@ export async function notifyReviewSubmitted(userId: string, courseId: string, ra
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
     await send(trainerId, 'review', `تقييم جديد في دورتك ${stars}`,
-      `قيّم المتدرب "${userName}" دورتك "${courseTitle}" بـ ${rating || 5} من 5.`, '#courses')
+      `قيّم المتدرب "${userName}" دورتك "${courseTitle}" بـ ${rating || 5} من 5.`, '/#courses')
   }
   // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'review', 'تقييم جديد لدورة',
-    `قيّم المتدرب "${userName}" دورة "${courseTitle}" بـ ${rating || 5} من 5.`, '#courses')
+    `قيّم المتدرب "${userName}" دورة "${courseTitle}" بـ ${rating || 5} من 5.`, '/#courses')
 }
 
 // === FORUM EVENTS ===
