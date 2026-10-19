@@ -123,10 +123,10 @@ export function ConfirmDialog({
               <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${cfg.iconColor}`} />
               <div className="min-w-0">
                 {itemLabel && (
-                  <div className="text-xs text-muted-foreground mb-1">{itemLabel}</div>
+                  <div className="text-xs text-white/60 mb-1">{itemLabel}</div>
                 )}
                 {itemName && (
-                  <div className="font-bold text-navy line-clamp-3 break-words whitespace-pre-line">
+                  <div className="font-bold text-white line-clamp-3 break-words whitespace-pre-line">
                     {itemName}
                   </div>
                 )}
@@ -134,7 +134,7 @@ export function ConfirmDialog({
             </div>
           )}
           {message && (
-            <p className="text-sm text-muted-foreground text-center whitespace-pre-line">
+            <p className="text-sm text-white/60 text-center whitespace-pre-line">
               {message}
             </p>
           )}
