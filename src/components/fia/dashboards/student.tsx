@@ -873,12 +873,26 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
         )
         if (featuredCourses.length === 0) return null
         return (
-          <div className="mb-6 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-navy">
-              <Sparkles className="w-4 h-4 text-gold" /> عروض خاصة ومميزة
-              <Badge className="bg-gold/15 text-gold border-gold/30">{featuredCourses.length}</Badge>
+          <div className="mb-7 space-y-3">
+            {/* Magical section header with golden gradient + sparkles */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-navy via-navy-light to-navy p-3.5 ring-1 ring-gold/30 shadow-lg">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, #fff 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/20 rounded-full blur-2xl" />
+              <div className="relative flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md">
+                  <Sparkles className="w-5 h-5 text-navy" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-white text-sm">عروض خاصة ومميزة</div>
+                  <div className="text-gold/80 text-[10px] mt-0.5">فقط للحظات — لا تفوّت الفرصة</div>
+                </div>
+                <Badge className="bg-gold/20 text-gold border-gold/40 backdrop-blur-sm font-bold">{featuredCourses.length} عروض</Badge>
+              </div>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
               {featuredCourses.map((c: any) => {
                 const isFree = c.price_type === 'مجانية' || c.price === 0
                 const offerPrice = Number(c.offer_price) || 0
@@ -891,11 +905,6 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
                   c.offer_duration_unit === 'weeks' ? 'أسبوع' : 'شهر'
 
                 // === Remaining time for limited-time offers ===
-                // Use the course's updated_at as the offer start time
-                // (the trainer saves the course when setting the offer).
-                // Compute the expiry = updated_at + duration, then
-                // remaining = expiry - now. If remaining ≤ 0, the
-                // offer has expired — don't show this card.
                 const offerStart = c.updated_at || c.created_at
                 let remainingMs: number | null = null
                 let expired = false
@@ -910,7 +919,6 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
                   if (remainingMs <= 0) expired = true
                 }
                 if (expired) return null
-                // Format remaining time as "X ساعة Y دقيقة" or "X يوم Y ساعة"
                 const fmtRemaining = (ms: number) => {
                   const totalSec = Math.floor(ms / 1000)
                   const days = Math.floor(totalSec / 86400)
@@ -921,64 +929,102 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
                   if (mins > 0) return `${mins} دقيقة`
                   return 'تنتهي قريباً'
                 }
+                const discountPct = hasDiscount
+                  ? Math.round((1 - displayPrice / Math.max(originalPrice, 1)) * 100)
+                  : 0
                 return (
                   <Card
                     key={c.id}
-                    className={`overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-1 ring-2 ${isLimited ? 'ring-gold/50' : 'ring-gold/30'}`}
+                    className={`fia-course-card overflow-hidden cursor-pointer ${isLimited ? 'fia-limited-ring' : 'fia-featured-ring'}`}
                     onClick={() => handleCardClick(c)}
                   >
-                    {/* Cover + prominent featured badge */}
-                    <div className="h-32 bg-navy relative">
-                      {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-                      <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/30 to-transparent" />
-                      {/* Big offer badge top-right */}
-                      <div className={`absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 ${isLimited ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse' : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'}`}>
-                        {isLimited ? <Clock className="w-3.5 h-3.5" /> : <Star className="w-3.5 h-3.5" />}
-                        <span className="text-xs font-extrabold">{isLimited ? '⏰ لمدة محدودة' : '⭐ مميزة'}</span>
+                    {/* Magical cover with zoom + shine sweep */}
+                    <div className="relative h-36 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                      {c.cover && (
+                        <img
+                          src={c.cover}
+                          alt={c.title}
+                          loading="lazy"
+                          className="fia-cover-img absolute inset-0 w-full h-full object-cover"
+                        />
+                      )}
+                      {/* Layered overlays for legibility */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/40 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                      <div className="fia-shine" />
+
+                      {/* Offer badge top-right — animated gradient */}
+                      <div className={`absolute top-2.5 right-2.5 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 ring-1 ${isLimited ? 'bg-gradient-to-r from-red-500 via-rose-500 to-red-600 text-white ring-white/30 fia-pulse-red' : 'bg-gradient-to-r from-gold via-amber-400 to-gold text-navy ring-white/40'}`}>
+                        {isLimited ? <Clock className="w-3.5 h-3.5" /> : <Star className="w-3.5 h-3.5 fill-current" />}
+                        <span className="text-[11px] font-extrabold tracking-tight">{isLimited ? '⏰ لمدة محدودة' : '⭐ مميزة'}</span>
                       </div>
-                      {/* Remaining time chip for limited-time offers */}
+
+                      {/* Discount % — rotated chip top-left */}
+                      {hasDiscount && (
+                        <div className="fia-discount-pop absolute top-2.5 left-2.5 w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex flex-col items-center justify-center shadow-lg ring-2 ring-white/60">
+                          <span className="text-[11px] font-extrabold leading-none">{discountPct}%</span>
+                          <span className="text-[8px] font-bold leading-none mt-0.5">خصم</span>
+                        </div>
+                      )}
+
+                      {/* Remaining time chip — limited-time offers */}
                       {isLimited && remainingMs !== null && (
-                        <div className="absolute bottom-2 right-2 bg-white text-red-600 text-[10px] font-extrabold px-2 py-1 rounded-md shadow-md border border-red-500/30 flex items-center gap-1">
+                        <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-sm text-red-600 text-[10px] font-extrabold px-2.5 py-1 rounded-lg shadow-md border border-red-500/30 flex items-center gap-1">
                           <Clock className="w-3 h-3" /> {fmtRemaining(remainingMs)}
                         </div>
                       )}
+
                       {/* For featured (not limited), show duration chip */}
                       {!isLimited && Number(c.offer_duration_value) > 0 && (
-                        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-navy text-[10px] font-bold px-2 py-0.5 rounded-md" dir="ltr">
+                        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-navy text-[10px] font-bold px-2.5 py-1 rounded-lg shadow" dir="ltr">
                           {c.offer_duration_value} {unitLabel}
                         </div>
                       )}
+
+                      {/* Level chip bottom-left */}
+                      {c.level && (
+                        <div className="absolute bottom-2 left-2 bg-navy/80 text-gold text-[10px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm border border-gold/30">
+                          {c.level}
+                        </div>
+                      )}
                     </div>
-                    {/* Body */}
-                    <div className="p-4">
+
+                    {/* Body — magical gradient header strip */}
+                    <div className="relative p-4">
+                      {/* Magical top strip */}
+                      <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-80" />
+
                       {c.offer_headline && (
-                        <div className={`text-xs font-bold mb-1 ${isLimited ? 'text-red-600' : 'text-gold'}`}>
+                        <div className={`text-xs font-bold mb-1.5 truncate flex items-center gap-1 ${isLimited ? 'text-red-600' : 'text-gold'}`}>
                           {isLimited ? '⏰' : '⭐'} {c.offer_headline}
                         </div>
                       )}
                       <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+
+                      {/* Magical price display */}
                       <div className="flex items-baseline gap-2 mb-3">
                         {isFree ? (
-                          <span className="text-2xl font-extrabold text-green-600" dir="ltr">مجانية</span>
+                          <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent" dir="ltr">مجانية</span>
                         ) : (
                           <>
                             {hasDiscount && (
-                              <span className="text-xs line-through text-red-500" dir="ltr">
+                              <span className="text-xs line-through text-red-500/80 font-bold" dir="ltr">
                                 {originalPrice.toLocaleString()} {c.currency || 'ر.ي'}
                               </span>
                             )}
-                            <span className="text-xl font-extrabold text-gold" dir="ltr">
+                            <span className="text-xl font-extrabold bg-gradient-to-r from-gold to-amber-500 bg-clip-text text-transparent" dir="ltr">
                               {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                             </span>
                           </>
                         )}
                       </div>
+
                       <Button
                         size="sm"
-                        className={`w-full text-xs ${isLimited ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-navy hover:bg-navy-light text-gold'}`}
+                        className={`w-full text-xs rounded-xl shadow-md hover:shadow-lg active:scale-[0.97] transition-all ${isLimited ? 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white' : 'bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold border border-gold/30'}`}
                         onClick={(e) => { e.stopPropagation(); handleCardClick(c) }}
                       >
-                        {isFree ? 'سجّل الآن — مجانية' : 'احصل على العرض الآن'}
+                        {isFree ? '✨ سجّل الآن — مجانية' : '🚀 احصل على العرض الآن'}
                       </Button>
                     </div>
                   </Card>
@@ -989,7 +1035,8 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
         )
       })()}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* === Main course grid — magical creative cards === */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
         {courses.map((c: any) => {
           const enr = enrollments?.find((e: any) => e.course_id === c.id)
           const isPendingPayment = enr?.payment_status === 'pending'
@@ -997,130 +1044,152 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
           const isFree = c.price_type === 'مجانية' || c.price === 0
           const isPaidNotEnrolled = !enr && !isFree
           // === Offer price logic ===
-          // - offer_price (if > 0) takes priority — it's the special
-          //   promotional price for this course.
-          // - If offer_price = 0, fall back to the regular course.price.
-          // - The "struck through" original is whichever is bigger:
-          //   original_price (the was-price) or the regular price
-          //   (when offer_price < price).
           const originalPriceField = Number(c.original_price) || 0
           const regularPrice = Number(c.price) || 0
           const offerPrice = Number(c.offer_price) || 0
-          // displayPrice = the price the student actually pays
           const displayPrice = offerPrice > 0 ? offerPrice : regularPrice
-          // strikePrice = the price that gets struck through (the "was" price)
-          // Pick the LARGER of original_price and regular price as the
-          // "was" price, so the user sees the biggest possible discount.
           const strikePrice = Math.max(originalPriceField, regularPrice, offerPrice)
           const hasDiscount = !isFree && strikePrice > displayPrice && displayPrice > 0
-          // Offer flag — is this course currently in an offer period?
           const hasOffer = !isFree && (c.offer_type === 'limited_time' || c.offer_type === 'featured')
           const offerPct = hasDiscount
             ? Math.round((1 - displayPrice / strikePrice) * 100)
             : 0
+          // Magical border ring based on state
+          const ringClass = hasOffer
+            ? (c.offer_type === 'limited_time' ? 'fia-limited-ring' : 'fia-featured-ring')
+            : isOpenable
+              ? 'ring-2 ring-emerald-400/50'
+              : isPendingPayment
+                ? 'ring-2 ring-amber-400/60'
+                : isPaidNotEnrolled
+                  ? 'ring-1 ring-gold/40'
+                  : 'ring-1 ring-gray-200'
           return (
             <Card
               key={c.id}
-              className={`overflow-hidden card-hover cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${
-                hasOffer ? 'ring-2 ring-gold/50' :
-                isOpenable ? 'ring-2 ring-green-500/30'
-                : isPendingPayment ? 'ring-2 ring-yellow-500/40'
-                : isPaidNotEnrolled ? 'ring-1 ring-gold/40'
-                : ''
-              }`}
+              className={`fia-course-card overflow-hidden cursor-pointer ${ringClass}`}
               onClick={() => handleCardClick(c)}
             >
-              <div className="h-40 bg-navy relative">
-                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-                {/* Gradient overlay for legibility of the price badge */}
-                <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-transparent to-transparent" />
+              {/* === Magical cover === */}
+              <div className="relative h-44 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                {c.cover && (
+                  <img
+                    src={c.cover}
+                    alt={c.title}
+                    loading="lazy"
+                    className="fia-cover-img absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+                {/* Gradient overlays for legibility */}
+                <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                <div className="fia-shine" />
 
-                <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+                {/* Level chip top-right */}
+                {c.level && (
+                  <Badge className="absolute top-2.5 right-2.5 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm shadow-md">{c.level}</Badge>
+                )}
 
                 {/* Prominent price display in the middle-bottom of the image */}
                 {!isFree && (
-                  <div className="absolute bottom-2 right-2 left-2 flex flex-col items-center justify-center text-center">
+                  <div className="absolute bottom-2.5 right-2.5 left-2.5 flex flex-col items-center justify-center text-center">
                     {hasDiscount ? (
-                      <div className={`flex items-baseline gap-2 rounded-lg px-3 py-1.5 border shadow-lg ${
+                      <div className={`flex items-baseline gap-2 rounded-xl px-3 py-1.5 border shadow-lg ${
                         hasOffer
-                          ? 'bg-gradient-to-r from-red-600 to-red-800 border-red-300/30'
+                          ? 'bg-gradient-to-r from-red-600 to-rose-800 border-red-300/30'
                           : 'bg-white/10 backdrop-blur-md border-white/20'
                       }`}>
                         <span className="text-xs line-through text-white/70 font-bold" dir="ltr">
                           {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
-                        <span className={`text-xl font-extrabold ${hasOffer ? 'text-gold' : 'text-gold'}`} dir="ltr">
+                        <span className="text-xl font-extrabold text-gold" dir="ltr">
                           {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </div>
                     ) : (
-                      <div className="bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/20 shadow-lg">
+                      <div className="bg-white/10 backdrop-blur-md rounded-xl px-3 py-1.5 border border-white/20 shadow-lg">
                         <span className="text-xl font-extrabold text-gold" dir="ltr">
                           {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </div>
                     )}
                     {hasDiscount && (
-                      <div className={`mt-1 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow ${
-                        hasOffer ? 'bg-yellow-400 text-navy' : 'bg-red-500'
-                      }`}>
+                      <div className="fia-discount-pop mt-1.5 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md bg-gradient-to-r from-yellow-400 to-amber-500 text-navy ring-1 ring-white/40">
                         {offerPct}% خصم{hasOffer ? ' — عرض خاص' : ''}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Status / offer badge in top-left */}
+                {/* === Status / offer badge top-left — magical pill === */}
                 {hasOffer ? (
-                  <Badge className={`absolute top-2 left-2 flex items-center gap-1 backdrop-blur-sm ${
-                    c.offer_type === 'limited_time'
-                      ? 'bg-gradient-to-r from-red-500 to-red-700 text-white animate-pulse'
-                      : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'
-                  }`}>
-                    {c.offer_type === 'limited_time' ? <Clock className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+                  <Badge className={`absolute top-2.5 left-2.5 flex items-center gap-1 backdrop-blur-sm shadow-md ${c.offer_type === 'limited_time' ? 'bg-gradient-to-r from-red-500 to-red-700 text-white fia-pulse-red' : 'bg-gradient-to-r from-gold to-yellow-500 text-navy'}`}>
+                    {c.offer_type === 'limited_time' ? <Clock className="w-3 h-3" /> : <Star className="w-3 h-3 fill-current" />}
                     {c.offer_type === 'limited_time' ? '⏰ لمدة محدودة' : '⭐ مميزة'}
                   </Badge>
                 ) : isOpenable ? (
-                  <Badge className="absolute top-2 left-2 bg-green-500 text-white flex items-center gap-1 backdrop-blur-sm">
+                  <Badge className="fia-status-glow absolute top-2.5 left-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center gap-1 backdrop-blur-sm shadow-md border border-emerald-300/40">
                     <CheckCircle2 className="w-3 h-3" /> مسجّل — اضغط للفتح
                   </Badge>
                 ) : isPendingPayment ? (
-                  <Badge className="absolute top-2 left-2 bg-yellow-500 text-navy flex items-center gap-1 backdrop-blur-sm">
+                  <Badge className="absolute top-2.5 left-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-navy flex items-center gap-1 backdrop-blur-sm shadow-md border border-amber-300/50">
                     <Clock className="w-3 h-3" /> بانتظار الدفع
                   </Badge>
                 ) : isFree ? (
-                  <Badge className="absolute top-2 left-2 bg-green-500 text-white backdrop-blur-sm">مجانية — اضغط للفتح</Badge>
+                  <Badge className="absolute top-2.5 left-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white backdrop-blur-sm shadow-md border border-emerald-300/40 flex items-center gap-1">
+                    <Gift className="w-3 h-3" /> مجانية — اضغط للفتح
+                  </Badge>
                 ) : (
-                  <Badge className="absolute top-2 left-2 bg-gold text-navy backdrop-blur-sm">مدفوعة — اضغط للاشتراك</Badge>
+                  <Badge className="absolute top-2.5 left-2.5 bg-gradient-to-r from-gold to-amber-500 text-navy backdrop-blur-sm shadow-md border border-gold/40 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> مدفوعة — اضغط للاشتراك
+                  </Badge>
                 )}
               </div>
-              <div className="p-4">
+
+              {/* === Magical body === */}
+              <div className="relative p-4">
+                {/* Top magical strip */}
+                <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+
                 {/* Offer headline (if set) */}
                 {hasOffer && c.offer_headline && (
-                  <div className={`text-xs font-bold mb-1 truncate ${c.offer_type === 'limited_time' ? 'text-red-600' : 'text-gold'}`}>
+                  <div className={`text-xs font-bold mb-1.5 truncate flex items-center gap-1 ${c.offer_type === 'limited_time' ? 'text-red-600' : 'text-gold'}`}>
                     {c.offer_type === 'limited_time' ? '⏰' : '⭐'} {c.offer_headline}
                   </div>
                 )}
-                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+
+                {/* Title + magical gradient on hover */}
+                <h3 className="font-bold text-navy text-sm mb-1.5 line-clamp-2 min-h-[2.5rem] transition-colors">{c.title}</h3>
+
+                {/* Description */}
                 <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{c.short_description}</p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                  <span className="flex items-center gap-1">
+
+                {/* Meta row — duration + price */}
+                <div className="flex items-center justify-between text-xs mb-3">
+                  <span className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="w-3 h-3" /> {c.duration_hours || 0} ساعة
                   </span>
-                  <span className="font-bold text-navy" dir="ltr">
-                    {isFree ? <span className="text-green-600">مجانية</span> : hasDiscount ? (
-                      <span>
-                        <span className="line-through text-red-500 text-[10px]" dir="ltr">
+                  <span className="font-bold" dir="ltr">
+                    {isFree ? <span className="text-emerald-600">مجانية</span> : hasDiscount ? (
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="line-through text-red-500/70 text-[10px]" dir="ltr">
                           {strikePrice.toLocaleString()} {c.currency || 'ر.ي'}
-                        </span>{' '}
-                        <span className="text-green-600" dir="ltr">
+                        </span>
+                        <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent" dir="ltr">
                           {displayPrice.toLocaleString()} {c.currency || 'ر.ي'}
                         </span>
                       </span>
-                    ) : `${displayPrice.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                    ) : <span className="text-gold">{displayPrice.toLocaleString()} {c.currency || 'ر.ي'}</span>}
                   </span>
                 </div>
-                <div className="text-[10px] text-muted-foreground/80 text-center">
+
+                {/* CTA hint — magical gradient pill */}
+                <div className={`text-[10px] font-bold text-center py-1.5 rounded-lg transition-all ${
+                  isOpenable ? 'bg-emerald-50/80 text-emerald-700 border border-emerald-200/50' :
+                  isPendingPayment ? 'bg-amber-50/80 text-amber-700 border border-amber-200/50' :
+                  isFree ? 'bg-emerald-50/80 text-emerald-700 border border-emerald-200/50' :
+                  'bg-navy/5 text-navy border border-gold/30'
+                }`}>
                   {isOpenable
                     ? '↵ اضغط لفتح الدورة'
                     : isPendingPayment
@@ -1134,6 +1203,20 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
           )
         })}
       </div>
+
+      {/* === Empty state — magical when no courses exist === */}
+      {(!courses || courses.length === 0) && (
+        <div className="text-center py-16">
+          <div className="relative inline-block mb-5">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <BookOpen className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد دورات بعد</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">سيتم إضافة دورات جديدة قريباً — ترقّب الإشعارات ✨</p>
+        </div>
+      )}
 
       {payDialog?.open && (
         <PaymentDialog
