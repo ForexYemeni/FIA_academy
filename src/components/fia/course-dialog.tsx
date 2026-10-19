@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift,
+  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus,
 } from 'lucide-react'
 
 // Category groups — top-level dropdown
