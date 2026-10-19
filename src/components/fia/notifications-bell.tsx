@@ -360,13 +360,46 @@ export function NotificationsBell() {
             for (const n of fresh) {
               if (!recentlyAnnouncedRef.current.has(n.id)) {
                 recentlyAnnouncedRef.current.add(n.id)
-                // Cleanup: keep only the last 50 IDs to avoid unbounded growth
-                if (recentlyAnnouncedRef.current.size > 50) {
+                // Cleanup: keep only the last 100 IDs to avoid unbounded growth
+                // (raised from 50 to 100 to reduce the risk of losing
+                // announcements if 50+ notifications arrive in quick succession)
+                if (recentlyAnnouncedRef.current.size > 100) {
                   const arr = Array.from(recentlyAnnouncedRef.current)
-                  recentlyAnnouncedRef.current = new Set(arr.slice(-50))
+                  recentlyAnnouncedRef.current = new Set(arr.slice(-100))
                 }
                 announceNotification(n)
               }
+            }
+          } else {
+            // ⚡ First load (prev was empty). Mark ALL existing items as
+            // already announced so we DON'T fire popups for old notifications
+            // the user has already seen. This prevents a flood of popups
+            // when the user re-opens the app after being away.
+            // But if there are notifications newer than the last time the
+            // user visited (tracked via localStorage 'lastNotifSeen'),
+            // we DO announce those.
+            const lastSeen = (() => {
+              try { return localStorage.getItem('fia-last-notif-seen') || '' } catch { return '' }
+            })()
+            let lastSeenDate = 0
+            try { lastSeenDate = lastSeen ? new Date(lastSeen).getTime() : 0 } catch {}
+            for (const n of newItems) {
+              recentlyAnnouncedRef.current.add(n.id)
+              // Announce only notifications newer than lastSeen
+              const nDate = n.created_at ? new Date(n.created_at).getTime() : 0
+              if (nDate > lastSeenDate && lastSeenDate > 0) {
+                announceNotification(n)
+              }
+            }
+            // Cleanup
+            if (recentlyAnnouncedRef.current.size > 100) {
+              const arr = Array.from(recentlyAnnouncedRef.current)
+              recentlyAnnouncedRef.current = new Set(arr.slice(-100))
+            }
+            // Save the most recent notification's created_at as lastSeen
+            const mostRecent = newItems[0]  // newest first (sorted by API)
+            if (mostRecent?.created_at) {
+              try { localStorage.setItem('fia-last-notif-seen', mostRecent.created_at) } catch {}
             }
           }
           return newItems
@@ -410,10 +443,15 @@ export function NotificationsBell() {
             // (e.g. by the polling fallback that ran 50ms earlier).
             if (recentlyAnnouncedRef.current.has(n.id)) return
             recentlyAnnouncedRef.current.add(n.id)
-            // Cleanup: keep only the last 50 IDs
-            if (recentlyAnnouncedRef.current.size > 50) {
+            // Cleanup: keep only the last 100 IDs (raised from 50)
+            if (recentlyAnnouncedRef.current.size > 100) {
               const arr = Array.from(recentlyAnnouncedRef.current)
-              recentlyAnnouncedRef.current = new Set(arr.slice(-50))
+              recentlyAnnouncedRef.current = new Set(arr.slice(-100))
+            }
+            // Update lastSeen in localStorage so the polling fallback
+            // doesn't re-announce this notification on the next load()
+            if (n.created_at) {
+              try { localStorage.setItem('fia-last-notif-seen', n.created_at) } catch {}
             }
             announceNotification(n)
           }
