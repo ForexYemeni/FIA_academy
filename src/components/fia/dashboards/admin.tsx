@@ -1482,30 +1482,128 @@ function AdminPaymentMethods() {
       setDeleting(false)
     }
   }
+
+  // Helper: get category badge
+  const getCategoryInfo = (p: any) => {
+    if (p.payment_category === 'crypto') {
+      return { label: 'عملة رقمية', color: 'from-amber-500 to-orange-600', text: 'text-amber-600', bg: 'bg-amber-50', icon: '₿' }
+    }
+    return { label: 'عملة محلية', color: 'from-emerald-500 to-teal-600', text: 'text-emerald-600', bg: 'bg-emerald-50', icon: '💵' }
+  }
+
   return (
     <SectionCard
       title="طرق الدفع"
       description={`${items.length} طريقة`}
       action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديدة</Button>}
     >
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((p) => (
-          <Card key={p.id} className="p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div className="text-3xl">{p.icon}</div>
-              <Switch checked={!!p.enabled} onCheckedChange={(v) => toggle(p.id, v)} />
+      {/* ⚡ Professional payment method cards */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {items.map((p) => {
+          const cat = getCategoryInfo(p)
+          return (
+            <div key={p.id} className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200/60 hover:shadow-lg transition-all">
+              {/* Top gradient bar based on category */}
+              <div className={`h-1.5 bg-gradient-to-r ${cat.color}`} />
+              {/* Body */}
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center shadow-sm text-lg font-bold text-white`}>
+                      {p.payment_category === 'crypto' ? (p.crypto_coin?.charAt(0) || '₿') : (p.icon || '💳')}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-navy text-sm leading-tight">{p.name}</h4>
+                      <span className={`text-[10px] ${cat.text} ${cat.bg} px-2 py-0.5 rounded-full font-medium`}>{cat.label}</span>
+                    </div>
+                  </div>
+                  <Switch checked={!!p.enabled} onCheckedChange={(v) => toggle(p.id, v)} />
+                </div>
+
+                {/* Crypto details */}
+                {p.payment_category === 'crypto' && (
+                  <div className="space-y-1.5 mb-3 p-2.5 bg-amber-50/50 rounded-xl border border-amber-100/60">
+                    {p.crypto_coin && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">العملة:</span>
+                        <span className="font-bold text-amber-700">{p.crypto_coin}</span>
+                      </div>
+                    )}
+                    {p.crypto_network && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">الشبكة:</span>
+                        <span className="font-mono font-bold text-amber-700" dir="ltr">{p.crypto_network}</span>
+                      </div>
+                    )}
+                    {p.wallet_address && (
+                      <div className="text-[11px]">
+                        <span className="text-gray-400">العنوان: </span>
+                        <span className="font-mono text-navy break-all" dir="ltr">{p.wallet_address.substring(0, 20)}...{p.wallet_address.slice(-4)}</span>
+                      </div>
+                    )}
+                    {p.binance_pay_id && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">Binance Pay ID:</span>
+                        <span className="font-mono font-bold text-amber-700" dir="ltr">{p.binance_pay_id}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Local currency details */}
+                {p.payment_category !== 'crypto' && (
+                  <div className="space-y-1.5 mb-3 p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100/60">
+                    {p.account_number && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">رقم الحساب:</span>
+                        <span className="font-mono font-bold text-emerald-700" dir="ltr">{p.account_number}</span>
+                      </div>
+                    )}
+                    {p.account_holder && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">صاحب الحساب:</span>
+                        <span className="font-medium text-emerald-700">{p.account_holder}</span>
+                      </div>
+                    )}
+                    {p.currency && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">العملة:</span>
+                        <span className="font-bold text-emerald-700">{p.currency}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Instructions */}
+                {p.instructions && <p className="text-[11px] text-gray-400 line-clamp-2 mb-3">{p.instructions}</p>}
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
+                  <Button size="sm" variant="ghost" className="h-8 px-2.5 text-navy hover:bg-navy/5" onClick={() => { setEditing(p); setOpen(true) }}>
+                    <Edit className="w-3.5 h-3.5" /> تعديل
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2.5 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}>
+                    <Trash2 className="w-3.5 h-3.5" /> حذف
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="font-bold text-navy">{p.name}</div>
-            <div className="text-xs text-muted-foreground mb-2">{p.description || ''}</div>
-            {p.wallet_id && <div className="text-xs font-mono text-gold" dir="ltr">{p.wallet_id}</div>}
-            <div className="flex gap-2 mt-3">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
+          )
+        })}
+        {/* Empty state */}
+        {!items.length && (
+          <div className="text-center py-12 col-span-full">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+              <DollarSign className="w-8 h-8 text-gray-300" />
             </div>
-          </Card>
-        ))}
+            <p className="text-sm text-muted-foreground mb-4">لا توجد طرق دفع بعد</p>
+            <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> إضافة طريقة دفع</Button>
+          </div>
+        )}
       </div>
-      {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'icon', 'type', 'wallet_id', 'description', 'instructions']} apiPath="/api/payment-methods" />}
+
+      {/* ⚡ Professional Payment Method Dialog */}
+      {open && <PaymentMethodDialog open={open} onOpenChange={setOpen} editing={editing} onSaved={load} />}
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -1521,6 +1619,244 @@ function AdminPaymentMethods() {
         loading={deleting}
       />
     </SectionCard>
+  )
+}
+
+// ⚡ Professional Payment Method Dialog — supports crypto + local currencies
+function PaymentMethodDialog({ open, onOpenChange, editing, onSaved }: any) {
+  const [form, setForm] = useState<any>(editing || {})
+  const [saving, setSaving] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null)
+
+  useEffect(() => {
+    setForm(editing || { payment_category: 'local', enabled: true, type: 'manual', currency: 'ر.ي' })
+  }, [editing])
+
+  const CRYPTO_COINS = [
+    { value: 'USDT', label: 'USDT (تيثر)' },
+    { value: 'USDC', label: 'USDC (USD Coin)' },
+    { value: 'BTC', label: 'BTC (بيتكوين)' },
+    { value: 'ETH', label: 'ETH (إيثيريوم)' },
+    { value: 'BNB', label: 'BNB (بايننس)' },
+  ]
+
+  const CRYPTO_NETWORKS = [
+    { value: 'TRC20', label: 'TRC20 (Tron) — رسوم منخفضة' },
+    { value: 'ERC20', label: 'ERC20 (Ethereum) — رسوم مرتفعة' },
+    { value: 'BSC', label: 'BSC (Binance Smart Chain)' },
+    { value: 'BEP20', label: 'BEP20 (Binance)' },
+    { value: 'MATIC', label: 'MATIC (Polygon)' },
+    { value: 'SOL', label: 'SOL (Solana)' },
+  ]
+
+  const CATEGORIES = [
+    { value: 'local', label: '💵 عملة محلية (تحويل بنكي / محفظة)', icon: '💵' },
+    { value: 'crypto', label: '₿ عملة رقمية (USDT / Binance Pay)', icon: '₿' },
+  ]
+
+  const CURRENCIES = ['ر.ي', 'ر.س', '$', '€', 'د.إ']
+
+  const save = async () => {
+    if (!form.name) { toast.error('أدخل اسم طريقة الدفع'); return }
+    setSaving(true)
+    try {
+      const body = {
+        ...form,
+        name: form.name,
+        icon: form.icon || (form.payment_category === 'crypto' ? '₿' : '💳'),
+        type: form.type || 'manual',
+        currency: form.currency || 'ر.ي',
+        enabled: form.enabled !== false,
+      }
+      const url = '/api/payment-methods'
+      const method = editing ? 'PUT' : 'POST'
+      if (editing) body.id = editing.id
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) { toast.error('فشل الحفظ'); return }
+      toast.success(editing ? 'تم التحديث' : 'تمت الإضافة')
+      onOpenChange(false)
+      onSaved?.()
+    } catch { toast.error('خطأ') }
+    finally { setSaving(false) }
+  }
+
+  // ⚡ Custom Dropdown (same magical style as course dialog)
+  const CustomSelect = ({ label, value, onChange, options, icon }: any) => {
+    const selectedOption = options.find((o: any) => (o.value || o) === value)
+    const selectedLabel = selectedOption?.label || selectedOption || value || '— اختر —'
+    const isOpen = dropdownOpen === label
+
+    return (
+      <div>
+        {label && <Label className="text-xs font-bold text-navy mb-1.5 block">{label}</Label>}
+        <button type="button" onClick={() => setDropdownOpen(isOpen ? null : label)}
+          className="w-full h-11 px-3 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm flex items-center justify-between gap-2">
+          <span className="font-medium text-navy truncate">{selectedLabel}</span>
+          <ChevronDown className={`w-4 h-4 text-navy/40 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-[100]" onClick={() => setDropdownOpen(null)} />
+            <div className="absolute z-[100] mt-1 w-full bg-white rounded-2xl shadow-2xl border border-gray-200/60 overflow-hidden max-h-64 overflow-y-auto">
+              {options.map((o: any) => {
+                const val = o.value || o
+                const lbl = o.label || o
+                const isSelected = val === value
+                return (
+                  <button key={val} type="button" onClick={() => { onChange(val); setDropdownOpen(null) }}
+                    className={`w-full px-4 py-3 text-right text-sm font-medium flex items-center justify-between gap-2 transition-all ${isSelected ? 'bg-gradient-to-l from-navy/10 to-navy/5 text-navy border-r-4 border-r-gold' : 'text-gray-600 hover:bg-gray-50 hover:text-navy'}`}>
+                    <span>{lbl}</span>
+                    {isSelected && <CheckCircle2 className="w-4 h-4 text-gold flex-shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto p-0 gap-0 border-0">
+        {/* ⚡ Magical gradient header — emerald/amber based on category */}
+        <div className={`relative p-5 pb-6 rounded-t-2xl overflow-hidden transition-all ${form.payment_category === 'crypto' ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600' : 'bg-gradient-to-br from-emerald-600 to-teal-700'}`}>
+          <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '25px 25px, 20px 20px' }} />
+          <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-12 -translate-y-12" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+              <DollarSign className="w-7 h-7 text-white" strokeWidth={2.2} />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">{editing ? 'تعديل طريقة الدفع' : 'طريقة دفع جديدة'}</DialogTitle>
+              <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> {form.payment_category === 'crypto' ? 'عملة رقمية' : 'عملة محلية'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className={`bg-gradient-to-b p-5 space-y-4 rounded-b-2xl ${form.payment_category === 'crypto' ? 'from-amber-50/30 to-white' : 'from-emerald-50/30 to-white'}`}>
+          {/* Category selector — two beautiful cards */}
+          <div>
+            <Label className="text-xs font-bold text-navy mb-2 block">نوع طريقة الدفع</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {CATEGORIES.map((cat) => {
+                const isActive = form.payment_category === cat.value
+                return (
+                  <button key={cat.value} type="button" onClick={() => setForm({ ...form, payment_category: cat.value })}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isActive ? (cat.value === 'crypto' ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300 shadow-md' : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300 shadow-md') : 'border-gray-200/60 bg-white hover:border-gray-300'}`}>
+                    <span className="text-2xl">{cat.icon}</span>
+                    <span className={`text-xs font-bold ${isActive ? (cat.value === 'crypto' ? 'text-amber-700' : 'text-emerald-700') : 'text-gray-500'}`}>{cat.label.split(' (')[0]}</span>
+                    {isActive && <CheckCircle2 className={`w-4 h-4 ${cat.value === 'crypto' ? 'text-amber-500' : 'text-emerald-500'}`} />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Common fields — name */}
+          <div className={`p-4 rounded-2xl border space-y-3 ${form.payment_category === 'crypto' ? 'bg-amber-50/30 border-amber-100/60' : 'bg-emerald-50/30 border-emerald-100/60'}`}>
+            <div>
+              <Label className="text-xs font-bold text-navy mb-1.5 block">اسم المحفظة / طريقة الدفع *</Label>
+              <Input value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="مثال: بنك الكريمي / محفظة جوالي / USDT-TRC20"
+                className={`h-11 text-sm bg-white/80 rounded-xl ${form.payment_category === 'crypto' ? 'border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30' : 'border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30'}`} />
+            </div>
+          </div>
+
+          {/* Crypto fields */}
+          {form.payment_category === 'crypto' && (
+            <div className="p-4 bg-gradient-to-br from-amber-50/80 to-orange-50/50 rounded-2xl border border-amber-200/40 space-y-3">
+              {/* Coin selector */}
+              <CustomSelect label="العملة الرقمية" value={form.crypto_coin || ''} onChange={(v: string) => setForm({ ...form, crypto_coin: v })}
+                options={CRYPTO_COINS} />
+
+              {/* Network selector */}
+              <CustomSelect label="الشبكة (Network)" value={form.crypto_network || ''} onChange={(v: string) => setForm({ ...form, crypto_network: v })}
+                options={CRYPTO_NETWORKS} />
+
+              {/* Choice: Wallet address OR Binance Pay ID */}
+              <div>
+                <Label className="text-xs font-bold text-amber-700 mb-2 block">طريقة الاستلام</Label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button type="button" onClick={() => setForm({ ...form, binance_pay_id: '' })}
+                    className={`p-2.5 rounded-xl border-2 text-xs font-bold transition-all ${!form.binance_pay_id ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm' : 'border-gray-200/60 text-gray-500 hover:border-amber-200'}`}>
+                    📬 عنوان المحفظة
+                  </button>
+                  <button type="button" onClick={() => setForm({ ...form, wallet_address: '' })}
+                    className={`p-2.5 rounded-xl border-2 text-xs font-bold transition-all ${form.binance_pay_id ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm' : 'border-gray-200/60 text-gray-500 hover:border-amber-200'}`}>
+                    🆔 Binance Pay ID
+                  </button>
+                </div>
+                {/* Wallet address input */}
+                {!form.binance_pay_id && (
+                  <div>
+                    <Label className="text-xs font-bold text-amber-700 mb-1.5 block">عنوان المحفظة (Wallet Address)</Label>
+                    <Input value={form.wallet_address || ''} onChange={(e) => setForm({ ...form, wallet_address: e.target.value })}
+                      placeholder="TJZyQ8K3mN..." dir="ltr" className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl font-mono" />
+                  </div>
+                )}
+                {/* Binance Pay ID input */}
+                {form.binance_pay_id && (
+                  <div>
+                    <Label className="text-xs font-bold text-amber-700 mb-1.5 block">معرف Binance Pay ID</Label>
+                    <Input value={form.binance_pay_id || ''} onChange={(e) => setForm({ ...form, binance_pay_id: e.target.value })}
+                      placeholder="123456789" dir="ltr" className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl font-mono" />
+                    <p className="text-[10px] text-amber-600 mt-1">💡 يمكن للمتدرب الدفع عبر Binance Pay باستخدام هذا المعرف</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Local currency fields */}
+          {form.payment_category !== 'crypto' && (
+            <div className="p-4 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 rounded-2xl border border-emerald-200/40 space-y-3">
+              <div>
+                <Label className="text-xs font-bold text-emerald-700 mb-1.5 block">رقم الحساب / المحفظة</Label>
+                <Input value={form.account_number || form.wallet_id || ''} onChange={(e) => setForm({ ...form, account_number: e.target.value, wallet_id: e.target.value })}
+                  placeholder="01234567890" dir="ltr" className="h-11 text-sm bg-white/80 border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30 rounded-xl font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-emerald-700 mb-1.5 block">اسم صاحب الحساب</Label>
+                <Input value={form.account_holder || ''} onChange={(e) => setForm({ ...form, account_holder: e.target.value })}
+                  placeholder="مثال: أكاديمية المستقبل الدولية" className="h-11 text-sm bg-white/80 border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30 rounded-xl" />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-emerald-700 mb-1.5 block">العملة</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {CURRENCIES.map((c) => (
+                    <button key={c} type="button" onClick={() => setForm({ ...form, currency: c })}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${form.currency === c ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md' : 'bg-white/80 text-gray-500 border border-emerald-200/40 hover:border-emerald-400'}`}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Instructions — common */}
+          <div className={`p-4 rounded-2xl border ${form.payment_category === 'crypto' ? 'bg-amber-50/30 border-amber-100/60' : 'bg-emerald-50/30 border-emerald-100/60'}`}>
+            <Label className={`text-xs font-bold mb-1.5 block ${form.payment_category === 'crypto' ? 'text-amber-700' : 'text-emerald-700'}`}>تعليمات الدفع</Label>
+            <Textarea value={form.instructions || ''} onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+              rows={3} placeholder="اكتب تعليمات الدفع للمتدرب هنا..."
+              className={`text-sm bg-white/80 rounded-xl resize-none ${form.payment_category === 'crypto' ? 'border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30' : 'border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30'}`} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100 rounded-b-2xl">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
+          <Button onClick={save} disabled={saving}
+            className={`text-white rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all px-6 ${form.payment_category === 'crypto' ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' : 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800'}`}>
+            {saving ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <Plus className="w-4 h-4 ml-1.5" />}
+            {saving ? 'جاري الحفظ...' : editing ? 'تحديث' : 'إضافة'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
