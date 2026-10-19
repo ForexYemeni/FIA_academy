@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SectionCard } from './shell'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { toast } from 'sonner'
+import { supabasePublic } from '@/lib/supabase'
 import {
   Plus, Edit, Trash2, Tag, Users, FileText, Star, MessageSquare,
   Newspaper, Mail, HelpCircle, ExternalLink, Clock, CheckCircle2, X,
@@ -31,6 +32,29 @@ export function AdminCoupons() {
 
   const load = () => fetch('/api/coupons').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // ⚡ REAL-TIME: coupons — admin sees coupon changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-coupons-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'coupons' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'coupons' },
+          (payload: any) => setItems((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'coupons' },
+          (payload: any) => setItems((prev) => prev.filter((c) => c.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -188,6 +212,29 @@ export function AdminAffiliates() {
 
   const load = () => fetch('/api/affiliates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // ⚡ REAL-TIME: affiliates — admin sees marketer changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-affiliates-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'affiliates' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'affiliates' },
+          (payload: any) => setItems((prev) => prev.map((a) => a.id === payload.new.id ? { ...a, ...payload.new } : a))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'affiliates' },
+          (payload: any) => setItems((prev) => prev.filter((a) => a.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -624,6 +671,32 @@ export function AdminReviews() {
   }, [])
   useEffect(() => { load() }, [courseFilter])
 
+  // ⚡ REAL-TIME: reviews — admin sees new reviews INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-reviews-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'reviews' },
+          (payload: any) => {
+            setItems((prev) => [payload.new, ...prev])
+            toast.info('⭐ تقييم جديد')
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'reviews' },
+          (payload: any) => setItems((prev) => prev.map((r) => r.id === payload.new.id ? { ...r, ...payload.new } : r))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'reviews' },
+          (payload: any) => setItems((prev) => prev.filter((r) => r.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
   // Aggregate stats
   const total = items.length
   const avg = total > 0 ? (items.reduce((s, r) => s + (r.rating || 0), 0) / total) : 0
@@ -762,6 +835,32 @@ export function AdminForum() {
   const loadCats = () => fetch('/api/forum-categories').then((r) => r.json()).then((d) => setCats(Array.isArray(d) ? d : []))
   const loadTopics = () => fetch('/api/forum-topics').then((r) => r.json()).then((d) => setTopics(Array.isArray(d) ? d : []))
   useEffect(() => { loadCats(); loadTopics() }, [])
+
+  // ⚡ REAL-TIME: forum — admin sees new topics + replies INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-forum-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'forum_topics' },
+          (payload: any) => {
+            setTopics((prev: any[]) => [payload.new, ...prev])
+            toast.info('💬 موضوع جديد في المنتدى')
+          }
+        )
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'forum_posts' },
+          () => toast.info('💬 رد جديد في المنتدى')
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'forum_topics' },
+          (payload: any) => setTopics((prev: any[]) => prev.filter((t) => t.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const handleDeleteCat = async () => {
     if (!deleteTarget) return
@@ -1181,6 +1280,32 @@ export function AdminBlog() {
 
   const load = () => fetch('/api/blog').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // ⚡ REAL-TIME: blog posts — admin sees new articles INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-blog-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'blog_posts' },
+          (payload: any) => {
+            setItems((prev) => [payload.new, ...prev])
+            toast.info('📰 مقال جديد')
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'blog_posts' },
+          (payload: any) => setItems((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'blog_posts' },
+          (payload: any) => setItems((prev) => prev.filter((p) => p.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -1611,6 +1736,28 @@ export function AdminContact() {
   const load = () => fetch('/api/contact').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
 
+  // ⚡ REAL-TIME: contact messages — admin sees new messages INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-contact-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'contact_messages' },
+          (payload: any) => {
+            setItems((prev) => [payload.new, ...prev])
+            toast.info('📧 رسالة جديدة من نموذج التواصل')
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'contact_messages' },
+          (payload: any) => setItems((prev) => prev.map((m) => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
   const updateStatus = async (m: any, newStatus: string) => {
     await fetch('/api/contact', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id, status: newStatus }) })
     load()
@@ -1743,6 +1890,29 @@ export function AdminFaqs() {
 
   const load = () => fetch('/api/faqs').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // ⚡ REAL-TIME: FAQs — admin sees FAQ changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-faqs-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'faqs' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'faqs' },
+          (payload: any) => setItems((prev) => prev.map((f) => f.id === payload.new.id ? { ...f, ...payload.new } : f))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'faqs' },
+          (payload: any) => setItems((prev) => prev.filter((f) => f.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const handleDelete = async () => {
     if (!deleteTarget) return

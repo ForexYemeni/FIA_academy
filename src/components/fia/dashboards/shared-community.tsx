@@ -15,6 +15,7 @@ import { SectionCard } from './shell'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
+import { supabasePublic } from '@/lib/supabase'
 import {
   MessageSquare, Plus, ArrowRight, Eye, Reply, Pin, Trash2, Ban,
   Newspaper, HelpCircle, ChevronDown, Clock, Loader2, AlertTriangle,
@@ -291,6 +292,51 @@ export function SharedForum({ user }: { user: any }) {
   useEffect(() => { loadCategories() }, [loadCategories])
   useEffect(() => { loadTopics() }, [loadTopics])
   useEffect(() => { checkBan() }, [checkBan])
+
+  // ⚡ REAL-TIME: forum topics + posts — users see new content INSTANTLY
+  useEffect(() => {
+    let channel: any
+    let debounceTimer: any
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => loadTopics(), 200)
+    }
+    try {
+      channel = supabasePublic
+        .channel('shared-forum-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'forum_topics' }, (payload: any) => {
+          // New topic — refresh to include it
+          debouncedRefresh()
+          // Don't show toast for own topics (the user just created it)
+          if (payload.new.user_id !== user?.id) {
+            toast.info('💬 موضوع جديد في المنتدى')
+          }
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'forum_posts' }, (payload: any) => {
+          // New reply — update the topic's replies_count
+          setTopics((prev: any[]) => prev.map((t) =>
+            t.id === payload.new.topic_id
+              ? { ...t, replies_count: (t.replies_count || 0) + 1 }
+              : t
+          ))
+          if (payload.new.user_id !== user?.id) {
+            toast.info('💬 رد جديد في المنتدى')
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'forum_topics' }, (payload: any) => {
+          setTopics((prev: any[]) => prev.map((t) => t.id === payload.new.id ? { ...t, ...payload.new } : t))
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'forum_topics' }, (payload: any) => {
+          setTopics((prev: any[]) => prev.filter((t) => t.id !== payload.old.id))
+        })
+        .subscribe()
+    } catch {}
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      try { supabasePublic.removeChannel(channel) } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, loadTopics])
 
   // Auto-open a topic when arriving via a deep-link notification.
   // Notification link format: `/#forum?t=<topic-id>`. The useHashTab hook
@@ -653,6 +699,46 @@ export function SharedBlog() {
     }).catch(() => setLoading(false))
   }, [])
 
+  // ⚡ REAL-TIME: blog posts — readers see new articles INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('shared-blog-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'blog_posts' },
+          (payload: any) => {
+            // Only add published posts
+            if (payload.new.status === 'منشور' || payload.new.status === 'published') {
+              setPosts((prev: any[]) => [payload.new, ...prev])
+              toast.info('📰 مقال جديد في المدونة')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'blog_posts' },
+          (payload: any) => {
+            setPosts((prev: any[]) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+            // Update viewingPost if it's the same one
+            if (viewingPost?.id === payload.new.id) {
+              setViewingPost(payload.new)
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'blog_posts' },
+          (payload: any) => {
+            setPosts((prev: any[]) => prev.filter((p) => p.id !== payload.old.id))
+            if (viewingPost?.id === payload.old.id) {
+              setViewingPost(null)
+            }
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [viewingPost?.id])
+
   if (viewingPost) {
     return (
       <SectionCard
@@ -731,6 +817,33 @@ export function SharedFAQ() {
       setItems(Array.isArray(d) ? d : [])
       setLoading(false)
     }).catch(() => setLoading(false))
+  }, [])
+
+  // ⚡ REAL-TIME: FAQs — readers see FAQ changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('shared-faqs-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'faqs' },
+          (payload: any) => {
+            if (payload.new.status === 'نشط' || payload.new.status === 'active') {
+              setItems((prev: any[]) => [payload.new, ...prev])
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'faqs' },
+          (payload: any) => setItems((prev: any[]) => prev.map((f) => f.id === payload.new.id ? { ...f, ...payload.new } : f))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'faqs' },
+          (payload: any) => setItems((prev: any[]) => prev.filter((f) => f.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
   }, [])
 
   // Group by category
