@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
   BookOpen, GraduationCap, UserCog, Crown, ChevronLeft, X, Star, Briefcase, Phone, Linkedin,
-  Building2, ExternalLink, CheckCircle2, Loader2, Send, Sparkles, Clock, Tag,
+  Building2, ExternalLink, CheckCircle2, Loader2, Send, Sparkles, Clock, Tag, Share2,
 } from 'lucide-react'
 
 // ⚡ Professional card metadata: gradient + accent for each card type.
@@ -75,41 +75,90 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
   }
 
   const getContent = () => {
-    // === COURSES ===
+    // === COURSES — professional cards with cover images + gradient overlays ===
     if (cardId === 'courses') {
-      if (courses.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا توجد دورات متاحة حالياً</p>
+      if (courses.length === 0) return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
+            <BookOpen className="w-8 h-8 text-blue-300" />
+          </div>
+          <p className="text-sm text-gray-500">لا توجد دورات متاحة حالياً</p>
+        </div>
+      )
       return (
-        <div className="space-y-2.5">
-          {courses.map((c) => (
-            <div key={c.id} className="group flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-200/60 hover:border-[#C9A961]/40 hover:shadow-md transition-all">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                <BookOpen className="w-5 h-5 text-white" strokeWidth={2.2} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-[#0A1F44] text-sm leading-tight">{c.title}</h4>
-                {c.short_description && <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{c.short_description}</p>}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {c.duration_hours > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      <Clock className="w-2.5 h-2.5" /> {c.duration_hours} ساعة
-                    </span>
-                  )}
-                  {c.level && (
-                    <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{c.level}</span>
-                  )}
-                  {c.price_type === 'مجانية' || c.price === 0 ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-green-700 bg-green-50 border border-green-200/60 px-2 py-0.5 rounded-full font-semibold">
-                      <Tag className="w-2.5 h-2.5" /> مجانية
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-[#C9A961] bg-[#C9A961]/10 border border-[#C9A961]/20 px-2 py-0.5 rounded-full font-semibold">
-                      <Tag className="w-2.5 h-2.5" /> {c.price?.toLocaleString()} {c.currency || 'ر.ي'}
-                    </span>
-                  )}
+        <div className="space-y-3">
+          {courses.map((c) => {
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            return (
+              <div key={c.id} className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200/60 hover:border-blue-500/40 hover:shadow-lg transition-all">
+                {/* Cover image with gradient overlay */}
+                {c.cover ? (
+                  <div className="relative h-24 overflow-hidden">
+                    <img src={c.cover} alt={c.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0A1F44]/80 via-[#0A1F44]/20 to-transparent" />
+                    {/* Price badge on cover */}
+                    <div className="absolute top-2 left-2">
+                      {isFree ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-white bg-green-500 px-2.5 py-1 rounded-full font-bold shadow-md">
+                          <Tag className="w-2.5 h-2.5" /> مجانية
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-[#0A1F44] bg-gradient-to-r from-amber-400 to-yellow-500 px-2.5 py-1 rounded-full font-bold shadow-md">
+                          <Tag className="w-2.5 h-2.5" /> {c.price?.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                      )}
+                    </div>
+                    {/* Title on cover */}
+                    <h4 className="absolute bottom-2 right-2 left-2 text-white font-bold text-sm leading-tight line-clamp-1">{c.title}</h4>
+                  </div>
+                ) : (
+                  /* No cover — header with gradient + icon */
+                  <div className="relative h-20 bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                    <BookOpen className="w-10 h-10 text-white/30" />
+                    <div className="absolute top-2 left-2">
+                      {isFree ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-white bg-green-500 px-2.5 py-1 rounded-full font-bold shadow-md">
+                          <Tag className="w-2.5 h-2.5" /> مجانية
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-[#0A1F44] bg-gradient-to-r from-amber-400 to-yellow-500 px-2.5 py-1 rounded-full font-bold shadow-md">
+                          <Tag className="w-2.5 h-2.5" /> {c.price?.toLocaleString()} {c.currency || 'ر.ي'}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="absolute bottom-2 right-2 left-2 text-white font-bold text-sm leading-tight line-clamp-1">{c.title}</h4>
+                  </div>
+                )}
+                {/* Body — description + badges */}
+                <div className="p-3">
+                  {c.short_description && <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-2">{c.short_description}</p>}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {c.duration_hours > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                        <Clock className="w-2.5 h-2.5" /> {c.duration_hours} ساعة
+                      </span>
+                    )}
+                    {c.level && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                        <Award className="w-2.5 h-2.5" /> {c.level}
+                      </span>
+                    )}
+                    {c.category && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                        <BookOpen className="w-2.5 h-2.5" /> {c.category}
+                      </span>
+                    )}
+                    {c.enrolled > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        <Users className="w-2.5 h-2.5" /> {c.enrolled} متدرب
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )
     }
