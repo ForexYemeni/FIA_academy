@@ -1299,7 +1299,20 @@ export function AdminBlog() {
           ))}
         </div>
       )}
-      {open && <BlogPostDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={() => { setOpen(false); load() }} />}
+      {open && <BlogPostDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={(newPost) => {
+        setOpen(false)
+        // === OPTIMISTIC UPDATE === — insert the new post at the top
+        // of the list IMMEDIATELY, no full reload needed.
+        if (newPost && newPost.id) {
+          if (editing) {
+            setItems(prev => prev.map(p => p.id === newPost.id ? { ...p, ...newPost } : p))
+          } else {
+            setItems(prev => [{ ...newPost, created_at: new Date().toISOString() }, ...prev])
+          }
+        } else {
+          load() // fallback if no data returned
+        }
+      }} />}
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -1410,8 +1423,15 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
     setSaving(true)
     try {
       const res = await fetch('/api/blog', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : form) })
-      if (res.ok) { toast.success(initial ? 'تم التحديث' : 'تم النشر'); onSaved() }
-      else { const d = await res.json(); toast.error(d.error || 'فشل') }
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success(initial ? 'تم التحديث ✓' : 'تم النشر ✓')
+        // === OPTIMISTIC UPDATE === — pass the new post to the parent
+        // so it appears in the list IMMEDIATELY without a full reload
+        onSaved(data)
+      } else {
+        toast.error(data.error || 'فشل')
+      }
     } finally { setSaving(false) }
   }
 

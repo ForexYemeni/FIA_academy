@@ -2678,86 +2678,86 @@ const DZ_SECTION_LABELS: Record<string, string> = {
     />
 
     {/* ===== Danger Zone confirmation dialog ===== */}
-    <Dialog open={dzOpen} onOpenChange={(o) => { if (!o) closeDzDialog(); else setDzOpen(true) }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!dzLoading}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="w-5 h-5" />
-            تأكيد حذف جميع البيانات
-          </DialogTitle>
-        </DialogHeader>
+    {/* === Danger Zone — professional custom overlay (matches chat delete) === */}
+    {dzOpen && (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={() => { if (!dzLoading) closeDzDialog() }}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Top: red gradient with icon */}
+          <div className="bg-gradient-to-br from-red-500 to-red-600 p-6 text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-2">
+              <AlertTriangle className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-white text-lg font-bold">حذف جميع البيانات</h3>
+          </div>
 
-        <div className="py-2 space-y-4">
-          {/* Warning box */}
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm font-semibold text-red-700">
-                سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
+          {/* Body */}
+          <div className="p-6 text-center">
+            <p className="text-sm text-gray-600 mb-1">سيتم حذف جميع البيانات نهائياً:</p>
+            <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-red-600 leading-relaxed">
+                ⚠️ سيتم حذف جميع البيانات نهائياً ولا يمكن استعادتها. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية لا يمكن التراجع عنها.
               </p>
             </div>
-            <p className="text-xs text-red-600/80 pr-6">
-              سيتم الاحتفاظ بحساب المؤسس التنفيذي فقط
-            </p>
-            <p className="text-xs text-red-600/80 pr-6 font-semibold">
-              ⚠ هذه العملية لا يمكن التراجع عنها
-            </p>
-          </div>
 
-          {/* Password confirmation */}
-          <div>
-            <Label className="text-navy font-semibold">أكّد بكلمة المرور *</Label>
-            <div className="relative mt-1">
-              <Input
-                type={showDzPassword ? 'text' : 'password'}
-                value={dzPassword}
-                onChange={(e) => setDzPassword(e.target.value)}
-                placeholder="••••••••"
-                dir="ltr"
-                disabled={dzLoading}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && dzPassword && !dzLoading) {
-                    handleDangerZoneConfirm()
-                  }
-                }}
-              />
+            {/* Password field */}
+            <div className="mb-4 text-right">
+              <Label className="text-navy font-bold text-sm flex items-center gap-1 mb-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                كلمة المرور — تأكيد الهوية
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showDzPassword ? 'text' : 'password'}
+                  value={dzPassword}
+                  onChange={(e) => setDzPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && dzPassword && !dzLoading) handleDangerZoneConfirm() }}
+                  placeholder="••••••••"
+                  dir="ltr"
+                  className="h-12 pr-10 text-base"
+                  disabled={dzLoading}
+                  autoFocus
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowDzPassword(!showDzPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-navy transition-colors"
+                  tabIndex={-1}
+                >
+                  {showDzPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2">
               <button
-                type="button"
-                onClick={() => setShowDzPassword(!showDzPassword)}
+                onClick={closeDzDialog}
                 disabled={dzLoading}
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy disabled:opacity-50"
+                className="flex-1 h-11 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {showDzPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                إلغاء
+              </button>
+              <button
+                onClick={handleDangerZoneConfirm}
+                disabled={dzLoading || !dzPassword}
+                className="flex-1 h-11 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {dzLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {dzLoading ? 'جاري الحذف...' : 'حذف نهائي'}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              يجب إدخال كلمة مرور حساب المؤسس للتحقق
-            </p>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={closeDzDialog}
-            disabled={dzLoading}
-          >
-            إلغاء
-          </Button>
-          <Button
-            onClick={handleDangerZoneConfirm}
-            disabled={dzLoading || !dzPassword}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            {dzLoading ? (
-              <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحذف...</>
-            ) : (
-              <><Trash2 className="w-4 h-4 ml-1" /> تأكيد الحذف</>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    )}
     </>
   )
 }
