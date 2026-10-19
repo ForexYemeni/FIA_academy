@@ -107,24 +107,29 @@ export function DashboardShell({
   const effectiveColor = derived?.color ?? roleColor
 
   const Sidebar = (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gold/20">
-        <div className="flex items-center gap-2">
-          <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-lg" />
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#0A1F44] to-[#061229]">
+      {/* Logo header with subtle gradient border */}
+      <div className="p-4 border-b border-gold/20 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #C9A961 1px, transparent 1px)', backgroundSize: '15px 15px' }} />
+        <div className="relative flex items-center gap-2">
+          <div className="relative">
+            <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-xl shadow-md" />
+            <div className="absolute inset-0 rounded-xl ring-1 ring-gold/30" />
+          </div>
           <div>
-            <div className="text-white font-bold text-sm">أكاديمية المستقبل الدولية</div>
-            <div className="text-gold text-xs">FIA Dashboard</div>
+            <div className="text-white font-bold text-sm tracking-tight">أكاديمية المستقبل الدولية</div>
+            <div className="text-gold text-xs flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5" /> FIA Dashboard
+            </div>
           </div>
         </div>
       </div>
 
+      {/* User profile section */}
       <div className="p-4 border-b border-gold/20">
         <div className="flex items-center gap-3">
-          {/* Outer wrapper — relative + NOT overflow-hidden so the
-              founder crown can be pinned to the top-left corner of the
-              avatar without being clipped. */}
           <div className="relative flex-shrink-0">
-            <div className={`relative w-12 h-12 rounded-full overflow-hidden border-2 shadow-md bg-navy-light ${
+            <div className={`relative w-12 h-12 rounded-2xl overflow-hidden border-2 shadow-md bg-navy-light ${
               derived?.label === 'المؤسس'
                 ? 'border-gold shadow-gold/30'
                 : derived
@@ -141,9 +146,6 @@ export function DashboardShell({
               {/* Online indicator */}
               <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-navy-light"></span>
             </div>
-            {/* Founder / leader / team crown — pinned to the top-left
-                corner of the avatar (top-right in RTL layout). Hidden
-                for regular admin/trainer/student accounts. */}
             {derived && (
               <span className="absolute -top-1 -left-1 z-10 w-5 h-5 rounded-full bg-gold flex items-center justify-center shadow-md ring-2 ring-navy">
                 <Crown className="w-3 h-3 text-navy" />
@@ -165,6 +167,7 @@ export function DashboardShell({
         </Badge>
       </div>
 
+      {/* Navigation — professional buttons with hover effects */}
       <nav className="flex-1 p-2 overflow-y-auto fia-scroll">
         {nav.map((item) => {
           const Icon = item.icon
@@ -176,19 +179,24 @@ export function DashboardShell({
                 onNavigate(item.id)
                 setMobileOpen(false)
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-1 ${
+              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 relative ${
                 isActive
-                  ? 'bg-gold/15 text-gold sidebar-active'
+                  ? 'bg-gradient-to-l from-gold/20 to-gold/5 text-gold sidebar-active shadow-sm'
                   : 'text-white/70 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              {/* Active indicator bar */}
+              {isActive && (
+                <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gold rounded-l-full" />
+              )}
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
               <span>{item.label}</span>
             </button>
           )
         })}
       </nav>
 
+      {/* Logout button */}
       <div className="p-3 border-t border-gold/20">
         <Button
           onClick={() => {
@@ -196,7 +204,7 @@ export function DashboardShell({
             toast.success('تم تسجيل الخروج')
           }}
           variant="ghost"
-          className="w-full text-white/70 hover:text-red-400 hover:bg-red-500/10 justify-start"
+          className="w-full text-white/70 hover:text-red-400 hover:bg-red-500/10 justify-start rounded-xl"
         >
           <LogOut className="w-4 h-4 ml-2" />
           تسجيل الخروج
@@ -272,18 +280,18 @@ export function StatCard({
   trend?: string
   color?: 'navy' | 'gold' | 'green' | 'red' | 'blue'
 }) {
-  const colorMap: Record<string, string> = {
-    navy: 'bg-navy text-gold',
-    gold: 'bg-gold text-navy',
-    green: 'bg-green-500 text-white',
-    red: 'bg-red-500 text-white',
-    blue: 'bg-blue-500 text-white',
+  const colorMap: Record<string, { bg: string; gradient: string }> = {
+    navy:  { bg: 'bg-navy text-gold',           gradient: 'from-[#0A1F44] to-[#102a63]' },
+    gold:  { bg: 'bg-gold text-navy',           gradient: 'from-amber-500 to-yellow-600' },
+    green: { bg: 'bg-green-500 text-white',     gradient: 'from-green-500 to-emerald-600' },
+    red:   { bg: 'bg-red-500 text-white',       gradient: 'from-red-500 to-rose-600' },
+    blue:  { bg: 'bg-blue-500 text-white',      gradient: 'from-blue-500 to-indigo-600' },
   }
   return (
-    <div className="stat-card p-5">
+    <div className="stat-card p-5 group hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colorMap[color]}`}>
-          <Icon className="w-6 h-6" />
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${colorMap[color].gradient} flex items-center justify-center shadow-md group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+          <Icon className="w-6 h-6 text-white" strokeWidth={2.2} />
         </div>
         {trend && <Badge variant="outline" className="text-xs">{trend}</Badge>}
       </div>
@@ -305,10 +313,13 @@ export function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-xl border border-border p-5 lg:p-6 shadow-sm">
+    <div className="bg-white rounded-2xl border border-border p-5 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-5">
         <div>
-          <h2 className="font-bold text-navy text-lg">{title}</h2>
+          <h2 className="font-bold text-navy text-lg flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-gold to-amber-600 rounded-full" />
+            {title}
+          </h2>
           {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
         {action}

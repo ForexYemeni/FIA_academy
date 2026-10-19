@@ -123,105 +123,142 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
         const qualifications = parseList(selectedTrainer.qualifications)
 
         return (
-          <div className="space-y-4">
-            {/* Back button */}
-            <button onClick={() => setSelectedTrainer(null)} className="flex items-center gap-1 text-xs text-[#C9A961] hover:text-[#0A1F44] mb-2">
-              <ChevronLeft className="w-4 h-4 rotate-180" /> رجوع للقائمة
+          <div className="space-y-3">
+            {/* Back button — professional pill button */}
+            <button onClick={() => setSelectedTrainer(null)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-full transition-all">
+              <ChevronLeft className="w-4 h-4" /> رجوع للقائمة
             </button>
 
-            {/* Trainer header */}
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-[#0A1F44] to-[#102a63] rounded-xl text-white">
-              {selectedTrainer.avatar ? (
-                <img src={selectedTrainer.avatar} alt={selectedTrainer.name} className="w-16 h-16 rounded-full object-cover border-2 border-[#C9A961] flex-shrink-0" />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-white/10 border-2 border-[#C9A961] flex items-center justify-center flex-shrink-0">
-                  <span className="text-[#C9A961] font-bold text-xl">{selectedTrainer.name?.charAt(0)}</span>
+            {/* Trainer hero header — emerald gradient with avatar */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 p-4 text-white shadow-lg">
+              {/* Decorative pattern */}
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="relative flex items-center gap-4">
+                {selectedTrainer.avatar ? (
+                  <img src={selectedTrainer.avatar} alt={selectedTrainer.name} className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow-md flex-shrink-0" />
+                ) : (
+                  <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-2xl">{selectedTrainer.name?.charAt(0)}</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-white text-base leading-tight">{selectedTrainer.name}</h4>
+                  {selectedTrainer.title && <p className="text-white/80 text-xs mt-1">{selectedTrainer.title}</p>}
+                  {selectedTrainer.specialization && (
+                    <span className="inline-block mt-1.5 text-[10px] bg-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/20">
+                      {selectedTrainer.specialization}
+                    </span>
+                  )}
+                  {selectedTrainer.years_experience > 0 && (
+                    <p className="text-white/60 text-[10px] mt-1.5 flex items-center gap-1">
+                      <Briefcase className="w-2.5 h-2.5" /> {selectedTrainer.years_experience} سنوات خبرة
+                    </p>
+                  )}
                 </div>
-              )}
-              <div>
-                <h4 className="font-bold text-white text-base">{selectedTrainer.name}</h4>
-                {selectedTrainer.title && <p className="text-[#C9A961] text-xs">{selectedTrainer.title}</p>}
-                {selectedTrainer.specialization && <p className="text-white/60 text-[10px] mt-0.5">{selectedTrainer.specialization}</p>}
-                {selectedTrainer.years_experience > 0 && <p className="text-white/40 text-[10px] mt-0.5">{selectedTrainer.years_experience} سنوات خبرة</p>}
               </div>
             </div>
 
-            {/* Bio */}
+            {/* Bio — professional card with left border accent */}
             {selectedTrainer.bio && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-1">النبذة المهنية</h5>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-emerald-500/40">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1.5 flex items-center gap-1.5">
+                  <span className="w-1 h-4 bg-emerald-500 rounded-full" /> النبذة المهنية
+                </h5>
                 <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedTrainer.bio}</p>
               </div>
             )}
 
-            {/* Qualifications */}
+            {/* Qualifications — professional badges */}
             {qualifications.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Star className="w-3 h-3 text-[#C9A961]" /> المؤهلات</h5>
-                <ul className="space-y-1">
-                  {qualifications.map((q, i) => (
-                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
-                      <span className="text-[#C9A961] mt-0.5">•</span> {q}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Achievements */}
-            {achievements.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Briefcase className="w-3 h-3 text-[#C9A961]" /> الإنجازات</h5>
-                <ul className="space-y-1">
-                  {achievements.map((a, i) => (
-                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
-                      <span className="text-[#C9A961] mt-0.5">•</span> {a}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Courses */}
-            {trainerCourses.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><BookOpen className="w-3 h-3 text-[#C9A961]" /> الدورات ({trainerCourses.length})</h5>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2.5 flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 text-amber-500" /> المؤهلات العلمية
+                </h5>
                 <div className="space-y-1.5">
-                  {trainerCourses.map((c) => (
-                    <div key={c.id} className="flex items-center gap-2 text-xs text-gray-600 p-1.5 bg-white rounded-lg">
-                      <BookOpen className="w-3 h-3 text-[#C9A961] flex-shrink-0" /> {c.title}
+                  {qualifications.map((q, i) => (
+                    <div key={i} className="flex items-start gap-2 p-2 bg-amber-50/50 rounded-lg">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs text-gray-700 leading-relaxed">{q}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* No contact info shown — privacy: no email/phone/linkedin for trainers */}
+            {/* Achievements — professional list */}
+            {achievements.length > 0 && (
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2.5 flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-emerald-500" /> الإنجازات المهنية
+                </h5>
+                <div className="space-y-1.5">
+                  {achievements.map((a, i) => (
+                    <div key={i} className="flex items-start gap-2 p-2 bg-emerald-50/50 rounded-lg">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                      <span className="text-xs text-gray-700 leading-relaxed">{a}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Courses — professional cards */}
+            {trainerCourses.length > 0 && (
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2.5 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-500" /> الدورات ({trainerCourses.length})
+                </h5>
+                <div className="space-y-1.5">
+                  {trainerCourses.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 p-2 bg-blue-50/50 rounded-lg hover:bg-blue-50 transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <BookOpen className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <span className="text-xs text-gray-700 font-medium">{c.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )
       }
 
       // === LIST VIEW for trainers ===
-      if (trainers.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد مدربون حالياً</p>
+      if (trainers.length === 0) return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 flex items-center justify-center mb-3">
+            <GraduationCap className="w-8 h-8 text-emerald-300" />
+          </div>
+          <p className="text-sm text-gray-500">لا يوجد مدربون حالياً</p>
+        </div>
+      )
       return (
-        <div className="space-y-2">
-          <p className="text-[10px] text-gray-400 mb-2 text-center">اضغط على أي مدرب لعرض الإنجازات والدورات</p>
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-1.5 mb-3 text-[10px] text-gray-400">
+            <Sparkles className="w-3 h-3" />
+            <span>اضغط على أي مدرب لعرض الإنجازات والدورات</span>
+          </div>
           {trainers.map((t) => (
             <button key={t.id} onClick={() => setSelectedTrainer(t)}
-              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all text-right">
+              className="group w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200/60 hover:border-emerald-500/40 hover:shadow-md transition-all text-right">
               {t.avatar ? (
-                <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0 shadow-sm" />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
-                  <span className="text-[#C9A961] font-bold text-sm">{t.name?.charAt(0)}</span>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <span className="text-white font-bold text-sm">{t.name?.charAt(0)}</span>
                 </div>
               )}
-              <div className="flex-1 text-right">
+              <div className="flex-1 text-right min-w-0">
                 <h4 className="font-bold text-[#0A1F44] text-sm">{t.name}</h4>
-                {t.title && <p className="text-xs text-gray-500">{t.title}</p>}
-                {t.specialization && <p className="text-[10px] text-gray-400 mt-0.5">{t.specialization}</p>}
+                {t.title && <p className="text-xs text-gray-500 mt-0.5">{t.title}</p>}
+                {t.specialization && (
+                  <span className="inline-block text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                    {t.specialization}
+                  </span>
+                )}
               </div>
-              <ChevronLeft className="w-4 h-4 text-gray-300 flex-shrink-0" />
+              <ChevronLeft className="w-4 h-4 text-gray-300 group-hover:text-emerald-500 group-hover:-translate-x-0.5 transition-all flex-shrink-0" />
             </button>
           ))}
         </div>
@@ -234,88 +271,131 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
         // === DETAIL VIEW for selected member ===
         const qualifications = parseList(selectedMember.qualifications)
         const achievements = parseList(selectedMember.achievements)
+        const isFounder = selectedMember.role === 'founder'
 
         return (
-          <div className="space-y-4">
-            <button onClick={() => setSelectedMember(null)} className="flex items-center gap-1 text-xs text-[#C9A961] hover:text-[#0A1F44] mb-2">
-              <ChevronLeft className="w-4 h-4 rotate-180" /> رجوع للقائمة
+          <div className="space-y-3">
+            {/* Back button */}
+            <button onClick={() => setSelectedMember(null)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full transition-all">
+              <ChevronLeft className="w-4 h-4" /> رجوع للقائمة
             </button>
 
-            {/* Member header — special styling for founder */}
-            <div className={`flex items-center gap-3 p-4 rounded-xl text-white ${selectedMember.role === 'founder' ? 'bg-gradient-to-l from-[#C9A961] via-[#D4AF37] to-[#C9A961]' : 'bg-gradient-to-l from-[#0A1F44] to-[#102a63]'}`}>
-              <div className="relative">
-                {selectedMember.avatar ? (
-                  <img src={selectedMember.avatar} alt={selectedMember.name} className={`w-16 h-16 rounded-full object-cover flex-shrink-0 ${selectedMember.role === 'founder' ? 'border-2 border-white' : 'border-2 border-[#C9A961]'}`} />
-                ) : (
-                  <div className={`w-16 h-16 rounded-full ${selectedMember.role === 'founder' ? 'bg-white/20' : 'bg-white/10'} flex items-center justify-center flex-shrink-0`}>
-                    <span className={`font-bold text-xl ${selectedMember.role === 'founder' ? 'text-[#0A1F44]' : 'text-[#C9A961]'}`}>{selectedMember.name?.charAt(0)}</span>
-                  </div>
-                )}
-                {selectedMember.role === 'founder' && (
-                  <div className="absolute -top-1 -right-1 text-xl">👑</div>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-white text-base">{selectedMember.name}</h4>
-                  {selectedMember.role === 'founder' && <span className="text-[10px] bg-[#0A1F44] text-[#C9A961] px-2 py-0.5 rounded-full font-bold">المؤسس</span>}
-                  {selectedMember.role === 'leader' && <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">قيادي</span>}
+            {/* Member hero header — gold gradient for founder, navy for others */}
+            <div className={`relative overflow-hidden rounded-2xl p-4 text-white shadow-lg ${isFounder ? 'bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600' : 'bg-gradient-to-br from-[#0A1F44] to-[#102a63]'}`}>
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="relative flex items-center gap-4">
+                <div className="relative flex-shrink-0">
+                  {selectedMember.avatar ? (
+                    <img src={selectedMember.avatar} alt={selectedMember.name} className={`w-20 h-20 rounded-2xl object-cover border-2 ${isFounder ? 'border-white/50' : 'border-white/30'} shadow-md`} />
+                  ) : (
+                    <div className={`w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center`}>
+                      <span className="text-white font-bold text-2xl">{selectedMember.name?.charAt(0)}</span>
+                    </div>
+                  )}
+                  {isFounder && (
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
+                      <Crown className="w-5 h-5 text-amber-500" />
+                    </div>
+                  )}
                 </div>
-                {selectedMember.title && <p className={`text-xs ${selectedMember.role === 'founder' ? 'text-[#0A1F44]/80' : 'text-[#C9A961]'}`}>{selectedMember.title}</p>}
-                {selectedMember.specialization && <p className="text-white/60 text-[10px] mt-0.5">{selectedMember.specialization}</p>}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-white text-base">{selectedMember.name}</h4>
+                    {isFounder && <span className="text-[10px] bg-[#0A1F44] text-amber-400 px-2 py-0.5 rounded-full font-bold">المؤسس</span>}
+                    {selectedMember.role === 'leader' && <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">قيادي</span>}
+                  </div>
+                  {selectedMember.title && <p className={`text-xs mt-1 ${isFounder ? 'text-[#0A1F44]/80' : 'text-white/80'}`}>{selectedMember.title}</p>}
+                  {selectedMember.specialization && (
+                    <span className="inline-block mt-1.5 text-[10px] bg-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/20">
+                      {selectedMember.specialization}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Bio */}
             {selectedMember.bio && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-1">النبذة المهنية</h5>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-amber-500/40">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1.5 flex items-center gap-1.5">
+                  <span className="w-1 h-4 bg-amber-500 rounded-full" /> النبذة المهنية
+                </h5>
                 <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.bio}</p>
               </div>
             )}
 
-            {/* Vision */}
+            {/* Vision — special for founder/leaders */}
             {selectedMember.vision && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-1 flex items-center gap-1"><Eye className="w-3 h-3 text-[#C9A961]" /> الرؤية</h5>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-purple-500/40">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1.5 flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-purple-500" /> الرؤية
+                </h5>
                 <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.vision}</p>
               </div>
             )}
 
             {/* Mission */}
             {selectedMember.mission && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-1 flex items-center gap-1"><Target className="w-3 h-3 text-[#C9A961]" /> الرسالة</h5>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-blue-500/40">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-1.5 flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-blue-500" /> الرسالة
+                </h5>
                 <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedMember.mission}</p>
               </div>
             )}
 
             {/* Qualifications */}
             {qualifications.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Star className="w-3 h-3 text-[#C9A961]" /> المؤهلات</h5>
-                <ul className="space-y-1">
-                  {qualifications.map((q, i) => (<li key={i} className="text-xs text-gray-600 flex items-start gap-1"><span className="text-[#C9A961] mt-0.5">•</span> {q}</li>))}
-                </ul>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2.5 flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 text-amber-500" /> المؤهلات
+                </h5>
+                <div className="space-y-1.5">
+                  {qualifications.map((q, i) => (
+                    <div key={i} className="flex items-start gap-2 p-2 bg-amber-50/50 rounded-lg">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs text-gray-700 leading-relaxed">{q}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Achievements */}
             {achievements.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-xl">
-                <h5 className="text-xs font-bold text-[#0A1F44] mb-2 flex items-center gap-1"><Briefcase className="w-3 h-3 text-[#C9A961]" /> الإنجازات</h5>
-                <ul className="space-y-1">
-                  {achievements.map((a, i) => (<li key={i} className="text-xs text-gray-600 flex items-start gap-1"><span className="text-[#C9A961] mt-0.5">•</span> {a}</li>))}
-                </ul>
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200/60">
+                <h5 className="text-xs font-bold text-[#0A1F44] mb-2.5 flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-emerald-500" /> الإنجازات
+                </h5>
+                <div className="space-y-1.5">
+                  {achievements.map((a, i) => (
+                    <div key={i} className="flex items-start gap-2 p-2 bg-emerald-50/50 rounded-lg">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                      <span className="text-xs text-gray-700 leading-relaxed">{a}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* Contact */}
-            {(selectedMember.email || selectedMember.linkedin) && (
-              <div className="flex items-center gap-3 pt-2">
-                {selectedMember.email && <a href={`mailto:${selectedMember.email}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Mail className="w-3 h-3" /> بريد</a>}
-                {selectedMember.linkedin && <a href={selectedMember.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Linkedin className="w-3 h-3" /> لينكدإن</a>}
-                {selectedMember.phone && <a href={`tel:${selectedMember.phone}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#0A1F44]"><Phone className="w-3 h-3" /> هاتف</a>}
+            {/* Contact — professional buttons */}
+            {(selectedMember.email || selectedMember.linkedin || selectedMember.phone) && (
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                {selectedMember.email && (
+                  <a href={`mailto:${selectedMember.email}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-[#0A1F44] bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full transition-all">
+                    <Mail className="w-3.5 h-3.5" /> بريد
+                  </a>
+                )}
+                {selectedMember.linkedin && (
+                  <a href={selectedMember.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-all">
+                    <Linkedin className="w-3.5 h-3.5" /> لينكدإن
+                  </a>
+                )}
+                {selectedMember.phone && (
+                  <a href={`tel:${selectedMember.phone}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-full transition-all">
+                    <Phone className="w-3.5 h-3.5" /> هاتف
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -323,7 +403,14 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       }
 
       // === LIST VIEW for team — founder first with crown ===
-      if (team.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا يوجد أعضاء فريق حالياً</p>
+      if (team.length === 0) return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center mb-3">
+            <Users className="w-8 h-8 text-amber-300" />
+          </div>
+          <p className="text-sm text-gray-500">لا يوجد أعضاء فريق حالياً</p>
+        </div>
+      )
 
       // Sort: founder first, then leaders, then team
       const sorted = [...team].sort((a, b) => {
@@ -332,61 +419,73 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       })
 
       return (
-        <div className="space-y-2">
-          <p className="text-[10px] text-gray-400 mb-2 text-center">اضغط على أي عضو لعرض التفاصيل</p>
-          {sorted.map((member) => (
-            <button key={member.id} onClick={() => setSelectedMember(member)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right relative ${
-                member.role === 'founder'
-                  ? 'bg-gradient-to-l from-[#C9A961]/10 to-[#F5E5B3]/10 border border-[#C9A961]/30 hover:border-[#C9A961]/50'
-                  : 'bg-gray-50 hover:bg-gray-100'
-              }`}>
-              <div className="relative flex-shrink-0">
-                {member.avatar ? (
-                  <img src={member.avatar} alt={member.name} className={`w-12 h-12 rounded-full object-cover ${member.role === 'founder' ? 'border-2 border-[#C9A961]' : ''}`} />
-                ) : (
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${member.role === 'founder' ? 'bg-[#C9A961]' : 'bg-[#0A1F44]'}`}>
-                    <span className={`font-bold text-sm ${member.role === 'founder' ? 'text-[#0A1F44]' : 'text-[#C9A961]'}`}>{member.name?.charAt(0)}</span>
-                  </div>
-                )}
-                {member.role === 'founder' && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#C9A961] rounded-full flex items-center justify-center text-[10px]">👑</div>
-                )}
-              </div>
-              <div className="flex-1 text-right">
-                <div className="flex items-center gap-2 justify-end">
-                  {member.role === 'founder' && <span className="text-[9px] bg-[#C9A961] text-[#0A1F44] px-2 py-0.5 rounded-full font-bold flex-shrink-0">★ المؤسس</span>}
-                  {member.role === 'leader' && <span className="text-[9px] bg-blue-500/15 text-blue-600 px-2 py-0.5 rounded-full font-bold flex-shrink-0">قيادي</span>}
-                  <h4 className="font-bold text-[#0A1F44] text-sm">{member.name}</h4>
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-1.5 mb-3 text-[10px] text-gray-400">
+            <Sparkles className="w-3 h-3" />
+            <span>اضغط على أي عضو لعرض التفاصيل</span>
+          </div>
+          {sorted.map((member) => {
+            const isFounder = member.role === 'founder'
+            const isLeader = member.role === 'leader'
+            return (
+              <button key={member.id} onClick={() => setSelectedMember(member)}
+                className={`group w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right relative ${
+                  isFounder
+                    ? 'bg-gradient-to-l from-amber-50 to-yellow-50 border border-amber-200/60 hover:border-amber-400/50 hover:shadow-md'
+                    : 'bg-white border border-gray-200/60 hover:border-amber-500/30 hover:shadow-md'
+                }`}>
+                <div className="relative flex-shrink-0">
+                  {member.avatar ? (
+                    <img src={member.avatar} alt={member.name} className={`w-12 h-12 rounded-xl object-cover shadow-sm ${isFounder ? 'border-2 border-amber-400' : ''}`} />
+                  ) : (
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${isFounder ? 'bg-gradient-to-br from-amber-500 to-yellow-600' : 'bg-gradient-to-br from-[#0A1F44] to-[#102a63]'}`}>
+                      <span className={`font-bold text-sm ${isFounder ? 'text-white' : 'text-[#C9A961]'}`}>{member.name?.charAt(0)}</span>
+                    </div>
+                  )}
+                  {isFounder && (
+                    <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                      <Crown className="w-3 h-3 text-white" />
+                    </div>
+                  )}
                 </div>
-                {member.title && <p className="text-xs text-gray-500 mt-0.5">{member.title}</p>}
-              </div>
-              <ChevronLeft className="w-4 h-4 text-gray-300 flex-shrink-0" />
-            </button>
-          ))}
+                <div className="flex-1 text-right min-w-0">
+                  <div className="flex items-center gap-2 justify-end flex-wrap">
+                    {isFounder && <span className="text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold flex-shrink-0">★ المؤسس</span>}
+                    {isLeader && <span className="text-[9px] bg-blue-500/15 text-blue-600 px-2 py-0.5 rounded-full font-bold flex-shrink-0">قيادي</span>}
+                    <h4 className="font-bold text-[#0A1F44] text-sm">{member.name}</h4>
+                  </div>
+                  {member.title && <p className="text-xs text-gray-500 mt-0.5">{member.title}</p>}
+                </div>
+                <ChevronLeft className="w-4 h-4 text-gray-300 group-hover:text-amber-500 group-hover:-translate-x-0.5 transition-all flex-shrink-0" />
+              </button>
+            )
+          })}
         </div>
       )
     }
 
     // === ABOUT ===
     if (cardId === 'about') {
+      const aboutItems = [
+        { icon: Eye, title: 'رؤيتنا', text: settings.about_vision || 'لم تتم إضافة رؤيتنا بعد.', gradient: 'from-purple-500 to-fuchsia-600', bg: 'bg-purple-50/50', accent: 'text-purple-600' },
+        { icon: Target, title: 'رسالتنا', text: settings.about_mission || 'لم تتم إضافة رسالتنا بعد.', gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50/50', accent: 'text-blue-600' },
+        { icon: Heart, title: 'قيمنا', text: settings.about_values || 'لم تتم إضافة قيمنا بعد.', gradient: 'from-rose-500 to-pink-600', bg: 'bg-rose-50/50', accent: 'text-rose-600' },
+        { icon: Users, title: 'فريقنا', text: settings.about_team || 'لم تتم إضافة فريقنا بعد.', gradient: 'from-amber-500 to-orange-600', bg: 'bg-amber-50/50', accent: 'text-amber-600' },
+      ]
       return (
         <div className="space-y-3">
-          {[
-            { icon: Eye, title: 'رؤيتنا', text: settings.about_vision || 'لم تتم إضافة رؤيتنا بعد.' },
-            { icon: Target, title: 'رسالتنا', text: settings.about_mission || 'لم تتم إضافة رسالتنا بعد.' },
-            { icon: Heart, title: 'قيمنا', text: settings.about_values || 'لم تتم إضافة قيمنا بعد.' },
-            { icon: Users, title: 'فريقنا', text: settings.about_team || 'لم تتم إضافة فريقنا بعد.' },
-          ].map((item, i) => {
+          {aboutItems.map((item, i) => {
             const ItemIcon = item.icon
             return (
-              <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                <div className="w-10 h-10 rounded-xl bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
-                  <ItemIcon className="w-5 h-5 text-[#C9A961]" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-[#0A1F44] text-sm mb-1">{item.title}</h4>
-                  <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{item.text}</p>
+              <div key={i} className="group p-3.5 bg-white rounded-xl border border-gray-200/60 hover:border-purple-500/30 hover:shadow-md transition-all">
+                <div className="flex items-start gap-3">
+                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>
+                    <ItemIcon className="w-5 h-5 text-white" strokeWidth={2.2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-bold text-sm mb-1.5 ${item.accent}`}>{item.title}</h4>
+                    <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{item.text}</p>
+                  </div>
                 </div>
               </div>
             )
@@ -532,17 +631,24 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
     // === SOCIAL ===
     if (cardId === 'social') {
       const socials = [
-        { key: 'facebook', name: 'فيسبوك', enabled: settings.social_facebook_enabled, url: settings.social_facebook, color: '#1877F2',
+        { key: 'facebook', name: 'فيسبوك', enabled: settings.social_facebook_enabled, url: settings.social_facebook, color: '#1877F2', bg: 'from-blue-500 to-blue-700',
           icon: <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
-        { key: 'telegram', name: 'تيليجرام', enabled: settings.social_telegram_enabled, url: settings.social_telegram, color: '#0088cc',
+        { key: 'telegram', name: 'تيليجرام', enabled: settings.social_telegram_enabled, url: settings.social_telegram, color: '#0088cc', bg: 'from-cyan-400 to-blue-500',
           icon: <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg> },
-        { key: 'whatsapp', name: 'واتساب', enabled: settings.social_whatsapp_enabled, url: settings.social_whatsapp, color: '#25D366',
+        { key: 'whatsapp', name: 'واتساب', enabled: settings.social_whatsapp_enabled, url: settings.social_whatsapp, color: '#25D366', bg: 'from-green-400 to-green-600',
           icon: <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297.149-1.255.362-1.255.362l-.02.02c-.297-.149-1.255-.362-1.255-.362-.49.139-.614.471-.021.789.595.316 1.123.767 1.437 1.387.314.62.349 1.392.07 2.068-.279.676-.84 1.215-1.55 1.508-.71.293-1.523.335-2.282.124-.76-.211-1.443-.67-1.962-1.295-.52-.625-.852-1.392-.955-2.21-.103-.818.021-1.646.356-2.388.335-.742.873-1.375 1.547-1.817.674-.442 1.465-.672 2.27-.66.805.012 1.602.264 2.27.715.674.442 1.215 1.083 1.547 1.817.335.742.459 1.571.356 2.388-.103.818-.435 1.585-.955 2.21-.52.625-1.202 1.084-1.962 1.295-.76.211-1.573.169-2.282-.124-.71-.293-1.271-.832-1.55-1.508-.279-.676-.244-1.448.07-2.068.314-.62.842-1.071 1.437-1.387.593-.318 1.459-.127 1.95-.421z M12.02 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12.02 0zm.01 21.82c-5.42 0-9.82-4.4-9.82-9.82S6.6 2.18 12.02 2.18s9.82 4.4 9.82 9.82-4.4 9.82-9.82 9.82z"/></svg> },
-        { key: 'sms', name: 'رسائل نصية', enabled: settings.social_sms_enabled, url: settings.social_sms, color: '#34A853',
+        { key: 'sms', name: 'رسائل نصية', enabled: settings.social_sms_enabled, url: settings.social_sms, color: '#34A853', bg: 'from-emerald-400 to-green-600',
           icon: <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-2-5c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1s.45-1 1-1h2c.55 0 1 .45 1 1zm-6 0c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1s.45-1 1-1h4c.55 0 1 .45 1 1z"/></svg> },
       ]
       const activeSocials = socials.filter((s) => s.enabled && s.url)
-      if (activeSocials.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لم تتم إضافة روابط التواصل بعد.</p>
+      if (activeSocials.length === 0) return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+            <Share2 className="w-8 h-8 text-violet-300" />
+          </div>
+          <p className="text-sm text-gray-500">لم تتم إضافة روابط التواصل بعد.</p>
+        </div>
+      )
       return (
         <div className="grid grid-cols-2 gap-3">
           {activeSocials.map((s) => {
@@ -551,10 +657,11 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
               : s.key === 'sms' ? `sms:${s.url}` : s.url
             return (
               <a key={s.key} href={href} target="_blank" rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all hover:shadow-md"
-                style={{ borderColor: s.color + '40', backgroundColor: s.color + '08' }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: s.color }}>{s.icon}</div>
-                <span className="text-xs font-semibold text-gray-700">{s.name}</span>
+                className="group flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-white border border-gray-200/60 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${s.bg} flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                  {s.icon}
+                </div>
+                <span className="text-xs font-semibold text-gray-700 group-hover:text-[#0A1F44] transition-colors">{s.name}</span>
               </a>
             )
           })}
@@ -567,12 +674,25 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
       return <SupportContactForm settings={settings} />
     }
 
-    // === POLICIES ===
+    // === POLICIES — professional layout with icon + styled content ===
     const fieldMap: Record<string, string> = { privacy: 'policy_privacy', terms: 'policy_terms', refund: 'policy_refund' }
     const content = settings[fieldMap[cardId]] || 'هذا المحتوى قيد التحضير. سيتم تحديثه قريباً.'
+    const policyIcons: Record<string, { icon: any; color: string }> = {
+      privacy: { icon: Shield, color: 'text-slate-600' },
+      terms:   { icon: FileText, color: 'text-sky-600' },
+      refund:  { icon: RefreshCw, color: 'text-rose-600' },
+    }
+    const PolicyIcon = policyIcons[cardId]?.icon || FileText
     return (
-      <div className="p-4 bg-gray-50 rounded-xl">
-        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{content}</p>
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 p-3.5 bg-white rounded-xl border border-gray-200/60">
+          <div className={`w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0`}>
+            <PolicyIcon className={`w-5 h-5 ${policyIcons[cardId]?.color || 'text-gray-600'}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{content}</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -652,12 +772,14 @@ function SupportContactForm({ settings }: { settings: any }) {
   if (sent) {
     return (
       <div className="p-6 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+        <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-4 shadow-lg">
+          <CheckCircle2 className="w-10 h-10 text-white" />
         </div>
         <h4 className="font-bold text-[#0A1F44] text-base mb-1">تم إرسال رسالتك بنجاح!</h4>
         <p className="text-xs text-gray-500 mb-4">سنرد عليك في أقرب وقت ممكن عبر بريدك الإلكتروني</p>
-        <button onClick={() => { setSent(false); setForm({ name: '', email: '', subject: '', message: '' }) }} className="text-xs text-[#C9A961] font-bold hover:underline">إرسال رسالة أخرى</button>
+        <button onClick={() => { setSent(false); setForm({ name: '', email: '', subject: '', message: '' }) }} className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-600 hover:text-cyan-700 bg-cyan-50 hover:bg-cyan-100 px-4 py-2 rounded-full transition-all">
+          <RefreshCw className="w-3.5 h-3.5" /> إرسال رسالة أخرى
+        </button>
       </div>
     )
   }
@@ -665,29 +787,32 @@ function SupportContactForm({ settings }: { settings: any }) {
   const supportText = settings.policy_support || 'فريق الدعم لدينا متاح لمساعدتك في أي وقت. أرسل لنا رسالتك وسنرد عليك في أقرب وقت ممكن.'
 
   return (
-    <div className="space-y-4">
-      <div className="p-3 bg-gray-50 rounded-xl">
+    <div className="space-y-3">
+      {/* Info banner */}
+      <div className="flex items-start gap-2.5 p-3 bg-cyan-50/50 rounded-xl border border-cyan-200/40">
+        <LifeBuoy className="w-4 h-4 text-cyan-600 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-gray-600 leading-relaxed">{supportText}</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      {/* Form fields */}
+      <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الاسم *</label>
-          <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="اسمك الكامل" />
+          <label className="text-[10px] font-bold text-[#0A1F44] mb-1.5 block">الاسم *</label>
+          <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-3 text-sm bg-white border border-gray-200/60 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all" placeholder="اسمك الكامل" />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">البريد *</label>
-          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="email@example.com" dir="ltr" />
+          <label className="text-[10px] font-bold text-[#0A1F44] mb-1.5 block">البريد *</label>
+          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-10 px-3 text-sm bg-white border border-gray-200/60 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all" placeholder="email@example.com" dir="ltr" />
         </div>
       </div>
       <div>
-        <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الموضوع</label>
-        <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20" placeholder="موضوع الرسالة" />
+        <label className="text-[10px] font-bold text-[#0A1F44] mb-1.5 block">الموضوع</label>
+        <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full h-10 px-3 text-sm bg-white border border-gray-200/60 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all" placeholder="موضوع الرسالة" />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-[#0A1F44] mb-1 block">الرسالة *</label>
-        <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows={4} className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20 resize-none" placeholder="اكتب رسالتك هنا..." />
+        <label className="text-[10px] font-bold text-[#0A1F44] mb-1.5 block">الرسالة *</label>
+        <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows={4} className="w-full p-3 text-sm bg-white border border-gray-200/60 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 resize-none transition-all" placeholder="اكتب رسالتك هنا..." />
       </div>
-      <button onClick={submit} disabled={sending || !form.name || !form.email || !form.message} className="w-full h-11 bg-[#0A1F44] hover:bg-[#102a63] text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+      <button onClick={submit} disabled={sending || !form.name || !form.email || !form.message} className="w-full h-11 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.98]">
         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         {sending ? 'جاري الإرسال...' : 'إرسال الرسالة'}
       </button>
