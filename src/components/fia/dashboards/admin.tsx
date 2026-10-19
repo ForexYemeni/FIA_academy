@@ -307,6 +307,83 @@ function AdminOverview() {
     }).catch(() => {})
   }, [])
 
+  // ⚡ REAL-TIME: refresh overview stats INSTANTLY when payments/courses/enrollments change
+  // Note: We re-fetch because the stats require aggregation across multiple tables.
+  useEffect(() => {
+    let channel: any
+    let debounceTimer: any
+    const debouncedRefresh = () => {
+      // Debounce to avoid spamming when many changes happen quickly
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        // Trigger the same Promise.all fetch as above
+        Promise.all([
+          fetch('/api/courses').then((r) => r.json()),
+          fetch('/api/trainers').then((r) => r.json()),
+          fetch('/api/students?role=student').then((r) => r.json()),
+          fetch('/api/payments').then((r) => r.json()),
+          fetch('/api/enrollments').then((r) => r.json()),
+        ]).then(([c, t, s, p, e]) => {
+          const coursesArr = Array.isArray(c) ? c : []
+          const trainers = Array.isArray(t) ? t : []
+          const students = Array.isArray(s) ? s : []
+          const payments = Array.isArray(p) ? p : []
+          const enrollments = Array.isArray(e) ? e : []
+          setCourses(coursesArr)
+          const courseMap = new Map<string, any>()
+          for (const cr of coursesArr) courseMap.set(cr.id, cr)
+          const resolveCurrency = (pay: any): string => {
+            if (pay.course_id) {
+              const cr = courseMap.get(pay.course_id)
+              if (cr?.currency) return cr.currency
+            }
+            return pay.currency || 'ر.ي'
+          }
+          const groups: Record<string, { total: number; pending_total: number; paid_count: number; pending_count: number }> = {}
+          for (const pay of payments) {
+            const cur = resolveCurrency(pay)
+            if (!groups[cur]) groups[cur] = { total: 0, pending_total: 0, paid_count: 0, pending_count: 0 }
+            if (pay.status === 'مكتمل' || pay.status === 'completed' || pay.status === 'paid') {
+              groups[cur].total += Number(pay.amount) || 0
+              groups[cur].paid_count += 1
+            } else if (pay.status === 'قيد الانتظار' || pay.status === 'pending') {
+              groups[cur].pending_total += Number(pay.amount) || 0
+              groups[cur].pending_count += 1
+            }
+          }
+          const revenueByCurrency = Object.entries(groups).map(([cur, g]) => ({
+            currency: cur, total: g.total, pending_total: g.pending_total,
+            paid_count: g.paid_count, pending_count: g.pending_count,
+          })).sort((a, b) => b.total - a.total)
+          setStats({
+            courses: coursesArr.length,
+            trainers: trainers.length,
+            students: students.length,
+            payments: payments.length,
+            pendingPayments: payments.filter(p => p.status === 'قيد الانتظار' || p.status === 'pending').length,
+            completedEnrollments: enrollments.filter(e => e.status === 'completed' || e.status === 'مكتمل').length,
+            activeEnrollments: enrollments.filter(e => e.status === 'active').length,
+            revenueByCurrency,
+          })
+        }).catch(() => {})
+      }, 300)
+    }
+    try {
+      channel = supabasePublic
+        .channel('admin-overview-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainers' }, debouncedRefresh)
+        .subscribe()
+    } catch {}
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      try { supabasePublic.removeChannel(channel) } catch {}
+    }
+  }, [])
+
   // Pretty currency formatter — group digits, append the currency code
   const fmt = (amount: number, currency: string) => `${amount.toLocaleString('en-US')} ${currency}`
 
@@ -429,6 +506,29 @@ function AdminCourses() {
   }
   useEffect(() => { load() }, [])
 
+  // ⚡ REAL-TIME: courses — admin sees course changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-courses-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'courses' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'courses' },
+          (payload: any) => setItems((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'courses' },
+          (payload: any) => setItems((prev) => prev.filter((c) => c.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -523,6 +623,42 @@ function AdminStudents() {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+  }, [])
+
+  // ⚡ REAL-TIME: students + enrollments — admin sees new students + enrollments INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-students-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'users' },
+          (payload: any) => {
+            if (payload.new.role === 'student') {
+              setItems((prev) => [payload.new, ...prev])
+              toast.info('👤 طالب جديد سجل في المنصة')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'users' },
+          (payload: any) => setItems((prev) => prev.map((s) => s.id === payload.new.id ? { ...s, ...payload.new } : s))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'users' },
+          (payload: any) => setItems((prev) => prev.filter((s) => s.id !== payload.old.id))
+        )
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'enrollments' },
+          (payload: any) => setEnrollments((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'enrollments' },
+          (payload: any) => setEnrollments((prev) => prev.map((e) => e.id === payload.new.id ? { ...e, ...payload.new } : e))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
   }, [])
 
   const handleDelete = async () => {
@@ -1208,6 +1344,28 @@ function AdminPaymentMethods() {
   const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/payment-methods').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+  // ⚡ REAL-TIME: payment methods — admin sees changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-payment-methods-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'payment_methods' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'payment_methods' },
+          (payload: any) => setItems((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'payment_methods' },
+          (payload: any) => setItems((prev) => prev.filter((p) => p.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
   const toggle = async (id: string, enabled: boolean) => {
     await fetch('/api/payment-methods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enabled }) })
     setItems(items.map((p) => (p.id === id ? { ...p, enabled } : p)))
@@ -1297,6 +1455,29 @@ function AdminCertificates() {
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }
   useEffect(() => { load() }, [])
+
+  // ⚡ REAL-TIME: certificates — admin sees new certificates INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-cert-list-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'certificates' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'certificates' },
+          (payload: any) => setItems((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'certificates' },
+          (payload: any) => setItems((prev) => prev.filter((c) => c.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   const filtered = items.filter((c) => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false
@@ -1600,6 +1781,29 @@ function AdminTrainers() {
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
 
+  // ⚡ REAL-TIME: trainers — admin sees trainer changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-trainers-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'trainers' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'trainers' },
+          (payload: any) => setItems((prev) => prev.map((t) => t.id === payload.new.id ? { ...t, ...payload.new } : t))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'trainers' },
+          (payload: any) => setItems((prev) => prev.filter((t) => t.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
   // Pre-flight: make sure the trainer is not a team member (founder/leader).
   // If they are, show a toast error and skip opening the confirm dialog.
   const requestDelete = async (trainer: any) => {
@@ -1874,6 +2078,28 @@ function AdminPartners() {
   const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/partners').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+  // ⚡ REAL-TIME: partners — admin sees partner changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-partners-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'partners' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'partners' },
+          (payload: any) => setItems((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'partners' },
+          (payload: any) => setItems((prev) => prev.filter((p) => p.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -1947,6 +2173,28 @@ function AdminLicenses() {
   const [deleting, setDeleting] = useState(false)
   const load = () => fetch('/api/licenses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+  // ⚡ REAL-TIME: licenses — admin sees license changes INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-licenses-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'licenses' },
+          (payload: any) => setItems((prev) => [payload.new, ...prev])
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'licenses' },
+          (payload: any) => setItems((prev) => prev.map((l) => l.id === payload.new.id ? { ...l, ...payload.new } : l))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'licenses' },
+          (payload: any) => setItems((prev) => prev.filter((l) => l.id !== payload.old.id))
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
