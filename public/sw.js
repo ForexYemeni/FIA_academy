@@ -2,9 +2,13 @@
 // - Caches the app shell for offline use
 // - Handles push notifications (real external popups, even when app is closed)
 // - Handles notification clicks (navigate to a link)
+//
+// ⚠️ IMPORTANT: We NEVER cache API responses. The app relies on fresh
+// data from /api/* endpoints for Realtime updates + payment status +
+// enrollment lists. Caching these would cause stale UI.
 
-const APP_SHELL_CACHE = 'fia-shell-v2'
-const DYNAMIC_CACHE = 'fia-dynamic-v2'
+const APP_SHELL_CACHE = 'fia-shell-v3'
+const DYNAMIC_CACHE = 'fia-dynamic-v3'
 
 const APP_SHELL = [
   '/',
@@ -27,6 +31,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
+          // Delete ALL old cache versions (v1, v2, etc.) to ensure
+          // users get fresh content after we deploy updates.
           .filter((k) => k !== APP_SHELL_CACHE && k !== DYNAMIC_CACHE)
           .map((k) => caches.delete(k))
       )
@@ -41,9 +47,20 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
-  // Never cache API requests
+
+  // ⚡ NEVER cache API requests — always go to network.
+  // This is critical for the Realtime feature: when the app refetches
+  // /api/payments or /api/enrollments after a Realtime event, we
+  // MUST get the latest data, not a stale cached version.
   if (url.pathname.startsWith('/api/')) {
-    return fetch(request).catch(() => caches.match(request))
+    event.respondWith(fetch(request))
+    return
+  }
+
+  // ⚡ NEVER cache Supabase Realtime WebSocket upgrade requests
+  // (these go to wss://*.supabase.co/realtime/v1/...)
+  if (url.hostname.includes('supabase.co')) {
+    return // let the browser handle it natively
   }
 
   // Cache-first for static assets (images, fonts, _next/*)
@@ -70,7 +87,9 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Network-first for HTML pages
+  // Network-first for HTML pages — fall back to cache if offline.
+  // We DO cache the latest HTML so the app works offline, but we
+  // always prefer the network version when available.
   if (request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(request)

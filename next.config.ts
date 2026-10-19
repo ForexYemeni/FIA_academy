@@ -60,11 +60,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // API responses — short cache (5 minutes) so changes
-        // propagate fast, but CDN can serve stale during load spikes
+        // API responses — NEVER cache. The app relies on fresh data
+        // for Realtime features (payment status, enrollment lists,
+        // notifications). Caching API responses would cause stale UI
+        // where a newly-approved payment shows as 'pending' for 5 min.
         source: '/api/:path*',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=0, s-maxage=300' },
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
         ],
       },
       // Security headers — prevent clickjacking, MIME-sniffing, XSS

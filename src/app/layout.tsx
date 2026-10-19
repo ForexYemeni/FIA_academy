@@ -73,6 +73,12 @@ const SW_REGISTER = `
           // Force the new SW to take over immediately (so push events
           // work on first session without requiring a page reload).
           if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING')
+          // ⚡ Check for updates every 5 minutes. This ensures users get
+          // the latest SW version (which may contain critical fixes for
+          // Realtime notifications, payment updates, etc.).
+          setInterval(function() {
+            reg.update().catch(function() {})
+          }, 5 * 60 * 1000)
         })
         .catch(function (err) {
           console.warn('SW registration failed:', err)
