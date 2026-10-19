@@ -98,41 +98,30 @@ class MainActivity : AppCompatActivity() {
             // and triggers instant state refreshes + toast display.
             runOnUiThread {
                 try {
+                    // Escape strings for safe JS injection
+                    val safeTitle = title.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+                    val safeBody = body.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+                    val safeLink = link.replace("\\", "\\\\").replace("'", "\\'")
+                    val safeType = type.replace("\\", "\\\\").replace("'", "\\'")
+
                     val js = """
                         (function() {
                           try {
-                            // Dispatch a custom event that the web app listens for.
-                            // This triggers instant UI updates (toasts, refreshes,
-                            // badge counts, etc.) without page reload.
                             var eventData = {
-                              title: ${android.text.TextUtils.isEmpty(title) ? "''" : "'${title.replace("'", "\\'")}'"},
-                              body: ${android.text.TextUtils.isEmpty(body) ? "''" : "'${body.replace("'", "\\'")}'"},
-                              link: '$link',
-                              type: '$type',
+                              title: '$safeTitle',
+                              body: '$safeBody',
+                              link: '$safeLink',
+                              type: '$safeType',
                               timestamp: Date.now()
                             };
                             window.dispatchEvent(new CustomEvent('fia-native-notification', { detail: eventData }));
-
-                            // Also dispatch a 'storage' event so any listener
-                            // that uses localStorage-based caches gets refreshed.
                             window.dispatchEvent(new Event('storage'));
-
-                            // Show a toast inside the web UI too (in case the
-                            // system notification was dismissed or not granted).
                             if (window.__FIA_showToast) {
-                                window.__FIA_showToast(eventData.title + ' — ' + eventData.body);
+                                window.__FIA_showToast(eventData.title + (eventData.body ? ' — ' + eventData.body : ''));
                             }
-
-                            // Trigger a hashchange to the notification link if
-                            // the user is currently in the dashboard
-                            try {
-                              if (window.location.hash && window.location.hash.indexOf('dashboard') > -1 && eventData.link && eventData.link !== '/') {
-                                // Don't auto-navigate; just refresh data
-                                if (window.__FIA_refreshActiveView) {
-                                    window.__FIA_refreshActiveView();
-                                }
-                              }
-                            } catch(e) {}
+                            if (window.__FIA_refreshActiveView) {
+                                window.__FIA_refreshActiveView();
+                            }
                           } catch(e) {
                             console.error('FIA native notification error:', e);
                           }
