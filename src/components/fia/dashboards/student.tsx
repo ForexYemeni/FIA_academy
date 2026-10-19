@@ -113,6 +113,11 @@ export function StudentDashboard() {
   useHashTab(NAV.map((n) => n.id), setActive)
   const [viewingCourse, setViewingCourse] = useState<any | null>(null)
   const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)
+  // ⚡ When the user clicks "اشترك الآن" on a recommended course in the
+  // Overview tab, we set browseInitialCourse + switch to the browse tab.
+  // BrowseCourses reads this prop and auto-opens the payment dialog for
+  // that specific course — no need for the user to scroll and find it.
+  const [browseInitialCourse, setBrowseInitialCourse] = useState<any | null>(null)
   const user = useAuth((s) => s.user)
   const updateUser = useAuth((s) => s.updateUser)
   const [courses, setCourses] = useState<any[]>([])
@@ -167,11 +172,10 @@ export function StudentDashboard() {
       loadPayments()
       fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
-
-      // Show a toast with the notification content
-      if (data.title) {
-        try { toast.success(`${data.title}${data.body ? ' — ' + data.body : ''}`) } catch {}
-      }
+      // ⚡ Note: We DON'T show a toast here — the notifications-bell component
+      // already shows a toast + browser notification when the corresponding
+      // notification row arrives. Showing a toast here too would cause
+      // duplicates. We only refresh data here.
     }
     window.addEventListener('fia-native-notification', handleNativeNotif as EventListener)
 
@@ -230,12 +234,11 @@ export function StudentDashboard() {
             // Without this, the course card would stay "قيد انتظار الدفع"
             // even though the payment was approved.
             loadEnrollments()
-            // Toast on status change to approved/rejected
-            if (payload.new.status === 'مكتمل' && payload.old?.status !== 'مكتمل') {
-              toast.success('✅ تم تأكيد دفعتك! الدورة مفعّلة الآن')
-            } else if (payload.new.status === 'ملغي' && payload.old?.status !== 'ملغي') {
-              toast.error('❌ تم رفض دفعتك - راجع السبب في صفحة المدفوعات')
-            }
+            // ⚡ Note: We DON'T show a toast here — the notifications-bell
+            // component already shows a toast when it receives the
+            // corresponding notification INSERT (via notifyPaymentApproved
+            // helper on the server). Showing a toast here too would
+            // cause duplicate notifications.
           }
         )
         .on('postgres_changes',
@@ -307,7 +310,12 @@ export function StudentDashboard() {
   }, [user?.name])
 
   const onEnrolled = () => {
+    // ⚡ Refresh both enrollments AND payments so the new course
+    // appears in "دوراتي" AND "مدفوعاتي" immediately after enrollment.
+    // For free courses, the API creates a payment row with amount=0 +
+    // status='مكتمل', so we need to refresh both states.
     loadEnrollments()
+    loadPayments()
   }
 
   return (
@@ -332,8 +340,9 @@ export function StudentDashboard() {
             const enr = enrollments.find((e:any)=>e.course_id===c.id)
             const isFree = c.price_type === 'مجانية' || c.price === 0
             if (!enr) {
-              // Not enrolled at all — route to BrowseCourses
-              toast.info(isFree ? 'سجّل في الدورة مجاناً من قسم "استكشاف الدورات"' : 'اشترك في الدورة من قسم "استكشاف الدورات"')
+              // Not enrolled at all — route to BrowseCourses with this course
+              // pre-selected so the user can enroll/pay in one click.
+              setBrowseInitialCourse(c)
               setActive('browse')
               return
             }
@@ -344,11 +353,18 @@ export function StudentDashboard() {
             setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
           }} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
-          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} onViewCourse={(c) => {
-            // Same safety check — only open if enrolled and not pending
-            const enr = enrollments.find((e:any)=>e.course_id===c.id)
-            if (!enr || enr.payment_status === 'pending') {
+          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} initialCourse={browseInitialCourse} onInitialCourseConsumed={() => setBrowseInitialCourse(null)} onViewCourse={(c, enrollmentOverride?: any) => {
+            // ⚡ Use the enrollment passed from BrowseCourses if available
+            // (e.g. after a successful free enrollment, the new enrollment
+            // data is passed directly so we don't have to wait for the
+            // enrollments state to refresh).
+            const enr = enrollmentOverride || enrollments.find((e:any)=>e.course_id===c.id)
+            if (!enr) {
               toast.info('لا يمكن فتح الدورة قبل إتمام التسجيل/الدفع')
+              return
+            }
+            if (enr.payment_status === 'pending') {
+              toast.info('بانتظار تأكيد الإدارة للدفع — سيتم تفعيل الدورة قريباً')
               return
             }
             setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
@@ -450,12 +466,19 @@ function Overview({ user, courses, certificates, enrollments, onViewCourse }: an
             } else if (access.reason === 'free-not-enrolled') {
               btnLabel = 'سجّل الآن — مجانية'
               btnClass = 'w-full bg-green-600 hover:bg-green-700 text-white'
-              // Will be handled by parent (BrowseCourses logic) — for now, just route to "browse"
-              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" للتسجيل') }
+              // ⚡ Direct enrollment: clicking "سجّل الآن" on a free course
+              // in the Overview tab triggers immediate enrollment + opens
+              // the course. No more "افتح استكشاف الدورات" toast — the
+              // user expects to click → enroll → open in one smooth flow.
+              btnAction = () => onViewCourse?.(c)
             } else if (access.reason === 'paid-not-enrolled') {
               btnLabel = 'اشترك الآن'
               btnClass = 'w-full bg-gold hover:bg-gold-light text-navy'
-              btnAction = () => { toast.info('افتح قسم "استكشاف الدورات" لإتمام الدفع') }
+              // ⚡ Direct payment: clicking "اشترك الآن" on a paid course
+              // in the Overview tab navigates to BrowseCourses with this
+              // specific course pre-selected, which auto-opens the
+              // payment dialog. No more "افتح استكشاف الدورات" toast.
+              btnAction = () => onViewCourse?.(c)
             } else if (access.canOpen) {
               btnLabel = 'عرض الدورة'
               btnClass = 'w-full bg-navy hover:bg-navy-light'
@@ -594,7 +617,7 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   )
 }
 
-function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse }: any) {
+function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse, initialCourse, onInitialCourseConsumed }: any) {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -602,6 +625,32 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
   useEffect(() => {
     fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
   }, [])
+
+  // ⚡ Auto-open the payment dialog when the user navigated here from the
+  // Overview tab with a specific course in mind. This eliminates the
+  // need for the user to scroll through all courses and find the one
+  // they want to pay for.
+  useEffect(() => {
+    if (initialCourse && onInitialCourseConsumed) {
+      // Find the course in our list (in case initialCourse is stale)
+      const target = courses?.find((c: any) => c.id === initialCourse.id) || initialCourse
+      const isFree = target.price_type === 'مجانية' || target.price === 0
+      // If the user is already enrolled, open the course directly
+      const existingEnr = enrollments?.find((e: any) => e.course_id === target.id)
+      if (existingEnr && existingEnr.payment_status !== 'pending') {
+        onViewCourse?.(target, existingEnr)
+      } else if (isFree) {
+        // Auto-enroll in the free course immediately
+        enrollFree(target)
+      } else {
+        // Open the payment dialog directly for paid courses
+        setPayDialog({ course: target, open: true })
+      }
+      // Mark the initial course as consumed so it doesn't re-trigger
+      onInitialCourseConsumed()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCourse, courses, enrollments])
 
   const isEnrolled = (courseId: string) => enrollments?.some((e: any) => e.course_id === courseId)
 
@@ -630,7 +679,9 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
     if (isEnrolled(course.id)) {
       toast.info('أنت مسجّل في هذه الدورة')
       // If already enrolled, just open the course viewer immediately
-      onViewCourse?.(course)
+      // Pass the existing enrollment so the viewer doesn't have to look it up
+      const existingEnr = enrollments?.find((e: any) => e.course_id === course.id)
+      onViewCourse?.(course, existingEnr)
       return
     }
     setEnrolling(course.id)
@@ -643,15 +694,25 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse 
       const data = await res.json()
       if (data.already_enrolled) {
         toast.info('أنت مسجّل في هذه الدورة')
-        // Refresh + open the course viewer
+        // Refresh + open the course viewer with the returned enrollment data
         await onEnrolled?.()
-        onViewCourse?.(course)
+        onViewCourse?.(course, data)
       } else if (res.ok) {
         toast.success(`تم التسجيل في دورة: ${course.title}`)
         await onEnrolled?.()
-        // OPEN THE COURSE IMMEDIATELY after successful free enrollment
-        // (the user expects: click free course → it opens)
-        onViewCourse?.(course)
+        // ⚡ OPEN THE COURSE IMMEDIATELY after successful free enrollment.
+        // Pass the new enrollment data returned from the API so the
+        // parent component doesn't have to wait for the enrollments
+        // state to refresh (which would cause a "can't open" toast).
+        // Construct a synthetic enrollment object from the API response
+        // so the viewer has all the fields it needs.
+        const syntheticEnr = {
+          ...data,
+          payment_status: 'free',
+          status: 'مكتمل',
+          progress: 0,
+        }
+        onViewCourse?.(course, syntheticEnr)
       } else toast.error('فشل التسجيل')
     } catch {
       toast.error('خطأ')
