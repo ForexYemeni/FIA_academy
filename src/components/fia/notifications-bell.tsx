@@ -96,6 +96,11 @@ export function NotificationsBell() {
   // fire TWO browser notifications + TWO toasts + TWO sounds.
   // We use a ref (not state) so it doesn't trigger re-renders.
   const recentlyAnnouncedRef = useRef<Set<string>>(new Set())
+  // ⚡ Ref for the initialFallback timer so the subscribe() callback
+  // can cancel it when Realtime connects. Without this, polling would
+  // restart 5s after mount even though Realtime is working, causing
+  // duplicate notifications + wasted API calls.
+  const initialFallbackRef = useRef<any>(null)
 
   // Initialize muted state + audio unlock + notification permission
   useEffect(() => {
@@ -427,8 +432,15 @@ export function NotificationsBell() {
         )
         .subscribe((status: string) => {
           if (status === 'SUBSCRIBED') {
-            // Realtime is working — stop polling
+            // ⚡ Realtime is working — STOP polling AND cancel the
+            // initialFallback timeout. Without canceling the fallback,
+            // polling would restart after 5s even though Realtime is
+            // connected, causing duplicate notifications + slowness.
             stopPolling()
+            if (initialFallbackRef.current) {
+              clearTimeout(initialFallbackRef.current)
+              initialFallbackRef.current = null
+            }
             retryCount = 0
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             // Realtime failed — start polling as fallback
@@ -441,8 +453,13 @@ export function NotificationsBell() {
       startPolling()
     }
 
-    // Initial safety: start polling after 5s if Realtime hasn't confirmed
-    const initialFallback = setTimeout(() => {
+    // ⚡ Initial safety: start polling after 5s ONLY if Realtime hasn't
+    // confirmed yet. We store the timer in a ref so the subscribe()
+    // callback can cancel it when Realtime connects.
+    initialFallbackRef.current = setTimeout(() => {
+      // Only start polling if we're not already polling AND Realtime
+      // hasn't connected (interval is null means Realtime stopped it
+      // OR it was never started).
       if (!interval) {
         interval = setInterval(load, 60000)
       }
@@ -451,7 +468,10 @@ export function NotificationsBell() {
     return () => {
       try { supabasePublic.removeChannel(channel) } catch {}
       stopPolling()
-      clearTimeout(initialFallback)
+      if (initialFallbackRef.current) {
+        clearTimeout(initialFallbackRef.current)
+        initialFallbackRef.current = null
+      }
     }
   }, [user?.id])
 
