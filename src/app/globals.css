@@ -405,6 +405,17 @@ img[loading="lazy"] {
   100% { background-position: 0 50%; }
 }
 
+/* ⚡ Dropdown card animations — magical slide-up + fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 /* Remove the shimmer once the image is fully loaded.
  * We use the JS-loaded class (.img-loaded) instead of the
  * pseudo-class :loaded which doesn't exist. */
