@@ -35,6 +35,7 @@ import {
 import { AdminForumBans } from './shared-community'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
+import { supabasePublic } from '@/lib/supabase'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
@@ -731,7 +732,83 @@ function AdminPayments() {
   }
   useEffect(() => { load() }, [])
 
+  // ⚡ REAL-TIME: payments — admin sees new payments INSTANTLY when
+  // a student submits a payment proof. Also sees status updates.
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-payments-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'payments' },
+          (payload: any) => {
+            // New payment submitted — add to top of list immediately
+            setItems((prev) => [payload.new, ...prev])
+            // Show toast notification
+            toast.info('💰 طلب دفع جديد - بانتظار المراجعة', {
+              description: `${payload.new.amount} ${payload.new.currency || 'ر.ي'}`,
+            })
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'payments' },
+          (payload: any) => {
+            // Payment status changed (e.g. by another admin)
+            setItems((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+          }
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'payments' },
+          (payload: any) => {
+            setItems((prev) => prev.filter((p) => p.id !== payload.old.id))
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
+  // ⚡ REAL-TIME: enrollments — admin sees new enrollments instantly
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-enrollments-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'enrollments' },
+          () => {
+            toast.success('📚 تسجيل جديد في دورة')
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
+  // ⚡ REAL-TIME: certificates — admin sees certificate requests + issued certs
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-certificates-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'certificates' },
+          () => {
+            toast.success('🎓 تم إصدار شهادة جديدة')
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
   const updateStatus = async (id: string, status: string, reason?: string) => {
+    // ⚡ INSTANT OPTIMISTIC UPDATE: update the UI IMMEDIATELY before
+    // the server responds. This makes the action feel instant.
+    // If the server fails, we revert the optimistic update.
+    const previousItems = items
+    setItems((prev) => prev.map((p) => p.id === id ? { ...p, status, rejection_reason: reason || p.rejection_reason } : p))
+
     try {
       const res = await fetch('/api/payments', {
         method: 'PUT',
@@ -740,13 +817,17 @@ function AdminPayments() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+        // Revert optimistic update on failure
+        setItems(previousItems)
         toast.error(err.error || 'فشل تحديث حالة الدفع')
         return
       }
       toast.success(status === 'مكتمل' ? 'تم قبول الدفع — تم تفعيل الدورة للمتدرب' : status === 'ملغي' ? 'تم رفض الدفع — تم إشعار المتدرب' : 'تم التحديث')
-      load()
+      // Realtime subscription will sync other admins automatically
       setSelectedPayment(null)
     } catch {
+      // Revert optimistic update on network error
+      setItems(previousItems)
       toast.error('خطأ في الاتصال')
     }
   }

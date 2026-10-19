@@ -23,6 +23,7 @@ import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
+import { supabasePublic } from '@/lib/supabase'
 
 const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
@@ -128,6 +129,46 @@ export function TrainerDashboard() {
     loadCourses()
     loadStudents()
   }, [user?.id])
+
+  // ⚡ REAL-TIME: trainer sees new enrollments INSTANTLY when a student
+  // enrolls in their course. Also sees payment confirmations live.
+  useEffect(() => {
+    if (!user?.id) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`trainer-realtime:${user.id}`)
+        // New enrollment in any course — refresh students list
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'enrollments' },
+          (payload: any) => {
+            // Only relevant if it's in one of this trainer's courses
+            const courseId = payload.new.course_id
+            if (courses.some((c: any) => c.id === courseId)) {
+              loadStudents()
+              toast.success('📚 طالب جديد سجل في دورتك!')
+            }
+          }
+        )
+        // Payment status update — affects enrollments
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'payments' },
+          () => {
+            // Refresh students list (enrollment statuses may have changed)
+            loadStudents()
+          }
+        )
+        // Course update — refresh courses
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'courses' },
+          (payload: any) => {
+            setCourses((prev) => prev.map((c: any) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.id, courses.length])
 
   const navigateToContent = (courseId: string) => {
     setContentCourseId(courseId)
