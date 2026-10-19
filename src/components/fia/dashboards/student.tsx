@@ -353,7 +353,7 @@ export function StudentDashboard() {
             setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
           }} />}
           {active === 'courses' && <MyCourses courses={courses} enrollments={enrollments} studentName={user?.name} onContinue={(course, enrollment) => { setViewingCourse(course); setViewingEnrollment(enrollment); setActive('course-view') }} />}
-          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} initialCourse={browseInitialCourse} onInitialCourseConsumed={() => setBrowseInitialCourse(null)} onViewCourse={(c, enrollmentOverride?: any) => {
+          {active === 'browse' && <BrowseCourses courses={courses} enrollments={enrollments} userId={user?.id} onEnrolled={onEnrolled} setPayments={setPayments} setEnrollments={setEnrollments} initialCourse={browseInitialCourse} onInitialCourseConsumed={() => setBrowseInitialCourse(null)} onViewCourse={(c, enrollmentOverride?: any) => {
             // ⚡ Use the enrollment passed from BrowseCourses if available
             // (e.g. after a successful free enrollment, the new enrollment
             // data is passed directly so we don't have to wait for the
@@ -617,7 +617,7 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   )
 }
 
-function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse, initialCourse, onInitialCourseConsumed }: any) {
+function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse, initialCourse, onInitialCourseConsumed, setPayments, setEnrollments }: any) {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -699,19 +699,42 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
         onViewCourse?.(course, data)
       } else if (res.ok) {
         toast.success(`تم التسجيل في دورة: ${course.title}`)
-        await onEnrolled?.()
-        // ⚡ OPEN THE COURSE IMMEDIATELY after successful free enrollment.
-        // Pass the new enrollment data returned from the API so the
-        // parent component doesn't have to wait for the enrollments
-        // state to refresh (which would cause a "can't open" toast).
-        // Construct a synthetic enrollment object from the API response
-        // so the viewer has all the fields it needs.
+        // ⚡ OPTIMISTIC UPDATE: add the new free enrollment to the local
+        // state so it appears in 'دوراتي' immediately.
         const syntheticEnr = {
           ...data,
           payment_status: 'free',
           status: 'مكتمل',
           progress: 0,
         }
+        const syntheticPayment = {
+          id: data.id || `optimistic-${Date.now()}`,
+          user_id: userId,
+          course_id: course.id,
+          amount: 0,
+          currency: course.currency || 'ر.ي',
+          method: 'free',
+          status: 'مكتمل',
+          reference: 'FREE',
+          date: new Date().toISOString(),
+        }
+        try {
+          if (setEnrollments) {
+            setEnrollments((prev: any[]) => {
+              if (prev.some((e) => e.id === syntheticEnr.id)) return prev
+              return [syntheticEnr, ...prev]
+            })
+          }
+          // Note: we DON'T add the free payment to setPayments because the
+          // Payments API filters out free enrollments (amount=0 + method='free').
+          // Adding it would cause a phantom entry in 'مدفوعاتي' that
+          // disappears on the next refetch.
+        } catch {}
+        await onEnrolled?.()
+        // ⚡ OPEN THE COURSE IMMEDIATELY after successful free enrollment.
+        // Pass the new enrollment data returned from the API so the
+        // parent component doesn't have to wait for the enrollments
+        // state to refresh (which would cause a "can't open" toast).
         onViewCourse?.(course, syntheticEnr)
       } else toast.error('فشل التسجيل')
     } catch {
@@ -778,6 +801,51 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
       if (data.already_enrolled) { toast.info('أنت مسجّل في هذه الدورة') }
       else if (res.ok) {
         toast.success('تم تسجيل طلبك! سيتم تفعيل الدورة بعد تأكيد الدفع')
+        // ⚡ OPTIMISTIC UPDATE: immediately add the new payment + enrollment
+        // to the local state so they appear in 'مدفوعاتي' + 'دوراتي' WITHOUT
+        // waiting for the API refetch. This makes the UI feel instant.
+        // The Realtime subscription will eventually deliver the official
+        // row from the DB; if it differs (e.g., different id), we dedup
+        // by checking if the payment already exists.
+        const syntheticPayment = {
+          id: data.id || `optimistic-${Date.now()}`,
+          user_id: userId,
+          course_id: course.id,
+          amount: finalAmount,
+          currency: course.currency || 'ر.ي',
+          method: method.name,
+          status: 'قيد الانتظار',
+          reference: fullReference,
+          date: new Date().toISOString(),
+        }
+        const syntheticEnrollment = {
+          id: data.id || `optimistic-${Date.now()}`,
+          user_id: userId,
+          course_id: course.id,
+          payment_status: 'pending',
+          status: 'قيد الانتظار',
+          progress: 0,
+          amount_paid: finalAmount,
+          payment_method: method.name,
+          payment_reference: fullReference,
+          enrolled_at: new Date().toISOString(),
+          completed_at: null,
+        }
+        try {
+          if (setPayments) {
+            setPayments((prev: any[]) => {
+              // Dedup: don't add if a payment with this id already exists
+              if (prev.some((p) => p.id === syntheticPayment.id)) return prev
+              return [syntheticPayment, ...prev]
+            })
+          }
+          if (setEnrollments) {
+            setEnrollments((prev: any[]) => {
+              if (prev.some((e) => e.id === syntheticEnrollment.id)) return prev
+              return [syntheticEnrollment, ...prev]
+            })
+          }
+        } catch {}
         onEnrolled(); setPayDialog(null)
       } else toast.error('فشل التسجيل')
     } catch { toast.error('خطأ') }
