@@ -1338,25 +1338,34 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50" title="إغلاق">
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
-        <DialogHeader><DialogTitle>الاشتراك في دورة: {course.title}</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-4">
-          {/* Price with optional strikethrough + coupon discount */}
-          <div className="bg-gold/10 border border-gold/30 p-4 rounded-lg space-y-2">
-            {/* Case 1: coupon applied — show the post-coupon price
-                with the pre-coupon (strikePrice) struck through. */}
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-0 gap-0 border-0">
+        {/* ⚡ Magical gradient header */}
+        <div className="relative bg-gradient-to-br from-navy via-navy to-navy-light p-5 pb-6 rounded-t-2xl overflow-hidden">
+          <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #C9A961 1.5px, transparent 1.5px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '25px 25px, 20px 20px' }} />
+          <div className="absolute top-0 left-0 w-32 h-32 bg-[#C9A961]/20 rounded-full blur-3xl -translate-x-12 -translate-y-12" />
+          <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center z-50" title="إغلاق">
+            <X className="w-4 h-4 text-white/80" />
+          </button>
+          <div className="relative flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/25">
+              <CreditCard className="w-7 h-7 text-white" strokeWidth={2.2} />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">الاشتراك في دورة</DialogTitle>
+              <p className="text-[#C9A961] text-xs mt-0.5">{course.title}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="bg-gradient-to-b from-gray-50/50 to-white p-5 space-y-4 rounded-b-2xl">
+          {/* Price card */}
+          <div className="bg-gradient-to-br from-gold/10 to-amber-50/50 border border-gold/20 p-4 rounded-2xl space-y-2">
             {appliedCoupon && discount > 0 ? (
               <>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground line-through text-red-500" dir="ltr">
-                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
-                  </span>
-                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">
-                    -{discount.toLocaleString()} {course.currency || 'ر.ي'}
-                  </Badge>
+                  <span className="text-muted-foreground line-through text-red-500" dir="ltr">{strikePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                  <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-[10px]">-{discount.toLocaleString()} {course.currency || 'ر.ي'}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-navy">المبلغ النهائي:</span>
@@ -1364,51 +1373,37 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
                 </div>
               </>
             ) : hasStrikethrough ? (
-              /* Case 2: no coupon applied, but there's a strike price
-                 (original_price OR regular price > offer_price). Show
-                 strikePrice struck through + the actual charged price
-                 (basePrice = offer_price or regular price). */
               <>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">السعر الرسمي:</span>
-                  <span className="line-through text-red-500 font-bold" dir="ltr">
-                    {strikePrice.toLocaleString()} {course.currency || 'ر.ي'}
-                  </span>
+                  <span className="line-through text-red-500 font-bold" dir="ltr">{strikePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-navy">
-                    {offerPrice > 0 ? 'سعر العرض:' : 'السعر بعد الخصم:'}
-                  </span>
+                  <span className="text-sm font-semibold text-navy">{offerPrice > 0 ? 'سعر العرض:' : 'السعر بعد الخصم:'}</span>
                   <div className="flex flex-col items-end">
-                    <span className="text-xl font-extrabold text-green-600" dir="ltr">
-                      {basePrice.toLocaleString()} {course.currency || 'ر.ي'}
-                    </span>
-                    <span className="text-[10px] text-green-600 font-bold">
-                      وفّر {(strikePrice - basePrice).toLocaleString()} {course.currency || 'ر.ي'}
-                    </span>
+                    <span className="text-xl font-extrabold text-green-600" dir="ltr">{basePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
+                    <span className="text-[10px] text-green-600 font-bold">وفّر {(strikePrice - basePrice).toLocaleString()} {course.currency || 'ر.ي'}</span>
                   </div>
                 </div>
               </>
             ) : (
-              /* Case 3: no discount at all. */
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-navy">المبلغ المطلوب:</span>
                 <span className="text-xl font-extrabold text-gold" dir="ltr">{basePrice.toLocaleString()} {course.currency || 'ر.ي'}</span>
               </div>
             )}
           </div>
-          {/* Coupon input */}
+
+          {/* Coupon */}
           <div>
-            <Label className="text-navy text-xs">كوبون خصم (اختياري)</Label>
-            <div className="flex gap-2 mt-1">
-              <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(null); setCouponError('') }} placeholder="FIA-XXXX" dir="ltr" className="font-mono text-sm" />
-              <Button variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()} className="flex-shrink-0 text-xs">
-                {validatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'تطبيق'}
-              </Button>
+            <Label className="text-navy text-xs font-bold">كوبون خصم (اختياري)</Label>
+            <div className="flex gap-2 mt-1.5">
+              <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setAppliedCoupon(null); setCouponError('') }} placeholder="FIA-XXXX" dir="ltr" className="font-mono text-sm h-11 rounded-xl" />
+              <Button variant="outline" onClick={validateCoupon} disabled={validatingCoupon || !couponCode.trim()} className="flex-shrink-0 text-xs rounded-xl">{validatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'تطبيق'}</Button>
             </div>
             {couponError && <p className="text-[10px] text-red-500 mt-1">{couponError}</p>}
             {appliedCoupon && (
-              <div className="mt-2 flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg p-2">
+              <div className="mt-2 flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-xl p-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                 <span className="text-xs text-green-700 font-bold">{appliedCoupon.code}</span>
                 <span className="text-xs text-muted-foreground">{appliedCoupon.discount_type === 'percentage' ? `${appliedCoupon.discount_value}%` : `${appliedCoupon.discount_value} ر.ي`} خصم</span>
@@ -1416,52 +1411,158 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
               </div>
             )}
           </div>
-          {/* Payment methods */}
+
+          {/* ⚡ Payment methods — professional cards with category-aware display */}
           <div>
-            <Label className="text-navy">اختر طريقة الدفع</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              {methods.map((m: any) => (
-                <button key={m.id} onClick={() => setSelectedMethod(m)} className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${selectedMethod?.id === m.id ? 'border-gold bg-gold/5' : 'border-border hover:border-muted'}`}>
-                  <span className="text-2xl">{m.icon}</span>
-                  <div className="text-right"><div className="font-bold text-navy text-sm">{m.name}</div>{m.wallet_id && <div className="text-xs text-muted-foreground font-mono" dir="ltr">{m.wallet_id}</div>}</div>
-                </button>
-              ))}
+            <Label className="text-navy font-bold">اختر طريقة الدفع</Label>
+            <div className="grid grid-cols-1 gap-2 mt-2">
+              {methods.map((m: any) => {
+                const isCrypto = m.payment_category === 'crypto'
+                return (
+                  <button key={m.id} onClick={() => setSelectedMethod(m)}
+                    className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-right ${selectedMethod?.id === m.id ? (isCrypto ? 'border-amber-400 bg-amber-50/50 shadow-md' : 'border-emerald-400 bg-emerald-50/50 shadow-md') : 'border-gray-200/60 bg-white hover:border-gray-300'}`}>
+                    {/* Icon */}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${isCrypto ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'}`}>
+                      {isCrypto ? (m.crypto_coin?.charAt(0) || '₿') : (m.icon || '💳')}
+                    </div>
+                    {/* Name + details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-navy text-sm">{m.name}</div>
+                      {isCrypto ? (
+                        <div className="text-[10px] text-amber-600 font-mono" dir="ltr">{m.crypto_coin} • {m.crypto_network}</div>
+                      ) : (
+                        <>
+                          {m.account_number && <div className="text-[10px] text-emerald-600 font-mono" dir="ltr">{m.account_number}</div>}
+                          {m.account_holder && <div className="text-[10px] text-gray-400">{m.account_holder}</div>}
+                        </>
+                      )}
+                    </div>
+                    {/* Selected indicator */}
+                    {selectedMethod?.id === m.id && <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${isCrypto ? 'text-amber-500' : 'text-emerald-500'}`} />}
+                  </button>
+                )
+              })}
             </div>
           </div>
+
+          {/* ⚡ Selected method details — professional card with copy buttons */}
           {selectedMethod && (
-            <div className="bg-muted/30 p-3 rounded-lg border border-border text-sm">
-              <div className="font-semibold text-navy mb-1">{selectedMethod.name} — تعليمات الدفع:</div>
-              <p className="text-muted-foreground text-xs">{selectedMethod.instructions || 'حول المبلغ إلى المحفظة الموضّحة، ثم ارفع صورة الإيصال.'}</p>
+            <div className={`p-4 rounded-2xl border space-y-3 ${selectedMethod.payment_category === 'crypto' ? 'bg-gradient-to-br from-amber-50/80 to-orange-50/50 border-amber-200/40' : 'bg-gradient-to-br from-emerald-50/80 to-teal-50/50 border-emerald-200/40'}`}>
+              <div className={`font-bold text-sm flex items-center gap-1.5 ${selectedMethod.payment_category === 'crypto' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                {selectedMethod.payment_category === 'crypto' ? '₿ تفاصيل العملة الرقمية' : '💵 تفاصيل الحساب'}
+              </div>
+
+              {/* Crypto: show coin + network + wallet address / Binance Pay ID */}
+              {selectedMethod.payment_category === 'crypto' && (
+                <div className="space-y-2">
+                  {selectedMethod.crypto_coin && (
+                    <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
+                      <span className="text-xs text-gray-400">العملة:</span>
+                      <span className="text-xs font-bold text-amber-700">{selectedMethod.crypto_coin}</span>
+                    </div>
+                  )}
+                  {selectedMethod.crypto_network && (
+                    <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
+                      <span className="text-xs text-gray-400">الشبكة:</span>
+                      <span className="text-xs font-mono font-bold text-amber-700" dir="ltr">{selectedMethod.crypto_network}</span>
+                    </div>
+                  )}
+                  {selectedMethod.wallet_address && (
+                    <div className="bg-white/60 rounded-xl px-3 py-2.5 space-y-1">
+                      <span className="text-xs text-gray-400">عنوان المحفظة:</span>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs font-mono text-navy break-all flex-1" dir="ltr" id="wallet-addr">{selectedMethod.wallet_address}</code>
+                        <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedMethod.wallet_address); toast.success('تم نسخ العنوان ✓') }}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 flex items-center justify-center transition-colors">
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedMethod.binance_pay_id && (
+                    <div className="bg-white/60 rounded-xl px-3 py-2.5 space-y-1">
+                      <span className="text-xs text-gray-400">Binance Pay ID:</span>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs font-mono font-bold text-amber-700 flex-1" dir="ltr">{selectedMethod.binance_pay_id}</code>
+                        <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedMethod.binance_pay_id); toast.success('تم نسخ المعرف ✓') }}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 flex items-center justify-center transition-colors">
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Local: show account number + holder + currency with copy buttons */}
+              {selectedMethod.payment_category !== 'crypto' && (
+                <div className="space-y-2">
+                  {selectedMethod.account_number && (
+                    <div className="bg-white/60 rounded-xl px-3 py-2.5 space-y-1">
+                      <span className="text-xs text-gray-400">رقم الحساب:</span>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs font-mono font-bold text-emerald-700 flex-1" dir="ltr">{selectedMethod.account_number}</code>
+                        <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedMethod.account_number); toast.success('تم نسخ رقم الحساب ✓') }}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors">
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedMethod.account_holder && (
+                    <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
+                      <span className="text-xs text-gray-400">صاحب الحساب:</span>
+                      <span className="text-xs font-bold text-emerald-700">{selectedMethod.account_holder}</span>
+                    </div>
+                  )}
+                  {selectedMethod.currency && (
+                    <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
+                      <span className="text-xs text-gray-400">العملة:</span>
+                      <span className="text-xs font-bold text-emerald-700">{selectedMethod.currency}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Instructions */}
+              {selectedMethod.instructions && (
+                <div className="bg-white/60 rounded-xl px-3 py-2.5">
+                  <span className="text-xs text-gray-400 block mb-1">تعليمات:</span>
+                  <p className="text-xs text-gray-600 leading-relaxed">{selectedMethod.instructions}</p>
+                </div>
+              )}
             </div>
           )}
+
+          {/* ⚡ Upload proof — professional card */}
           <div>
-            <Label htmlFor="ref">رقم المعاملة / المرجع</Label>
-            <Input id="ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="مثال: JB-123456789" dir="ltr" className="mt-1" />
-          </div>
-          <div>
-            <Label className="text-navy">رفع صورة إثبات الدفع (إيصال)</Label>
+            <Label className="text-navy font-bold text-sm">رفع صورة إثبات الدفع (إيصال)</Label>
             <input type="file" accept="image/*" className="hidden" id="proof-upload" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProofUpload(f) }} />
-            <div className="mt-1 flex items-center gap-3">
+            <div className="mt-2">
               {proofUrl ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-md border-2 border-green-500/30" />
-                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تم رفع الإيصال</div>
-                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs">إزالة</button>
+                <div className="flex items-center gap-3 p-3 bg-green-50/50 rounded-2xl border border-green-200/40">
+                  <img src={proofUrl} alt="proof" className="w-16 h-16 object-cover rounded-xl border-2 border-green-500/30" />
+                  <div className="flex-1 text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> تم رفع الإيصال بنجاح</div>
+                  <button onClick={() => setProofUrl(null)} className="text-red-500 text-xs flex items-center gap-1"><X className="w-3.5 h-3.5" /> إزالة</button>
                 </div>
               ) : (
-                <Button type="button" variant="outline" disabled={uploadingProof} className="flex-1" onClick={() => document.getElementById('proof-upload')?.click()}>
-                  {uploadingProof ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفع...</> : <><FileUp className="w-4 h-4 ml-1" /> اختر صورة الإيصال</>}
+                <Button type="button" variant="outline" disabled={uploadingProof} className="w-full h-12 rounded-2xl border-2 border-dashed border-gray-300/60 hover:border-gold/40 hover:bg-gold/5 bg-white/50"
+                  onClick={() => document.getElementById('proof-upload')?.click()}>
+                  {uploadingProof ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري الرفع...</> : <><FileUp className="w-5 h-5 ml-1.5" /> اختر صورة الإيصال</>}
                 </Button>
               )}
             </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-          <Button className="bg-navy hover:bg-navy-light" disabled={loading || !selectedMethod || !reference.trim() || !proofUrl} onClick={() => onPay(selectedMethod, reference, proofUrl, appliedCoupon?.code)}>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100 rounded-b-2xl">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
+          <Button className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-white rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all px-6"
+            disabled={loading || !selectedMethod || !proofUrl} onClick={() => onPay(selectedMethod, reference || 'N/A', proofUrl, appliedCoupon?.code)}>
             {loading ? 'جاري المعالجة...' : `تأكيد الاشتراك${finalPrice < originalPrice ? ` (${finalPrice.toLocaleString()} ${course.currency || 'ر.ي'})` : ''}`}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
