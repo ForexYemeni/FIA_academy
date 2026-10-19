@@ -38,7 +38,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60 backdrop-blur-lg",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur-sm",
         className
       )}
       {...props}
@@ -90,7 +90,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Base styles: bg + border + shadow + animation
-          "bg-navy/95 backdrop-blur-xl border border-white/10 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           // Layout: fixed full-screen flexbox centering (responsive)
           "fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6",
           // Inner dialog: full-width with max constraints + max-height
@@ -113,7 +113,7 @@ function DialogContent({
           {showCloseButton && (
             <DialogPrimitive.Close
               data-slot="dialog-close"
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-1.5 bg-white/10 backdrop-blur-md border border-white/20"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none p-1.5 bg-background/80 backdrop-blur-sm border border-border/50"
               style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
             >
               <XIcon className="h-4 w-4" />
@@ -137,7 +137,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="dialog-header"
       className={cn(
         "flex flex-col gap-1.5 text-center sm:text-right p-4 sm:p-5 md:p-6",
-        "border-b border-white/10 bg-white/5 backdrop-blur-md",
+        "border-b border-border/50 bg-background/95 backdrop-blur-sm",
         "rounded-t-lg flex-shrink-0", // sticky top
         className
       )}
@@ -178,7 +178,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
       className={cn(
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         "p-4 sm:p-5 md:p-6",
-        "border-t border-white/10 bg-white/5 backdrop-blur-md",
+        "border-t border-border/50 bg-background/95 backdrop-blur-sm",
         "rounded-b-lg flex-shrink-0", // sticky bottom
         // Add safe-area-inset-bottom for iPhone notch on bottom
         className

@@ -179,8 +179,8 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
     >
       {courses.length === 0 ? (
         <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-white/60/30 mx-auto mb-4" />
-          <p className="text-white/60">لا توجد دورات بعد</p>
+          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">لا توجد دورات بعد</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -200,13 +200,13 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
                   </div>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold text-white text-sm mb-2 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
-                  <div className="flex justify-between text-xs text-white/60 mb-3">
+                  <h3 className="font-bold text-navy text-sm mb-2 line-clamp-2 min-h-[2.5rem]">{c.title}</h3>
+                  <div className="flex justify-between text-xs text-muted-foreground mb-3">
                     <span>{c.modules_count || 0} وحدة</span>
                     <span>{c.lessons_count || 0} درس</span>
                     <span>{c.duration_hours || 0} ساعة</span>
                   </div>
-                  <div className="text-xs text-white/60 mb-3 flex items-center gap-1.5">
+                  <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-navy/10 text-navy font-bold text-[10px]">
                       {enrolledCount(c.id)}
                     </span>
@@ -326,7 +326,7 @@ function AdminOverview() {
       {/* ========= PROFESSIONAL FINANCIAL OVERVIEW ========= */}
       <SectionCard title="نظرة عامة مالية" description="الإيرادات الفعلية مجمّعة حسب العملة">
         {stats.revenueByCurrency.length === 0 ? (
-          <div className="text-center py-10 text-white/60">
+          <div className="text-center py-10 text-muted-foreground">
             <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p>لا توجد معاملات بعد</p>
           </div>
@@ -450,7 +450,7 @@ function AdminCourses() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border text-right text-white/60">
+            <tr className="border-b border-border text-right text-muted-foreground">
               <th className="py-3 px-2">العنوان</th>
               <th className="py-3 px-2">المستوى</th>
               <th className="py-3 px-2">السعر</th>
@@ -473,7 +473,7 @@ function AdminCourses() {
                 </td>
               </tr>
             ))}
-            {!items.length && !loading && <tr><td colSpan={5} className="text-center py-8 text-white/60">لا توجد دورات</td></tr>}
+            {!items.length && !loading && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد دورات</td></tr>}
           </tbody>
         </table>
       </div>
@@ -501,8 +501,8 @@ function AdminExams() {
   return (
     <SectionCard title="الاختبارات" description="إدارة الاختبارات">
       <div className="text-center py-12">
-        <FileText className="w-16 h-16 text-white/60/30 mx-auto mb-4" />
-        <p className="text-white/60 mb-4">لا توجد اختبارات</p>
+        <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+        <p className="text-muted-foreground mb-4">لا توجد اختبارات</p>
         <Button className="bg-navy hover:bg-navy-light"><Plus className="w-4 h-4 ml-1" /> اختبار جديد</Button>
       </div>
     </SectionCard>
@@ -575,11 +575,11 @@ function AdminStudents() {
               </div>
               <div className="p-4 space-y-2">
                 {s.phone && (
-                  <div className="flex items-center gap-2 text-xs text-white/60">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>📞</span><span dir="ltr">{s.phone}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-xs text-white/60">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>📅</span><span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
@@ -589,7 +589,7 @@ function AdminStudents() {
                 {sEnrs.slice(0, 2).map((e) => {
                   const c = courses.find(co => co.id === e.course_id)
                   return c ? (
-                    <div key={e.id} className="text-xs text-white/60 bg-muted/30 rounded p-1.5 flex items-center justify-between">
+                    <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
                       <span className="truncate">{c.title}</span>
                       <Badge className={
                         e.status === 'completed' || e.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
@@ -601,7 +601,7 @@ function AdminStudents() {
                     </div>
                   ) : null
                 })}
-                {sEnrs.length > 2 && <div className="text-[10px] text-white/60">+{sEnrs.length - 2} دورة أخرى</div>}
+                {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground">+{sEnrs.length - 2} دورة أخرى</div>}
               </div>
               <div className="flex gap-1 p-3 pt-0">
                 <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
@@ -612,7 +612,7 @@ function AdminStudents() {
         })}
       </div>
 
-      {filtered.length === 0 && <div className="text-center py-8 text-white/60">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
+      {filtered.length === 0 && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
 
       {/* Student detail modal */}
       {selectedStudent && (
@@ -630,11 +630,11 @@ function AdminStudents() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
+                <h4 className="font-bold text-navy text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
                 <div className="space-y-2">
                   {getStudentEnrollments(selectedStudent.id).map((e) => {
                     const c = courses.find(co => co.id === e.course_id)
@@ -645,7 +645,7 @@ function AdminStudents() {
                       <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-navy text-sm truncate">{c.title}</div>
-                          <div className="text-xs text-white/60">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
+                          <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {/* DISABLED: certificate issuance button removed — will be re-enabled when design+prompt provided */}
@@ -683,7 +683,7 @@ function AdminStudents() {
                       </div>
                     )
                   })}
-                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-white/60 text-center py-4">لم يسجّل في أي دورة</p>}
+                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة</p>}
                 </div>
               </div>
             </div>
@@ -715,6 +715,15 @@ function AdminPayments() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
+  // === REJECTION DIALOG STATE ===
+  // When the admin clicks "رفض الدفع", we open a professional dialog
+  // (instead of window.prompt) that has a MANDATORY reason field.
+  // The reason is validated on BOTH frontend AND backend — the
+  // /api/payments PUT handler rejects empty/whitespace-only reasons.
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectError, setRejectError] = useState('')
 
   const load = () => {
     fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
@@ -740,6 +749,75 @@ function AdminPayments() {
     } catch {
       toast.error('خطأ في الاتصال')
     }
+  }
+
+  // === REJECTION CONFIRMATION FLOW ===
+  // Opens the rejection dialog with the target payment's details.
+  // The admin MUST type a reason — the "تأكيد الرفض" button is
+  // disabled until the reason field is non-empty.
+  const openRejectDialog = (payment: any) => {
+    setRejectTarget(payment)
+    setRejectReason('')
+    setRejectError('')
+    setSelectedPayment(null) // close the detail dialog if open
+  }
+
+  // Confirms the rejection: validates the reason is non-empty,
+  // then calls updateStatus with the reason. The button is
+  // disabled during the request to prevent duplicate submissions.
+  // After success, updates the local state IMMEDIATELY so the
+  // rejected payment shows "ملغي" status — prevents the admin
+  // from clicking "reject" again on the same payment.
+  const confirmReject = async () => {
+    if (!rejectTarget) return
+    const trimmed = rejectReason.trim()
+    if (!trimmed) {
+      setRejectError('سبب الرفض مطلوب — يرجى كتابة سبب واضح')
+      return
+    }
+    if (trimmed.length < 5) {
+      setRejectError('السبب قصير جداً — يرجى كتابة سبب مفصل (5 أحرف على الأقل)')
+      return
+    }
+    setRejecting(true)
+    setRejectError('')
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rejectTarget.id, status: 'ملغي', rejection_reason: trimmed }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل رفض المعاملة')
+        return
+      }
+      // === OPTIMISTIC STATE UPDATE ===
+      // Update the payment's status in local state IMMEDIATELY so:
+      // 1. The reject button disappears (only shown for 'قيد الانتظار')
+      // 2. The admin can't click reject again
+      // 3. The status badge shows 'ملغي' instantly
+      const rejectedPayment = rejectTarget
+      setItems((prev) => prev.map((p) =>
+        p.id === rejectedPayment.id
+          ? { ...p, status: 'ملغي', reference: (p.reference || '') + ` | REJECTION: ${trimmed}` }
+          : p
+      ))
+      toast.success('تم رفض الدفع — تم إشعار المتدرب')
+      setRejectTarget(null)
+      setRejectReason('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setRejecting(false)
+    }
+  }
+
+  const closeRejectDialog = () => {
+    if (rejecting) return // prevent closing during request
+    setRejectTarget(null)
+    setRejectReason('')
+    setRejectError('')
   }
 
   const filtered = items.filter(p => {
@@ -822,7 +900,7 @@ function AdminPayments() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-bold text-white text-sm" dir="ltr">
+                  <span className="font-bold text-navy text-sm" dir="ltr">
                     {p.amount?.toLocaleString()} {currency}
                   </span>
                   <Badge className={
@@ -837,14 +915,14 @@ function AdminPayments() {
                     </Badge>
                   )}
                 </div>
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-muted-foreground">
                   {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
                   {' • '}
                   <span>{p.method || '-'}</span>
                   {' • '}
                   <span dir="ltr">{ref || '-'}</span>
                 </div>
-                <div className="text-[10px] text-white/60 mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
               </div>
               <div className="flex gap-1 flex-shrink-0">
                 <Button size="sm" variant="ghost" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
@@ -855,7 +933,7 @@ function AdminPayments() {
                     <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
                       <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(p.id, 'ملغي', reason || undefined) }}>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => openRejectDialog(p)}>
                       <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
                     </Button>
                   </>
@@ -864,7 +942,7 @@ function AdminPayments() {
             </div>
           )
         })}
-        {!filtered.length && <div className="text-center py-8 text-white/60">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
+        {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
       </div>
 
       {/* Payment detail modal with proof image */}
@@ -879,7 +957,7 @@ function AdminPayments() {
                 const hasCoupon = !!couponCode
                 return (
                   <div className={`p-4 rounded-lg flex items-center justify-between ${hasCoupon ? 'bg-red-50 border-2 border-red-500' : 'bg-gold/10 border border-gold/30'}`}>
-                    <span className={`text-sm font-semibold ${hasCoupon ? 'text-red-400' : 'text-navy'}`}>
+                    <span className={`text-sm font-semibold ${hasCoupon ? 'text-red-700' : 'text-navy'}`}>
                       {hasCoupon ? '⚠ المبلغ بعد الخصم:' : 'المبلغ:'}
                     </span>
                     <div className="flex flex-col items-end gap-1">
@@ -894,10 +972,10 @@ function AdminPayments() {
                 )
               })()}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-white/60">الحالة</div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div></div>
+                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
                   <Badge className={
                     selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
                     : selectedPayment.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
@@ -909,9 +987,9 @@ function AdminPayments() {
                 const course = getCourse(selectedPayment.course_id)
                 return course ? (
                   <div className="bg-muted/30 p-3 rounded-lg">
-                    <div className="text-xs text-white/60">الدورة</div>
+                    <div className="text-xs text-muted-foreground">الدورة</div>
                     <div className="text-sm font-medium text-navy">{course.title}</div>
-                    <div className="text-xs text-white/60">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
+                    <div className="text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
                   </div>
                 ) : null
               })()}
@@ -921,13 +999,13 @@ function AdminPayments() {
                 const proofUrl = extractProofUrl(selectedPayment.reference)
                 return proofUrl ? (
                   <div>
-                    <div className="text-sm font-bold text-white mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
+                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
                     <div className="rounded-lg overflow-hidden border-2 border-gold/30">
                       <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain rounded-lg mx-auto" />
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-white/60 text-sm">لا يوجد إثبات دفع مرفق</div>
+                  <div className="text-center py-4 text-muted-foreground text-sm">لا يوجد إثبات دفع مرفق</div>
                 )
               })()}
 
@@ -936,7 +1014,7 @@ function AdminPayments() {
                   <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
                     <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
                   </Button>
-                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { const reason = window.prompt('سبب الرفض (اختياري):') ?? ''; updateStatus(selectedPayment.id, 'ملغي', reason || undefined) }}>
+                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => openRejectDialog(selectedPayment)} disabled={rejecting}>
                     <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
                   </Button>
                 </div>
@@ -948,6 +1026,95 @@ function AdminPayments() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* === REJECTION DIALOG — Professional design matching ConfirmDialog === */}
+      <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) closeRejectDialog() }}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden" showCloseButton={!rejecting}>
+          {/* === Red gradient header === */}
+          <div className="bg-gradient-to-br from-red-500 to-red-600 px-6 pt-6 pb-5 text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3">
+              <AlertTriangle className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-lg font-bold text-white leading-tight">
+              تأكيد رفض المعاملة
+            </h2>
+          </div>
+
+          {/* === White body === */}
+          <div className="px-6 py-5 space-y-4">
+            {/* Payment details summary */}
+            {rejectTarget && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5 text-center">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">المبلغ:</span>
+                  <span className="font-bold text-navy" dir="ltr">
+                    {(rejectTarget.amount || 0).toLocaleString()} {rejectTarget.currency || 'ر.ي'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">وسيلة الدفع:</span>
+                  <span className="font-bold text-navy">{rejectTarget.method || 'غير محدد'}</span>
+                </div>
+                {rejectTarget.reference && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">المرجع:</span>
+                    <span className="font-mono text-navy text-[10px]" dir="ltr">{rejectTarget.reference}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Instructions */}
+            <p className="text-xs text-red-700 text-center leading-relaxed">
+              يرجى مراجعة تفاصيل المعاملة وكتابة سبب الرفض بوضوح. سيُحفظ السبب ضمن سجل المعاملة.
+            </p>
+
+            {/* Mandatory reason field */}
+            <div>
+              <Label className="text-navy font-bold text-sm flex items-center gap-1 mb-1.5">
+                سبب الرفض — حقل إلزامي
+                <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                value={rejectReason}
+                onChange={(e) => { setRejectReason(e.target.value); setRejectError('') }}
+                placeholder="اكتب السبب بوضوح، مثل: إيصال غير واضح، مبلغ غير مطابق، أو تعذر التحقق من عملية الدفع."
+                rows={4}
+                className="resize-none rounded-xl"
+                disabled={rejecting}
+                autoFocus
+                maxLength={500}
+              />
+              <div className="flex items-center justify-between mt-1">
+                {rejectError ? (
+                  <p className="text-[10px] text-red-500 font-bold">{rejectError}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">5 أحرف على الأقل، بحد أقصى 500 حرف</p>
+                )}
+                <span className="text-[10px] text-muted-foreground">{rejectReason.length}/500</span>
+              </div>
+            </div>
+          </div>
+
+          {/* === Buttons === */}
+          <div className="px-6 pb-6 pt-2 flex gap-2">
+            <Button variant="outline" onClick={closeRejectDialog} disabled={rejecting} className="flex-1 h-11 text-sm font-semibold rounded-xl">
+              إلغاء
+            </Button>
+            <Button
+              className="flex-1 h-11 text-sm font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmReject}
+              disabled={rejecting || rejectReason.trim().length < 5}
+            >
+              {rejecting ? (
+                <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الرفض...</>
+              ) : (
+                <><AlertTriangle className="w-4 h-4 ml-1" /> تأكيد الرفض</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 }
@@ -989,8 +1156,8 @@ function AdminPaymentMethods() {
               <div className="text-3xl">{p.icon}</div>
               <Switch checked={!!p.enabled} onCheckedChange={(v) => toggle(p.id, v)} />
             </div>
-            <div className="font-bold text-white">{p.name}</div>
-            <div className="text-xs text-white/60 mb-2">{p.description || ''}</div>
+            <div className="font-bold text-navy">{p.name}</div>
+            <div className="text-xs text-muted-foreground mb-2">{p.description || ''}</div>
             {p.wallet_id && <div className="text-xs font-mono text-gold" dir="ltr">{p.wallet_id}</div>}
             <div className="flex gap-2 mt-3">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
@@ -1179,7 +1346,7 @@ function AdminCertificates() {
                     <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : c.status === 'مستبدلة' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
                   </div>
                   <div className="font-medium text-navy text-sm">{c.student_name}</div>
-                  <div className="text-xs text-white/60 truncate">{c.course_title || '-'}</div>
+                  <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
                 </div>
                 <div className="flex gap-1 flex-shrink-0 flex-wrap">
                   <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة الشهادة"><Eye className="w-4 h-4 text-navy" /></Button>
@@ -1192,7 +1359,7 @@ function AdminCertificates() {
                 </div>
               </div>
             ))}
-            {!filtered.length && <div className="text-center py-8 text-white/60">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
+            {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
           </div>
         </>
       ) : (
@@ -1209,9 +1376,9 @@ function AdminCertificates() {
                   {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
                 </div>
                 <div className="font-medium text-navy text-sm">{r.student_name}</div>
-                <div className="text-xs text-white/60">{r.course_title || '-'}</div>
-                {r.amount > 0 && <div className="text-xs text-white/60 mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
-                {r.created_at && <div className="text-[10px] text-white/60 mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
+                <div className="text-xs text-muted-foreground">{r.course_title || '-'}</div>
+                {r.amount > 0 && <div className="text-xs text-muted-foreground mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
+                {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
                 {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
                 {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
                 {r.cert_number && <div className="text-xs font-mono text-green-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
@@ -1250,7 +1417,7 @@ function AdminCertificates() {
               </div>
             )
           })}
-          {requests.length === 0 && <div className="text-center py-8 text-white/60">لا توجد طلبات شهادات</div>}
+          {requests.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد طلبات شهادات</div>}
         </div>
       )}
 
@@ -1262,7 +1429,7 @@ function AdminCertificates() {
             <DialogHeader><DialogTitle>إلغاء الشهادة</DialogTitle></DialogHeader>
             <div className="space-y-3 py-4">
               <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
-                <div className="font-bold text-red-400">{revokeTarget.student_name}</div>
+                <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
                 <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
                 <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
               </div>
@@ -1284,7 +1451,7 @@ function AdminCertificates() {
                 <DialogTitle className="flex items-center gap-2">
                   <Award className="w-5 h-5 text-gold" /> معاينة الشهادة — {previewCert.certificate_number}
                 </DialogTitle>
-                <button onClick={() => setPreviewCert(null)} className="text-white/60 hover:text-navy">
+                <button onClick={() => setPreviewCert(null)} className="text-muted-foreground hover:text-navy">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1399,15 +1566,15 @@ function AdminTrainers() {
                   <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-bold text-white">{t.name}</div>
+                  <div className="font-bold text-navy">{t.name}</div>
                   <div className="text-xs text-gold">{t.title}</div>
                   {isTeamMember && <Badge className="mt-1 bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">👑 عضو فريق</Badge>}
                 </div>
               </div>
-              <div className="text-xs text-white/60 mb-3">{t.specialization}</div>
+              <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
               <div className="text-xs space-y-1 mb-3">
-                <div className="text-white/60" dir="ltr">📧 {t.email}</div>
-                <div className="text-white/60" dir="ltr">📞 {t.phone || '-'}</div>
+                <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
+                <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
@@ -1567,7 +1734,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             <Label className="text-xs">كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}</Label>
             <div className="relative mt-1">
               <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" placeholder="••••••••" />
-              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/60">
+              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -1581,10 +1748,10 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
           {/* Professional Complete Bio — نبذة تعريفية احترافية واحدة */}
           <div className="border-t border-border pt-4">
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs font-bold text-white">النبذة التعريفية الكاملة</Label>
+              <Label className="text-xs font-bold text-navy">النبذة التعريفية الكاملة</Label>
               <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
             </div>
-            <p className="text-[10px] text-white/60 mb-3 leading-relaxed">
+            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
               اكتب نبذة واحدة متكاملة واحترافية عن المدرب — تظهر بالضبط كما تكتبها هنا في حساب المدرب وفي الصفحة الرئيسية عند الضغط على المدرب.
               <br />
               <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ، مثل: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
@@ -1595,7 +1762,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
               className="w-full min-h-[260px] p-4 border border-input rounded-lg text-sm leading-relaxed bg-background focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/40 transition-all"
               placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
             />
-            <div className="flex items-center justify-between mt-2 text-[10px] text-white/60">
+            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
               <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
               <span>{(form.bio || '').length} حرف</span>
             </div>
@@ -1652,8 +1819,8 @@ function AdminPartners() {
             <div className="flex items-start gap-3 mb-3">
               <div className="text-3xl">{p.logo}</div>
               <div className="flex-1">
-                <div className="font-bold text-white">{p.name}</div>
-                <div className="text-xs text-white/60">{p.description}</div>
+                <div className="font-bold text-navy">{p.name}</div>
+                <div className="text-xs text-muted-foreground">{p.description}</div>
                 {p.since && <Badge variant="outline" className="mt-1 text-xs">منذ {p.since}</Badge>}
               </div>
             </div>
@@ -1724,13 +1891,13 @@ function AdminLicenses() {
           <Card key={l.id} className="p-5">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <div className="font-bold text-white">{l.issuing_body}</div>
+                <div className="font-bold text-navy">{l.issuing_body}</div>
                 <div className="text-xs text-gold">{l.type}</div>
               </div>
               <Badge className={l.status === 'ساري' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{l.status === 'ساري' ? '● ساري' : '● متوقف'}</Badge>
             </div>
-            <div className="text-xs text-white/60 mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
-            <div className="flex justify-between text-xs text-white/60 mb-3">
+            <div className="text-xs text-muted-foreground mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
+            <div className="flex justify-between text-xs text-muted-foreground mb-3">
               <span>إصدار: <span dir="ltr">{l.issued_at}</span></span>
               <span>انتهاء: <span dir="ltr">{l.expires_at}</span></span>
             </div>
@@ -1843,7 +2010,7 @@ function AdminSite() {
               <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
             </div>
             <div className="border-t border-border pt-4">
-              <h3 className="font-bold text-white mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
+              <h3 className="font-bold text-navy mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
                 <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
@@ -1855,7 +2022,7 @@ function AdminSite() {
         {/* ABOUT US */}
         {tab === 'about' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-white/60">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
               💡 يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
             </div>
             <div>
@@ -1884,7 +2051,7 @@ function AdminSite() {
         {/* POLICIES */}
         {tab === 'policies' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-white/60">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
               💡 تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
             </div>
             <div>
@@ -1913,7 +2080,7 @@ function AdminSite() {
         {/* SOCIAL */}
         {tab === 'social' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-white/60">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
               💡 كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
             </div>
             {/* Facebook */}
@@ -1966,13 +2133,13 @@ function AdminSite() {
         {/* VISIBILITY */}
         {tab === 'visibility' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-white/60">
+            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
               💡 تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
             </div>
             <div className="border border-border rounded-lg p-3 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">إظهار قسم الشركاء</div>
-                <div className="text-xs text-white/60">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+                <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
+                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
               </div>
               <label className="flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} />
@@ -1981,8 +2148,8 @@ function AdminSite() {
             </div>
             <div className="border border-border rounded-lg p-3 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">إظهار قسم التراخيص</div>
-                <div className="text-xs text-white/60">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+                <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
+                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
               </div>
               <label className="flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} />
@@ -2147,14 +2314,14 @@ const DZ_SECTION_LABELS: Record<string, string> = {
       <div className="space-y-5 max-w-2xl">
         {/* Current account info */}
         <div className="bg-muted/30 p-4 rounded-lg border border-border">
-          <div className="text-xs text-white/60 mb-1">الحساب الحالي:</div>
+          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
               {user?.name?.charAt(0)}
             </div>
             <div>
-              <div className="font-bold text-white">{user?.name}</div>
-              <div className="text-xs text-white/60" dir="ltr">{user?.email}</div>
+              <div className="font-bold text-navy">{user?.name}</div>
+              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
             </div>
           </div>
         </div>
@@ -2173,17 +2340,17 @@ const DZ_SECTION_LABELS: Record<string, string> = {
             <button
               type="button"
               onClick={() => setShowCurrent(!showCurrent)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-white/60 hover:text-navy"
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
             >
               {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-xs text-white/60 mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
+          <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
         </div>
 
         {/* New email */}
         <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
             <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
           </h3>
           <div>
@@ -2196,13 +2363,13 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               dir="ltr"
               className="mt-1"
             />
-            <p className="text-xs text-white/60 mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
           </div>
         </div>
 
         {/* New password */}
         <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
             <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
           </h3>
           <div className="space-y-3">
@@ -2219,7 +2386,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
                 <button
                   type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-white/60 hover:text-navy"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy"
                 >
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -2244,7 +2411,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
                 </p>
               )}
             </div>
-            <p className="text-xs text-white/60">اتركها فارغاً إذا لم ترد تغيير كلمة المرور</p>
+            <p className="text-xs text-muted-foreground">اتركها فارغاً إذا لم ترد تغيير كلمة المرور</p>
           </div>
         </div>
 
@@ -2272,13 +2439,13 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         <p className="text-sm text-navy">
           سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
         </p>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-muted-foreground">
           سيتم الاحتفاظ بحساب المؤسس التنفيذي فقط — وكذلك إعدادات الموقع.
         </p>
         <Button
           variant="outline"
           onClick={() => setDzOpen(true)}
-          className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-400"
+          className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700"
         >
           <Trash2 className="w-4 h-4 ml-1" /> حذف جميع البيانات
         </Button>
@@ -2289,7 +2456,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
             <Eraser className="w-4 h-4 text-red-500" />
             <h4 className="font-bold text-red-600 text-sm">حذف قسم محدد</h4>
           </div>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-muted-foreground">
             احذف قسماً واحداً فقط بدلاً من مسح كل شيء. مفيد للتنظيف المُستهدف.
           </p>
 
@@ -2333,7 +2500,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               <Brush className="w-4 h-4 text-orange-500" />
               <h4 className="font-bold text-orange-600 text-sm">تنظيف السجلات اليتيمة</h4>
             </div>
-            <p className="text-xs text-white/60 mb-2">
+            <p className="text-xs text-muted-foreground mb-2">
               يحذف كل السجلات التي بحوزتها course_id أو user_id لم يعد موجوداً — مدفوعات، تقييمات، مواضيع منتدى، ردود، تقدّم، إحالات عمولة، استخدامات كوبونات، نتائج اختبارات.
             </p>
             <Button
@@ -2379,7 +2546,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         <div className="py-2 space-y-3">
           {/* Loading spinner */}
           {orphanPreviewLoading ? (
-            <div className="p-6 text-center text-xs text-white/60">
+            <div className="p-6 text-center text-xs text-muted-foreground">
               <div className="w-8 h-8 mx-auto mb-2 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
               جاري فحص قاعدة البيانات...
             </div>
@@ -2389,8 +2556,8 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-green-500/15 flex items-center justify-center">
                 <CheckCircle2 className="w-7 h-7 text-green-600" />
               </div>
-              <p className="text-sm font-bold text-white mb-1">✓ قاعدة البيانات نظيفة</p>
-              <p className="text-xs text-white/60">لا توجد سجلات يتيمة — كل شيء على ما يرام.</p>
+              <p className="text-sm font-bold text-navy mb-1">✓ قاعدة البيانات نظيفة</p>
+              <p className="text-xs text-muted-foreground">لا توجد سجلات يتيمة — كل شيء على ما يرام.</p>
             </div>
           ) : (
             /* Found orphans — show breakdown */
@@ -2466,7 +2633,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
             </div>
           )}
           {orphanCleanupLoading && (
-            <div className="flex items-center justify-center p-3 text-sm text-white/60">
+            <div className="flex items-center justify-center p-3 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 ml-2 animate-spin" />
               جاري التنظيف...
             </div>
@@ -2525,7 +2692,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm font-semibold text-red-400">
+              <p className="text-sm font-semibold text-red-700">
                 سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
               </p>
             </div>
@@ -2558,12 +2725,12 @@ const DZ_SECTION_LABELS: Record<string, string> = {
                 type="button"
                 onClick={() => setShowDzPassword(!showDzPassword)}
                 disabled={dzLoading}
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-white/60 hover:text-navy disabled:opacity-50"
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-navy disabled:opacity-50"
               >
                 {showDzPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-white/60 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               يجب إدخال كلمة مرور حساب المؤسس للتحقق
             </p>
           </div>
@@ -2676,7 +2843,7 @@ function AdminReports() {
       <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="w-8 h-8 text-navy animate-spin" />
-          <div className="text-sm text-white/60">جاري تحميل البيانات...</div>
+          <div className="text-sm text-muted-foreground">جاري تحميل البيانات...</div>
         </div>
       </SectionCard>
     )
@@ -2703,7 +2870,7 @@ function AdminReports() {
   return (
     <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
       {isEmpty ? (
-        <div className="text-center py-12 text-white/60">لا توجد بيانات</div>
+        <div className="text-center py-12 text-muted-foreground">لا توجد بيانات</div>
       ) : (
         <>
           {/* Summary stat cards */}
@@ -2722,28 +2889,28 @@ function AdminReports() {
 
           {/* Most popular courses by REAL enrollment count (computed from /api/enrollments) */}
           <div className="mt-6">
-            <h4 className="font-bold text-white text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
+            <h4 className="font-bold text-navy text-sm mb-3">الدورات الأكثر تسجيلاً</h4>
             <div className="space-y-2">
               {popularCourses.map((c: any, i: number) => (
                 <div key={c.id} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
                   <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">{i + 1}</div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-navy text-sm truncate">{c.title}</div>
-                    <div className="text-xs text-white/60">{c.specialization || '-'}</div>
+                    <div className="text-xs text-muted-foreground">{c.specialization || '-'}</div>
                   </div>
-                  <div className="text-sm font-bold text-white">{c.enrollment_count} متدرب</div>
+                  <div className="text-sm font-bold text-navy">{c.enrollment_count} متدرب</div>
                   <Badge className={c.price_type === 'مجانية' || c.price === 0 ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
                     {c.price_type === 'مجانية' || c.price === 0 ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || ''}`}
                   </Badge>
                 </div>
               ))}
-              {popularCourses.length === 0 && <div className="text-center py-8 text-white/60">لا توجد بيانات</div>}
+              {popularCourses.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد بيانات</div>}
             </div>
           </div>
 
           {/* Recent enrollments (sorted by date desc, last 10) */}
           <div className="mt-6">
-            <h4 className="font-bold text-white text-sm mb-3">أحدث التسجيلات</h4>
+            <h4 className="font-bold text-navy text-sm mb-3">أحدث التسجيلات</h4>
             <div className="space-y-2">
               {recentEnrollments.map((e: any, i: number) => {
                 const course = data.courses.find((c: any) => c.id === e.course_id)
@@ -2758,7 +2925,7 @@ function AdminReports() {
                     ? 'bg-green-500/15 text-green-600 border-green-500/30'
                     : e.status === 'active'
                       ? 'bg-blue-500/15 text-blue-600 border-blue-500/30'
-                      : 'bg-muted text-white/60 border-border'
+                      : 'bg-muted text-muted-foreground border-border'
                 return (
                   <div key={e.id || i} className="flex items-center gap-3 p-3 bg-white border border-border rounded-lg">
                     <div className="w-8 h-8 rounded-lg bg-gold/15 flex items-center justify-center text-navy flex-shrink-0">
@@ -2766,16 +2933,16 @@ function AdminReports() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-navy text-sm truncate">{student?.name || student?.email || 'متدرب'}</div>
-                      <div className="text-xs text-white/60 truncate">{course?.title || 'دورة غير محددة'}</div>
+                      <div className="text-xs text-muted-foreground truncate">{course?.title || 'دورة غير محددة'}</div>
                     </div>
                     <Badge className={statusClass}>{statusLabel}</Badge>
-                    <div className="text-xs text-white/60 flex-shrink-0" dir="ltr">
+                    <div className="text-xs text-muted-foreground flex-shrink-0" dir="ltr">
                       {e.enrolled_at ? new Date(e.enrolled_at).toLocaleDateString('ar-EG') : '-'}
                     </div>
                   </div>
                 )
               })}
-              {recentEnrollments.length === 0 && <div className="text-center py-8 text-white/60">لا توجد بيانات</div>}
+              {recentEnrollments.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد بيانات</div>}
             </div>
           </div>
         </>
@@ -2851,14 +3018,14 @@ function AdminLogs() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-navy truncate">{l.action}</div>
-                  <div className="text-xs text-white/60" dir="ltr">{l.user}</div>
+                  <div className="text-xs text-muted-foreground" dir="ltr">{l.user}</div>
                 </div>
               </div>
-              <div className="text-xs text-white/60 flex-shrink-0" dir="ltr">{l.time ? new Date(l.time).toLocaleString('ar-EG') : '-'}</div>
+              <div className="text-xs text-muted-foreground flex-shrink-0" dir="ltr">{l.time ? new Date(l.time).toLocaleString('ar-EG') : '-'}</div>
             </div>
           )
         })}
-        {logs.length === 0 && <div className="text-center py-8 text-white/60">لا توجد عمليات مسجّلة</div>}
+        {logs.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد عمليات مسجّلة</div>}
       </div>
     </SectionCard>
   )
