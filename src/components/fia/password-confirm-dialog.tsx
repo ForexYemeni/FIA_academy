@@ -7,39 +7,34 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertTriangle, Loader2, Trash2, Lock, Eye, EyeOff } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2, Lock, Eye, EyeOff, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
 
 export interface PasswordConfirmDialogProps {
-  /** Controls dialog visibility */
   open: boolean
-  /** Called when dialog open state should change (close) */
   onOpenChange: (open: boolean) => void
-  /** Title shown in the dialog header */
   title: string
-  /** Descriptive message under the item box */
   message?: string
-  /** Optional name/details of the item being deleted */
   itemName?: string
-  /** Optional small label above the item name */
   itemLabel?: string
-  /** Confirm button label */
   confirmLabel?: string
-  /** Called when the user types correct password and clicks Confirm */
   onConfirm: () => void | Promise<void>
-  /** Shows spinner + disables buttons while true */
   loading?: boolean
 }
 
 /**
- * Password-confirmation dialog for destructive operations.
+ * Professional password-confirmation dialog — premium SaaS design.
  *
- * The user MUST type their account password to confirm. We verify
- * the password via /api/auth/verify-password before calling onConfirm.
+ * Design matches the ConfirmDialog style (colored header + white body)
+ * but adds a password field for destructive operations that require
+ * extra authentication.
  *
- * Use this for: deleting courses, students, trainers, team members —
- * anywhere a misclick could cause irreversible data loss.
+ * Flow:
+ * 1. User types their account password
+ * 2. We verify it via /api/auth/verify-password
+ * 3. On success, call onConfirm()
+ * 4. On failure, show error + keep the dialog open
  */
 export function PasswordConfirmDialog({
   open,
@@ -52,13 +47,13 @@ export function PasswordConfirmDialog({
   onConfirm,
   loading = false,
 }: PasswordConfirmDialogProps) {
-  const { user } = useAuth()
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
   const [verifying, setVerifying] = React.useState(false)
   const [error, setError] = React.useState('')
+  const user = useAuth((s) => s.user)
 
-  // Reset state whenever the dialog opens/closes
+  // Reset state when dialog opens/closes
   React.useEffect(() => {
     if (open) {
       setPassword('')
@@ -69,38 +64,31 @@ export function PasswordConfirmDialog({
 
   const handleConfirm = async () => {
     if (!password.trim()) {
-      setError('أدخل كلمة المرور للتأكيد')
-      return
-    }
-    if (!user?.id) {
-      setError('المستخدم غير مسجّل')
+      setError('كلمة المرور مطلوبة')
       return
     }
     setVerifying(true)
     setError('')
     try {
+      // Verify the password via the server
       const res = await fetch('/api/auth/verify-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, password }),
+        body: JSON.stringify({ user_id: user?.id, password }),
       })
-      const data = await res.json().catch(() => ({}))
-      if (!data.valid) {
-        setError('كلمة المرور غير صحيحة')
-        setVerifying(false)
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        setError(data.error || 'كلمة المرور غير صحيحة')
         return
       }
-    } catch {
-      setError('فشل التحقق من كلمة المرور — تحقق من الاتصال')
-      setVerifying(false)
-      return
-    }
-    setVerifying(false)
-    // Password verified — call the destructive action.
-    try {
+      // Password verified — call the onConfirm handler
       await onConfirm()
-    } catch (e: any) {
-      setError(e?.message || 'فشل تنفيذ العملية')
+      // If onConfirm didn't throw, close the dialog
+      setPassword('')
+    } catch {
+      setError('خطأ في الاتصال')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -109,97 +97,102 @@ export function PasswordConfirmDialog({
     onOpenChange(next)
   }
 
+  const isBusy = loading || verifying
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!loading && !verifying}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="w-5 h-5" />
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden" showCloseButton={!isBusy}>
+        {/* === Colored header (navy for password = security theme) === */}
+        <div className="bg-gradient-to-br from-navy to-navy-light px-6 pt-6 pb-5 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center mb-3">
+            <Shield className="w-8 h-8 text-gold" />
+          </div>
+          <h2 className="text-lg font-bold text-gold leading-tight">
             {title}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+        </div>
 
-        <div className="py-2 space-y-3">
+        {/* === White body section === */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Item name */}
           {(itemName || itemLabel) && (
-            <div className="flex items-start gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-              <Trash2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
-              <div className="min-w-0">
-                {itemLabel && (
-                  <div className="text-xs text-white/60 mb-1">{itemLabel}</div>
-                )}
-                {itemName && (
-                  <div className="font-bold text-white line-clamp-3 break-words whitespace-pre-line">
-                    {itemName}
-                  </div>
-                )}
-              </div>
+            <div className="bg-navy/5 border border-navy/10 rounded-xl p-3 text-center">
+              {itemLabel && (
+                <p className="text-[10px] text-muted-foreground mb-1">{itemLabel}</p>
+              )}
+              {itemName && (
+                <p className="font-bold text-navy text-sm break-words whitespace-pre-line line-clamp-3">
+                  {itemName}
+                </p>
+              )}
             </div>
           )}
+
+          {/* Message */}
           {message && (
-            <p className="text-sm text-white/60 text-center whitespace-pre-line">
+            <p className="text-xs text-muted-foreground text-center leading-relaxed whitespace-pre-line">
               {message}
             </p>
           )}
 
-          {/* Password input — this is what makes the dialog "password-confirmed" */}
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm-pwd" className="text-xs font-bold text-white flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-red-500" />
-              كلمة مرورك للتأكيد
+          {/* Password field */}
+          <div>
+            <Label className="text-navy font-bold text-sm flex items-center gap-1 mb-1.5">
+              <Lock className="w-3.5 h-3.5" />
+              كلمة المرور — تأكيد الهوية
             </Label>
             <div className="relative">
               <Input
-                id="confirm-pwd"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setError('') }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !loading && !verifying) handleConfirm() }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !isBusy) handleConfirm() }}
                 placeholder="••••••••"
                 dir="ltr"
-                className="pr-9"
-                disabled={loading || verifying}
+                className="h-12 pr-10 text-base rounded-xl"
+                disabled={isBusy}
                 autoFocus
+                autoComplete="current-password"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
-            <p className="text-[10px] text-white/60">
-              لإتمام هذا الإجراء، يجب إدخال كلمة مرور حسابك. هذا يحمي من الحذف العرضي.
-            </p>
+            {error && (
+              <p className="text-[10px] text-red-500 font-bold mt-1.5 text-center">
+                {error}
+              </p>
+            )}
           </div>
         </div>
 
-        <DialogFooter>
+        {/* === Buttons === */}
+        <div className="px-6 pb-6 pt-2 flex gap-2">
           <Button
             variant="outline"
             onClick={() => handleOpenChange(false)}
-            disabled={loading || verifying}
+            disabled={isBusy}
+            className="flex-1 h-11 text-sm font-semibold rounded-xl"
           >
             إلغاء
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={loading || verifying || !password.trim()}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            disabled={isBusy || !password.trim()}
+            className="flex-1 h-11 text-sm font-bold rounded-xl bg-navy hover:bg-navy-light text-gold"
           >
-            {loading || verifying ? (
-              <>
-                <Loader2 className="w-4 h-4 ml-1 animate-spin" /> {verifying ? 'جاري التحقق...' : 'جاري...'}
-              </>
+            {isBusy ? (
+              <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</>
             ) : (
-              <>
-                <Trash2 className="w-4 h-4 ml-1" /> {confirmLabel}
-              </>
+              <><Trash2 className="w-4 h-4 ml-1" /> {confirmLabel}</>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
