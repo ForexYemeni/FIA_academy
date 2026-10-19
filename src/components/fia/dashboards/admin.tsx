@@ -570,42 +570,114 @@ function AdminCourses() {
     }
   }
 
+  // Helper: determine level badge style
+  const getLevelStyle = (level: string) => {
+    if (!level) return { label: 'غير محدد', color: 'bg-gray-100 text-gray-600' }
+    if (level === 'مبتدئ') return { label: 'مبتدئ', color: 'bg-green-100 text-green-700' }
+    if (level === 'متوسط') return { label: 'متوسط', color: 'bg-blue-100 text-blue-700' }
+    if (level === 'متقدم') return { label: 'متقدم', color: 'bg-purple-100 text-purple-700' }
+    return { label: level, color: 'bg-gray-100 text-gray-600' }
+  }
+
+  // Helper: determine status badge style
+  const getStatusStyle = (status: string) => {
+    if (status === 'منشورة') return { label: 'منشورة', color: 'bg-green-100 text-green-700 border-green-200' }
+    if (status === 'مسودة') return { label: 'مسودة', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' }
+    return { label: status || 'غير محدد', color: 'bg-gray-100 text-gray-600 border-gray-200' }
+  }
+
   return (
     <SectionCard
       title="إدارة الدورات"
       description={`${items.length} دورة`}
       action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-right text-muted-foreground">
-              <th className="py-3 px-2">العنوان</th>
-              <th className="py-3 px-2">المستوى</th>
-              <th className="py-3 px-2">السعر</th>
-              <th className="py-3 px-2">الحالة</th>
-              <th className="py-3 px-2">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id} className="border-b border-border">
-                <td className="py-3 px-2 font-medium text-navy">{c.title}</td>
-                <td className="py-3 px-2">{c.level}</td>
-                <td className="py-3 px-2">{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency}`}</td>
-                <td className="py-3 px-2"><Badge className="bg-green-500/15 text-green-600 border-green-500/30">{c.status}</Badge></td>
-                <td className="py-3 px-2">
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }}><Edit className="w-4 h-4 text-navy" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(c)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!items.length && !loading && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد دورات</td></tr>}
-          </tbody>
-        </table>
+      {/* ⚡ Professional course cards — each course is a beautiful card
+          with cover image (or gradient fallback), price badge, level
+          badge, status badge, and hover effects. This replaces the old
+          plain table with a modern, visually rich layout. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((c) => {
+          const isFree = c.price_type === 'مجانية' || c.price === 0
+          const level = getLevelStyle(c.level)
+          const status = getStatusStyle(c.status)
+          return (
+            <div key={c.id} className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200/60 hover:border-navy/30 hover:shadow-lg transition-all">
+              {/* Cover image with gradient overlay */}
+              {c.cover ? (
+                <div className="relative h-28 overflow-hidden">
+                  <img src={c.cover} alt={c.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-navy/20 to-transparent" />
+                </div>
+              ) : (
+                <div className="relative h-28 bg-gradient-to-br from-navy to-navy-light overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                  <BookOpen className="w-12 h-12 text-white/20" />
+                </div>
+              )}
+              {/* Price badge — floats on cover */}
+              <div className="absolute top-2 left-2 z-10">
+                {isFree ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-white bg-green-500 px-2.5 py-1 rounded-full font-bold shadow-md">مجانية</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-navy bg-gradient-to-r from-gold to-amber-500 px-2.5 py-1 rounded-full font-bold shadow-md">{c.price?.toLocaleString()} {c.currency || 'ر.ي'}</span>
+                )}
+              </div>
+              {/* Status badge — floats on cover top-right */}
+              <div className="absolute top-2 right-2 z-10">
+                <span className={`inline-flex items-center text-[9px] border px-2 py-0.5 rounded-full font-semibold ${status.color}`}>{status.label}</span>
+              </div>
+              {/* Body */}
+              <div className="p-3">
+                <h4 className="font-bold text-navy text-sm leading-tight line-clamp-1 mb-1">{c.title}</h4>
+                {c.short_description && <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-2">{c.short_description}</p>}
+                {/* Badges row */}
+                <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                  <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-medium ${level.color}`}>{level.label}</span>
+                  {c.duration_hours > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-2.5 h-2.5" /> {c.duration_hours}س</span>
+                  )}
+                  {c.modules_count > 0 && (
+                    <span className="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{c.modules_count} وحدات</span>
+                  )}
+                  {c.lessons_count > 0 && (
+                    <span className="inline-flex items-center text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">{c.lessons_count} دروس</span>
+                  )}
+                  {c.enrolled > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><Users className="w-2.5 h-2.5" /> {c.enrolled}</span>
+                  )}
+                </div>
+                {/* Action buttons */}
+                <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
+                  <Button size="sm" variant="ghost" className="h-8 px-2.5 text-navy hover:bg-navy/5" onClick={() => { setEditing(c); setOpen(true) }}>
+                    <Edit className="w-3.5 h-3.5" /> تعديل
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2.5 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)}>
+                    <Trash2 className="w-3.5 h-3.5" /> حذف
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
+      {/* Empty state */}
+      {!items.length && !loading && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+            <BookOpen className="w-8 h-8 text-gray-300" />
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">لا توجد دورات بعد</p>
+          <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> إضافة أول دورة</Button>
+        </div>
+      )}
+      {/* Loading state */}
+      {loading && (
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 mx-auto text-navy animate-spin mb-3" />
+          <p className="text-sm text-muted-foreground">جاري تحميل الدورات...</p>
+        </div>
+      )}
       {open && <ProCourseDialog open={open} onOpenChange={setOpen} course={editing} trainerId={undefined} onSaved={load} />}
 
       {/* Password-confirmation dialog for course deletion. The user must
