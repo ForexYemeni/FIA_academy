@@ -275,24 +275,33 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     }
   }
 
-  // Custom select — clean, professional, with chevron
+  // ⡙ Custom select — magical gradient style with icon + colored chevron
   const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
     <div>
       <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-        {Icon && <Icon className="w-3.5 h-3.5 text-gold" />}
+        {Icon && (
+          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+            <Icon className="w-3 h-3 text-gold" />
+          </div>
+        )}
         {label}
       </Label>
-      <div className="relative">
+      <div className="relative group">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-10 pl-3 pr-9 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 appearance-none cursor-pointer transition-all"
+          className="w-full h-11 pl-10 pr-9 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 appearance-none cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm"
         >
           {options.map((o: any) => (
             <option key={o.value || o} value={o.value || o}>{o.label || o}</option>
           ))}
         </select>
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        {Icon && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <Icon className="w-4 h-4 text-gold/60 group-hover:text-gold transition-colors" />
+          </div>
+        )}
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy/40 group-hover:text-navy pointer-events-none transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
       </div>
     </div>
   )
