@@ -211,14 +211,22 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
         body: JSON.stringify(moduleDialog.editing ? { id: moduleDialog.editing.id, ...data } : { course_id: courseId, ...data }),
       })
       const result = await res.json()
-      if (res.ok) {
-        toast.success(moduleDialog.editing ? 'تم تحديث الوحدة' : 'تمت إضافة الوحدة')
+      if (res.ok && result) {
+        toast.success(moduleDialog.editing ? 'تم تحديث الوحدة ✓' : 'تمت إضافة الوحدة ✓')
         setModuleDialog({ open: false, editing: null })
-        loadModules()
+        // === OPTIMISTIC UPDATE === — no loadModules() needed
+        if (result.id) {
+          if (moduleDialog.editing) {
+            setModules(prev => prev.map(m => m.id === result.id ? { ...m, ...result } : m))
+          } else {
+            setModules(prev => [...prev, { ...result, course_id: courseId, ...data, lessons: [] } as Module])
+            setExpanded(prev => new Set(prev).add(result.id))
+            setLessonsByModule(prev => ({ ...prev, [result.id]: [] }))
+          }
+        }
       } else if (result.needs_setup) {
         setNeedsSetup(true)
         setModuleDialog({ open: false, editing: null })
-        toast.error('يجب تنفيذ SQL أولاً')
       } else {
         toast.error(result.error || 'فشل الحفظ')
       }
@@ -230,10 +238,25 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
   const deleteModule = async () => {
     if (!moduleDeleteTarget) return
     setDeletingModule(true)
+    // === OPTIMISTIC DELETE === — remove from local state immediately
+    const targetId = moduleDeleteTarget.id
+    setModules(prev => prev.filter(m => m.id !== targetId))
+    setLessonsByModule(prev => { const n = { ...prev }; delete n[targetId]; return n })
+    setModuleDeleteTarget(null)
     try {
-      await fetch('/api/modules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: moduleDeleteTarget.id }) })
-      toast.success('تم الحذف')
-      setModuleDeleteTarget(null)
+      const res = await fetch('/api/modules', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: targetId, course_id: courseId }),
+      })
+      if (res.ok) {
+        toast.success('تم الحذف ✓')
+      } else {
+        toast.error('فشل الحذف — جاري إعادة التحميل')
+        loadModules()
+      }
+    } catch {
+      toast.error('خطأ في الاتصال — جاري إعادة التحميل')
       loadModules()
     } finally {
       setDeletingModule(false)
@@ -242,9 +265,6 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
 
   const saveLesson = async (data: any, moduleId: string, editing: Lesson | null) => {
     try {
-      // The /api/lessons route requires { id, module_id, course_id } for PUT
-      // and { module_id, course_id, ... } for POST. Always include course_id
-      // to avoid an expensive full-table scan on the server.
       const body = editing
         ? { id: editing.id, module_id: moduleId, course_id: courseId, ...data }
         : { module_id: moduleId, course_id: courseId, ...data }
@@ -253,28 +273,26 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      const result = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success(editing ? 'تم تحديث الدرس' : 'تمت إضافة الدرس')
+        toast.success(editing ? 'تم تحديث الدرس ✓' : 'تمت إضافة الدرس ✓')
         setLessonDialog(null)
-        loadModules()
-
-        // Publish lesson/exam to Telegram channel (non-blocking)
+        // === OPTIMISTIC UPDATE ===
+        if (result && result.id) {
+          setLessonsByModule(prev => {
+            const list = prev[moduleId] || []
+            if (editing) {
+              return { ...prev, [moduleId]: list.map(l => l.id === result.id ? { ...l, ...result, ...data } : l) }
+            }
+            return { ...prev, [moduleId]: [...list, { ...result, module_id: moduleId, ...data } as Lesson] }
+          })
+        } else {
+          loadModules()
+        }
         if (!editing) {
-          const lessonTypeLabels: Record<string, string> = { video: 'فيديو', text: 'نص', exam: 'اختبار', pdf: 'PDF' }
-          const typeLabel = lessonTypeLabels[data.lesson_type] || 'درس'
-          fetch('/api/telegram-publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              course_id: courseId,
-              action: 'lesson',
-              lesson_title: data.title,
-              lesson_type: typeLabel,
-            }),
-          }).catch(() => {})
+          fetch('/api/telegram-publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ course_id: courseId, action: 'lesson', lesson_title: data.title, lesson_type: data.lesson_type || 'درس' }) }).catch(() => {})
         }
       } else {
-        const result = await res.json().catch(() => ({}))
         toast.error(result.error || 'فشل الحفظ')
       }
     } catch {
@@ -285,22 +303,26 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
   const deleteLesson = async () => {
     if (!lessonDeleteTarget) return
     setDeletingLesson(true)
+    // === OPTIMISTIC DELETE ===
+    const targetId = lessonDeleteTarget.id
+    const targetModuleId = lessonDeleteTarget.moduleId
+    setLessonsByModule(prev => ({ ...prev, [targetModuleId]: (prev[targetModuleId] || []).filter(l => l.id !== targetId) }))
+    setLessonDeleteTarget(null)
     try {
       const res = await fetch('/api/lessons', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: lessonDeleteTarget.id, module_id: lessonDeleteTarget.moduleId, course_id: courseId }),
+        body: JSON.stringify({ id: targetId, module_id: targetModuleId, course_id: courseId }),
       })
-      if (!res.ok) {
-        const result = await res.json().catch(() => ({}))
-        toast.error(result.error || 'فشل الحذف')
-        return
+      if (res.ok) {
+        toast.success('تم الحذف ✓')
+      } else {
+        toast.error('فشل الحذف — جاري إعادة التحميل')
+        loadModules()
       }
-      toast.success('تم الحذف')
-      setLessonDeleteTarget(null)
-      loadModules()
     } catch {
-      toast.error('خطأ في الاتصال')
+      toast.error('خطأ في الاتصال — جاري إعادة التحميل')
+      loadModules()
     } finally {
       setDeletingLesson(false)
     }
