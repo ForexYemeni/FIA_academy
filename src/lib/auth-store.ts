@@ -96,8 +96,22 @@ export const useAuth = create<AuthState>()(
       // After rehydration from localStorage, if a user is present,
       // notify the APK so the OneSignal login happens on app restart
       // (the bridge state is lost when the app process dies).
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => async (state) => {
         if (state?.user?.id) {
+          // Check if this user's account has been force-deleted
+          // by the admin. If so, clear the session immediately.
+          try {
+            const res = await fetch(`/api/auth/check-deleted?user_id=${state.user.id}`)
+            if (res.ok) {
+              const data = await res.json()
+              if (data.deleted) {
+                // User account was deleted — force logout
+                state.logout()
+                return
+              }
+            }
+          } catch {}
+          // Account still valid — notify the APK
           notifyApkOfUserId(state.user.id)
         }
       },

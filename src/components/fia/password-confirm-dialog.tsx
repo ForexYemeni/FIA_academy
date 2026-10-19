@@ -125,10 +125,10 @@ export function PasswordConfirmDialog({
               <Trash2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
               <div className="min-w-0">
                 {itemLabel && (
-                  <div className="text-xs text-muted-foreground mb-1">{itemLabel}</div>
+                  <div className="text-xs text-white/60 mb-1">{itemLabel}</div>
                 )}
                 {itemName && (
-                  <div className="font-bold text-navy line-clamp-3 break-words whitespace-pre-line">
+                  <div className="font-bold text-white line-clamp-3 break-words whitespace-pre-line">
                     {itemName}
                   </div>
                 )}
@@ -136,14 +136,14 @@ export function PasswordConfirmDialog({
             </div>
           )}
           {message && (
-            <p className="text-sm text-muted-foreground text-center whitespace-pre-line">
+            <p className="text-sm text-white/60 text-center whitespace-pre-line">
               {message}
             </p>
           )}
 
           {/* Password input — this is what makes the dialog "password-confirmed" */}
           <div className="space-y-1.5">
-            <Label htmlFor="confirm-pwd" className="text-xs font-bold text-navy flex items-center gap-1.5">
+            <Label htmlFor="confirm-pwd" className="text-xs font-bold text-white flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5 text-red-500" />
               كلمة مرورك للتأكيد
             </Label>
@@ -163,14 +163,14 @@ export function PasswordConfirmDialog({
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px] text-white/60">
               لإتمام هذا الإجراء، يجب إدخال كلمة مرور حسابك. هذا يحمي من الحذف العرضي.
             </p>
           </div>

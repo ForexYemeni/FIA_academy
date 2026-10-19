@@ -87,6 +87,41 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    // Before deleting, store the user's ID in a "force_logout" table
+    // so the auth store can check and force-logout the deleted user
+    // on their next app load. Without this, the deleted user's session
+    // in localStorage remains valid until they manually logout.
+    try {
+      await supabaseAdmin.from('force_logout').upsert({
+        user_id: id,
+        reason: 'account_deleted',
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+    } catch {}
+
+    // Cascade delete related data to prevent orphaned rows
+    for (const table of ['payments', 'certificates', 'reviews', 'forum_topics', 'forum_posts', 'lesson_progress', 'course_progress', 'exam_attempts', 'chat_messages', 'notifications']) {
+      try {
+        await supabaseAdmin.from(table).delete().eq('user_id', id)
+      } catch {}
+      try {
+        await supabaseAdmin.from(table).delete().eq('sender_id', id)
+      } catch {}
+    }
+
+    // Also delete their chat conversations
+    try {
+      await supabaseAdmin.from('chat_conversations').delete().or(`participant_1.eq.${id},participant_2.eq.${id}`)
+    } catch {}
+
+    // Delete public profiles
+    try {
+      await supabaseAdmin.from('public_profiles').delete().eq('user_id', id)
+    } catch {}
+
+    // Finally, delete the user
     const { error } = await supabaseAdmin.from('users').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

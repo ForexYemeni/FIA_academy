@@ -132,7 +132,7 @@ export function NotificationOptInPrompt() {
             <p className="text-sm text-navy font-bold">
               ابقَ على اطلاع بكل تحدّث في المنصة
             </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <p className="text-xs text-white/60 leading-relaxed">
               عند موافقتك، ستتلقى إشعارات منبثقة + نغمات صوتية مميزة عند:
               طلبات الدفع، طلبات الشهادات، تأكيدات الدفع، إكمال الدورات،
               التقييمات، المواضيع الجديدة، وأكثر.
@@ -143,20 +143,20 @@ export function NotificationOptInPrompt() {
           <div className="flex flex-wrap justify-center gap-2">
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gold/10 border border-gold/30 rounded-full">
               <Volume2 className="w-3 h-3 text-gold" />
-              <span className="text-[10px] font-bold text-navy">نغمات احترافية</span>
+              <span className="text-[10px] font-bold text-white">نغمات احترافية</span>
             </div>
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full">
               <Bell className="w-3 h-3 text-blue-600" />
-              <span className="text-[10px] font-bold text-navy">إشعارات منبثقة</span>
+              <span className="text-[10px] font-bold text-white">إشعارات منبثقة</span>
             </div>
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/30 rounded-full">
               <CheckCircle2 className="w-3 h-3 text-green-600" />
-              <span className="text-[10px] font-bold text-navy">توصيل فوري</span>
+              <span className="text-[10px] font-bold text-white">توصيل فوري</span>
             </div>
           </div>
 
           {/* Privacy note */}
-          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+          <p className="text-[10px] text-white/60 text-center leading-relaxed">
             🔒 لن نرسل لك أي إعلانات أو رسائل ترويجية — فقط الإشعارات المتعلقة بنشاطك في الأكاديمية. يمكنك كتم الأصوات أو إيقاف الإشعارات في أي وقت من زر الجرس.
           </p>
         </div>
