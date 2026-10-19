@@ -15,7 +15,7 @@ import {
   Plus, Edit, Trash2, ChevronDown, ChevronUp, Video, FileText,
   HelpCircle, FileUp, GripVertical, Save, X, Loader2,
   Database, Copy, ExternalLink, RefreshCw, CheckCircle2, Eye,
-  Package, BookOpen,
+  Package, BookOpen, Sparkles, Layers,
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
@@ -558,52 +558,63 @@ function ModuleDialog({ open, onOpenChange, editing, onSave }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0">
-        {/* ⚡ Professional gradient header — amber for modules */}
-        <div className="relative bg-gradient-to-br from-amber-600 via-orange-600 to-amber-700 p-5 pb-4 rounded-t-xl overflow-hidden">
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
-            backgroundSize: '25px 25px',
+      <DialogContent className="sm:max-w-md p-0 gap-0 border-0">
+        {/* ⚡ Magical gradient header — amber/orange with pattern */}
+        <div className="relative bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 p-5 pb-6 rounded-t-2xl overflow-hidden">
+          {/* Decorative flowing pattern */}
+          <div className="absolute inset-0 opacity-15" style={{
+            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px), radial-gradient(circle at 50% 80%, white 1px, transparent 1px)',
+            backgroundSize: '25px 25px, 20px 20px, 30px 30px',
           }} />
+          {/* Glow effect */}
+          <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-12 -translate-y-12" />
           <div className="relative flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm border border-white/20">
-              <Package className="w-6 h-6 text-white" strokeWidth={2.2} />
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+              <Package className="w-7 h-7 text-white" strokeWidth={2.2} />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-white tracking-tight">{editing ? 'تعديل الوحدة' : 'وحدة جديدة'}</DialogTitle>
-              <p className="text-white/70 text-xs mt-0.5">أضف محتوى تعليمي للدورة</p>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">{editing ? 'تعديل الوحدة' : 'وحدة جديدة'}</DialogTitle>
+              <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> أضف محتوى تعليمي للدورة</p>
             </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="bg-gradient-to-b from-amber-50/30 to-white p-5 space-y-4">
-          <div>
-            <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان الوحدة *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="مثال: الوحدة الأولى - الأساسيات"
-              className="h-10 text-sm border-gray-200/60 focus:border-amber-500 focus:ring-amber-500/20" />
+        {/* ⡙ Body — amber-tinted gradient with colored section cards */}
+        <div className="bg-gradient-to-b from-amber-50 via-orange-50/30 to-white p-5 space-y-4 rounded-b-2xl">
+          {/* Title field — amber gradient card */}
+          <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl border border-amber-200/40 space-y-3">
+            <div>
+              <Label className="text-xs font-bold text-amber-700 mb-1.5 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <BookOpen className="w-3 h-3 text-white" />
+                </div>
+                عنوان الوحدة *
+              </Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="مثال: الوحدة الأولى - الأساسيات"
+                className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-amber-700 mb-1.5 block">وصف مختصر</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+                className="text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl resize-none"
+                placeholder="وصف موجز لمحتوى الوحدة..." />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-amber-700 mb-1.5 block">الترتيب</Label>
+              <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
+                className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" placeholder="0" />
+            </div>
           </div>
-          <div>
-            <Label className="text-xs font-bold text-navy mb-1.5 block">وصف مختصر</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
-              className="text-sm border-gray-200/60 focus:border-amber-500 focus:ring-amber-500/20 resize-none"
-              placeholder="وصف موجز لمحتوى الوحدة..." />
-          </div>
-          <div>
-            <Label className="text-xs font-bold text-navy mb-1.5 block">الترتيب</Label>
-            <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
-              className="h-10 text-sm border-gray-200/60 focus:border-amber-500 focus:ring-amber-500/20" placeholder="0" />
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
-          <Button onClick={() => { if (!title) { toast.error('أدخل العنوان'); return } onSave({ title, description, position }); }}
-            className="bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all">
-            <Save className="w-4 h-4 ml-1" /> حفظ الوحدة
-          </Button>
+          {/* Footer — premium gradient button */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl border-amber-200/40 text-amber-700 hover:bg-amber-50">إلغاء</Button>
+            <Button onClick={() => { if (!title) { toast.error('أدخل العنوان'); return } onSave({ title, description, position }); }}
+              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all px-6">
+              <Save className="w-4 h-4 ml-1.5" /> حفظ الوحدة
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -712,73 +723,87 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0">
-        {/* ⚡ Professional gradient header — blue/indigo for lessons */}
-        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-5 pb-4 rounded-t-xl overflow-hidden sticky top-0 z-10">
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
-            backgroundSize: '25px 25px',
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0 border-0">
+        {/* ⚡ Magical gradient header — blue/indigo with glow */}
+        <div className="relative bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 p-5 pb-6 rounded-t-2xl overflow-hidden sticky top-0 z-10">
+          <div className="absolute inset-0 opacity-15" style={{
+            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px), radial-gradient(circle at 50% 80%, white 1px, transparent 1px)',
+            backgroundSize: '25px 25px, 20px 20px, 30px 30px',
           }} />
+          <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-12 -translate-y-12" />
           <div className="relative flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm border border-white/20">
-              <BookOpen className="w-6 h-6 text-white" strokeWidth={2.2} />
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+              <BookOpen className="w-7 h-7 text-white" strokeWidth={2.2} />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-white tracking-tight">{editing ? 'تعديل الدرس' : 'درس جديد'}</DialogTitle>
-              <p className="text-white/70 text-xs mt-0.5">أضف محتوى تعليمي تفاعلي</p>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">{editing ? 'تعديل الدرس' : 'درس جديد'}</DialogTitle>
+              <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> أضف محتوى تعليمي تفاعلي</p>
             </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="bg-gradient-to-b from-blue-50/30 to-white p-5 space-y-4">
-          {/* Title */}
-          <div>
-            <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان الدرس *</Label>
+        {/* Body — blue-tinted gradient with colored section cards */}
+        <div className="bg-gradient-to-b from-blue-50 via-indigo-50/30 to-white p-5 space-y-4 rounded-b-2xl">
+          {/* Title — blue gradient card */}
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-200/40">
+            <Label className="text-xs font-bold text-blue-700 mb-1.5 flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <BookOpen className="w-3 h-3 text-white" />
+              </div>
+              عنوان الدرس *
+            </Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: مقدمة في الإنعاش القلبي"
-              className="h-10 text-sm border-gray-200/60 focus:border-blue-500 focus:ring-blue-500/20" />
+              className="h-11 text-sm bg-white/80 border-blue-200/40 focus:border-blue-500 focus:ring-blue-500/30 rounded-xl" />
           </div>
 
-          {/* Lesson type — professional gradient selector */}
-          <div>
-            <Label className="text-xs font-bold text-navy mb-2 block">نوع الدرس</Label>
+          {/* Lesson type — creative gradient selector */}
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-200/40">
+            <Label className="text-xs font-bold text-blue-700 mb-2.5 flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <Layers className="w-3 h-3 text-white" />
+              </div>
+              نوع الدرس
+            </Label>
             <div className="grid grid-cols-4 gap-2">
               {LESSON_TYPES.map((t) => {
                 const Icon = t.icon
                 const active = lessonType === t.value
                 return (
                   <button key={t.value} type="button" onClick={() => setLessonType(t.value as any)}
-                    className={`group flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all ${
-                      active ? 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-600 text-white shadow-md' : 'border-gray-200/60 bg-white text-gray-500 hover:border-blue-400/40 hover:text-blue-600'
+                    className={`group flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all ${
+                      active ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-500 text-white shadow-lg scale-105' : 'border-blue-200/40 bg-white/80 text-gray-500 hover:border-blue-400/60 hover:text-blue-600 hover:shadow-md'
                     }`}>
-                    <Icon className={`w-5 h-5 transition-transform ${active ? 'scale-110' : 'group-hover:scale-105'}`} />
-                    <span className="text-xs font-medium">{t.label}</span>
+                    <Icon className={`w-6 h-6 transition-transform ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
+                    <span className="text-xs font-semibold">{t.label}</span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Video section */}
+          {/* Video section — red gradient card */}
           {lessonType === 'video' && (
-            <div className="space-y-3 p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-red-500/40">
+            <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50/50 rounded-2xl border border-red-200/40 space-y-3">
+              <Label className="text-xs font-bold text-red-600 mb-1.5 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                  <Video className="w-3 h-3 text-white" />
+                </div>
+                رفع فيديو
+              </Label>
+              <input type="file" accept="video/*" className="hidden" id="video-upload"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = '' }} />
+              <Button variant="outline" className="w-full bg-white/80 border-red-200/40 hover:border-red-400 hover:bg-red-50 rounded-xl" disabled={uploadingVideo}
+                onClick={() => document.getElementById('video-upload')?.click()}>
+                {uploadingVideo ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <Video className="w-4 h-4 ml-1.5" />}
+                {uploadingVideo ? 'جاري الرفع...' : 'اختر فيديو للرفع'}
+              </Button>
               <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">رفع فيديو (عبر تيليجرام بوت)</Label>
-                <input type="file" accept="video/*" className="hidden" id="video-upload"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = '' }} />
-                <Button variant="outline" className="w-full border-gray-200/60 hover:border-red-400 hover:bg-red-50" disabled={uploadingVideo}
-                  onClick={() => document.getElementById('video-upload')?.click()}>
-                  {uploadingVideo ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Video className="w-4 h-4 ml-1" />}
-                  {uploadingVideo ? 'جاري الرفع...' : 'اختر فيديو للرفع'}
-                </Button>
-              </div>
-              <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">أو الصق رابط فيديو</Label>
+                <Label className="text-xs font-bold text-red-600 mb-1.5 block">أو الصق رابط فيديو</Label>
                 <Input value={videoUrl.startsWith('tg://') ? '' : videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
                   placeholder="https://api.telegram.org/file/..." dir="ltr"
-                  className="h-10 text-sm border-gray-200/60 focus:border-red-400 focus:ring-red-400/20" />
+                  className="h-11 text-sm bg-white/80 border-red-200/40 focus:border-red-400 focus:ring-red-400/30 rounded-xl" />
                 {videoUrl && (
-                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2 bg-green-50 px-2.5 py-1.5 rounded-lg">
+                  <div className="mt-2 text-xs text-green-600 flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
                     <Video className="w-3 h-3" /> رابط الفيديو جاهز
                     <button onClick={() => setVideoUrl('')} className="text-red-500 hover:text-red-700 mr-auto"><X className="w-3 h-3" /></button>
                   </div>
@@ -787,21 +812,24 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
             </div>
           )}
 
-          {/* PDF section */}
+          {/* PDF section — green gradient card */}
           {lessonType === 'pdf' && (
-            <div className="space-y-3 p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-green-500/40">
-              <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">رفع ملف PDF</Label>
-                <input type="file" accept=".pdf,application/pdf,application/octet-stream,application/x-pdf" className="hidden" id="pdf-upload"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }} />
-                <Button variant="outline" className="w-full border-gray-200/60 hover:border-green-400 hover:bg-green-50" disabled={savingPdf}
-                  onClick={() => document.getElementById('pdf-upload')?.click()}>
-                  {savingPdf ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileUp className="w-4 h-4 ml-1" />}
-                  {savingPdf ? 'جاري الرفع...' : 'اختر PDF من الجهاز'}
-                </Button>
-              </div>
+            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50/50 rounded-2xl border border-green-200/40 space-y-3">
+              <Label className="text-xs font-bold text-green-600 mb-1.5 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                  <FileUp className="w-3 h-3 text-white" />
+                </div>
+                رفع ملف PDF
+              </Label>
+              <input type="file" accept=".pdf,application/pdf,application/octet-stream,application/x-pdf" className="hidden" id="pdf-upload"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }} />
+              <Button variant="outline" className="w-full bg-white/80 border-green-200/40 hover:border-green-400 hover:bg-green-50 rounded-xl" disabled={savingPdf}
+                onClick={() => document.getElementById('pdf-upload')?.click()}>
+                {savingPdf ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <FileUp className="w-4 h-4 ml-1.5" />}
+                {savingPdf ? 'جاري الرفع...' : 'اختر PDF من الجهاز'}
+              </Button>
               {pdfUrl && (
-                <div className="text-xs text-green-600 flex items-center gap-2 bg-green-50 px-2.5 py-1.5 rounded-lg">
+                <div className="text-xs text-green-600 flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
                   <FileUp className="w-3 h-3" /> {pdfUrl.split('/').pop()}
                   <button onClick={() => setPdfUrl('')} className="text-red-500 mr-auto"><X className="w-3 h-3" /></button>
                 </div>
@@ -809,55 +837,61 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
             </div>
           )}
 
-          {/* Text content */}
+          {/* Text content — blue gradient card */}
           {lessonType === 'text' && (
-            <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-blue-500/40">
-              <Label className="text-xs font-bold text-navy mb-1.5 block">محتوى الدرس النصي</Label>
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-200/40">
+              <Label className="text-xs font-bold text-blue-600 mb-1.5 flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <FileText className="w-3 h-3 text-white" />
+                </div>
+                محتوى الدرس النصي
+              </Label>
               <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={6}
                 placeholder="اكتب محتوى الدرس هنا..."
-                className="text-sm border-gray-200/60 focus:border-blue-500 focus:ring-blue-500/20 resize-y" />
+                className="text-sm bg-white/80 border-blue-200/40 focus:border-blue-500 focus:ring-blue-500/30 rounded-xl resize-y" />
             </div>
           )}
 
-          {/* Exam builder */}
+          {/* Exam builder — purple gradient card */}
           {lessonType === 'exam' && (
-            <div className="p-3.5 bg-white rounded-xl border border-gray-200/60 border-r-4 border-r-purple-500/40">
+            <div className="p-4 bg-gradient-to-br from-purple-50 to-fuchsia-50/50 rounded-2xl border border-purple-200/40">
               <ExamBuilder value={content} onChange={setContent} />
             </div>
           )}
 
-          {/* Duration + Position */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-bold text-navy mb-1.5 block">المدة (دقيقة)</Label>
-              <Input type="number" value={duration || ''} onChange={(e) => setDuration(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
-                className="h-10 text-sm border-gray-200/60 focus:border-blue-500 focus:ring-blue-500/20" placeholder="0" />
+          {/* Duration + Position — gray gradient card */}
+          <div className="p-4 bg-gradient-to-br from-gray-50 to-slate-50/50 rounded-2xl border border-gray-200/40">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-gray-600 mb-1.5 block">المدة (دقيقة)</Label>
+                <Input type="number" value={duration || ''} onChange={(e) => setDuration(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
+                  className="h-11 text-sm bg-white/80 border-gray-200/40 focus:border-blue-500 focus:ring-blue-500/30 rounded-xl" placeholder="0" />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-gray-600 mb-1.5 block">الترتيب</Label>
+                <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
+                  className="h-11 text-sm bg-white/80 border-gray-200/40 focus:border-blue-500 focus:ring-blue-500/30 rounded-xl" placeholder="0" />
+              </div>
             </div>
-            <div>
-              <Label className="text-xs font-bold text-navy mb-1.5 block">الترتيب</Label>
-              <Input type="number" value={position || ''} onChange={(e) => setPosition(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr"
-                className="h-10 text-sm border-gray-200/60 focus:border-blue-500 focus:ring-blue-500/20" placeholder="0" />
+            {/* Preview toggle */}
+            <div className="flex items-center gap-3 mt-3 p-3 bg-blue-50/50 rounded-xl border border-blue-200/30">
+              <input type="checkbox" id="preview" checked={isPreview} onChange={(e) => setIsPreview(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+              <Label htmlFor="preview" className="cursor-pointer text-xs font-medium text-navy flex-1">درس معاينة مجانية (يمكن للزوار مشاهدته دون تسجيل)</Label>
+              {isPreview && <span className="text-[10px] text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full font-bold">معاينة مجانية</span>}
             </div>
           </div>
 
-          {/* Preview toggle — professional switch */}
-          <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-200/40">
-            <input type="checkbox" id="preview" checked={isPreview} onChange={(e) => setIsPreview(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-            <Label htmlFor="preview" className="cursor-pointer text-xs font-medium text-navy flex-1">درس معاينة مجانية (يمكن للزوار مشاهدته دون تسجيل)</Label>
-            {isPreview && <span className="text-[10px] text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full font-bold">معاينة مجانية</span>}
+          {/* Footer — premium gradient button */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl border-blue-200/40 text-blue-700 hover:bg-blue-50">إلغاء</Button>
+            <Button onClick={() => {
+                if (!title) { toast.error('أدخل العنوان'); return }
+                onSave({ title, lesson_type: lessonType, content: content || null, video_url: videoUrl || null, pdf_url: pdfUrl || null, duration_minutes: duration, position, is_preview: isPreview })
+              }}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all px-6">
+              <Save className="w-4 h-4 ml-1.5" /> حفظ الدرس
+            </Button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100 sticky bottom-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
-          <Button onClick={() => {
-              if (!title) { toast.error('أدخل العنوان'); return }
-              onSave({ title, lesson_type: lessonType, content: content || null, video_url: videoUrl || null, pdf_url: pdfUrl || null, duration_minutes: duration, position, is_preview: isPreview })
-            }}
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all">
-            <Save className="w-4 h-4 ml-1" /> حفظ الدرس
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
