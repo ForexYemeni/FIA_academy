@@ -51,6 +51,31 @@ export function TrainerDashboard() {
   const [enrolledStudentIds, setEnrolledStudentIds] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<any | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // ⚡ Listen for native notifications from the APK bridge.
+  useEffect(() => {
+    ;(window as any).__FIA_showToast = (msg: string) => {
+      try { toast.success(msg) } catch {}
+    }
+    ;(window as any).__FIA_refreshActiveView = () => {
+      // No-op: Realtime subscriptions handle refresh
+    }
+    const handleNativeNotif = (event: any) => {
+      const data = event.detail || {}
+      if (data.title) {
+        try { toast.success(`${data.title}${data.body ? ' — ' + data.body : ''}`) } catch {}
+      }
+    }
+    window.addEventListener('fia-native-notification', handleNativeNotif as EventListener)
+    return () => {
+      window.removeEventListener('fia-native-notification', handleNativeNotif as EventListener)
+      try {
+        delete (window as any).__FIA_refreshActiveView
+        delete (window as any).__FIA_showToast
+      } catch {}
+    }
+  }, [])
+
   // Profile state is seeded from auth-store user; refreshTrainerProfile() below
   // keeps it in sync with the latest DB record fetched from /api/trainers.
   const [profile, setProfile] = useState({

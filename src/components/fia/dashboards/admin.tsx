@@ -73,6 +73,34 @@ export function AdminDashboard() {
   const updateUser = useAuth((s) => s.updateUser)
   const logout = useAuth((s) => s.logout)
 
+  // ⚡ Listen for native notifications from the APK bridge.
+  // When the APK receives a push notification (e.g. new payment), it
+  // dispatches a 'fia-native-notification' event on window. We listen
+  // for it here and show a toast — the per-section Realtime subscriptions
+  // in AdminPayments/AdminStudents/etc. handle the actual data refresh.
+  useEffect(() => {
+    ;(window as any).__FIA_showToast = (msg: string) => {
+      try { toast.success(msg) } catch {}
+    }
+    ;(window as any).__FIA_refreshActiveView = () => {
+      // No-op: each sub-component refreshes itself via its own Realtime subscription
+    }
+    const handleNativeNotif = (event: any) => {
+      const data = event.detail || {}
+      if (data.title) {
+        try { toast.success(`${data.title}${data.body ? ' — ' + data.body : ''}`) } catch {}
+      }
+    }
+    window.addEventListener('fia-native-notification', handleNativeNotif as EventListener)
+    return () => {
+      window.removeEventListener('fia-native-notification', handleNativeNotif as EventListener)
+      try {
+        delete (window as any).__FIA_refreshActiveView
+        delete (window as any).__FIA_showToast
+      } catch {}
+    }
+  }, [])
+
   return (
     <DashboardShell
       nav={NAV}
