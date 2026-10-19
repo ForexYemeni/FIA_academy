@@ -95,7 +95,14 @@ class MainActivity : AppCompatActivity() {
 
             // Inject JavaScript into the WebView to update the UI instantly.
             // The JS dispatches a CustomEvent that the web app listens for
-            // and triggers instant state refreshes + toast display.
+            // and triggers instant state refreshes.
+            //
+            // ⚠️ NOTE: We DON'T call window.__FIA_showToast here anymore.
+            // The notifications-bell component already shows a toast + a
+            // browser notification + plays a sound when it receives the
+            // corresponding notification INSERT via Realtime. Calling
+            // __FIA_showToast here too would cause DUPLICATE toasts.
+            // We only dispatch the event to trigger data refreshes.
             runOnUiThread {
                 try {
                     // Escape strings for safe JS injection
@@ -114,11 +121,14 @@ class MainActivity : AppCompatActivity() {
                               type: '$safeType',
                               timestamp: Date.now()
                             };
+                            // ⚡ Dispatch the event so dashboards can refresh
+                            // their data INSTANTLY (payments, enrollments, etc.)
                             window.dispatchEvent(new CustomEvent('fia-native-notification', { detail: eventData }));
                             window.dispatchEvent(new Event('storage'));
-                            if (window.__FIA_showToast) {
-                                window.__FIA_showToast(eventData.title + (eventData.body ? ' — ' + eventData.body : ''));
-                            }
+                            // ⚡ Trigger a data refresh — this is the ONLY
+                            // action we take; the notifications-bell handles
+                            // showing the toast + browser notification via
+                            // its own Realtime subscription.
                             if (window.__FIA_refreshActiveView) {
                                 window.__FIA_refreshActiveView();
                             }
