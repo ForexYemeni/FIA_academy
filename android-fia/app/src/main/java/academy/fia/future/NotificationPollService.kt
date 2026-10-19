@@ -160,6 +160,24 @@ class NotificationPollService : Service() {
     private fun fireNotification(title: String, body: String, link: String) {
         val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
+        // ⚡ STEP 1: Send a broadcast to MainActivity so it can inject JS
+        // into the WebView to update the UI INSTANTLY (sub-100ms).
+        // This is the bridge that makes the web UI feel as real-time as
+        // the native notifications.
+        try {
+            val broadcastIntent = Intent(MainActivity.ACTION_NEW_NOTIFICATION).apply {
+                setPackage(packageName)  // Restrict to our own app
+                putExtra(MainActivity.EXTRA_NOTIF_TITLE, title)
+                putExtra(MainActivity.EXTRA_NOTIF_BODY, body)
+                putExtra(MainActivity.EXTRA_NOTIF_LINK, link)
+                putExtra(MainActivity.EXTRA_NOTIF_TYPE, "poll")
+            }
+            sendBroadcast(broadcastIntent)
+            Log.d(TAG, "⚡ Sent notification broadcast to WebView: $title")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to send notification broadcast", e)
+        }
+
         // Deep-link intent — opens MainActivity with the hash URL
         val intent = Intent(this, MainActivity::class.java).apply {
             data = android.net.Uri.parse("$API_BASE$link")

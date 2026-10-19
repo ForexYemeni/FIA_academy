@@ -126,6 +126,49 @@ export function StudentDashboard() {
     fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
   }
 
+  // ⚡ Helper functions exposed globally so the APK's native notification
+  // bridge can call them via evaluateJavascript. This makes the WebView
+  // update INSTANTLY when a notification arrives (instead of requiring a
+  // page reload). The APK dispatches a 'fia-native-notification' custom
+  // event with the notification data; we listen for it here and refresh
+  // all data + show a toast.
+  useEffect(() => {
+    // Expose global helpers for the APK bridge
+    ;(window as any).__FIA_refreshActiveView = () => {
+      loadEnrollments()
+      fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    }
+    ;(window as any).__FIA_showToast = (msg: string) => {
+      try { toast.success(msg) } catch {}
+    }
+
+    // ⚡ Listen for native notifications from the APK bridge
+    const handleNativeNotif = (event: any) => {
+      const data = event.detail || {}
+      // Refresh all relevant data INSTANTLY when a native notification arrives
+      loadEnrollments()
+      fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+
+      // Show a toast with the notification content
+      if (data.title) {
+        try { toast.success(`${data.title}${data.body ? ' — ' + data.body : ''}`) } catch {}
+      }
+    }
+    window.addEventListener('fia-native-notification', handleNativeNotif as EventListener)
+
+    return () => {
+      window.removeEventListener('fia-native-notification', handleNativeNotif as EventListener)
+      try {
+        delete (window as any).__FIA_refreshActiveView
+        delete (window as any).__FIA_showToast
+      } catch {}
+    }
+  }, [user?.id])
+
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})

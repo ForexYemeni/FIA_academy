@@ -62,6 +62,89 @@ class MainActivity : AppCompatActivity() {
         // where MediaStore still needs WRITE_EXTERNAL_STORAGE to write
         // to the public Pictures folder.
         private const val PERM_REQUEST_STORAGE = 0xA1
+
+        // ⚡ Broadcast action — sent by NotificationPollService when a new
+        // notification arrives. MainActivity listens for this and injects
+        // JS into the WebView to instantly update the UI (toasts, badges,
+        // payment status changes, enrollment list refresh, etc.).
+        const val ACTION_NEW_NOTIFICATION = "academy.fia.future.NEW_NOTIFICATION"
+        const val EXTRA_NOTIF_TITLE = "notif_title"
+        const val EXTRA_NOTIF_BODY = "notif_body"
+        const val EXTRA_NOTIF_LINK = "notif_link"
+        const val EXTRA_NOTIF_TYPE = "notif_type"
+    }
+
+    /**
+     * ⚡ BroadcastReceiver — listens for new notifications from
+     * NotificationPollService. When received, injects JS into the WebView
+     * to trigger instant UI updates without page reload.
+     *
+     * This is the bridge between the native Android notification system
+     * and the web UI running inside the WebView. Without this, the user
+     * sees a system notification but the web UI doesn't update until they
+     * manually close and reopen the app.
+     */
+    private val notificationReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val title = intent?.getStringExtra(EXTRA_NOTIF_TITLE) ?: return
+            val body = intent.getStringExtra(EXTRA_NOTIF_BODY) ?: ""
+            val link = intent.getStringExtra(EXTRA_NOTIF_LINK) ?: "/"
+            val type = intent.getStringExtra(EXTRA_NOTIF_TYPE) ?: "system"
+
+            Log.d(TAG, "⚡ Received notification broadcast: $title")
+
+            // Inject JavaScript into the WebView to update the UI instantly.
+            // The JS dispatches a CustomEvent that the web app listens for
+            // and triggers instant state refreshes + toast display.
+            runOnUiThread {
+                try {
+                    val js = """
+                        (function() {
+                          try {
+                            // Dispatch a custom event that the web app listens for.
+                            // This triggers instant UI updates (toasts, refreshes,
+                            // badge counts, etc.) without page reload.
+                            var eventData = {
+                              title: ${android.text.TextUtils.isEmpty(title) ? "''" : "'${title.replace("'", "\\'")}'"},
+                              body: ${android.text.TextUtils.isEmpty(body) ? "''" : "'${body.replace("'", "\\'")}'"},
+                              link: '$link',
+                              type: '$type',
+                              timestamp: Date.now()
+                            };
+                            window.dispatchEvent(new CustomEvent('fia-native-notification', { detail: eventData }));
+
+                            // Also dispatch a 'storage' event so any listener
+                            // that uses localStorage-based caches gets refreshed.
+                            window.dispatchEvent(new Event('storage'));
+
+                            // Show a toast inside the web UI too (in case the
+                            // system notification was dismissed or not granted).
+                            if (window.__FIA_showToast) {
+                                window.__FIA_showToast(eventData.title + ' — ' + eventData.body);
+                            }
+
+                            // Trigger a hashchange to the notification link if
+                            // the user is currently in the dashboard
+                            try {
+                              if (window.location.hash && window.location.hash.indexOf('dashboard') > -1 && eventData.link && eventData.link !== '/') {
+                                // Don't auto-navigate; just refresh data
+                                if (window.__FIA_refreshActiveView) {
+                                    window.__FIA_refreshActiveView();
+                                }
+                              }
+                            } catch(e) {}
+                          } catch(e) {
+                            console.error('FIA native notification error:', e);
+                          }
+                        })();
+                    """.trimIndent()
+                    webView.evaluateJavascript(js, null)
+                    Log.d(TAG, "⚡ Injected notification JS into WebView")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to inject notification JS", e)
+                }
+            }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -395,6 +478,23 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.startForegroundService(this, serviceIntent)
         } catch (e: Exception) {
             Log.w(TAG, "Could not start poller service", e)
+        }
+
+        // ⚡ Register the BroadcastReceiver for new notifications.
+        // When NotificationPollService detects a new notification, it
+        // sends a broadcast that we receive here, then we inject JS
+        // into the WebView to update the UI instantly.
+        try {
+            val filter = android.content.IntentFilter(ACTION_NEW_NOTIFICATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(notificationReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(notificationReceiver, filter)
+            }
+            Log.d(TAG, "⚡ Notification receiver registered")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register notification receiver", e)
         }
 
         // Request POST_NOTIFICATIONS permission (Android 13+)
@@ -859,6 +959,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        // ⚡ Unregister the notification receiver to prevent leaks
+        try {
+            unregisterReceiver(notificationReceiver)
+        } catch (_: Exception) {}
+
         // Clean up the WebView — important to prevent memory leaks
         // (WebView can hold references and leak the activity)
         try {
