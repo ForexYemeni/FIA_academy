@@ -1986,15 +1986,20 @@ function Payments({ payments, userId, courses }: any) {
     <>
     <SectionCard title="مدفوعاتي" description={`${sortedPayments.length} معاملة`}>
       {sortedPayments.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
-            <CreditCard className="w-10 h-10 text-muted-foreground/50" />
+        /* === Magical empty state — gold-glow icon + navy box === */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <CreditCard className="w-10 h-10 text-gold" />
+            </div>
           </div>
-          <p className="text-base font-semibold text-navy mb-1">لا توجد مدفوعات بعد</p>
-          <p className="text-xs text-muted-foreground">عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا.</p>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد مدفوعات بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">عند تسجيلك في دورة مدفوعة ورفع إيصال الدفع، ستظهر تفاصيل المعاملة هنا ✨</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        /* === Magical compact payment cards — grid of mini cards === */
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
           {sortedPayments.map((p: any) => {
             const statusInfo = getPaymentRecordStatusInfo(p.status)
             const courseTitle = getCourseTitle(p.course_id)
@@ -2004,72 +2009,97 @@ function Payments({ payments, userId, courses }: any) {
             const couponCode = getCouponCode(p)
             const currency = getCurrency(p)
             const hasCoupon = !!couponCode
+            // Status-based magical theme
+            const isCompleted = ['مكتمل', 'تم تأكيد الدفع', 'confirmed', 'completed'].includes(p.status)
+            const isPending = ['بانتظار', 'بانتظار تأكيد الدفع', 'pending', 'قيد الانتظار'].includes(p.status)
+            const isFree = p.status === 'مجانية' || (Number(p.amount) === 0 && (!p.method || p.method === 'free'))
+            // Theme color per state
+            const theme = isCompleted
+              ? { headerFrom: 'from-emerald-600', headerTo: 'to-teal-700', border: 'border-emerald-400/40', glow: 'shadow-emerald-500/20', accentText: 'text-emerald-700', chip: 'bg-emerald-50/80 text-emerald-700 border-emerald-200/50' }
+              : isPending
+                ? { headerFrom: 'from-amber-500', headerTo: 'to-yellow-600', border: 'border-amber-400/40', glow: 'shadow-amber-500/20', accentText: 'text-amber-700', chip: 'bg-amber-50/80 text-amber-700 border-amber-200/50' }
+                : isFree
+                  ? { headerFrom: 'from-blue-600', headerTo: 'to-indigo-700', border: 'border-blue-400/40', glow: 'shadow-blue-500/20', accentText: 'text-blue-700', chip: 'bg-blue-50/80 text-blue-700 border-blue-200/50' }
+                  : { headerFrom: 'from-navy', headerTo: 'to-navy-light', border: 'border-gold/30', glow: 'shadow-navy/20', accentText: 'text-gold', chip: 'bg-navy/5 text-navy border-gold/30' }
+
             return (
-              <Card key={p.id} className={`p-0 overflow-hidden card-hover ${hasCoupon ? 'border-l-4 border-l-red-500 ring-1 ring-red-500/20' : 'border-border'}`}>
-                {/* Amount header — has red accent when coupon applied */}
-                <div className={`p-4 text-white ${hasCoupon ? 'bg-gradient-to-br from-red-700 to-red-900' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className={`text-[11px] font-semibold mb-0.5 ${hasCoupon ? 'text-red-100' : 'text-gold/80'}`}>
-                        {hasCoupon ? '⚠ المبلغ بعد الخصم' : 'المبلغ'}
-                      </div>
-                      <div className="text-2xl font-extrabold tracking-tight" dir="ltr">
-                        {fmtAmount(p)} <span className={`text-base font-bold ${hasCoupon ? 'text-red-200' : 'text-gold'}`}>{fmtCurrency(currency)}</span>
-                      </div>
-                    </div>
-                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap`}>{statusInfo.label}</Badge>
+              <Card
+                key={p.id}
+                className={`fia-course-card p-0 overflow-hidden cursor-default border ${theme.border} ${hasCoupon ? 'ring-1 ring-red-500/30' : ''}`}
+              >
+                {/* === Magical mini header — gradient + amount + status pill === */}
+                <div className={`relative p-3 text-white bg-gradient-to-br ${theme.headerFrom} ${theme.headerTo} ${hasCoupon ? 'from-red-700! to-rose-900!' : ''}`}>
+                  {/* Subtle pattern overlay */}
+                  <div className="absolute inset-0 opacity-15" style={{
+                    backgroundImage: 'radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '14px 14px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+
+                  {/* Top row — status pill + coupon chip */}
+                  <div className="relative flex items-start justify-between gap-1.5 mb-2">
+                    <Badge className={`${statusInfo.badgeClass} border whitespace-nowrap text-[10px] px-2 py-0.5`}>{statusInfo.label}</Badge>
+                    {hasCoupon && (
+                      <span className="inline-flex items-center gap-1 bg-red-500/40 border border-red-300/40 rounded-md px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        <Gift className="w-2.5 h-2.5" /> {couponCode}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Amount — large with currency suffix */}
+                  <div className="relative flex items-baseline gap-1.5">
+                    <span className="text-2xl font-extrabold tracking-tight" dir="ltr">{fmtAmount(p)}</span>
+                    <span className={`text-xs font-bold ${hasCoupon ? 'text-red-200' : 'text-white/80'}`}>{fmtCurrency(currency)}</span>
                   </div>
                   {hasCoupon && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 bg-red-500/30 border border-red-300/50 rounded-md px-2 py-0.5">
-                      <span className="text-[10px] text-red-100">كوبون خصم:</span>
-                      <span className="text-[11px] font-bold text-white font-mono" dir="ltr">{couponCode}</span>
-                    </div>
+                    <div className="relative text-[9px] text-red-100 mt-0.5">⚠ بعد تطبيق الكوبون</div>
                   )}
                 </div>
 
-                {/* Receipt thumbnail — opens in-app viewer */}
-                {proofUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setViewingReceipt(proofUrl)}
-                    className="relative block w-full h-36 bg-muted/40 group cursor-pointer"
-                    title="اضغط لعرض الإيصال"
-                  >
-                    <img src={proofUrl} alt="إيصال الدفع" className="w-full h-full object-cover" loading="lazy" />
-                    <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/50 transition-colors flex items-center justify-center">
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5">
-                        <FileUp className="w-4 h-4" /> عرض الإيصال
-                      </span>
-                    </div>
-                  </button>
-                )}
-
-                {/* Details body */}
-                <div className="p-4 space-y-3">
+                {/* === Mini body — compact info === */}
+                <div className="p-3 space-y-2">
+                  {/* Course title with magical icon */}
                   {courseTitle && (
-                    <div>
-                      <div className="text-[11px] text-muted-foreground mb-0.5">الدورة</div>
-                      <div className="text-sm font-semibold text-navy line-clamp-2">{courseTitle}</div>
+                    <div className="flex items-start gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 mt-0.5 text-gold flex-shrink-0" />
+                      <div className="text-xs font-bold text-navy line-clamp-2 leading-tight">{courseTitle}</div>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-[11px] text-muted-foreground mb-0.5">طريقة الدفع</div>
-                      <div className="text-sm font-medium text-navy">{p.method || '-'}</div>
+
+                  {/* Receipt thumbnail — compact 16x9 */}
+                  {proofUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setViewingReceipt(proofUrl)}
+                      className="relative block w-full h-16 rounded-lg overflow-hidden bg-muted/40 group cursor-pointer border border-border"
+                      title="اضغط لعرض الإيصال"
+                    >
+                      <img src={proofUrl} alt="إيصال الدفع" className="w-full h-full object-cover" loading="lazy" />
+                      <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/60 transition-colors flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-navy text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <FileUp className="w-3 h-3" /> عرض
+                        </span>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Compact meta — payment method + date in one row */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40">
+                    <div className="pt-1.5">
+                      <div className="text-[9px] text-muted-foreground mb-0.5">طريقة الدفع</div>
+                      <div className="text-[11px] font-bold text-navy line-clamp-1">{p.method || '-'}</div>
                     </div>
-                    <div>
-                      <div className="text-[11px] text-muted-foreground mb-0.5">التاريخ</div>
-                      <div className="text-sm font-medium text-navy" dir="ltr">{dateStr || '-'}</div>
+                    <div className="pt-1.5">
+                      <div className="text-[9px] text-muted-foreground mb-0.5">التاريخ</div>
+                      <div className="text-[11px] font-medium text-navy line-clamp-1" dir="ltr">{dateStr || '-'}</div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[11px] text-muted-foreground mb-0.5">العملة</div>
-                    <div className="text-sm font-bold text-navy" dir="ltr">{fmtCurrency(currency)}</div>
-                  </div>
+
+                  {/* Reference chip — only if exists */}
                   {ref && (
-                    <div>
-                      <div className="text-[11px] text-muted-foreground mb-0.5">رقم المرجع</div>
-                      <div className="text-sm font-mono text-navy break-all" dir="ltr">{ref}</div>
+                    <div className="pt-1 border-t border-border/40">
+                      <div className="text-[9px] text-muted-foreground mb-0.5">رقم المرجع</div>
+                      <div className="text-[10px] font-mono text-navy break-all leading-tight" dir="ltr">{ref}</div>
                     </div>
                   )}
                 </div>
