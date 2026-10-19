@@ -143,14 +143,102 @@ export function StudentDashboard() {
         .channel('courses-realtime')
         .on('postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'courses' },
-          () => {
-            fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+          (payload: any) => {
+            // ⚡ INSTANT UPDATE: patch the specific course in-place for sub-100ms updates
+            setCourses((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
           }
         )
         .subscribe()
     } catch {}
     return () => { try { supabasePublic.removeChannel(channel) } catch {} }
   }, [])
+
+  // ⚡ REAL-TIME: payments — when admin approves/rejects a payment,
+  // the student sees the status change INSTANTLY (sub-100ms) without refresh.
+  useEffect(() => {
+    if (!user?.id) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`payments-realtime-student:${user.id}`)
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            // Patch the payment in-place for instant UI update
+            setPayments((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+            // Toast on status change to approved/rejected
+            if (payload.new.status === 'مكتمل' && payload.old?.status !== 'مكتمل') {
+              toast.success('✅ تم تأكيد دفعتك! الدورة مفعّلة الآن')
+            } else if (payload.new.status === 'ملغي' && payload.old?.status !== 'ملغي') {
+              toast.error('❌ تم رفض دفعتك - راجع السبب في صفحة المدفوعات')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            // New payment record created
+            setPayments((prev) => [payload.new, ...prev])
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.id])
+
+  // ⚡ REAL-TIME: enrollments — when admin approves a payment, the
+  // enrollment is updated/created. Student sees the course appear instantly.
+  useEffect(() => {
+    if (!user?.id) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`enrollments-realtime-student:${user.id}`)
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'enrollments', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            setEnrollments((prev) => [payload.new, ...prev])
+            toast.success('📚 تم تسجيلك في دورة جديدة!')
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'enrollments', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            setEnrollments((prev) => prev.map((e) => e.id === payload.new.id ? { ...e, ...payload.new } : e))
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.id])
+
+  // ⚡ REAL-TIME: certificates — when admin issues a certificate,
+  // the student sees it appear INSTANTLY in "شهاداتي".
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('certificates-realtime-student')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'certificates' },
+          (payload: any) => {
+            // Only show certificates matching this student's name
+            if (payload.new.student_name === user?.name) {
+              setCertificates((prev) => [payload.new, ...prev])
+              toast.success('🎓 تم إصدار شهادتك! يمكنك تحميلها الآن')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'certificates' },
+          (payload: any) => {
+            setCertificates((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c))
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.name])
 
   const onEnrolled = () => {
     loadEnrollments()

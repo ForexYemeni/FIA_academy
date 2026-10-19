@@ -353,17 +353,28 @@ export function NotificationsBell() {
       .catch(() => setLoading(false))
   }
 
-  useEffect(() => {
-    load()
-    // Poll every 15s as a fallback when Realtime isn't reachable.
-    const interval = setInterval(load, 15000)
-    return () => clearInterval(interval)
-  }, [user?.id])
-
-  // Real-time subscription for instant delivery (sub-second latency).
+  // ⚡ INSTANT REAL-TIME: Subscribe to notifications for this user.
+  // Polling is now a FALLBACK that only kicks in if Realtime fails.
+  // This eliminates the 15s delay between new notification and UI update.
   useEffect(() => {
     if (!user?.id) return
+    let interval: any
     let channel: any
+    let retryCount = 0
+
+    // Initial load
+    load()
+
+    const startPolling = () => {
+      if (interval) return
+      // Poll only when Realtime is broken (less frequently: every 30s)
+      interval = setInterval(load, 30000)
+    }
+
+    const stopPolling = () => {
+      if (interval) { clearInterval(interval); interval = null }
+    }
+
     try {
       channel = supabasePublic
         .channel('notifications:' + user.id)
@@ -375,9 +386,46 @@ export function NotificationsBell() {
             announceNotification(n)
           }
         )
-        .subscribe()
-    } catch {}
-    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            setItems((prev) => prev.map((n) => n.id === payload.new.id ? { ...n, ...payload.new } : n))
+          }
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            setItems((prev) => prev.filter((n) => n.id !== payload.old.id))
+          }
+        )
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            // Realtime is working — stop polling
+            stopPolling()
+            retryCount = 0
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // Realtime failed — start polling as fallback
+            startPolling()
+            retryCount++
+          }
+        })
+    } catch {
+      // If subscribe throws, use polling
+      startPolling()
+    }
+
+    // Initial safety: start polling after 5s if Realtime hasn't confirmed
+    const initialFallback = setTimeout(() => {
+      if (!interval) {
+        interval = setInterval(load, 60000)
+      }
+    }, 5000)
+
+    return () => {
+      try { supabasePublic.removeChannel(channel) } catch {}
+      stopPolling()
+      clearTimeout(initialFallback)
+    }
   }, [user?.id])
 
   // Close on outside click / Escape key

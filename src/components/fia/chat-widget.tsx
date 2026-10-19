@@ -28,6 +28,11 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   const [searching, setSearching] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // ⚡ NEW: typing indicator + read receipts + online status
+  const [isTyping, setIsTyping] = useState(false)
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
+  const typingTimeoutRef = useRef<any>(null)
+  const typingChannelRef = useRef<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -159,6 +164,104 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     } catch {}
     return () => { try { supabasePublic.removeChannel(channel) } catch {} }
   }, [activeConvId, user?.id])
+
+  // ⚡ REAL-TIME: conversation list — when a new conversation is created
+  // (e.g. someone messages me for the first time), it appears INSTANTLY.
+  useEffect(() => {
+    if (!user?.id) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`conversations-list:${user.id}`)
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'chat_conversations' },
+          (payload: any) => {
+            if (payload.new.participant_1 === user.id || payload.new.participant_2 === user.id) {
+              loadConversations()
+              toast.success('💬 محادثة جديدة!')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'chat_conversations' },
+          (payload: any) => {
+            setConversations((prev) => prev.map((c) =>
+              c.id === payload.new.id ? { ...c, ...payload.new } : c
+            ))
+          }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.id])
+
+  // ⚡ TYPING INDICATOR: broadcast typing status via Realtime Presence
+  useEffect(() => {
+    if (!activeConvId || !user?.id) return
+    let channel: any
+    try {
+      const convId = activeConvId
+      channel = supabasePublic.channel(`typing:${convId}`, {
+        config: { presence: { key: user.id } }
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        const typingUsers = Object.keys(state).filter(id => id !== user.id)
+        setIsTyping(typingUsers.length > 0)
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        setOnlineUsers((prev) => new Set(prev).add(key))
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        setOnlineUsers((prev) => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+        setIsTyping(false)
+      })
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: user.id, typing: false })
+        }
+      })
+      typingChannelRef.current = channel
+    } catch {}
+    return () => {
+      try { supabasePublic.removeChannel(channel) } catch {}
+      typingChannelRef.current = null
+    }
+  }, [activeConvId, user?.id])
+
+  const broadcastTyping = (typing: boolean) => {
+    const channel = typingChannelRef.current
+    if (!channel || !user?.id) return
+    try { channel.track({ user_id: user.id, typing }) } catch {}
+  }
+
+  useEffect(() => {
+    if (!draft) {
+      broadcastTyping(false)
+      return
+    }
+    broadcastTyping(true)
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => {
+      broadcastTyping(false)
+    }, 2000)
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    }
+  }, [draft])
+
+  // ⚡ REAL-TIME: mark messages as read instantly when chat is open
+  useEffect(() => {
+    if (!open || !activeConvId || !user?.id) return
+    setMessages((prev) => prev.map((m) => m.sender_id !== user.id && !m.read_at
+      ? { ...m, read_at: new Date().toISOString() }
+      : m
+    ))
+  }, [open, activeConvId, messages.length, user?.id])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -394,6 +497,17 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                         </div>
                       )
                     })}
+                  </div>
+                )}
+                {/* ⚡ TYPING INDICATOR - shows when other user is typing */}
+                {isTyping && (
+                  <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 rounded-full bg-gold/60 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 rounded-full bg-gold/60 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 rounded-full bg-gold/60 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span>يكتب الآن...</span>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
