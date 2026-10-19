@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus, Sparkles,
+  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus, Sparkles, CheckCircle2,
 } from 'lucide-react'
 
 // Category groups — top-level dropdown
@@ -275,36 +275,69 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     }
   }
 
-  // ⡙ Custom select — magical gradient style with icon + colored chevron
-  const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
-    <div>
-      <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-        {Icon && (
-          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-            <Icon className="w-3 h-3 text-gold" />
-          </div>
-        )}
-        {label}
-      </Label>
-      <div className="relative group">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full h-11 pl-10 pr-9 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 appearance-none cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm"
+  // ⚡ Custom Dropdown — replaces native <select> with a beautiful modal picker
+  // The native <select> popup looks ugly on mobile (white background, small text,
+  // no styling). This custom version opens a professional bottom-sheet with
+  // gradient header + colored option cards + checkmark on selected.
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null)
+
+  const CustomDropdown = ({ label, value, onChange, options, icon: Icon, accent }: any) => {
+    const selectedOption = options.find((o: any) => (o.value || o) === value)
+    const selectedLabel = selectedOption?.label || selectedOption || value || '— اختر —'
+    const isOpen = dropdownOpen === label
+
+    return (
+      <div>
+        <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+          {Icon && (
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Icon className="w-3 h-3 text-gold" />
+            </div>
+          )}
+          {label}
+        </Label>
+        <button
+          type="button"
+          onClick={() => setDropdownOpen(isOpen ? null : label)}
+          className="w-full h-11 px-3 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm flex items-center justify-between gap-2"
         >
-          {options.map((o: any) => (
-            <option key={o.value || o} value={o.value || o}>{o.label || o}</option>
-          ))}
-        </select>
-        {Icon && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Icon className="w-4 h-4 text-gold/60 group-hover:text-gold transition-colors" />
-          </div>
+          <span className="font-medium text-navy truncate">{selectedLabel}</span>
+          <ChevronDown className={`w-4 h-4 text-navy/40 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Custom dropdown popup — professional modal overlay */}
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-50" onClick={() => setDropdownOpen(null)} />
+            {/* Dropdown panel */}
+            <div className="absolute z-50 mt-1 w-full bg-white rounded-2xl shadow-2xl border border-gray-200/60 overflow-hidden max-h-64 overflow-y-auto">
+              {options.map((o: any) => {
+                const val = o.value || o
+                const lbl = o.label || o
+                const isSelected = val === value
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => { onChange(val); setDropdownOpen(null) }}
+                    className={`w-full px-4 py-3 text-right text-sm font-medium flex items-center justify-between gap-2 transition-all ${
+                      isSelected
+                        ? `bg-gradient-to-l ${accent || 'from-navy/10 to-navy/5'} text-navy border-r-4 ${accent ? 'border-r-navy' : 'border-r-gold'}`
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-navy'
+                    }`}
+                  >
+                    <span>{lbl}</span>
+                    {isSelected && <CheckCircle2 className="w-4 h-4 text-gold flex-shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+          </>
         )}
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy/40 group-hover:text-navy pointer-events-none transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -383,14 +416,14 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
 
           {/* === Section 2: Category + Specialization === */}
           <div className="grid grid-cols-2 gap-3">
-            <Select label="التخصص" value={form.category || ''} onChange={(v: string) => setForm({ ...form, category: v, specialization: '' })}
+            <CustomDropdown label="التخصص" value={form.category || ''} onChange={(v: string) => setForm({ ...form, category: v, specialization: '' })}
               options={[{ value: '', label: '— اختر التخصص —' }, ...CATEGORY_GROUPS.map(g => ({ value: g.value, label: g.label }))]} icon={Tag} />
-            <Select label="المسمى الوظيفي" value={form.specialization || ''} onChange={(v: string) => setForm({ ...form, specialization: v })}
+            <CustomDropdown label="المسمى الوظيفي" value={form.specialization || ''} onChange={(v: string) => setForm({ ...form, specialization: v })}
               options={currentRoles.length > 0 ? [{ value: '', label: '— اختر المسمى —' }, ...currentRoles.map(r => ({ value: r, label: r }))] : [{ value: '', label: '— اختر التخصص أولاً —' }]} icon={Briefcase} />
           </div>
 
           {/* === Section 3: Level === */}
-          <Select label="المستوى" value={form.level || 'متوسط'} onChange={(v: string) => setForm({ ...form, level: v })}
+          <CustomDropdown label="المستوى" value={form.level || 'متوسط'} onChange={(v: string) => setForm({ ...form, level: v })}
             options={LEVELS.map(l => ({ value: l.value, label: l.label }))} icon={Layers} />
 
           {/* === Section 4: Pricing — emerald gradient card === */}
@@ -402,9 +435,9 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
               التسعير
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Select label="النوع" value={form.price_type || 'مجانية'} onChange={(v: string) => setForm({ ...form, price_type: v })}
+              <CustomDropdown label="النوع" value={form.price_type || 'مجانية'} onChange={(v: string) => setForm({ ...form, price_type: v })}
                 options={[{ value: 'مجانية', label: 'مجانية' }, { value: 'مدفوعة', label: 'مدفوعة' }]} />
-              <Select label="العملة" value={form.currency || 'ر.ي'} onChange={(v: string) => setForm({ ...form, currency: v })}
+              <CustomDropdown label="العملة" value={form.currency || 'ر.ي'} onChange={(v: string) => setForm({ ...form, currency: v })}
                 options={CURRENCIES.map(c => ({ value: c, label: c }))} />
             </div>
             {form.price_type === 'مدفوعة' && (
@@ -475,7 +508,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
               عرض ترويجي (اختياري)
             </div>
             <p className="text-[10px] text-muted-foreground">اجعل دورتك مميزة — تظهر بشارة احترافية للمتدربين.</p>
-            <Select label="نوع العرض" value={form.offer_type || 'none'} onChange={(v: string) => setForm({ ...form, offer_type: v })}
+            <CustomDropdown label="نوع العرض" value={form.offer_type || 'none'} onChange={(v: string) => setForm({ ...form, offer_type: v })}
               options={[{ value: 'none', label: '— لا عرض —' }, { value: 'limited_time', label: '⏰ لمدة محدودة' }, { value: 'featured', label: '⭐ دورة مميزة' }]} />
             {form.offer_type && form.offer_type !== 'none' && (
               <>
@@ -542,7 +575,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                   className="h-11 text-sm bg-white/80 border-slate-200/40 focus:border-gold focus:ring-gold/30 rounded-xl" dir="ltr" placeholder="60" />
               </div>
             </div>
-            <Select label="الحالة" value={form.status || 'منشورة'} onChange={(v: string) => setForm({ ...form, status: v })}
+            <CustomDropdown label="الحالة" value={form.status || 'منشورة'} onChange={(v: string) => setForm({ ...form, status: v })}
               options={[{ value: 'منشورة', label: 'منشورة' }, { value: 'مسودة', label: 'مسودة' }]} />
           </div>
 
