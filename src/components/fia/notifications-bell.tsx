@@ -623,41 +623,49 @@ export function NotificationsBell() {
 
   return (
     <div className="relative flex-shrink-0" ref={ref}>
-      {/* Single bell button — mute toggle is inside the dropdown header */}
+      {/* ⚡ Magical bell button — animated gold glow when unread */}
       <button
         onClick={() => { setOpen(!open); if (!open) load() }}
-        className="relative w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
+        className="relative w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center transition-all"
         title="الإشعارات"
         aria-label="الإشعارات"
       >
-        <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-navy' : 'text-muted-foreground'}`} />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
+          <div className="absolute inset-0 rounded-xl bg-gold/20 animate-ping opacity-50" />
+        )}
+        <Bell className={`relative w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-navy animate-swing' : 'text-muted-foreground'}`} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-gradient-to-br from-red-500 to-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown panel — anchored to LEFT edge of bell so it extends
-          RIGHT (toward screen center). Correct for RTL layouts where
-          the bell sits on the left side of the navbar. */}
+      {/* ⚡ Magical dropdown panel */}
       {open && (
         <div
-          className="absolute left-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden"
-          style={{ animation: 'fiaBellSlide 0.18s ease-out' }}
+          className="absolute left-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border-2 border-gold/30 rounded-2xl shadow-2xl z-50 overflow-hidden"
+          style={{ animation: 'fiaBellSlide 0.18s ease-out', boxShadow: '0 20px 60px rgba(11, 22, 53, 0.25), 0 0 40px -10px rgba(212, 175, 55, 0.3)' }}
         >
-          {/* Header — navy gradient with title + actions */}
-          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-navy to-navy-light text-white">
-            <div className="flex items-center gap-2 min-w-0">
-              <Bell className="w-4 h-4 text-gold flex-shrink-0" />
+          {/* ⚡ Magical header */}
+          <div className="relative flex items-center justify-between p-3 bg-gradient-to-l from-navy via-navy-light to-navy text-white overflow-hidden">
+            <div className="absolute inset-0 opacity-25" style={{
+              backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px'
+            }} />
+            <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
+            <div className="relative flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                <Bell className="w-4 h-4 text-navy" />
+              </div>
               <h4 className="font-bold text-sm">الإشعارات</h4>
               {unreadCount > 0 && (
-                <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 shadow-sm">
                   {unreadCount} غير مقروء
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-0.5 flex-shrink-0">
+            <div className="relative flex items-center gap-0.5 flex-shrink-0">
               {/* Mute toggle */}
               <button
                 onClick={toggleMute}
@@ -738,12 +746,16 @@ export function NotificationsBell() {
                 جاري تحميل الإشعارات...
               </div>
             ) : items.length === 0 ? (
+              /* ⚡ Magical empty state */
               <div className="p-10 text-center">
-                <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-muted/50 flex items-center justify-center">
-                  <Bell className="w-7 h-7 text-muted-foreground/40" />
+                <div className="relative inline-block mb-3">
+                  <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+                  <div className="relative w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                    <Bell className="w-7 h-7 text-gold" />
+                  </div>
                 </div>
-                <p className="text-sm font-semibold text-navy mb-1">لا توجد إشعارات</p>
-                <p className="text-xs text-muted-foreground">ستظهر هنا التنبيهات الجديدة فور وصولها</p>
+                <p className="text-sm font-bold text-navy mb-1">لا توجد إشعارات</p>
+                <p className="text-xs text-muted-foreground">ستظهر هنا التنبيهات الجديدة فور وصولها ✨</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">

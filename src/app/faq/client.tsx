@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ChevronDown, HelpCircle } from 'lucide-react'
+import { ChevronDown, HelpCircle, Sparkles } from 'lucide-react'
 
 export default function FaqClient({ faqs }: { faqs: any[] }) {
   const [openIdx, setOpenIdx] = useState<number | null>(0)
@@ -18,9 +18,15 @@ export default function FaqClient({ faqs }: { faqs: any[] }) {
   if (faqs.length === 0) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center" dir="rtl">
-        <div className="text-center py-20">
-          <HelpCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">لا توجد أسئلة شائعة بعد.</p>
+        <div className="text-center py-20 px-4">
+          {/* ⚡ Magical empty state */}
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <HelpCircle className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <p className="text-gray-500 max-w-xs mx-auto">لا توجد أسئلة شائعة بعد — سيتم إضافتها قريباً ✨</p>
         </div>
       </div>
     )
@@ -28,12 +34,27 @@ export default function FaqClient({ faqs }: { faqs: any[] }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-navy/5 to-white" dir="rtl">
-      <section className="bg-gradient-to-br from-navy to-navy-light text-white py-20">
-        <div className="container mx-auto px-4 lg:px-6 text-center">
-          <Badge className="bg-gold/15 text-gold border-gold/30 mb-3">الأسئلة الشائعة</Badge>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">إجابات لأكثر الأسئلة شيوعاً</h1>
+      {/* ⚡ Magical hero */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy text-white py-20">
+        <div className="absolute inset-0 opacity-25" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px'
+        }} />
+        <div className="absolute -top-16 -right-16 w-64 h-64 bg-gold/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-gold/10 rounded-full blur-2xl" />
+        <div className="container mx-auto px-4 lg:px-6 text-center relative">
+          <div className="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-full bg-gold/15 text-gold border border-gold/30 backdrop-blur-sm">
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-bold">الأسئلة الشائعة</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
+            <span className="bg-gradient-to-l from-white via-gold/90 to-white bg-clip-text text-transparent">
+              إجابات لأكثر الأسئلة شيوعاً
+            </span>
+          </h1>
           <p className="text-white/70 text-lg">كل ما تحتاج معرفته عن الدورات والتسجيل والشهادات</p>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-navy/5 to-transparent" />
       </section>
 
       <section className="py-16">
@@ -41,23 +62,31 @@ export default function FaqClient({ faqs }: { faqs: any[] }) {
           {Object.entries(grouped).map(([category, items]) => (
             <div key={category} className="mb-10">
               <h2 className="text-xl font-bold text-navy mb-4 flex items-center gap-2">
-                <span className="w-1 h-6 bg-gold rounded-full" /> {category}
+                <div className="w-1 h-6 bg-gradient-to-b from-gold to-amber-500 rounded-full" />
+                {category}
               </h2>
               <div className="space-y-3">
-                {items.map((f, i) => {
+                {items.map((f) => {
                   const idx = faqs.indexOf(f)
                   const isOpen = openIdx === idx
                   return (
-                    <Card key={f.id} className="overflow-hidden">
+                    <Card key={f.id} className={`fia-card-hover overflow-hidden border ${isOpen ? 'border-gold/40' : 'border-gold/20'} hover:border-gold/40 transition-colors`}>
                       <button
                         onClick={() => setOpenIdx(isOpen ? null : idx)}
-                        className="w-full flex items-center justify-between p-5 text-right hover:bg-navy/5 transition-colors"
+                        className="w-full flex items-center justify-between p-5 text-right hover:bg-gradient-to-l hover:from-gold/5 hover:to-transparent transition-all"
                       >
-                        <span className="font-bold text-navy">{f.question}</span>
-                        <ChevronDown className={`w-5 h-5 text-gold flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        <span className="font-bold text-navy flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isOpen ? 'bg-gradient-to-br from-gold to-amber-500 text-navy shadow-md' : 'bg-navy/5 text-gold'}`}>
+                            <HelpCircle className="w-4 h-4" />
+                          </div>
+                          {f.question}
+                        </span>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isOpen ? 'bg-gold text-navy rotate-180' : 'bg-navy/5 text-gold'}`}>
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
                       </button>
                       {isOpen && (
-                        <div className="px-5 pb-5 text-gray-700 leading-relaxed border-t border-gray-100 pt-4">
+                        <div className="px-5 pb-5 pl-14 text-gray-700 leading-relaxed border-t border-gold/10 pt-4 bg-gradient-to-l from-gold/5 to-transparent">
                           {f.answer}
                         </div>
                       )}

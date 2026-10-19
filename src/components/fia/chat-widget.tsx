@@ -9,7 +9,7 @@ import { supabasePublic } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
   Send, Loader2, Search, X, MessageCircle, ArrowRight, Users, Trash2,
-  AlertTriangle,
+  AlertTriangle, Sparkles, Clock,
 } from 'lucide-react'
 
 export function ChatWidget({ initialRecipientId, initialRecipientName }: { initialRecipientId?: string; initialRecipientName?: string }) {
@@ -302,14 +302,20 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
 
   return (
     <>
-      {/* Floating button */}
+      {/* ⚡ Magical floating button — gold glow + scale animation */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-navy hover:bg-navy-light text-gold shadow-xl flex items-center justify-center transition-all z-50 hover:scale-110"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all z-50 hover:scale-110 active:scale-95 ring-2 ring-gold/30"
+        style={{ boxShadow: '0 8px 32px rgba(11, 22, 53, 0.45), 0 0 0 0 rgba(212, 175, 55, 0.5)' }}
       >
-        {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+        {!open && (
+          <div className="absolute inset-0 rounded-full bg-gold/20 animate-ping opacity-50" />
+        )}
+        <span className="relative">
+          {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+        </span>
         {!open && conversations.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-gold text-navy text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-gradient-to-br from-gold to-amber-500 text-navy text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border border-white/40">
             {conversations.length > 9 ? '9+' : conversations.length}
           </span>
         )}
@@ -317,33 +323,41 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
 
       {/* Overlay */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-[min(860px,calc(100vw-3rem))] h-[min(560px,calc(100vh-8rem))] bg-white rounded-2xl overflow-hidden flex flex-col border border-gray-200" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        <div className="fixed bottom-24 right-6 z-50 w-[min(860px,calc(100vw-3rem))] h-[min(560px,calc(100vh-8rem))] bg-white rounded-2xl overflow-hidden flex flex-col border-2 border-gold/30" style={{ boxShadow: '0 20px 60px rgba(11, 22, 53, 0.35), 0 0 40px -10px rgba(212, 175, 55, 0.4)' }}>
 
           {view === 'search' ? (
             // ==================== VIEW 1: SEARCH ====================
             <>
-              {/* Header */}
-              <div className="bg-gradient-to-l from-navy to-navy-light text-white px-5 py-4 flex items-center gap-3 flex-shrink-0">
-                <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-gold" />
+              {/* ⚡ Magical header */}
+              <div className="relative bg-gradient-to-l from-navy via-navy-light to-navy text-white px-5 py-4 flex items-center gap-3 flex-shrink-0 overflow-hidden">
+                <div className="absolute inset-0 opacity-25" style={{
+                  backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+                  backgroundSize: '24px 24px, 18px 18px'
+                }} />
+                <div className="absolute -top-8 -right-8 w-24 h-24 bg-gold/15 rounded-full blur-2xl" />
+                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md">
+                  <MessageCircle className="w-5 h-5 text-navy" />
                 </div>
-                <div>
+                <div className="relative flex-1">
                   <h2 className="text-base font-bold">المحادثات</h2>
-                  <p className="text-white/50 text-[10px]">ابحث عن مستخدم لبدء محادثة</p>
+                  <p className="text-gold/80 text-[10px] flex items-center gap-1">
+                    <span className="w-1 h-1 bg-gold rounded-full animate-pulse" />
+                    ابحث عن مستخدم لبدء محادثة
+                  </p>
                 </div>
               </div>
 
               {/* Search bar */}
               <div className="p-4 border-b border-gray-100 flex-shrink-0">
                 <div className="relative">
-                  <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gold/60" />
                   <input
                     ref={searchRef}
                     type="text"
                     value={searchQ}
                     onChange={(e) => searchUsers(e.target.value)}
                     placeholder="ابحث بالاسم عن مدرب أو متدرب أو عضو فريق..."
-                    className="w-full h-12 pr-12 pl-4 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all"
+                    className="w-full h-12 pr-12 pl-4 text-sm bg-gradient-to-br from-gray-50 to-white border-2 border-gold/20 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all"
                   />
                   {searchQ && (
                     <button onClick={() => { setSearchQ(''); setSearchResults([]) }} className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center">
@@ -362,35 +376,39 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                 {searchResults.length > 0 ? (
                   // Search results
                   <div className="p-3">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide px-2 mb-2">نتائج البحث ({searchResults.length})</p>
+                    <p className="text-[10px] text-gold font-bold uppercase tracking-wide px-2 mb-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> نتائج البحث ({searchResults.length})
+                    </p>
                     {searchResults.map((u) => (
-                      <button key={u.id} onClick={() => openConversation(u)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 text-right transition-colors mb-1">
-                        <Avatar className="w-11 h-11 flex-shrink-0">
+                      <button key={u.id} onClick={() => openConversation(u)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gradient-to-l hover:from-gold/5 hover:to-transparent text-right transition-all mb-1 border border-transparent hover:border-gold/20">
+                        <Avatar className="w-11 h-11 flex-shrink-0 ring-2 ring-gold/20">
                           <AvatarImage src={u.avatar || ''} />
-                          <AvatarFallback className="bg-navy text-gold text-sm font-bold">{u.name?.charAt(0)}</AvatarFallback>
+                          <AvatarFallback className="bg-gradient-to-br from-navy to-navy-light text-gold text-sm font-bold">{u.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-navy truncate">{u.name}</div>
                           <div className="text-[10px] text-gray-400 truncate">{u.email}</div>
                         </div>
-                        {u.role && <Badge className="bg-navy/5 text-navy border-navy/10 text-[9px] px-2">{roleLabel(u.role)}</Badge>}
-                        <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0 rotate-180" />
+                        {u.role && <Badge className="bg-gradient-to-r from-navy/5 to-navy/10 text-navy border-navy/10 text-[9px] px-2">{roleLabel(u.role)}</Badge>}
+                        <ArrowRight className="w-4 h-4 text-gold/60 flex-shrink-0 rotate-180" />
                       </button>
                     ))}
                   </div>
                 ) : conversations.length > 0 ? (
                   // Recent conversations
                   <div className="p-3">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide px-2 mb-2">المحادثات الأخيرة</p>
+                    <p className="text-[10px] text-gold font-bold uppercase tracking-wide px-2 mb-2 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> المحادثات الأخيرة
+                    </p>
                     {conversations.map((c) => (
-                      <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 text-right transition-colors mb-1 group">
+                      <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gradient-to-l hover:from-gold/5 hover:to-transparent text-right transition-all mb-1 group border border-transparent hover:border-gold/20">
                         <button onClick={() => openExistingConversation(c)} className="flex items-center gap-3 flex-1 min-w-0 text-right">
                           <div className="relative flex-shrink-0">
-                            <Avatar className="w-11 h-11">
+                            <Avatar className="w-11 h-11 ring-2 ring-gold/20">
                               <AvatarImage src={c.other?.avatar || ''} />
-                              <AvatarFallback className="bg-navy text-gold text-sm font-bold">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
+                              <AvatarFallback className="bg-gradient-to-br from-navy to-navy-light text-gold text-sm font-bold">{c.other?.name?.charAt(0) || '؟'}</AvatarFallback>
                             </Avatar>
-                            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white"></span>
+                            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white shadow-sm"></span>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-bold text-navy truncate">{c.other?.name || 'مستخدم'}</div>
@@ -407,14 +425,17 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                     ))}
                   </div>
                 ) : (
-                  // Empty state
+                  // Empty state — magical
                   <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                    <div className="w-20 h-20 rounded-full bg-navy/5 flex items-center justify-center mb-4">
-                      <Users className="w-10 h-10 text-navy/15" />
+                    <div className="relative inline-block mb-4">
+                      <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+                      <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                        <Users className="w-10 h-10 text-gold" />
+                      </div>
                     </div>
                     <h3 className="text-base font-bold text-navy mb-1">ابدأ محادثة جديدة</h3>
                     <p className="text-xs text-gray-400 max-w-[240px] leading-relaxed">
-                      ابحث عن مدرب أو متدرب أو عضو فريق بالاسم في الأعلى، ثم اختره لبدء محادثة
+                      ابحث عن مدرب أو متدرب أو عضو فريق بالاسم في الأعلى، ثم اختره لبدء محادثة ✨
                     </p>
                   </div>
                 )}
@@ -423,36 +444,40 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
           ) : (
             // ==================== VIEW 2: CHAT CONVERSATION ====================
             <>
-              {/* Chat header — with delete + close buttons */}
-              <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-                <button onClick={goBack} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0" title="رجوع">
-                  <ArrowRight className="w-4 h-4 text-navy" />
+              {/* ⚡ Magical chat header */}
+              <div className="relative bg-gradient-to-l from-navy via-navy-light to-navy text-white px-4 py-3 flex items-center gap-3 flex-shrink-0 overflow-hidden">
+                <div className="absolute inset-0 opacity-20" style={{
+                  backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1px, transparent 1px)',
+                  backgroundSize: '14px 14px'
+                }} />
+                <button onClick={goBack} className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0" title="رجوع">
+                  <ArrowRight className="w-4 h-4 text-gold" />
                 </button>
-                <Avatar className="w-10 h-10 flex-shrink-0">
+                <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-gold/40">
                   {otherAvatar ? <AvatarImage src={otherAvatar} /> : null}
-                  <AvatarFallback className="bg-navy text-gold text-sm font-bold">{otherName.charAt(0)}</AvatarFallback>
+                  <AvatarFallback className="bg-gradient-to-br from-gold/30 to-amber-500/30 text-gold text-sm font-bold">{otherName.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-navy truncate">{otherName}</div>
+                <div className="relative flex-1 min-w-0">
+                  <div className="text-sm font-bold truncate text-white">{otherName}</div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                    <span className="text-[10px] text-green-600 font-medium">متصل الآن</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-[10px] text-green-300 font-medium">متصل الآن</span>
                     {recipient?.role && (
-                      <Badge className="bg-navy/5 text-navy border-navy/10 text-[8px] px-1.5 py-0 mr-1">{roleLabel(recipient.role)}</Badge>
+                      <Badge className="bg-white/10 text-gold border-gold/30 text-[8px] px-1.5 py-0 mr-1">{roleLabel(recipient.role)}</Badge>
                     )}
                   </div>
                 </div>
                 {activeConvId && (
                   <button
                     onClick={(e) => requestDelete(activeConvId, otherName, e)}
-                    className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 transition-colors"
+                    className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-red-500/30 text-white flex items-center justify-center flex-shrink-0 transition-colors"
                     title="حذف المحادثة"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors" title="إغلاق">
-                  <X className="w-4 h-4 text-navy" />
+                <button onClick={() => setOpen(false)} className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors" title="إغلاق">
+                  <X className="w-4 h-4 text-gold" />
                 </button>
               </div>
 

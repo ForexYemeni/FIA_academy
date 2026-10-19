@@ -555,26 +555,29 @@ export function SharedForum({ user }: { user: any }) {
       title="المنتدى"
       description={`${topics.length} موضوع`}
       action={
-        <Button className="bg-navy hover:bg-navy-light" onClick={() => setNewTopicOpen(true)}>
+        <Button className="bg-navy hover:bg-navy-light rounded-xl" onClick={() => setNewTopicOpen(true)}>
           <Plus className="w-4 h-4 ml-1" /> موضوع جديد
         </Button>
       }
     >
-      {/* Category tabs */}
+      {/* ⚡ Magical category tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setActiveCategory(c.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeCategory === c.id
-                ? 'bg-navy text-gold shadow-md'
-                : 'bg-muted/50 hover:bg-muted text-navy'
-            }`}
-          >
-            <span>{c.icon}</span> {c.name}
-          </button>
-        ))}
+        {categories.map((c) => {
+          const isActive = activeCategory === c.id
+          return (
+            <button
+              key={c.id}
+              onClick={() => setActiveCategory(c.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                isActive
+                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+                  : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+              }`}
+            >
+              <span>{c.icon}</span> {c.name}
+            </button>
+          )
+        })}
       </div>
 
       {loading ? (
@@ -582,29 +585,42 @@ export function SharedForum({ user }: { user: any }) {
           <Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" />
         </div>
       ) : topics.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>لا توجد مواضيع بعد في هذه الفئة. كن أول من يبدأ النقاش!</p>
+        /* ⚡ Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <MessageSquare className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد مواضيع بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">كن أول من يبدأ النقاش في هذه الفئة ✨</p>
         </div>
       ) : (
         <div className="space-y-3">
           {topics.map((t) => (
-            <Card key={t.id} className="p-4 hover:shadow-md transition-all cursor-pointer" >
+            <Card key={t.id} className="fia-card-hover p-4 border border-gold/20 hover:border-gold/40 cursor-pointer overflow-hidden relative">
+              {/* Magical left strip */}
+              <div className="absolute top-0 right-0 bottom-0 w-1 bg-gradient-to-b from-gold via-amber-400 to-gold opacity-70" />
               <button onClick={() => openTopic(t)} className="w-full text-right">
-                <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-start justify-between gap-3 mb-2 pr-2">
                   <div className="flex-1 min-w-0">
-                    {t.pinned && <Badge className="bg-gold/15 text-gold border-gold/30 mb-1 text-[10px]">📌 مثبت</Badge>}
-                    <h4 className="font-bold text-navy text-base mb-1">{t.title}</h4>
-                    {t.body && <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>}
+                    {t.pinned && (
+                      <Badge className="bg-gradient-to-r from-gold/15 to-amber-500/15 text-gold border-gold/30 mb-1 text-[10px]">
+                        📌 مثبت
+                      </Badge>
+                    )}
+                    <h4 className="font-bold text-navy text-base mb-1 line-clamp-1">{t.title}</h4>
+                    {t.body && <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{t.body}</p>}
                   </div>
-                  <ChevronDown className="w-5 h-5 text-muted-foreground rotate-[-90deg]" />
+                  <ChevronDown className="w-5 h-5 text-gold flex-shrink-0 rotate-[-90deg]" />
                 </div>
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40 pr-2">
                   <AuthorChip author={t.author} />
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span><Eye className="w-3 h-3 inline" /> {t.views || 0}</span>
-                    <span><Reply className="w-3 h-3 inline" /> {t.replies_count || 0}</span>
-                    <span><Clock className="w-3 h-3 inline" /> {new Date(t.updated_at || t.created_at).toLocaleDateString('ar-EG')}</span>
+                    <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-gold/60" /> {t.views || 0}</span>
+                    <span className="flex items-center gap-1"><Reply className="w-3 h-3 text-gold/60" /> {t.replies_count || 0}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-gold/60" /> {new Date(t.updated_at || t.created_at).toLocaleDateString('ar-EG')}</span>
                   </div>
                 </div>
               </button>
