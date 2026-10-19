@@ -90,6 +90,12 @@ export function NotificationsBell() {
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>('default')
   const ref = useRef<HTMLDivElement>(null)
+  // ⚡ Track recently announced notification IDs to prevent duplicates.
+  // Both the Realtime subscription AND the polling fallback call
+  // announceNotification(). Without dedup, the same notification would
+  // fire TWO browser notifications + TWO toasts + TWO sounds.
+  // We use a ref (not state) so it doesn't trigger re-renders.
+  const recentlyAnnouncedRef = useRef<Set<string>>(new Set())
 
   // Initialize muted state + audio unlock + notification permission
   useEffect(() => {
@@ -344,7 +350,19 @@ export function NotificationsBell() {
           if (prev.length > 0) {
             const prevIds = new Set(prev.map(n => n.id))
             const fresh = newItems.filter(n => !prevIds.has(n.id))
-            for (const n of fresh) announceNotification(n)
+            // ⚡ Dedup: skip notifications that were already announced by
+            // the Realtime subscription. We track announced IDs in a ref.
+            for (const n of fresh) {
+              if (!recentlyAnnouncedRef.current.has(n.id)) {
+                recentlyAnnouncedRef.current.add(n.id)
+                // Cleanup: keep only the last 50 IDs to avoid unbounded growth
+                if (recentlyAnnouncedRef.current.size > 50) {
+                  const arr = Array.from(recentlyAnnouncedRef.current)
+                  recentlyAnnouncedRef.current = new Set(arr.slice(-50))
+                }
+                announceNotification(n)
+              }
+            }
           }
           return newItems
         })
@@ -383,6 +401,15 @@ export function NotificationsBell() {
           (payload: any) => {
             const n = payload.new
             setItems((prev) => [n, ...prev].slice(0, 50))
+            // ⚡ Dedup: skip if this notification was already announced
+            // (e.g. by the polling fallback that ran 50ms earlier).
+            if (recentlyAnnouncedRef.current.has(n.id)) return
+            recentlyAnnouncedRef.current.add(n.id)
+            // Cleanup: keep only the last 50 IDs
+            if (recentlyAnnouncedRef.current.size > 50) {
+              const arr = Array.from(recentlyAnnouncedRef.current)
+              recentlyAnnouncedRef.current = new Set(arr.slice(-50))
+            }
             announceNotification(n)
           }
         )
