@@ -275,66 +275,127 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
     }
   }
 
-  // ⚡ Custom Dropdown — replaces native <select> with a beautiful modal picker
-  // The native <select> popup looks ugly on mobile (white background, small text,
-  // no styling). This custom version opens a professional bottom-sheet with
-  // gradient header + colored option cards + checkmark on selected.
-  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null)
+  // ⚡ Magical Dropdown Card — a professional mini-card picker that slides up
+  // from the bottom of the screen with a gradient header, colored option cards,
+  // and smooth animations. Each option is a beautiful card with hover effects.
+  const [dropdownOpen, setDropdownOpen] = useState<{ label: string; options: any[]; value: string; onChange: any; icon: any; accent: string } | null>(null)
 
-  const CustomDropdown = ({ label, value, onChange, options, icon: Icon, accent }: any) => {
+  const CustomDropdown = ({ label, value, onChange, options, icon: Icon, accent = 'navy' }: any) => {
     const selectedOption = options.find((o: any) => (o.value || o) === value)
     const selectedLabel = selectedOption?.label || selectedOption || value || '— اختر —'
-    const isOpen = dropdownOpen === label
+
+    // Accent color mapping
+    const accents: Record<string, { gradient: string; bg: string; text: string; border: string; iconBg: string }> = {
+      navy:    { gradient: 'from-[#0A1F44] to-[#102a63]',     bg: 'from-navy/8 to-navy/3',       text: 'text-navy',    border: 'border-navy/20',    iconBg: 'from-navy to-navy-light' },
+      emerald: { gradient: 'from-emerald-600 to-teal-700',    bg: 'from-emerald-50 to-teal-50',  text: 'text-emerald-700', border: 'border-emerald-200', iconBg: 'from-emerald-500 to-teal-600' },
+      amber:   { gradient: 'from-amber-500 to-orange-600',     bg: 'from-amber-50 to-orange-50',  text: 'text-amber-700',   border: 'border-amber-200',   iconBg: 'from-amber-500 to-orange-600' },
+      blue:    { gradient: 'from-blue-600 to-indigo-700',      bg: 'from-blue-50 to-indigo-50',   text: 'text-blue-700',    border: 'border-blue-200',    iconBg: 'from-blue-500 to-indigo-600' },
+    }
+    const a = accents[accent] || accents.navy
 
     return (
       <div>
         <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
           {Icon && (
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-              <Icon className="w-3 h-3 text-gold" />
+            <div className={`w-5 h-5 rounded-md bg-gradient-to-br ${a.iconBg} flex items-center justify-center`}>
+              <Icon className="w-3 h-3 text-white" />
             </div>
           )}
           {label}
         </Label>
+        {/* Trigger button — shows selected value as a mini card */}
         <button
           type="button"
-          onClick={() => setDropdownOpen(isOpen ? null : label)}
-          className="w-full h-11 px-3 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm flex items-center justify-between gap-2"
+          onClick={() => setDropdownOpen({ label, options, value, onChange, icon: Icon, accent })}
+          className={`w-full h-11 px-3 text-sm bg-gradient-to-br ${a.bg} border ${a.border} rounded-xl focus:outline-none focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:shadow-md flex items-center justify-between gap-2 group`}
         >
-          <span className="font-medium text-navy truncate">{selectedLabel}</span>
-          <ChevronDown className={`w-4 h-4 text-navy/40 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+          <span className={`font-medium ${a.text} truncate flex items-center gap-1.5`}>
+            {selectedLabel}
+          </span>
+          <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${a.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform`}>
+            <ChevronDown className="w-3.5 h-3.5 text-white" />
+          </div>
         </button>
+      </div>
+    )
+  }
 
-        {/* Custom dropdown popup — professional modal overlay */}
-        {isOpen && (
-          <>
-            {/* Backdrop */}
-            <div className="fixed inset-0 z-50" onClick={() => setDropdownOpen(null)} />
-            {/* Dropdown panel */}
-            <div className="absolute z-50 mt-1 w-full bg-white rounded-2xl shadow-2xl border border-gray-200/60 overflow-hidden max-h-64 overflow-y-auto">
-              {options.map((o: any) => {
-                const val = o.value || o
-                const lbl = o.label || o
-                const isSelected = val === value
-                return (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => { onChange(val); setDropdownOpen(null) }}
-                    className={`w-full px-4 py-3 text-right text-sm font-medium flex items-center justify-between gap-2 transition-all ${
-                      isSelected
-                        ? `bg-gradient-to-l ${accent || 'from-navy/10 to-navy/5'} text-navy border-r-4 ${accent ? 'border-r-navy' : 'border-r-gold'}`
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-navy'
-                    }`}
-                  >
-                    <span>{lbl}</span>
-                    {isSelected && <CheckCircle2 className="w-4 h-4 text-gold flex-shrink-0" />}
-                  </button>
-                )
-              })}
+  // ⚡ Dropdown Card Modal — full-screen overlay with a beautiful bottom card
+  const DropdownCardModal = () => {
+    if (!dropdownOpen) return null
+    const { label, options, value, onChange, icon: Icon, accent } = dropdownOpen
+    const accents: Record<string, { gradient: string; text: string; iconBg: string; bg: string; border: string }> = {
+      navy:    { gradient: 'from-[#0A1F44] to-[#102a63]',     text: 'text-navy',    iconBg: 'from-navy to-navy-light',       bg: 'from-navy/8 to-navy/3',     border: 'border-navy/20' },
+      emerald: { gradient: 'from-emerald-600 to-teal-700',    text: 'text-emerald-700', iconBg: 'from-emerald-500 to-teal-600', bg: 'from-emerald-50 to-teal-50', border: 'border-emerald-200' },
+      amber:   { gradient: 'from-amber-500 to-orange-600',   text: 'text-amber-700',   iconBg: 'from-amber-500 to-orange-600', bg: 'from-amber-50 to-orange-50', border: 'border-amber-200' },
+      blue:    { gradient: 'from-blue-600 to-indigo-700',    text: 'text-blue-700',    iconBg: 'from-blue-500 to-indigo-600',  bg: 'from-blue-50 to-indigo-50',  border: 'border-blue-200' },
+    }
+    const a = accents[accent] || accents.navy
+    const selectedOption = options.find((o: any) => (o.value || o) === value)
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center" style={{ animation: 'fadeIn 0.2s ease' }}>
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDropdownOpen(null)} />
+        {/* Card */}
+        <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+          {/* Gradient header */}
+          <div className={`relative bg-gradient-to-br ${a.gradient} p-4 pb-3 overflow-hidden`}>
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+            <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-x-8 -translate-y-8" />
+            <div className="relative flex items-center gap-2.5">
+              {Icon && (
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-sm border border-white/25">
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-white tracking-tight">{label}</h3>
+                <p className="text-white/70 text-[10px] flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> اختر خياراً من القائمة</p>
+              </div>
+              <button type="button" onClick={() => setDropdownOpen(null)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </>
-        )}
+          </div>
+
+          {/* Options list — each is a beautiful mini card */}
+          <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto fia-scroll" style={{ background: 'linear-gradient(to bottom, rgba(248,250,252,0.5), white)' }}>
+            {options.map((o: any, i: number) => {
+              const val = o.value || o
+              const lbl = o.label || o
+              const isSelected = val === value
+              return (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => { onChange(val); setDropdownOpen(null) }}
+                  style={{ animation: `slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.03}s both` }}
+                  className={`w-full p-3 rounded-2xl text-right text-sm font-medium flex items-center justify-between gap-2 transition-all ${
+                    isSelected
+                      ? `bg-gradient-to-l ${a.bg} ${a.text} border-2 ${a.border} shadow-sm`
+                      : 'text-gray-600 bg-white border-2 border-transparent hover:bg-gray-50 hover:text-navy hover:border-gray-200/60'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    {isSelected && (
+                      <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${a.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    )}
+                    {!isSelected && (
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] text-gray-400 font-bold">{i + 1}</span>
+                      </div>
+                    )}
+                    {lbl}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }
@@ -417,14 +478,14 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
           {/* === Section 2: Category + Specialization === */}
           <div className="grid grid-cols-2 gap-3">
             <CustomDropdown label="التخصص" value={form.category || ''} onChange={(v: string) => setForm({ ...form, category: v, specialization: '' })}
-              options={[{ value: '', label: '— اختر التخصص —' }, ...CATEGORY_GROUPS.map(g => ({ value: g.value, label: g.label }))]} icon={Tag} />
+              options={[{ value: '', label: '— اختر التخصص —' }, ...CATEGORY_GROUPS.map(g => ({ value: g.value, label: g.label }))]} icon={Tag} accent="navy" />
             <CustomDropdown label="المسمى الوظيفي" value={form.specialization || ''} onChange={(v: string) => setForm({ ...form, specialization: v })}
-              options={currentRoles.length > 0 ? [{ value: '', label: '— اختر المسمى —' }, ...currentRoles.map(r => ({ value: r, label: r }))] : [{ value: '', label: '— اختر التخصص أولاً —' }]} icon={Briefcase} />
+              options={currentRoles.length > 0 ? [{ value: '', label: '— اختر المسمى —' }, ...currentRoles.map(r => ({ value: r, label: r }))] : [{ value: '', label: '— اختر التخصص أولاً —' }]} icon={Briefcase} accent="blue" />
           </div>
 
           {/* === Section 3: Level === */}
           <CustomDropdown label="المستوى" value={form.level || 'متوسط'} onChange={(v: string) => setForm({ ...form, level: v })}
-            options={LEVELS.map(l => ({ value: l.value, label: l.label }))} icon={Layers} />
+            options={LEVELS.map(l => ({ value: l.value, label: l.label }))} icon={Layers} accent="amber" />
 
           {/* === Section 4: Pricing — emerald gradient card === */}
           <div className="p-4 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 rounded-2xl border border-emerald-200/40 space-y-3">
@@ -436,9 +497,9 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             </div>
             <div className="grid grid-cols-2 gap-3">
               <CustomDropdown label="النوع" value={form.price_type || 'مجانية'} onChange={(v: string) => setForm({ ...form, price_type: v })}
-                options={[{ value: 'مجانية', label: 'مجانية' }, { value: 'مدفوعة', label: 'مدفوعة' }]} />
+                options={[{ value: 'مجانية', label: 'مجانية' }, { value: 'مدفوعة', label: 'مدفوعة' }]} accent="emerald" />
               <CustomDropdown label="العملة" value={form.currency || 'ر.ي'} onChange={(v: string) => setForm({ ...form, currency: v })}
-                options={CURRENCIES.map(c => ({ value: c, label: c }))} />
+                options={CURRENCIES.map(c => ({ value: c, label: c }))} accent="emerald" />
             </div>
             {form.price_type === 'مدفوعة' && (
               <>
@@ -509,7 +570,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             </div>
             <p className="text-[10px] text-muted-foreground">اجعل دورتك مميزة — تظهر بشارة احترافية للمتدربين.</p>
             <CustomDropdown label="نوع العرض" value={form.offer_type || 'none'} onChange={(v: string) => setForm({ ...form, offer_type: v })}
-              options={[{ value: 'none', label: '— لا عرض —' }, { value: 'limited_time', label: '⏰ لمدة محدودة' }, { value: 'featured', label: '⭐ دورة مميزة' }]} />
+              options={[{ value: 'none', label: '— لا عرض —' }, { value: 'limited_time', label: '⏰ لمدة محدودة' }, { value: 'featured', label: '⭐ دورة مميزة' }]} accent="amber" />
             {form.offer_type && form.offer_type !== 'none' && (
               <>
                 <div>
@@ -576,7 +637,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
               </div>
             </div>
             <CustomDropdown label="الحالة" value={form.status || 'منشورة'} onChange={(v: string) => setForm({ ...form, status: v })}
-              options={[{ value: 'منشورة', label: 'منشورة' }, { value: 'مسودة', label: 'مسودة' }]} />
+              options={[{ value: 'منشورة', label: 'منشورة' }, { value: 'مسودة', label: 'مسودة' }]} accent="navy" />
           </div>
 
           {/* === Section 6: Cover Image — blue gradient card === */}
@@ -622,6 +683,9 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             {saving ? 'جاري الحفظ...' : course ? 'تحديث الدورة' : 'إنشاء الدورة'}
           </Button>
         </div>
+
+        {/* ⚡ Dropdown Card Modal — renders the beautiful picker overlay */}
+        <DropdownCardModal />
       </DialogContent>
     </Dialog>
   )
