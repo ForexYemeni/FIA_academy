@@ -126,6 +126,18 @@ export function StudentDashboard() {
     fetch(`/api/enrollments?user_id=${user.id}`).then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : [])).catch(() => {})
   }
 
+  // ⚡ Helper: refresh all payments for the student. We use this both
+  // from the Realtime subscription handler AND the native APK bridge.
+  // Filtering by user_id server-side is more efficient than fetching all
+  // and filtering client-side, but the API supports both modes.
+  const loadPayments = () => {
+    if (!user?.id) return
+    fetch(`/api/payments?user_id=${user.id}`)
+      .then((r) => r.json())
+      .then((d) => setPayments(Array.isArray(d) ? d : []))
+      .catch(() => {})
+  }
+
   // ⚡ Helper functions exposed globally so the APK's native notification
   // bridge can call them via evaluateJavascript. This makes the WebView
   // update INSTANTLY when a notification arrives (instead of requiring a
@@ -136,7 +148,7 @@ export function StudentDashboard() {
     // Expose global helpers for the APK bridge
     ;(window as any).__FIA_refreshActiveView = () => {
       loadEnrollments()
-      fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+      loadPayments()
       fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     }
@@ -144,12 +156,15 @@ export function StudentDashboard() {
       try { toast.success(msg) } catch {}
     }
 
-    // ⚡ Listen for native notifications from the APK bridge
+    // ⚡ Listen for native notifications from the APK bridge.
+    // When the APK receives a push notification (e.g. new payment, payment
+    // approved), it dispatches a 'fia-native-notification' event. We listen
+    // for it here and refresh ALL relevant data INSTANTLY.
     const handleNativeNotif = (event: any) => {
       const data = event.detail || {}
       // Refresh all relevant data INSTANTLY when a native notification arrives
       loadEnrollments()
-      fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+      loadPayments()
       fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
 
@@ -172,7 +187,7 @@ export function StudentDashboard() {
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/payments').then((r) => r.json()).then((d) => setPayments(Array.isArray(d) ? d : [])).catch(() => {})
+    loadPayments()
     loadEnrollments()
   }, [user?.id])
 
@@ -209,6 +224,12 @@ export function StudentDashboard() {
           (payload: any) => {
             // Patch the payment in-place for instant UI update
             setPayments((prev) => prev.map((p) => p.id === payload.new.id ? { ...p, ...payload.new } : p))
+            // ⚡ Also refresh enrollments! The enrollment's payment_status is
+            // computed from the payment status (e.g., 'مكتمل' → 'confirmed'),
+            // so we need to refetch enrollments to update the UI properly.
+            // Without this, the course card would stay "قيد انتظار الدفع"
+            // even though the payment was approved.
+            loadEnrollments()
             // Toast on status change to approved/rejected
             if (payload.new.status === 'مكتمل' && payload.old?.status !== 'مكتمل') {
               toast.success('✅ تم تأكيد دفعتك! الدورة مفعّلة الآن')
@@ -222,6 +243,8 @@ export function StudentDashboard() {
           (payload: any) => {
             // New payment record created
             setPayments((prev) => [payload.new, ...prev])
+            // Also refresh enrollments so the new course appears in "دوراتي"
+            loadEnrollments()
           }
         )
         .subscribe()
