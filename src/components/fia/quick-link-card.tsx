@@ -5,8 +5,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Shield, Award, Users, FileText, RefreshCw, LifeBuoy, Eye, Target, Heart, Mail,
   BookOpen, GraduationCap, UserCog, Crown, ChevronLeft, X, Star, Briefcase, Phone, Linkedin,
-  Building2, ExternalLink, CheckCircle2, Loader2, Send,
+  Building2, ExternalLink, CheckCircle2, Loader2, Send, Sparkles, Clock, Tag,
 } from 'lucide-react'
+
+// ⚡ Professional card metadata: gradient + accent for each card type.
+// These are used in the dialog header to give each card a distinctive
+// look. The gradients are pure CSS (no images) so they render instantly.
+const CARD_STYLES: Record<string, { gradient: string; bg: string; accent: string }> = {
+  courses:  { gradient: 'from-blue-600 to-indigo-700',    bg: 'from-blue-50 to-indigo-50',    accent: 'text-blue-600' },
+  trainers: { gradient: 'from-emerald-600 to-teal-700',   bg: 'from-emerald-50 to-teal-50',  accent: 'text-emerald-600' },
+  team:     { gradient: 'from-amber-600 to-orange-700',    bg: 'from-amber-50 to-orange-50',  accent: 'text-amber-600' },
+  about:    { gradient: 'from-purple-600 to-fuchsia-700', bg: 'from-purple-50 to-fuchsia-50', accent: 'text-purple-600' },
+  privacy:  { gradient: 'from-slate-600 to-gray-700',     bg: 'from-slate-50 to-gray-50',   accent: 'text-slate-600' },
+  terms:    { gradient: 'from-sky-600 to-blue-700',       bg: 'from-sky-50 to-blue-50',     accent: 'text-sky-600' },
+  refund:   { gradient: 'from-rose-600 to-pink-700',      bg: 'from-rose-50 to-pink-50',    accent: 'text-rose-600' },
+  support:  { gradient: 'from-cyan-600 to-blue-700',      bg: 'from-cyan-50 to-blue-50',    accent: 'text-cyan-600' },
+  social:   { gradient: 'from-violet-600 to-purple-700',  bg: 'from-violet-50 to-purple-50', accent: 'text-violet-600' },
+  partners: { gradient: 'from-teal-600 to-emerald-700',   bg: 'from-teal-50 to-emerald-50', accent: 'text-teal-600' },
+  licenses: { gradient: 'from-indigo-600 to-blue-700',    bg: 'from-indigo-50 to-blue-50',   accent: 'text-indigo-600' },
+}
 
 export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | null; onClose: () => void; settings: any }) {
   const [courses, setCourses] = useState<any[]>([])
@@ -15,7 +32,7 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
   const [partners, setPartners] = useState<any[]>([])
   const [licenses, setLicenses] = useState<any[]>([])
   const [selectedMember, setSelectedMember] = useState<any | null>(null)
-  const [selectedTrainer, setSelectedTrainer] = useState<any | null>(null)
+  const [selectedTrainer, setSelectedTrainer] = useState<any>(null)
 
   useEffect(() => {
     if (cardId === 'courses') fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
@@ -62,22 +79,32 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
     if (cardId === 'courses') {
       if (courses.length === 0) return <p className="text-sm text-gray-500 text-center py-8">لا توجد دورات متاحة حالياً</p>
       return (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {courses.map((c) => (
-            <div key={c.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-[#0A1F44] flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-5 h-5 text-[#C9A961]" />
+            <div key={c.id} className="group flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-200/60 hover:border-[#C9A961]/40 hover:shadow-md transition-all">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                <BookOpen className="w-5 h-5 text-white" strokeWidth={2.2} />
               </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-[#0A1F44] text-sm">{c.title}</h4>
-                {c.short_description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{c.short_description}</p>}
-                <div className="flex items-center gap-2 mt-1">
-                  {c.duration_hours && <span className="text-[10px] text-gray-400">{c.duration_hours} ساعة</span>}
-                  {c.level && <span className="text-[10px] text-gray-400">{c.level}</span>}
-                  {c.price_type === 'free' || c.price === 0 ? (
-                    <span className="text-[10px] text-green-600 font-semibold">مجانية</span>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-[#0A1F44] text-sm leading-tight">{c.title}</h4>
+                {c.short_description && <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{c.short_description}</p>}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {c.duration_hours > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      <Clock className="w-2.5 h-2.5" /> {c.duration_hours} ساعة
+                    </span>
+                  )}
+                  {c.level && (
+                    <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{c.level}</span>
+                  )}
+                  {c.price_type === 'مجانية' || c.price === 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-green-700 bg-green-50 border border-green-200/60 px-2 py-0.5 rounded-full font-semibold">
+                      <Tag className="w-2.5 h-2.5" /> مجانية
+                    </span>
                   ) : (
-                    <span className="text-[10px] text-[#C9A961] font-semibold">{c.price?.toLocaleString()} {c.currency || 'ر.ي'}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-[#C9A961] bg-[#C9A961]/10 border border-[#C9A961]/20 px-2 py-0.5 rounded-full font-semibold">
+                      <Tag className="w-2.5 h-2.5" /> {c.price?.toLocaleString()} {c.currency || 'ر.ي'}
+                    </span>
                   )}
                 </div>
               </div>
@@ -550,26 +577,52 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
     )
   }
 
+  // Get the professional style for this card
+  const style = CARD_STYLES[cardId] || CARD_STYLES.about
+
   return (
     <Dialog open={!!cardId} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[#0A1F44] flex items-center justify-center">
-              <Icon className="w-5 h-5 text-[#C9A961]" />
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto p-0 gap-0">
+        {/* ⚡ Professional gradient header — gives each card a distinctive
+            look. The gradient is pure CSS (no images) so it renders
+            instantly without affecting Realtime performance. */}
+        <div className={`relative bg-gradient-to-br ${style.gradient} p-5 pb-4 rounded-t-xl overflow-hidden`}>
+          {/* Decorative pattern overlay (subtle, doesn't affect performance) */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
+            backgroundSize: '30px 30px',
+          }} />
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors z-10"
+            aria-label="إغلاق"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          {/* Icon + Title */}
+          <div className="relative flex items-center gap-3 mt-2">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm border border-white/20">
+              <Icon className="w-6 h-6 text-white" strokeWidth={2.2} />
             </div>
-            <DialogTitle className="text-lg font-bold text-[#0A1F44]">{m.title}</DialogTitle>
+            <div>
+              <DialogTitle className="text-lg font-bold text-white tracking-tight">{m.title}</DialogTitle>
+              <p className="text-white/70 text-xs mt-0.5">أكاديمية المستقبل الدولية</p>
+            </div>
           </div>
-        </DialogHeader>
-        {getContent()}
-        {['privacy', 'terms', 'refund'].includes(cardId) && settings.email && (
-          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-500 mb-2">لأي استفسار بخصوص {m.title}</p>
-            <a href={`mailto:${settings.email}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0A1F44]/5 border border-[#C9A961]/20 text-sm font-medium text-[#0A1F44] hover:bg-[#0A1F44]/10 transition-colors">
-              <Mail className="w-4 h-4 text-[#C9A961]" /> راسلنا
-            </a>
-          </div>
-        )}
+        </div>
+        {/* Content body with subtle gradient background */}
+        <div className={`bg-gradient-to-b ${style.bg} p-5`}>
+          {getContent()}
+          {['privacy', 'terms', 'refund'].includes(cardId) && settings.email && (
+            <div className="mt-4 pt-4 border-t border-gray-200/60 text-center">
+              <p className="text-xs text-gray-500 mb-2">لأي استفسار بخصوص {m.title}</p>
+              <a href={`mailto:${settings.email}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#C9A961]/30 text-sm font-medium text-[#0A1F44] hover:bg-[#C9A961]/5 hover:border-[#C9A961]/50 transition-all shadow-sm">
+                <Mail className="w-4 h-4 text-[#C9A961]" /> راسلنا
+              </a>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )
