@@ -280,23 +280,31 @@ export function StatCard({
   trend?: string
   color?: 'navy' | 'gold' | 'green' | 'red' | 'blue'
 }) {
-  const colorMap: Record<string, { bg: string; gradient: string }> = {
-    navy:  { bg: 'bg-navy text-gold',           gradient: 'from-[#0A1F44] to-[#102a63]' },
-    gold:  { bg: 'bg-gold text-navy',           gradient: 'from-amber-500 to-yellow-600' },
-    green: { bg: 'bg-green-500 text-white',     gradient: 'from-green-500 to-emerald-600' },
-    red:   { bg: 'bg-red-500 text-white',       gradient: 'from-red-500 to-rose-600' },
-    blue:  { bg: 'bg-blue-500 text-white',      gradient: 'from-blue-500 to-indigo-600' },
+  const colorMap: Record<string, { bg: string; gradient: string; ring: string; shadow: string }> = {
+    navy:  { bg: 'bg-navy text-gold',           gradient: 'from-[#0A1F44] to-[#102a63]', ring: 'ring-gold/30',     shadow: 'shadow-navy/20'   },
+    gold:  { bg: 'bg-gold text-navy',           gradient: 'from-amber-500 to-yellow-600', ring: 'ring-amber-400/40', shadow: 'shadow-amber-500/20' },
+    green: { bg: 'bg-green-500 text-white',     gradient: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-400/40', shadow: 'shadow-emerald-500/20' },
+    red:   { bg: 'bg-red-500 text-white',       gradient: 'from-red-500 to-rose-600',     ring: 'ring-red-400/40',  shadow: 'shadow-red-500/20'   },
+    blue:  { bg: 'bg-blue-500 text-white',      gradient: 'from-blue-500 to-indigo-600', ring: 'ring-blue-400/40',  shadow: 'shadow-blue-500/20'  },
   }
   return (
-    <div className="stat-card p-5 group hover:shadow-lg transition-shadow">
-      <div className="flex items-center justify-between mb-3">
+    <div className={`fia-course-card stat-card p-5 group relative overflow-hidden ring-1 ${colorMap[color].ring} ${colorMap[color].shadow}`}>
+      {/* ⚡ Subtle pattern overlay — magical dots */}
+      <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(212, 175, 55, 0.4) 1px, transparent 1px)',
+        backgroundSize: '14px 14px'
+      }} />
+      {/* Top-right glow */}
+      <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/10 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+
+      <div className="relative flex items-center justify-between mb-3">
         <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${colorMap[color].gradient} flex items-center justify-center shadow-md group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
           <Icon className="w-6 h-6 text-white" strokeWidth={2.2} />
         </div>
         {trend && <Badge variant="outline" className="text-xs">{trend}</Badge>}
       </div>
-      <div className="text-2xl font-extrabold text-navy">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
+      <div className="relative text-2xl font-extrabold text-navy">{value}</div>
+      <div className="relative text-xs text-muted-foreground mt-1">{label}</div>
     </div>
   )
 }

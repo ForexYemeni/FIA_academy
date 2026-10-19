@@ -5,6 +5,7 @@ import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
+  GraduationCap, Crown,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -300,12 +301,30 @@ function TrainerOverview({ user, courses, students }: any) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
-        <h2 className="text-2xl font-bold mb-1">مرحباً، {user?.name} 👋</h2>
-        <p className="text-white/80">نظرة عامة على نشاطك التدريبي</p>
+      {/* ⚡ Magical hero header */}
+      <div className="relative overflow-hidden rounded-2xl p-6 lg:p-7 bg-gradient-to-l from-navy via-navy-light to-navy text-white shadow-xl ring-1 ring-gold/30">
+        <div className="absolute inset-0 opacity-25" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px'
+        }} />
+        <div className="absolute -top-12 -right-12 w-40 h-40 bg-gold/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30">
+            <GraduationCap className="w-7 h-7 text-navy" strokeWidth={2.2} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">مرحباً، {user?.name}</h2>
+            <p className="text-gold/80 text-sm flex items-center gap-1.5">
+              <span className="w-1 h-1 bg-gold rounded-full animate-pulse" />
+              نظرة عامة على نشاطك التدريبي — محدّثة لحظياً
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ⚡ Magical StatCards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
         <StatCard icon={BookOpen} label="الدورات التدريبية" value={courses.length} color="navy" />
         <StatCard icon={Users} label="إجمالي المتدربين" value={String(students.length)} color="gold" />
         <StatCard icon={Star} label="متوسط التقييم" value={avgRating} color="green" />
@@ -317,20 +336,50 @@ function TrainerOverview({ user, courses, students }: any) {
         />
       </div>
 
+      {/* ⚡ Magical section — أحدث الدورات */}
       <SectionCard title="أحدث الدورات" description="الدورات التي تدرّسها">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.slice(0, 3).map((c: any) => (
-            <Card key={c.id} className="overflow-hidden card-hover">
-              <div className="h-32 bg-navy">
-                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
+        {courses.length === 0 ? (
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <BookOpen className="w-10 h-10 text-gold" />
               </div>
-              <div className="p-4">
-                <h3 className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</h3>
-                <div className="text-xs text-muted-foreground">{c.enrolled || 0} متدرب • {c.rating || 0} ⭐</div>
-              </div>
-            </Card>
-          ))}
-        </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">لا توجد دورات بعد</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">انتقل إلى تبويب "دوراتي التدريبية" لإضافة أول دورة ✨</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
+            {courses.slice(0, 3).map((c: any) => (
+              <Card key={c.id} className="fia-course-card overflow-hidden cursor-default border border-gold/20">
+                <div className="relative h-32 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                  {c.cover && (
+                    <img src={c.cover} alt={c.title} loading="lazy" className="fia-cover-img absolute inset-0 w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                  <div className="fia-shine" />
+                  {c.level && (
+                    <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+                  )}
+                </div>
+                <div className="relative p-3">
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+                  <h3 className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</h3>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-2.5 h-2.5" /> {c.enrolled || 0} متدرب
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Star className="w-2.5 h-2.5 text-gold fill-current" /> {c.rating || 0}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </SectionCard>
     </div>
   )
@@ -371,41 +420,74 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
       title="دوراتي التدريبية"
       description="إدارة الدورات التي تدرّسها"
       action={
-        <Button onClick={onAdd} className="bg-navy hover:bg-navy-light">
+        <Button onClick={onAdd} className="bg-navy hover:bg-navy-light rounded-xl">
           <Plus className="w-4 h-4 ml-1" /> دورة جديدة
         </Button>
       }
     >
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {courses.map((c: any) => (
-          <Card key={c.id} className="overflow-hidden card-hover">
-            <div className="h-32 bg-navy relative">
-              {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-              <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30">{c.level}</Badge>
+      {courses.length === 0 ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <BookOpen className="w-10 h-10 text-gold" />
             </div>
-            <div className="p-4">
-              <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
-              <div className="flex justify-between text-xs text-muted-foreground mb-3">
-                <span>{c.enrolled || 0} متدرب</span>
-                <span>{c.price_type === 'مجانية' ? 'مجانية' : `${c.price.toLocaleString()} ${c.currency || 'ر.ي'}`}</span>
-              </div>
-              <div className="space-y-2">
-                <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onManageContent(c.id)}>
-                  <FileText className="w-3.5 h-3.5 ml-1" /> إدارة المحتوى
-                </Button>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(c)}>
-                    <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(c)} disabled={deleting === c.id}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد دورات بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">اضغط على زر "دورة جديدة" لإضافة أول دورة ✨</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
+          {courses.map((c: any) => {
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            return (
+              <Card key={c.id} className="fia-course-card overflow-hidden cursor-default border border-gold/20">
+                <div className="relative h-32 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                  {c.cover && (
+                    <img src={c.cover} alt={c.title} loading="lazy" className="fia-cover-img absolute inset-0 w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                  <div className="fia-shine" />
+                  {c.level && (
+                    <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+                  )}
+                  {isFree ? (
+                    <Badge className="absolute top-2 left-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-300/40 backdrop-blur-sm">مجانية</Badge>
+                  ) : (
+                    <Badge className="absolute top-2 left-2 bg-gradient-to-r from-gold to-amber-500 text-navy border border-gold/40 backdrop-blur-sm">{c.price?.toLocaleString()} {c.currency || 'ر.ي'}</Badge>
+                  )}
                 </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+                <div className="relative p-3">
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+                  <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
+                  <div className="flex justify-between text-[10px] text-muted-foreground mb-3">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-2.5 h-2.5" /> {c.enrolled || 0} متدرب
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Star className="w-2.5 h-2.5 text-gold fill-current" /> {c.rating || 0}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <Button size="sm" className="w-full bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-lg shadow-md active:scale-[0.97] transition-all" onClick={() => onManageContent(c.id)}>
+                      <FileText className="w-3.5 h-3.5 ml-1" /> إدارة المحتوى
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1 rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => onEdit(c)}>
+                        <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-lg" onClick={() => setDeleteTarget(c)} disabled={deleting === c.id}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       {/* Professional delete-confirmation card */}
       <Dialog

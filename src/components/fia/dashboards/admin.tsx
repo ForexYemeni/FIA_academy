@@ -9,7 +9,8 @@ import {
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
-  Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase,
+  Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
+  Search, Calendar,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -417,29 +418,58 @@ function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
-        <h2 className="text-2xl font-bold mb-1">لوحة تحكم الإدارة 👑</h2>
-        <p className="text-white/80">نظرة شاملة على المنصة</p>
+      {/* ⚡ Magical hero header — navy gradient with gold dots + Sparkles */}
+      <div className="relative overflow-hidden rounded-2xl p-6 lg:p-7 bg-gradient-to-l from-navy via-navy-light to-navy text-white shadow-xl ring-1 ring-gold/30">
+        <div className="absolute inset-0 opacity-25" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px'
+        }} />
+        <div className="absolute -top-12 -right-12 w-40 h-40 bg-gold/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30">
+            <Sparkles className="w-7 h-7 text-navy" strokeWidth={2.2} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">لوحة تحكم الإدارة</h2>
+            <p className="text-gold/80 text-sm flex items-center gap-1.5">
+              <span className="w-1 h-1 bg-gold rounded-full animate-pulse" />
+              نظرة شاملة على المنصة — محدّثة لحظياً
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 bg-gold/15 text-gold border border-gold/40 rounded-full px-3 py-1.5 backdrop-blur-sm">
+            <Crown className="w-4 h-4" />
+            <span className="text-xs font-bold">الأدمن</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={BookOpen} label="إجمالي الدورات" value={stats.courses} color="navy" />
-        <StatCard icon={GraduationCap} label="المدربون" value={stats.trainers} color="gold" />
-        <StatCard icon={Users} label="المتدربون" value={stats.students} color="blue" />
-        <StatCard icon={CreditCard} label="المعاملات" value={stats.payments} color="green" />
+      {/* ⚡ Magical StatCards — 4 cards with gradient + glow + scale on hover */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
+        <StatCard icon={BookOpen}       label="إجمالي الدورات" value={stats.courses}  color="navy"  />
+        <StatCard icon={GraduationCap}  label="المدربون"      value={stats.trainers} color="gold"  />
+        <StatCard icon={Users}          label="المتدربون"     value={stats.students} color="blue"  />
+        <StatCard icon={CreditCard}     label="المعاملات"     value={stats.payments} color="green" />
       </div>
 
       {/* ========= PROFESSIONAL FINANCIAL OVERVIEW ========= */}
       <SectionCard title="نظرة عامة مالية" description="الإيرادات الفعلية مجمّعة حسب العملة">
         {stats.revenueByCurrency.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>لا توجد معاملات بعد</p>
+          /* ⚡ Magical empty state for revenue */
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <DollarSign className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">لا توجد معاملات بعد</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">عند تأكيد أول دفعة، ستظهر الإيرادات المجمّعة حسب العملة هنا ✨</p>
           </div>
         ) : (
           <div className="space-y-6">
             {/* Currency cards — one per currency, professional layout */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
               {stats.revenueByCurrency.map((rev) => {
                 const isUSD = rev.currency === '$' || rev.currency === 'USD'
                 const isSAR = rev.currency === 'ر.س'
@@ -452,19 +482,27 @@ function AdminOverview() {
                 return (
                   <div
                     key={rev.currency}
-                    className={`relative bg-gradient-to-br ${gradient} text-white p-5 rounded-2xl shadow-lg overflow-hidden`}
+                    className={`fia-course-card relative bg-gradient-to-br ${gradient} text-white p-5 rounded-2xl shadow-lg overflow-hidden`}
                   >
                     {/* Decorative currency icon in background */}
                     <div className="absolute -left-4 -bottom-4 text-white/10 text-7xl font-bold select-none">
                       {rev.currency}
                     </div>
+                    {/* Subtle pattern overlay */}
+                    <div className="absolute inset-0 opacity-15" style={{
+                      backgroundImage: 'radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
+                      backgroundSize: '14px 14px'
+                    }} />
+                    {/* Top-right glow */}
+                    <div className="absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-xl" />
+
                     <div className="relative">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <DollarSign className={`w-5 h-5 ${accent}`} />
                           <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">العملة</span>
                         </div>
-                        <span className="text-base font-extrabold bg-white/15 px-2 py-0.5 rounded-md" dir="ltr">
+                        <span className="text-base font-extrabold bg-white/15 px-2.5 py-0.5 rounded-md backdrop-blur-sm" dir="ltr">
                           {rev.currency}
                         </span>
                       </div>
@@ -476,14 +514,18 @@ function AdminOverview() {
                         </div>
                       </div>
                       {/* Pending row */}
-                      <div className="border-t border-white/15 pt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div className="border-t border-white/15 pt-2.5 grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <div className="text-white/70">قيد الانتظار</div>
+                          <div className="flex items-center gap-1 text-white/70 mb-0.5">
+                            <Clock className="w-2.5 h-2.5" /> قيد الانتظار
+                          </div>
                           <div className="font-bold" dir="ltr">{fmt(rev.pending_total, rev.currency)}</div>
                           <div className="text-[10px] text-white/60">{rev.pending_count} معاملة</div>
                         </div>
                         <div>
-                          <div className="text-white/70">مكتملة</div>
+                          <div className="flex items-center gap-1 text-white/70 mb-0.5">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> مكتملة
+                          </div>
                           <div className="font-bold" dir="ltr">{fmt(rev.total, rev.currency)}</div>
                           <div className="text-[10px] text-white/60">{rev.paid_count} معاملة</div>
                         </div>
@@ -494,22 +536,43 @@ function AdminOverview() {
               })}
             </div>
 
-            {/* Summary cards — count-based metrics (currency-agnostic) */}
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-5 rounded-xl">
-                <Clock className="w-6 h-6 mb-2" />
-                <div className="text-2xl font-bold">{stats.pendingPayments}</div>
-                <div className="text-white/80 text-sm">مدفوعات قيد الانتظار</div>
+            {/* ⚡ Magical summary cards — gradient + icons + glow */}
+            <div className="grid sm:grid-cols-3 gap-4 fia-stagger">
+              <div className="fia-course-card relative bg-gradient-to-br from-amber-500 to-yellow-600 text-white p-5 rounded-xl shadow-md overflow-hidden">
+                <div className="absolute inset-0 opacity-20" style={{
+                  backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                  backgroundSize: '12px 12px'
+                }} />
+                <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/15 rounded-full blur-xl" />
+                <div className="relative">
+                  <Clock className="w-6 h-6 mb-2" />
+                  <div className="text-2xl font-extrabold">{stats.pendingPayments}</div>
+                  <div className="text-white/85 text-sm font-medium">مدفوعات قيد الانتظار</div>
+                </div>
               </div>
-              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
-                <CheckCircle2 className="w-6 h-6 mb-2" />
-                <div className="text-2xl font-bold">{stats.completedEnrollments}</div>
-                <div className="text-white/80 text-sm">دورات مكتملة</div>
+              <div className="fia-course-card relative bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-5 rounded-xl shadow-md overflow-hidden">
+                <div className="absolute inset-0 opacity-20" style={{
+                  backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                  backgroundSize: '12px 12px'
+                }} />
+                <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/15 rounded-full blur-xl" />
+                <div className="relative">
+                  <CheckCircle2 className="w-6 h-6 mb-2" />
+                  <div className="text-2xl font-extrabold">{stats.completedEnrollments}</div>
+                  <div className="text-white/85 text-sm font-medium">دورات مكتملة</div>
+                </div>
               </div>
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
-                <Activity className="w-6 h-6 mb-2" />
-                <div className="text-2xl font-bold">{stats.activeEnrollments}</div>
-                <div className="text-white/80 text-sm">تسجيلات نشطة</div>
+              <div className="fia-course-card relative bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-5 rounded-xl shadow-md overflow-hidden">
+                <div className="absolute inset-0 opacity-20" style={{
+                  backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                  backgroundSize: '12px 12px'
+                }} />
+                <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/15 rounded-full blur-xl" />
+                <div className="relative">
+                  <Activity className="w-6 h-6 mb-2" />
+                  <div className="text-2xl font-extrabold">{stats.activeEnrollments}</div>
+                  <div className="text-white/85 text-sm font-medium">تسجيلات نشطة</div>
+                </div>
               </div>
             </div>
           </div>
@@ -786,92 +849,202 @@ function AdminStudents() {
 
   return (
     <SectionCard title="المتدربون" description={`${filtered.length} متدرب`}>
-      <div className="flex gap-2 mb-4">
-        <Input placeholder="بحث بالاسم أو البريد أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
+      {/* ⚡ Magical search bar with gold accent */}
+      <div className="relative mb-4">
+        <Input placeholder="بحث بالاسم أو البريد أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 pl-10 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl bg-white/80" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold/60" />
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((s) => {
-          const sEnrs = getStudentEnrollments(s.id)
-          return (
-            <Card key={s.id} className="overflow-hidden card-hover">
-              <div className="p-4 bg-fia-gradient text-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold/30 flex-shrink-0 bg-navy-light">
-                    {s.avatar ? (
-                      <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl">{s.name?.charAt(0)}</div>
+      {filtered.length === 0 ? (
+        /* ⚡ Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Users className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون بعد'}</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">{search ? 'جرّب كلمات بحث مختلفة' : 'سيتم تسجيل المتدربون تلقائياً عند إنشاء حساباتهم ✨'}</p>
+        </div>
+      ) : (
+        /* ⚡ Magical compact student cards — 2/3/4 grid */
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+          {filtered.map((s) => {
+            const sEnrs = getStudentEnrollments(s.id)
+            const completedCount = sEnrs.filter((e) => e.status === 'completed' || e.status === 'مكتمل').length
+            const pendingCount = sEnrs.filter((e) => e.payment_status === 'pending').length
+            return (
+              <Card key={s.id} className="fia-course-card overflow-hidden cursor-default border border-gold/20">
+                {/* ⚡ Magical header — navy gradient + gold dots */}
+                <div className="relative p-3 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+                  <div className="relative flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-gold/40 flex-shrink-0 bg-navy-light shadow-md">
+                      {s.avatar ? (
+                        <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl bg-gradient-to-br from-gold/20 to-amber-500/20">
+                          {s.name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs truncate text-white">{s.name}</div>
+                      <div className="text-[10px] text-white/70 truncate" dir="ltr">{s.email}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ⚡ Magical body — compact info */}
+                <div className="p-3 space-y-2.5">
+                  {/* Stats row — mini badges */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center gap-1 bg-blue-50 text-blue-700 rounded-lg px-2 py-1.5 border border-blue-200/40">
+                      <BookOpen className="w-3 h-3 flex-shrink-0" />
+                      <span className="text-[10px] font-bold">{sEnrs.length} دورة</span>
+                    </div>
+                    {completedCount > 0 && (
+                      <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-lg px-2 py-1.5 border border-emerald-200/40">
+                        <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                        <span className="text-[10px] font-bold">{completedCount}</span>
+                      </div>
+                    )}
+                    {pendingCount > 0 && (
+                      <div className="flex items-center gap-1 bg-amber-50 text-amber-700 rounded-lg px-2 py-1.5 border border-amber-200/40">
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        <span className="text-[10px] font-bold">{pendingCount}</span>
+                      </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{s.name}</div>
-                    <div className="text-xs text-white/70 truncate" dir="ltr">{s.email}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 space-y-2">
-                {s.phone && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>📞</span><span dir="ltr">{s.phone}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>📅</span><span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span>📚</span>
-                  <span className="font-semibold text-navy">{sEnrs.length} دورة مسجّلة</span>
-                </div>
-                {sEnrs.slice(0, 2).map((e) => {
-                  const c = courses.find(co => co.id === e.course_id)
-                  return c ? (
-                    <div key={e.id} className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 flex items-center justify-between">
-                      <span className="truncate">{c.title}</span>
-                      <Badge className={
-                        e.status === 'completed' || e.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30 text-[10px]'
-                        : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-[10px]'
-                        : 'bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px]'
-                      }>
-                        {e.status === 'completed' || e.status === 'مكتمل' ? 'مكتمل'  : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
-                      </Badge>
+
+                  {/* Phone + date row */}
+                  <div className="grid grid-cols-1 gap-1.5 text-[10px]">
+                    {s.phone && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Mail className="w-2.5 h-2.5" />
+                        <span dir="ltr" className="font-medium text-navy">{s.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="w-2.5 h-2.5" />
+                      <span className="font-medium text-navy">{s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
                     </div>
-                  ) : null
-                })}
-                {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground">+{sEnrs.length - 2} دورة أخرى</div>}
-              </div>
-              <div className="flex gap-1 p-3 pt-0">
-                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setSelectedStudent(s)}>عرض التفاصيل</Button>
-                <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(s)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+                  </div>
 
-      {filtered.length === 0 && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا يوجد متدربون'}</div>}
+                  {/* Course preview — first 2 courses */}
+                  {sEnrs.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-border/40">
+                      {sEnrs.slice(0, 2).map((e) => {
+                        const c = courses.find(co => co.id === e.course_id)
+                        if (!c) return null
+                        const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+                        return (
+                          <div key={e.id} className="text-[10px] flex items-center justify-between gap-1 bg-muted/20 rounded px-1.5 py-1">
+                            <span className="truncate text-navy font-medium">{c.title}</span>
+                            <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              isCompleted ? 'bg-emerald-500/15 text-emerald-700 border border-emerald-500/30'
+                              : e.payment_status === 'pending' ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30'
+                              : 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
+                            }`}>
+                              {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار' : 'قيد التعلّم'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground text-center">+{sEnrs.length - 2} دورة أخرى</div>}
+                    </div>
+                  )}
 
-      {/* Student detail modal */}
+                  {/* Actions row */}
+                  <div className="flex gap-1 pt-1 border-t border-border/40">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => setSelectedStudent(s)}>
+                      <Eye className="w-3 h-3 ml-1" /> عرض
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-500/10" onClick={() => setDeleteTarget(s)}>
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Student detail modal — magical themed */}
       {selectedStudent && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedStudent(null) }}>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>تفاصيل المتدرب</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="flex items-center gap-4 p-4 bg-fia-gradient rounded-lg text-white">
-                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/30 bg-navy-light">
-                  {selectedStudent.avatar ? <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gold font-bold text-2xl">{selectedStudent.name?.charAt(0)}</div>}
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-0 border-0">
+            {/* Magical header */}
+            <div className="relative p-5 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-12 -left-12 w-32 h-32 bg-gold/20 rounded-full blur-2xl" />
+              <button onClick={() => setSelectedStudent(null)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center z-10">
+                <X className="w-4 h-4 text-white/80" />
+              </button>
+              <div className="relative flex items-center gap-3">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-gold/40 bg-navy-light shadow-md">
+                  {selectedStudent.avatar ? (
+                    <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gold font-bold text-2xl bg-gradient-to-br from-gold/20 to-amber-500/20">
+                      {selectedStudent.name?.charAt(0)}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <div className="font-bold text-lg">{selectedStudent.name}</div>
-                  <div className="text-xs text-white/70" dir="ltr">{selectedStudent.email}</div>
+                  <DialogTitle className="text-lg font-bold text-white">{selectedStudent.name}</DialogTitle>
+                  <div className="text-xs text-white/70 mt-0.5" dir="ltr">{selectedStudent.email}</div>
                 </div>
               </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Quick stats — 2 magical cards */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الهاتف</div><div className="text-sm font-medium" dir="ltr">{selectedStudent.phone || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">تاريخ التسجيل</div><div className="text-sm font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div></div>
+                <div className="fia-card-hover p-3 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/40 rounded-xl">
+                  <div className="flex items-center gap-2 text-blue-700">
+                    <BookOpen className="w-4 h-4" />
+                    <span className="text-[10px] font-bold">إجمالي الدورات</span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-navy mt-1">{getStudentEnrollments(selectedStudent.id).length}</div>
+                </div>
+                <div className="fia-card-hover p-3 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/40 rounded-xl">
+                  <div className="flex items-center gap-2 text-emerald-700">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="text-[10px] font-bold">دورات مكتملة</span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-navy mt-1">
+                    {getStudentEnrollments(selectedStudent.id).filter((e) => e.status === 'completed' || e.status === 'مكتمل').length}
+                  </div>
+                </div>
               </div>
+
+              {/* Contact info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-muted/30 rounded-xl border border-border">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Mail className="w-3 h-3" /> الهاتف</div>
+                  <div className="text-sm font-bold text-navy" dir="ltr">{selectedStudent.phone || '-'}</div>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-xl border border-border">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> تاريخ التسجيل</div>
+                  <div className="text-sm font-bold text-navy">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div>
+                </div>
+              </div>
+
+              {/* Enrollments list */}
               <div>
-                <h4 className="font-bold text-navy text-sm mb-2">الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})</h4>
+                <h4 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-gold" /> الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})
+                </h4>
                 <div className="space-y-2">
                   {getStudentEnrollments(selectedStudent.id).map((e) => {
                     const c = courses.find(co => co.id === e.course_id)
@@ -879,40 +1052,18 @@ function AdminStudents() {
                     const isFree = c.price_type === 'مجانية' || c.price === 0
                     const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
                     return (
-                      <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
+                      <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-xl hover:border-gold/30 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-navy text-sm truncate">{c.title}</div>
-                          <div className="text-xs text-muted-foreground">{isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* DISABLED: certificate issuance button removed — will be re-enabled when design+prompt provided */}
-                          {/* {isCompleted && (
-                            <Button
-                              size="sm"
-                              className="bg-gold hover:bg-gold-light text-navy text-xs"
-                              onClick={async () => {
-                                // Auto-issue certificate directly
-                                const certNum = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
-                                await fetch('/api/certificates', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    student_name: selectedStudent.name,
-                                    course_title: c.title,
-                                    status: 'صالحة',
-                                    issued_by: 'أكاديمية المستقبل الدولية',
-                                  }),
-                                })
-                                toast.success(`تم إصدار الشهادة: ${certNum}`)
-                              }}
-                            >
-                              <Award className="w-3.5 h-3.5 ml-1" /> إصدار شهادة
-                            </Button>
-                          )} */}
                           <Badge className={
-                            isCompleted ? 'bg-green-500/15 text-green-600 border-green-500/30'
-                            : e.payment_status === 'pending' ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                            : 'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                            isCompleted ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+                            : e.payment_status === 'pending' ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
+                            : 'bg-blue-500/15 text-blue-700 border-blue-500/30'
                           }>
                             {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
                           </Badge>
@@ -920,13 +1071,16 @@ function AdminStudents() {
                       </div>
                     )
                   })}
-                  {getStudentEnrollments(selectedStudent.id).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة</p>}
+                  {getStudentEnrollments(selectedStudent.id).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة بعد</p>
+                  )}
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedStudent(null)}>إغلاق</Button>
-            </DialogFooter>
+
+            <div className="flex justify-end p-4 bg-muted/20 border-t border-border">
+              <Button variant="outline" onClick={() => setSelectedStudent(null)} className="rounded-xl">إغلاق</Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -2275,38 +2429,90 @@ function AdminTrainers() {
     <SectionCard
       title="المدربون"
       description={`${items.length} مدرب`}
-      action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
+      action={<Button className="bg-navy hover:bg-navy-light rounded-xl" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
     >
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((t) => {
-          // Check if this trainer is a team member
-          const isTeamMember = t.password && t.password.startsWith('__TEAM_MEMBER__')
-          return (
-            <Card key={t.id} className="p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <Avatar className="w-14 h-14 border-2 border-gold/30">
-                  <AvatarImage src={t.avatar || ''} />
-                  <AvatarFallback className="bg-navy text-gold">{t.name?.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-bold text-navy">{t.name}</div>
-                  <div className="text-xs text-gold">{t.title}</div>
-                  {isTeamMember && <Badge className="mt-1 bg-purple-500/15 text-purple-600 border-purple-500/30 text-[10px]">👑 عضو فريق</Badge>}
+      {items.length === 0 ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <GraduationCap className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد مدربون بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">أضف أول مدرب بالضغط على زر "جديد" ✨</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+          {items.map((t) => {
+            const isTeamMember = t.password && t.password.startsWith('__TEAM_MEMBER__')
+            return (
+              <Card key={t.id} className="fia-course-card p-0 overflow-hidden cursor-default border border-gold/20">
+                {/* Magical header */}
+                <div className="relative p-3 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+                  <div className="relative flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-gold/40 flex-shrink-0 bg-navy-light shadow-md">
+                      {t.avatar ? (
+                        <img src={t.avatar} alt={t.name} className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl bg-gradient-to-br from-gold/20 to-amber-500/20">
+                          {t.name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs truncate text-white flex items-center gap-1">
+                        {t.name}
+                        {isTeamMember && <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                      </div>
+                      <div className="text-[10px] text-gold truncate">{t.title}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="text-xs text-muted-foreground mb-3">{t.specialization}</div>
-              <div className="text-xs space-y-1 mb-3">
-                <div className="text-muted-foreground" dir="ltr">📧 {t.email}</div>
-                <div className="text-muted-foreground" dir="ltr">📞 {t.phone || '-'}</div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(t); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-                <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق — احذفه من قسم المؤسس والفريق أولاً' : 'حذف'}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+                {/* Magical body */}
+                <div className="p-3 space-y-2">
+                  {t.specialization && (
+                    <div className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{t.specialization}</div>
+                  )}
+                  <div className="space-y-1 pt-1 border-t border-border/40">
+                    {t.email && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Mail className="w-2.5 h-2.5 flex-shrink-0 text-gold/60" />
+                        <span dir="ltr" className="truncate text-navy font-medium">{t.email}</span>
+                      </div>
+                    )}
+                    {t.phone && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Mail className="w-2.5 h-2.5 flex-shrink-0 text-gold/60" />
+                        <span dir="ltr" className="text-navy font-medium">{t.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                  {isTeamMember && (
+                    <div className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200/40 rounded px-1.5 py-1 text-center font-bold">
+                      👑 عضو فريق
+                    </div>
+                  )}
+                  {/* Actions */}
+                  <div className="flex gap-1 pt-1 border-t border-border/40">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => { setEditing(t); setOpen(true) }}>
+                      <Edit className="w-3 h-3 ml-1" /> تعديل
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="h-8 w-8 p-0 border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق' : 'حذف'}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
       {open && <TrainerDialog open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
 
       <PasswordConfirmDialog
@@ -2557,33 +2763,72 @@ function AdminPartners() {
     load()
   }
   return (
-    <SectionCard title="الشركاء" description={`${items.length} شريك`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((p) => (
-          <Card key={p.id} className="p-5">
-            <div className="flex items-start gap-3 mb-3">
-              <div className="text-3xl">{p.logo}</div>
-              <div className="flex-1">
-                <div className="font-bold text-navy">{p.name}</div>
-                <div className="text-xs text-muted-foreground">{p.description}</div>
-                {p.since && <Badge variant="outline" className="mt-1 text-xs">منذ {p.since}</Badge>}
-              </div>
+    <SectionCard title="الشركاء" description={`${items.length} شريك`} action={<Button className="bg-navy hover:bg-navy-light rounded-xl" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+      {items.length === 0 ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Briefcase className="w-10 h-10 text-gold" />
             </div>
-            <div className="mb-3">
-              <Badge className={p.status === 'نشط' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>
-                {p.status === 'نشط' ? '● نشط' : '● متوقف'}
-              </Badge>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(p); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-              <Button size="sm" variant="outline" className={p.status === 'نشط' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(p)}>
-                {p.status === 'نشط' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
-              </Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد شركاء بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">أضف أول شريك بالضغط على زر "جديد" ✨</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+          {items.map((p) => {
+            const isActive = p.status === 'نشط'
+            return (
+              <Card key={p.id} className={`fia-course-card p-0 overflow-hidden cursor-default border ${isActive ? 'border-emerald-400/40' : 'border-red-400/40'}`}>
+                {/* Magical header */}
+                <div className={`relative p-3 text-white overflow-hidden ${isActive ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-rose-600 to-red-700'}`}>
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                  <div className="relative flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md flex-shrink-0">
+                      <span className="text-2xl">{p.logo || '🤝'}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs truncate text-white">{p.name}</div>
+                      <div className="text-[10px] text-white/80 truncate">{p.since ? `منذ ${p.since}` : 'شريك'}</div>
+                    </div>
+                  </div>
+                </div>
+                {/* Magical body */}
+                <div className="p-3 space-y-2">
+                  {p.description && (
+                    <div className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{p.description}</div>
+                  )}
+                  <div className="flex items-center justify-center pt-1 border-t border-border/40">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                      isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/40' : 'bg-rose-50 text-rose-700 border border-rose-200/40'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                      {p.status === 'نشط' ? 'نشط' : 'متوقف'}
+                    </span>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-1 pt-1 border-t border-border/40">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => { setEditing(p); setOpen(true) }}>
+                      <Edit className="w-3 h-3 ml-1" /> تعديل
+                    </Button>
+                    <Button size="sm" variant="outline" className={`h-8 w-8 p-0 ${isActive ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10'}`} onClick={() => toggleStatus(p)} title={isActive ? 'إيقاف' : 'تنشيط'}>
+                      {isActive ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(p)} title="حذف">
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['name', 'logo', 'description', 'website', 'since', 'status']} apiPath="/api/partners" />}
 
       <ConfirmDialog
@@ -2652,32 +2897,83 @@ function AdminLicenses() {
     load()
   }
   return (
-    <SectionCard title="التراخيص" description={`${items.length} ترخيص`} action={<Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
-      <div className="grid md:grid-cols-2 gap-4">
-        {items.map((l) => (
-          <Card key={l.id} className="p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <div className="font-bold text-navy">{l.issuing_body}</div>
-                <div className="text-xs text-gold">{l.type}</div>
-              </div>
-              <Badge className={l.status === 'ساري' ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{l.status === 'ساري' ? '● ساري' : '● متوقف'}</Badge>
+    <SectionCard title="التراخيص" description={`${items.length} ترخيص`} action={<Button className="bg-navy hover:bg-navy-light rounded-xl" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}>
+      {items.length === 0 ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Shield className="w-10 h-10 text-gold" />
             </div>
-            <div className="text-xs text-muted-foreground mb-2">رقم: <span className="font-mono text-gold" dir="ltr">{l.number}</span></div>
-            <div className="flex justify-between text-xs text-muted-foreground mb-3">
-              <span>إصدار: <span dir="ltr">{l.issued_at}</span></span>
-              <span>انتهاء: <span dir="ltr">{l.expires_at}</span></span>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(l); setOpen(true) }}><Edit className="w-3.5 h-3.5 ml-1" /> تعديل</Button>
-              <Button size="sm" variant="outline" className={l.status === 'ساري' ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-green-500/30 text-green-600 hover:bg-green-500/10'} onClick={() => toggleStatus(l)}>
-                {l.status === 'ساري' ? <><XCircle className="w-3.5 h-3.5 ml-1" /> إيقاف</> : <><CheckCircle2 className="w-3.5 h-3.5 ml-1" /> تنشيط</>}
-              </Button>
-              <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(l)}><Trash2 className="w-3.5 h-3.5" /></Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد تراخيص بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">أضف أول ترخيص بالضغط على زر "جديد" ✨</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+          {items.map((l) => {
+            const isActive = l.status === 'ساري'
+            return (
+              <Card key={l.id} className={`fia-course-card p-0 overflow-hidden cursor-default border ${isActive ? 'border-emerald-400/40' : 'border-red-400/40'}`}>
+                {/* Magical header */}
+                <div className={`relative p-3 text-white overflow-hidden ${isActive ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-rose-600 to-red-700'}`}>
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                  <div className="relative flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md flex-shrink-0">
+                      <Shield className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs truncate text-white">{l.issuing_body}</div>
+                      <div className="text-[10px] text-white/80 truncate">{l.type}</div>
+                    </div>
+                  </div>
+                </div>
+                {/* Magical body */}
+                <div className="p-3 space-y-2">
+                  <div className="pt-1 border-t border-border/40">
+                    <div className="text-[9px] text-muted-foreground mb-0.5">الرقم</div>
+                    <div className="text-[10px] font-mono font-bold text-gold break-all" dir="ltr">{l.number}</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 pt-1 border-t border-border/40">
+                    <div>
+                      <div className="text-[9px] text-muted-foreground mb-0.5">إصدار</div>
+                      <div className="text-[10px] font-bold text-navy" dir="ltr">{l.issued_at || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-muted-foreground mb-0.5">انتهاء</div>
+                      <div className="text-[10px] font-bold text-navy" dir="ltr">{l.expires_at || '-'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center pt-1 border-t border-border/40">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                      isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/40' : 'bg-rose-50 text-rose-700 border border-rose-200/40'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                      {l.status === 'ساري' ? 'ساري' : 'متوقف'}
+                    </span>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-1 pt-1 border-t border-border/40">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => { setEditing(l); setOpen(true) }}>
+                      <Edit className="w-3 h-3 ml-1" /> تعديل
+                    </Button>
+                    <Button size="sm" variant="outline" className={`h-8 w-8 p-0 ${isActive ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10'}`} onClick={() => toggleStatus(l)} title={isActive ? 'إيقاف' : 'تنشيط'}>
+                      {isActive ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(l)} title="حذف">
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
       {open && <SimpleDialog open={open} onOpenChange={setOpen} title={editing ? 'تعديل' : 'إضافة'} onSaved={load} initial={editing} fields={['issuing_body', 'type', 'number', 'issued_at', 'expires_at', 'status', 'verification_url']} apiPath="/api/licenses" />}
 
       <ConfirmDialog
