@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
-  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus,
+  GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus, Sparkles,
 } from 'lucide-react'
 
 // Category groups — top-level dropdown
@@ -299,74 +299,62 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto p-0 gap-0">
-        {/* ⚡ Professional gradient header — navy with gold accent */}
-        <div className="relative bg-gradient-to-br from-navy via-navy to-navy-light p-5 pb-4 rounded-t-xl overflow-hidden">
-          {/* Decorative dot pattern */}
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, #C9A961 1px, transparent 1px)',
-            backgroundSize: '30px 30px',
+      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto p-0 gap-0 border-0">
+        {/* ⚡ Magical gradient header — navy with gold glow */}
+        <div className="relative bg-gradient-to-br from-[#0A1F44] via-[#102a63] to-[#0A1F44] p-5 pb-6 rounded-t-2xl overflow-hidden">
+          {/* Decorative flowing pattern */}
+          <div className="absolute inset-0 opacity-15" style={{
+            backgroundImage: 'radial-gradient(circle at 20% 50%, #C9A961 1.5px, transparent 1.5px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px), radial-gradient(circle at 50% 80%, #C9A961 1px, transparent 1px)',
+            backgroundSize: '25px 25px, 20px 20px, 30px 30px',
           }} />
-          {/* Content */}
+          {/* Gold glow effect */}
+          <div className="absolute top-0 left-0 w-40 h-40 bg-[#C9A961]/20 rounded-full blur-3xl -translate-x-16 -translate-y-16" />
           <div className="relative flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm border border-white/20">
-              <GraduationCap className="w-6 h-6 text-white" strokeWidth={2.2} />
+            <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/25">
+              <GraduationCap className="w-7 h-7 text-white" strokeWidth={2.2} />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold text-white tracking-tight">
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">
                 {course ? 'تعديل الدورة' : 'دورة جديدة'}
               </DialogTitle>
-              <p className="text-white/70 text-xs mt-0.5">أكاديمية المستقبل الدولية</p>
+              <p className="text-[#C9A961] text-xs mt-0.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> أكاديمية المستقبل الدولية</p>
             </div>
           </div>
         </div>
 
-        {/* ⚡ Content body — all sections in a scrollable container
-            with subtle gradient background matching the FIA brand */}
-        <div className="bg-gradient-to-b from-gray-50 to-white p-5 space-y-4">
+        {/* ⚡ Body — navy-tinted gradient with colored section cards */}
+        <div className="bg-gradient-to-b from-navy/5 via-white to-white p-5 space-y-4 rounded-b-2xl">
 
-          {/* === Section 1: Basic Info — professional card with left accent === */}
-          <div className="space-y-3 p-4 bg-white rounded-2xl border border-gray-200/60 border-r-4 border-r-navy/40">
+          {/* === Section 1: Basic Info — navy gradient card === */}
+          <div className="space-y-3 p-4 bg-gradient-to-br from-navy/5 to-navy/10 rounded-2xl border border-navy/10">
             <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-                <BookOpen className="w-3.5 h-3.5 text-gold" />
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center shadow-sm">
+                <BookOpen className="w-4 h-4 text-gold" />
               </div>
               المعلومات الأساسية
             </div>
             <div>
               <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان الدورة *</Label>
               <Input value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" placeholder="مثال: أساسيات علم الأدوية" />
+                className="h-11 text-sm bg-white/80 border-navy/10 focus:border-gold focus:ring-gold/30 rounded-xl" placeholder="مثال: أساسيات علم الأدوية" />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy mb-1.5 block">وصف مختصر</Label>
               <Input value={form.short_description || ''} onChange={(e) => setForm({ ...form, short_description: e.target.value })}
-                className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" placeholder="جملة واحدة تلخص الدورة" />
+                className="h-11 text-sm bg-white/80 border-navy/10 focus:border-gold focus:ring-gold/30 rounded-xl" placeholder="جملة واحدة تلخص الدورة" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <Label className="text-xs font-bold text-navy block">الوصف الكامل</Label>
-                <button
-                  type="button"
-                  onClick={() => setDescExpanded((v) => !v)}
-                  className="text-[10px] text-navy hover:text-gold flex items-center gap-1 transition-colors font-semibold"
-                >
-                  {descExpanded ? (
-                    <><ChevronUp className="w-3 h-3" /> طي</>
-                  ) : (
-                    <><ChevronDown className="w-3 h-3" /> توسيع</>
-                  )}
+                <button type="button" onClick={() => setDescExpanded((v) => !v)}
+                  className="text-[10px] text-navy hover:text-gold flex items-center gap-1 transition-colors font-semibold">
+                  {descExpanded ? <><ChevronUp className="w-3 h-3" /> طي</> : <><ChevronDown className="w-3 h-3" /> توسيع</>}
                 </button>
               </div>
               {descExpanded ? (
                 <>
-                  <Textarea
-                    value={form.description || ''}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    rows={8}
-                    className="text-sm resize-y border-gray-200/60 focus:border-gold focus:ring-gold/20"
-                    placeholder="وصف تفصيلي لمحتوى الدورة..."
-                  />
+                  <Textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={8}
+                    className="text-sm bg-white/80 border-navy/10 focus:border-gold focus:ring-gold/30 rounded-xl resize-y" placeholder="وصف تفصيلي لمحتوى الدورة..." />
                   {form.description && (
                     <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
                       <span>{form.description.length} حرف</span>
@@ -376,7 +364,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                 </>
               ) : (
                 <button type="button" onClick={() => setDescExpanded(true)}
-                  className="w-full text-right p-2.5 rounded-lg border border-dashed border-gray-200 bg-gray-50 hover:bg-gold/5 hover:border-gold/30 transition-all text-xs text-muted-foreground min-h-[42px] flex items-center justify-between">
+                  className="w-full text-right p-3 rounded-xl border border-dashed border-navy/15 bg-white/50 hover:bg-gold/5 hover:border-gold/30 transition-all text-xs text-muted-foreground min-h-[44px] flex items-center justify-between">
                   <span>{form.description ? (form.description.length > 60 ? `${form.description.substring(0, 60)}… (${form.description.length} حرف)` : form.description) : 'لا يوجد وصف بعد — اضغط للتوسيع والكتابة'}</span>
                   <ChevronDown className="w-3 h-3 text-gold flex-shrink-0" />
                 </button>
@@ -396,11 +384,11 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
           <Select label="المستوى" value={form.level || 'متوسط'} onChange={(v: string) => setForm({ ...form, level: v })}
             options={LEVELS.map(l => ({ value: l.value, label: l.label }))} icon={Layers} />
 
-          {/* === Section 4: Pricing — professional card with green accent === */}
-          <div className="p-4 bg-white rounded-2xl border border-gray-200/60 border-r-4 border-r-emerald-500/40 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                <DollarSign className="w-3.5 h-3.5 text-white" />
+          {/* === Section 4: Pricing — emerald gradient card === */}
+          <div className="p-4 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 rounded-2xl border border-emerald-200/40 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wide">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                <DollarSign className="w-4 h-4 text-white" />
               </div>
               التسعير
             </div>
@@ -418,46 +406,46 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                       <span className="line-through text-red-500">السعر الرسمي</span>
                     </Label>
                     <Input type="number" value={form.original_price} onChange={(e) => setForm({ ...form, original_price: e.target.value })}
-                      className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" dir="ltr" placeholder="100" />
+                      className="h-11 text-sm bg-white/80 border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30 rounded-xl" dir="ltr" placeholder="100" />
                     <p className="text-[10px] text-muted-foreground mt-1">يظهر مشطوباً بالأحمر للمتدرب</p>
                   </div>
                   <div>
                     <Label className="text-xs font-bold text-emerald-600 mb-1.5 block">السعر بعد الخصم</Label>
                     <Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })}
-                      className="h-10 text-sm border-emerald-500/30 focus:border-emerald-500 focus:ring-emerald-500/20" dir="ltr" placeholder="50" />
+                      className="h-11 text-sm bg-white/80 border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30 rounded-xl" dir="ltr" placeholder="50" />
                     <p className="text-[10px] text-muted-foreground mt-1">السعر النهائي للمتدرب</p>
                   </div>
                 </div>
                 {Number(form.original_price) > Number(form.price) && Number(form.price) > 0 && (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200/40 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 bg-emerald-100/60 border border-emerald-200/40 rounded-xl px-3 py-2">
                     <span className="text-xs text-muted-foreground">معاينة:</span>
                     <span className="text-sm line-through text-red-500" dir="ltr">{Number(form.original_price).toLocaleString()} {form.currency || 'ر.ي'}</span>
                     <span className="text-base font-extrabold text-emerald-600" dir="ltr">{Number(form.price).toLocaleString()} {form.currency || 'ر.ي'}</span>
                   </div>
                 )}
-                {/* Auto-applied coupon */}
-                <div className="bg-gold/5 border border-gold/20 rounded-xl p-3 space-y-2">
-                  <Label className="text-xs font-bold text-navy mb-1.5 block">كوبون خصم تلقائي (اختياري)</Label>
+                {/* Auto-applied coupon — gold gradient card */}
+                <div className="bg-gradient-to-br from-amber-50/80 to-yellow-50/50 rounded-xl border border-amber-200/40 p-3 space-y-2">
+                  <Label className="text-xs font-bold text-amber-700 mb-1.5 block">كوبون خصم تلقائي (اختياري)</Label>
                   <div className="flex gap-2">
                     <Input value={form.auto_coupon_code || ''} onChange={(e) => setForm({ ...form, auto_coupon_code: e.target.value.toUpperCase() })}
-                      placeholder="FIA-XXXXXX" dir="ltr" className="font-mono text-sm h-9 flex-1 border-gold/20 focus:border-gold focus:ring-gold/20" />
+                      placeholder="FIA-XXXXXX" dir="ltr" className="font-mono text-sm h-10 flex-1 bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" />
                     {form.auto_coupon_code && (
-                      <Button type="button" variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-500/5" onClick={() => setForm({ ...form, auto_coupon_code: '' })}>
+                      <Button type="button" variant="outline" size="sm" className="text-red-500 border-red-500/30 hover:bg-red-50 rounded-xl" onClick={() => setForm({ ...form, auto_coupon_code: '' })}>
                         <X className="w-3 h-3" />
                       </Button>
                     )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">سيتم تطبيقه تلقائياً عند محاولة المتدرب الاشتراك — يرى السعر بعد الخصم مباشرة.</p>
+                  <p className="text-[10px] text-muted-foreground">سيتم تطبيقه تلقائياً عند محاولة المتدرب الاشتراك.</p>
                   {!form.auto_coupon_code && (
                     <>
                       {!showCreateCoupon ? (
-                        <button type="button" onClick={() => setShowCreateCoupon(true)} className="text-[10px] text-navy hover:text-gold flex items-center gap-1 font-semibold">+ إنشاء كوبون جديد بنقرة واحدة</button>
+                        <button type="button" onClick={() => setShowCreateCoupon(true)} className="text-[10px] text-amber-700 hover:text-amber-800 flex items-center gap-1 font-semibold">+ إنشاء كوبون جديد بنقرة واحدة</button>
                       ) : (
-                        <div className="bg-white border border-gold/30 rounded-lg p-2 space-y-2">
+                        <div className="bg-white/80 border border-amber-200/40 rounded-xl p-2 space-y-2">
                           <div className="flex items-center gap-2">
                             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">نسبة الخصم %:</Label>
                             <Input type="number" value={newCouponDiscount} onChange={(e) => setNewCouponDiscount(e.target.value)} className="h-8 text-sm w-20" dir="ltr" placeholder="10" />
-                            <Button type="button" size="sm" className="bg-navy hover:bg-navy-light text-gold h-8 text-xs" onClick={createCouponInline}>إنشاء</Button>
+                            <Button type="button" size="sm" className="bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs rounded-lg" onClick={createCouponInline}>إنشاء</Button>
                             <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCreateCoupon(false)}>إلغاء</Button>
                           </div>
                         </div>
@@ -469,32 +457,32 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             )}
           </div>
 
-          {/* === Section 4b: Promotional Offer — gold accent card === */}
-          <div className="p-4 bg-white rounded-2xl border-2 border-gold/30 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
-                <Gift className="w-3.5 h-3.5 text-white" />
+          {/* === Section 4b: Promotional Offer — gold gradient card === */}
+          <div className="p-4 bg-gradient-to-br from-amber-50/80 to-yellow-50/50 rounded-2xl border border-amber-200/40 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wide">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-sm">
+                <Gift className="w-4 h-4 text-white" />
               </div>
               عرض ترويجي (اختياري)
             </div>
-            <p className="text-[10px] text-muted-foreground">اجعل دورتك مميزة — تظهر بشارة احترافية للمتدربين في صفحة الاستكشاف.</p>
+            <p className="text-[10px] text-muted-foreground">اجعل دورتك مميزة — تظهر بشارة احترافية للمتدربين.</p>
             <Select label="نوع العرض" value={form.offer_type || 'none'} onChange={(v: string) => setForm({ ...form, offer_type: v })}
               options={[{ value: 'none', label: '— لا عرض —' }, { value: 'limited_time', label: '⏰ لمدة محدودة' }, { value: 'featured', label: '⭐ دورة مميزة' }]} />
             {form.offer_type && form.offer_type !== 'none' && (
               <>
                 <div>
-                  <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان جذّاب للعرض</Label>
+                  <Label className="text-xs font-bold text-amber-700 mb-1.5 block">عنوان جذّاب للعرض</Label>
                   <Input value={form.offer_headline || ''} onChange={(e) => setForm({ ...form, offer_headline: e.target.value })}
-                    placeholder="مثال: عرض خاص لمدة محدودة — سجّل الآن!" className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" />
+                    placeholder="مثال: عرض خاص لمدة محدودة — سجّل الآن!" className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs font-bold text-navy mb-1.5 block">مدة العرض</Label>
+                    <Label className="text-xs font-bold text-amber-700 mb-1.5 block">مدة العرض</Label>
                     <div className="flex gap-2">
                       <Input type="number" value={form.offer_duration_value} onChange={(e) => setForm({ ...form, offer_duration_value: e.target.value })}
-                        className="h-10 text-sm w-20" dir="ltr" placeholder="5" />
+                        className="h-11 text-sm w-20 bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" dir="ltr" placeholder="5" />
                       <select value={form.offer_duration_unit || 'days'} onChange={(e) => setForm({ ...form, offer_duration_unit: e.target.value })}
-                        className="flex-1 h-10 px-3 text-sm border border-gray-200/60 rounded-lg bg-gray-50 focus:border-gold focus:ring-gold/20">
+                        className="flex-1 h-11 px-3 text-sm bg-white/80 border border-amber-200/40 rounded-xl focus:border-amber-500 focus:ring-amber-500/30">
                         <option value="hours">ساعات</option>
                         <option value="days">أيام</option>
                         <option value="weeks">أسابيع</option>
@@ -503,13 +491,12 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs font-bold text-navy mb-1.5 block">سعر العرض الترويجي</Label>
+                    <Label className="text-xs font-bold text-amber-700 mb-1.5 block">سعر العرض الترويجي</Label>
                     <Input type="number" value={form.offer_price} onChange={(e) => setForm({ ...form, offer_price: e.target.value })}
-                      className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" dir="ltr" placeholder="0 = السعر الافتراضي" />
+                      className="h-11 text-sm bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" dir="ltr" placeholder="0 = السعر الافتراضي" />
                     <p className="text-[10px] text-muted-foreground mt-1">اترك 0 لاستخدام السعر الافتراضي</p>
                   </div>
                 </div>
-                {/* Live preview */}
                 {form.offer_headline && (
                   <div className="bg-gradient-to-l from-navy to-navy-light text-white p-3 rounded-xl flex items-center gap-2 shadow-md">
                     {form.offer_type === 'limited_time' ? '⏰' : '⭐'}
@@ -526,41 +513,41 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
             )}
           </div>
 
-          {/* === Section 5: Settings — gray accent card === */}
-          <div className="p-4 bg-white rounded-2xl border border-gray-200/60 border-r-4 border-r-slate-400/40 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wide">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center">
-                <Settings className="w-3.5 h-3.5 text-white" />
+          {/* === Section 5: Settings — slate gradient card === */}
+          <div className="p-4 bg-gradient-to-br from-slate-50/80 to-gray-50/50 rounded-2xl border border-slate-200/40 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wide">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center shadow-sm">
+                <Settings className="w-4 h-4 text-white" />
               </div>
               الإعدادات
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">عدد الساعات</Label>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">عدد الساعات</Label>
                 <Input type="number" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
-                  className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" dir="ltr" placeholder="0" />
+                  className="h-11 text-sm bg-white/80 border-slate-200/40 focus:border-gold focus:ring-gold/30 rounded-xl" dir="ltr" placeholder="0" />
               </div>
               <div>
-                <Label className="text-xs font-bold text-navy mb-1.5 block">درجة النجاح (%)</Label>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">درجة النجاح (%)</Label>
                 <Input type="number" value={form.pass_score} onChange={(e) => setForm({ ...form, pass_score: e.target.value })}
-                  className="h-10 text-sm border-gray-200/60 focus:border-gold focus:ring-gold/20" dir="ltr" placeholder="60" />
+                  className="h-11 text-sm bg-white/80 border-slate-200/40 focus:border-gold focus:ring-gold/30 rounded-xl" dir="ltr" placeholder="60" />
               </div>
             </div>
             <Select label="الحالة" value={form.status || 'منشورة'} onChange={(v: string) => setForm({ ...form, status: v })}
               options={[{ value: 'منشورة', label: 'منشورة' }, { value: 'مسودة', label: 'مسودة' }]} />
           </div>
 
-          {/* === Section 6: Cover Image — professional upload === */}
-          <div className="p-4 bg-white rounded-2xl border border-gray-200/60 border-r-4 border-r-blue-500/40 space-y-2">
-            <Label className="text-xs font-bold text-navy mb-1.5 flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <ImageIcon className="w-3.5 h-3.5 text-white" />
+          {/* === Section 6: Cover Image — blue gradient card === */}
+          <div className="p-4 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 rounded-2xl border border-blue-200/40 space-y-2">
+            <Label className="text-xs font-bold text-blue-700 mb-1.5 flex items-center gap-1.5">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                <ImageIcon className="w-4 h-4 text-white" />
               </div>
               صورة الغلاف
             </Label>
             <div className="flex items-center gap-3">
               {form.cover ? (
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-gold/20 flex-shrink-0 shadow-sm">
+                <div className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-blue-200/40 flex-shrink-0 shadow-sm">
                   <img src={form.cover} alt="cover" className="w-full h-full object-cover" />
                   <button type="button" onClick={() => setForm({ ...form, cover: '' })}
                     className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-1 hover:bg-red-600 transition-colors">
@@ -568,7 +555,7 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                   </button>
                 </div>
               ) : (
-                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 flex-shrink-0 hover:border-gold/40 hover:bg-gold/5 transition-all">
+                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-blue-200/40 bg-white/50 flex items-center justify-center text-blue-300 flex-shrink-0 hover:border-blue-400/60 hover:bg-blue-50 transition-all">
                   <ImageIcon className="w-6 h-6" />
                 </div>
               )}
@@ -576,20 +563,20 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadCover(f) }} />
               <Button variant="outline" type="button" disabled={uploadingCover}
                 onClick={() => document.getElementById('cover-upload-pro')?.click()}
-                className="h-9 text-xs border-gray-200/60 hover:border-gold hover:bg-gold/5">
-                {uploadingCover ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <FileUp className="w-3.5 h-3.5 ml-1" />}
+                className="h-10 text-xs bg-white/80 border-blue-200/40 hover:border-blue-400 hover:bg-blue-50 rounded-xl">
+                {uploadingCover ? <Loader2 className="w-3.5 h-3.5 ml-1.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5 ml-1.5" />}
                 {uploadingCover ? 'جاري...' : form.cover ? 'تغيير الصورة' : 'رفع صورة'}
               </Button>
             </div>
           </div>
         </div>
 
-        {/* ⚡ Professional footer with gradient save button */}
-        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100">
+        {/* ⚡ Footer — premium gradient button */}
+        <div className="flex items-center justify-end gap-2 p-4 bg-white border-t border-gray-100 rounded-b-2xl">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
           <Button onClick={save} disabled={saving}
-            className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-white rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all">
-            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Plus className="w-4 h-4 ml-1" />}
+            className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-white rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all px-6">
+            {saving ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <Plus className="w-4 h-4 ml-1.5" />}
             {saving ? 'جاري الحفظ...' : course ? 'تحديث الدورة' : 'إنشاء الدورة'}
           </Button>
         </div>
