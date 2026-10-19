@@ -626,6 +626,17 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
     fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
   }, [])
 
+  // ⚡ Currency-aware payment method filtering:
+  // - If a method's currency is "الكل" (All), it shows for every course
+  // - Otherwise, only show methods matching the course's currency
+  // This is computed per-course, so it stays in sync if the user opens
+  // the payment dialog for different courses.
+  const getMethodsForCourse = (course: any) => {
+    if (!paymentMethods.length) return []
+    const courseCurrency = course?.currency || 'ر.ي'
+    return paymentMethods.filter((m: any) => !m.currency || m.currency === 'الكل' || m.currency === courseCurrency)
+  }
+
   // ⚡ Auto-open the payment dialog when the user navigated here from the
   // Overview tab with a specific course in mind. This eliminates the
   // need for the user to scroll through all courses and find the one
@@ -1127,7 +1138,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
       {payDialog?.open && (
         <PaymentDialog
           course={payDialog.course}
-          methods={paymentMethods}
+          methods={getMethodsForCourse(payDialog.course)}
           open={payDialog.open}
           userId={userId}
           onOpenChange={(o) => setPayDialog({ ...payDialog, open: o })}
@@ -1432,7 +1443,7 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
                         <div className="text-[10px] text-amber-600 font-mono" dir="ltr">{m.crypto_coin} • {m.crypto_network}</div>
                       ) : (
                         <>
-                          {m.account_number && <div className="text-[10px] text-emerald-600 font-mono" dir="ltr">{m.account_number}</div>}
+                          {(m.account_number || m.wallet_id) && <div className="text-[10px] text-emerald-600 font-mono" dir="ltr">{m.account_number || m.wallet_id}</div>}
                           {m.account_holder && <div className="text-[10px] text-gray-400">{m.account_holder}</div>}
                         </>
                       )}
@@ -1497,25 +1508,29 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
               {/* Local: show account number + holder + currency with copy buttons */}
               {selectedMethod.payment_category !== 'crypto' && (
                 <div className="space-y-2">
-                  {selectedMethod.account_number && (
-                    <div className="bg-white/60 rounded-xl px-3 py-2.5 space-y-1">
-                      <span className="text-xs text-gray-400">رقم الحساب:</span>
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono font-bold text-emerald-700 flex-1" dir="ltr">{selectedMethod.account_number}</code>
-                        <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedMethod.account_number); toast.success('تم نسخ رقم الحساب ✓') }}
-                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors">
-                          <Copy className="w-3.5 h-3.5 text-white" />
-                        </button>
+                  {/* ⚡ Fall back to wallet_id for legacy rows where account_number is null */}
+                  {(() => {
+                    const acctNo = selectedMethod.account_number || selectedMethod.wallet_id
+                    return acctNo ? (
+                      <div className="bg-white/60 rounded-xl px-3 py-2.5 space-y-1">
+                        <span className="text-xs text-gray-400">رقم الحساب / المحفظة:</span>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono font-bold text-emerald-700 flex-1 break-all" dir="ltr">{acctNo}</code>
+                          <button type="button" onClick={() => { navigator.clipboard?.writeText(acctNo); toast.success('تم نسخ رقم الحساب ✓') }}
+                            className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors shadow-sm">
+                            <Copy className="w-3.5 h-3.5 text-white" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null
+                  })()}
                   {selectedMethod.account_holder && (
                     <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
                       <span className="text-xs text-gray-400">صاحب الحساب:</span>
                       <span className="text-xs font-bold text-emerald-700">{selectedMethod.account_holder}</span>
                     </div>
                   )}
-                  {selectedMethod.currency && (
+                  {selectedMethod.currency && selectedMethod.currency !== 'الكل' && (
                     <div className="flex items-center justify-between bg-white/60 rounded-xl px-3 py-2">
                       <span className="text-xs text-gray-400">العملة:</span>
                       <span className="text-xs font-bold text-emerald-700">{selectedMethod.currency}</span>

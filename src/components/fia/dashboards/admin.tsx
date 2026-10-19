@@ -1553,10 +1553,10 @@ function AdminPaymentMethods() {
                 {/* Local currency details */}
                 {p.payment_category !== 'crypto' && (
                   <div className="space-y-1.5 mb-3 p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100/60">
-                    {p.account_number && (
+                    {(p.account_number || p.wallet_id) && (
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-gray-400">رقم الحساب:</span>
-                        <span className="font-mono font-bold text-emerald-700" dir="ltr">{p.account_number}</span>
+                        <span className="font-mono font-bold text-emerald-700" dir="ltr">{p.account_number || p.wallet_id}</span>
                       </div>
                     )}
                     {p.account_holder && (
@@ -1568,7 +1568,7 @@ function AdminPaymentMethods() {
                     {p.currency && (
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-gray-400">العملة:</span>
-                        <span className="font-bold text-emerald-700">{p.currency}</span>
+                        <span className={`font-bold ${p.currency === 'الكل' ? 'text-blue-600 bg-blue-50/80 px-2 py-0.5 rounded-md' : 'text-emerald-700'}`}>{p.currency === 'الكل' ? '🌍 كل العملات' : p.currency}</span>
                       </div>
                     )}
                   </div>
@@ -1654,7 +1654,14 @@ function PaymentMethodDialog({ open, onOpenChange, editing, onSaved }: any) {
     { value: 'crypto', label: '₿ عملة رقمية (USDT / Binance Pay)', icon: '₿' },
   ]
 
-  const CURRENCIES = ['ر.ي', 'ر.س', '$', '€', 'د.إ']
+  const CURRENCIES = [
+    { value: 'الكل', label: '🌍 كل العملات (يظهر للجميع)' },
+    { value: 'ر.ي', label: 'ر.ي — ريال يمني' },
+    { value: 'ر.س', label: 'ر.س — ريال سعودي' },
+    { value: '$', label: '$ — دولار أمريكي' },
+    { value: '€', label: '€ — يورو' },
+    { value: 'د.إ', label: 'د.إ — درهم إماراتي' },
+  ]
 
   const save = async () => {
     if (!form.name) { toast.error('أدخل اسم طريقة الدفع'); return }
@@ -1823,17 +1830,12 @@ function PaymentMethodDialog({ open, onOpenChange, editing, onSaved }: any) {
                 <Input value={form.account_holder || ''} onChange={(e) => setForm({ ...form, account_holder: e.target.value })}
                   placeholder="مثال: أكاديمية المستقبل الدولية" className="h-11 text-sm bg-white/80 border-emerald-200/40 focus:border-emerald-500 focus:ring-emerald-500/30 rounded-xl" />
               </div>
-              <div>
-                <Label className="text-xs font-bold text-emerald-700 mb-1.5 block">العملة</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {CURRENCIES.map((c) => (
-                    <button key={c} type="button" onClick={() => setForm({ ...form, currency: c })}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${form.currency === c ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md' : 'bg-white/80 text-gray-500 border border-emerald-200/40 hover:border-emerald-400'}`}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* ⚡ Currency as a professional dropdown — includes "All" option */}
+              <CustomSelect label="العملة" value={form.currency || 'الكل'} onChange={(v: string) => setForm({ ...form, currency: v })}
+                options={CURRENCIES} />
+              {form.currency === 'الكل' && (
+                <p className="text-[10px] text-emerald-600 -mt-1.5 flex items-center gap-1">💡 هذه الطريقة ستظهر لجميع العملات بغض النظر عن عملة الدورة</p>
+              )}
             </div>
           )}
 
