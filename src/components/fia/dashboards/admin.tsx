@@ -9,7 +9,7 @@ import {
   Lock, Mail, CheckCircle2, User, XCircle, ExternalLink, Download,
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
-  Eraser, Brush,
+  Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
