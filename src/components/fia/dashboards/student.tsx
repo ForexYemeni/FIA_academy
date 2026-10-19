@@ -6,7 +6,7 @@ import {
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
-  Sparkles, Star,
+  Sparkles, Star, PlayCircle, Phone, Briefcase,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -416,87 +416,130 @@ function Overview({ user, courses, certificates, enrollments, onViewCourse }: an
 
   return (
     <div className="space-y-6">
-      <div className="bg-fia-gradient rounded-2xl p-6 lg:p-8 text-white">
-        <h2 className="text-2xl font-bold mb-1">أهلاً، {user?.name} 👋</h2>
-        <p className="text-white/80">إليك ملخّص نشاطك في أكاديمية المستقبل الدولية</p>
+      {/* ⚡ Magical hero header */}
+      <div className="relative overflow-hidden rounded-2xl p-6 lg:p-7 bg-gradient-to-l from-navy via-navy-light to-navy text-white shadow-xl ring-1 ring-gold/30">
+        <div className="absolute inset-0 opacity-25" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px'
+        }} />
+        <div className="absolute -top-12 -right-12 w-40 h-40 bg-gold/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30">
+            <Sparkles className="w-7 h-7 text-navy" strokeWidth={2.2} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">أهلاً، {user?.name}</h2>
+            <p className="text-gold/80 text-sm flex items-center gap-1.5">
+              <span className="w-1 h-1 bg-gold rounded-full animate-pulse" />
+              إليك ملخّص نشاطك في أكاديمية المستقبل الدولية
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ⚡ Magical StatCards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
         <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
         <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
         <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
         <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
       </div>
 
+      {/* ⚡ Magical progress section */}
       <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
         <div className="space-y-4">
           {enrollments && enrollments.length > 0 ? (
             enrollments.slice(0, 3).map((e: any) => {
               const c = courses.find((x:any) => x.id === e.course_id)
               if (!c) return null
+              const pct = e.progress || 0
+              const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+              const isPending = e.payment_status === 'pending'
               return (
-                <div key={e.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-navy text-sm">{c.title}</div>
-                    <span className="text-xs text-muted-foreground">{e.progress || 0}%</span>
+                <div key={e.id} className="fia-card-hover p-3 rounded-xl border border-gold/20 hover:border-gold/40 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${isCompleted ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' : isPending ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-navy' : 'bg-gradient-to-br from-navy to-navy-light text-gold'}`}>
+                        {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isPending ? <Clock className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                      </div>
+                      <div className="font-bold text-navy text-sm truncate">{c.title}</div>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ${isCompleted ? 'bg-emerald-500/15 text-emerald-700' : isPending ? 'bg-amber-500/15 text-amber-700' : 'bg-navy/5 text-navy'}`}>{pct}%</span>
                   </div>
-                  <Progress value={e.progress || 0} className="h-2" />
+                  <Progress value={pct} className="h-2" />
                 </div>
               )
             })
           ) : (
-            <div className="text-center py-6 text-muted-foreground text-sm">لا توجد دورات مسجّلة بعد — تصفّح الدورات المتاحة</div>
+            /* ⚡ Magical empty state */
+            <div className="text-center py-10">
+              <div className="relative inline-block mb-3">
+                <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                  <BookOpen className="w-8 h-8 text-gold" />
+                </div>
+              </div>
+              <p className="text-sm font-bold text-navy mb-1">لا توجد دورات مسجّلة بعد</p>
+              <p className="text-xs text-muted-foreground">تصفّح الدورات المتاحة في تبويب "استكشاف الدورات" ✨</p>
+            </div>
           )}
         </div>
       </SectionCard>
 
+      {/* ⚡ Magical recommended courses */}
       <SectionCard title="الدورات الموصى بها" description="استكشف المزيد من الدورات — اضغط للتسجيل أو فتح الدورة">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
           {courses.slice(0, 3).map((c: any) => {
             const access = getCourseAccess(c)
             const isFree = c.price_type === 'مجانية' || c.price === 0
             // Decide button label + action based on access state
             let btnLabel = 'عرض الدورة'
             let btnAction: () => void = () => onViewCourse?.(c)
-            let btnClass = 'w-full bg-navy hover:bg-navy-light'
+            let btnClass = 'w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all'
             if (access.enrollment?.payment_status === 'pending') {
               btnLabel = 'بانتظار تأكيد الدفع'
-              btnClass = 'w-full bg-yellow-500/20 text-yellow-700 border border-yellow-500/30 cursor-not-allowed'
+              btnClass = 'w-full bg-amber-500/20 text-amber-700 border border-amber-500/30 cursor-not-allowed rounded-xl'
               btnAction = () => toast.info('سيتم تفعيل الدورة بعد تأكيد الإدارة للدفع')
             } else if (access.reason === 'free-not-enrolled') {
-              btnLabel = 'سجّل الآن — مجانية'
-              btnClass = 'w-full bg-green-600 hover:bg-green-700 text-white'
-              // ⚡ Direct enrollment: clicking "سجّل الآن" on a free course
-              // in the Overview tab triggers immediate enrollment + opens
-              // the course. No more "افتح استكشاف الدورات" toast — the
-              // user expects to click → enroll → open in one smooth flow.
+              btnLabel = '✨ سجّل الآن — مجانية'
+              btnClass = 'w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all'
               btnAction = () => onViewCourse?.(c)
             } else if (access.reason === 'paid-not-enrolled') {
-              btnLabel = 'اشترك الآن'
-              btnClass = 'w-full bg-gold hover:bg-gold-light text-navy'
-              // ⚡ Direct payment: clicking "اشترك الآن" on a paid course
-              // in the Overview tab navigates to BrowseCourses with this
-              // specific course pre-selected, which auto-opens the
-              // payment dialog. No more "افتح استكشاف الدورات" toast.
+              btnLabel = '🚀 اشترك الآن'
+              btnClass = 'w-full bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-md active:scale-[0.97] transition-all'
               btnAction = () => onViewCourse?.(c)
             } else if (access.canOpen) {
-              btnLabel = 'عرض الدورة'
-              btnClass = 'w-full bg-navy hover:bg-navy-light'
+              btnLabel = '↵ عرض الدورة'
+              btnClass = 'w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all'
               btnAction = () => onViewCourse?.(c)
             }
             return (
-              <Card key={c.id} className="p-4 card-hover">
-                <div className="h-24 bg-navy rounded-lg mb-3 overflow-hidden relative">
-                  {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-                  <Badge className={`absolute top-2 left-2 ${isFree ? 'bg-green-500 text-white' : 'bg-gold text-navy'}`}>
+              <Card key={c.id} className="fia-course-card p-0 overflow-hidden cursor-default border border-gold/20">
+                <div className="relative h-24 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                  {c.cover && (
+                    <img src={c.cover} alt={c.title} loading="lazy" className="fia-cover-img absolute inset-0 w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/30 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                  <div className="fia-shine" />
+                  <Badge className={`absolute top-2 left-2 backdrop-blur-sm shadow-md ${isFree ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-300/40' : 'bg-gradient-to-r from-gold to-amber-500 text-navy border border-gold/40'}`}>
                     {isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}
                   </Badge>
+                  {c.level && (
+                    <Badge className="absolute top-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">{c.level}</Badge>
+                  )}
                 </div>
-                <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
-                <div className="text-xs text-muted-foreground mb-2">{c.duration_hours} ساعة</div>
-                <Button size="sm" className={btnClass} onClick={btnAction} disabled={access.enrollment?.payment_status === 'pending'}>
-                  {btnLabel}
-                </Button>
+                <div className="relative p-3">
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+                  <div className="font-bold text-navy text-sm mb-1 line-clamp-1">{c.title}</div>
+                  <div className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-gold/60" /> {c.duration_hours} ساعة
+                  </div>
+                  <Button size="sm" className={btnClass} onClick={btnAction} disabled={access.enrollment?.payment_status === 'pending'}>
+                    {btnLabel}
+                  </Button>
+                </div>
               </Card>
             )
           })}
@@ -546,71 +589,99 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   return (
     <SectionCard title="دوراتي المسجّلة" description={`${enrolled.length} دورة`}>
       {enrolled.length === 0 ? (
-        <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground mb-4">لم تسجّل في أي دورة بعد</p>
-          <p className="text-xs text-muted-foreground mb-4">تصفّح الدورات المتاحة في قسم "استكشاف الدورات"</p>
+        /* ⚡ Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <BookOpen className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لم تسجّل في أي دورة بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">تصفّح الدورات المتاحة في قسم "استكشاف الدورات" ✨</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {enrolled.map((c: any) => (
-            <Card key={c.id} className="overflow-hidden card-hover">
-              <div className="h-32 bg-navy relative">
-                {c.cover && <img src={c.cover} alt={c.title} className="w-full h-full object-cover" />}
-                <div className="absolute top-2 right-2">
-                  <Badge className={getPaymentStatusInfo(c.enrollment.payment_status).badgeClass}>
-                    {getPaymentStatusInfo(c.enrollment.payment_status).label}
-                  </Badge>
+        /* ⚡ Magical compact course cards — 2/3/4 grid */
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+          {enrolled.map((c: any) => {
+            const isCompleted = c.enrollment.payment_status === 'completed' || c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل'
+            const isPending = c.enrollment.payment_status === 'pending'
+            const isFree = c.price_type === 'مجانية' || c.price === 0
+            const pct = c.enrollment.progress || 0
+            return (
+              <Card key={c.id} className="fia-course-card p-0 overflow-hidden cursor-default border border-gold/20">
+                {/* Magical header — cover + status badge */}
+                <div className="relative h-28 overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy">
+                  {c.cover && (
+                    <img src={c.cover} alt={c.title} loading="lazy" className="fia-cover-img absolute inset-0 w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+                  <div className="fia-shine" />
+                  {/* Status pill — state-aware */}
+                  {isCompleted ? (
+                    <Badge className="fia-status-glow absolute top-2 right-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-300/40 backdrop-blur-sm shadow-md">
+                      <CheckCircle2 className="w-3 h-3 ml-0.5" /> مكتملة
+                    </Badge>
+                  ) : isPending ? (
+                    <Badge className="absolute top-2 right-2 bg-gradient-to-r from-amber-400 to-yellow-500 text-navy border border-amber-300/50 backdrop-blur-sm shadow-md">
+                      <Clock className="w-3 h-3 ml-0.5" /> بانتظار
+                    </Badge>
+                  ) : isFree ? (
+                    <Badge className="absolute top-2 right-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-300/40 backdrop-blur-sm shadow-md">
+                      <Gift className="w-3 h-3 ml-0.5" /> مجانية
+                    </Badge>
+                  ) : (
+                    <Badge className="absolute top-2 right-2 bg-gradient-to-r from-gold to-amber-500 text-navy border border-gold/40 backdrop-blur-sm shadow-md">
+                      نشطة
+                    </Badge>
+                  )}
+                  {c.level && (
+                    <Badge className="absolute bottom-2 right-2 bg-navy/80 text-gold border-gold/30 backdrop-blur-sm text-[10px]">{c.level}</Badge>
+                  )}
                 </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold text-navy text-sm mb-2 line-clamp-1">{c.title}</h3>
-                <Progress value={c.enrollment.progress || 0} className="h-2 mb-2" />
-                <div className="flex justify-between text-xs text-muted-foreground mb-3">
-                  <span>{c.enrollment.progress || 0}% مكتمل</span>
-                  <span>{c.duration_hours} ساعة</span>
-                </div>
-                {c.enrollment.payment_status === 'pending' ? (
-                  <Button size="sm" variant="outline" disabled className="w-full border-yellow-500/30 text-yellow-600">
-                    بانتظار تأكيد الدفع
-                  </Button>
-                ) : c.enrollment.payment_status === 'completed' ? (
-                  <div className="space-y-2">
-                    <Button size="sm" variant="outline" className="w-full border-green-500/30 text-green-600 hover:bg-green-500/5">
-                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> دورة مكتملة
-                    </Button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-navy/30 text-navy hover:bg-navy/5"
-                        onClick={() => onContinue(c, c.enrollment)}
-                      >
-                        <BookOpen className="w-3.5 h-3.5 ml-1" /> مراجعة
-                      </Button>
-                      {/* DISABLED: certificate request button removed — will be re-enabled when design+prompt provided */}
-                      {/* <Button
-                        size="sm"
-                        className="bg-gold hover:bg-gold-light text-navy"
-                        disabled={requesting === c.id}
-                        onClick={() => requestCertificate(c)}
-                      >
-                        {requesting === c.id ? (
-                          <><Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> جاري...</>
-                        ) : (
-                          <><Award className="w-3.5 h-3.5 ml-1" /> طلب شهادة</>
-                        )}
-                      </Button> */}
+                {/* Magical body */}
+                <div className="relative p-3">
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+                  <h3 className="font-bold text-navy text-xs mb-2 line-clamp-1">{c.title}</h3>
+                  {/* Progress with magical gradient */}
+                  <div className="space-y-1 mb-2">
+                    <div className="flex justify-between text-[9px] text-muted-foreground">
+                      <span>التقدّم</span>
+                      <span className="font-bold text-navy">{pct}%</span>
                     </div>
+                    <Progress value={pct} className="h-1.5" />
                   </div>
-                ) : (
-                  <Button size="sm" className="w-full bg-gold hover:bg-gold-light text-navy" onClick={() => onContinue(c, c.enrollment)}>
-                    متابعة التعلّم
-                  </Button>
-                )}
-              </div>
-            </Card>
-          ))}
+                  {/* Meta row */}
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-2 pb-2 border-b border-border/40">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-gold/60" /> {c.duration_hours || 0} ساعة
+                    </span>
+                    {isCompleted && <span className="text-emerald-600 font-bold flex items-center gap-0.5"><Award className="w-2.5 h-2.5" /> مكتملة</span>}
+                  </div>
+                  {/* Actions */}
+                  {c.enrollment.payment_status === 'pending' ? (
+                    <Button size="sm" variant="outline" disabled className="w-full h-8 text-[10px] rounded-lg border-amber-500/30 text-amber-700 bg-amber-500/5">
+                      <Clock className="w-3 h-3 ml-1" /> بانتظار تأكيد الدفع
+                    </Button>
+                  ) : c.enrollment.payment_status === 'completed' || isCompleted ? (
+                    <div className="space-y-1.5">
+                      <Button size="sm" variant="outline" className="w-full h-8 text-[10px] rounded-lg border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/5">
+                        <CheckCircle2 className="w-3 h-3 ml-1" /> دورة مكتملة
+                      </Button>
+                      <Button size="sm" variant="outline" className="w-full h-8 text-[10px] rounded-lg border-gold/30 text-navy hover:bg-gold/5" onClick={() => onContinue(c, c.enrollment)}>
+                        <BookOpen className="w-3 h-3 ml-1" /> مراجعة
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy shadow-md active:scale-[0.97] transition-all" onClick={() => onContinue(c, c.enrollment)}>
+                      <PlayCircle className="w-3 h-3 ml-1" /> متابعة التعلّم
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            )
+          })}
         </div>
       )}
     </SectionCard>
@@ -2159,41 +2230,61 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
   return (
     <SectionCard title="الملف الشخصي" description="إدارة معلوماتك الشخصية">
       <div className="space-y-6 max-w-2xl">
-        <div className="flex flex-col items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
-          <AvatarUploader
-            userId={user.id}
-            role="student"
-            initialUrl={user?.avatar}
-            name={user?.name}
-            size="xl"
-            onUploaded={(url) => updateUser({ avatar: url })}
-          />
+        {/* ⚡ Magical avatar section */}
+        <div className="relative flex flex-col items-center gap-4 p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy/5 via-white to-gold/5 overflow-hidden">
+          <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle at 50% 0%, #D4AF37 1px, transparent 1px)',
+            backgroundSize: '14px 14px'
+          }} />
+          <div className="absolute -top-8 -left-8 w-24 h-24 bg-gold/15 rounded-full blur-2xl" />
+          <div className="absolute -bottom-8 -right-8 w-20 h-20 bg-navy/15 rounded-full blur-2xl" />
+          <div className="relative">
+            <AvatarUploader
+              userId={user.id}
+              role="student"
+              initialUrl={user?.avatar}
+              name={user?.name}
+              size="xl"
+              onUploaded={(url) => updateUser({ avatar: url })}
+            />
+          </div>
         </div>
 
+        {/* ⚡ Magical form fields */}
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <Label className="text-navy">الاسم الكامل</Label>
-            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+              <User className="w-3.5 h-3.5 text-gold" /> الاسم الكامل
+            </Label>
+            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
           </div>
           <div>
-            <Label className="text-navy">البريد الإلكتروني</Label>
-            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
+            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+              <Mail className="w-3.5 h-3.5 text-gold" /> البريد الإلكتروني
+            </Label>
+            <Input value={user?.email || ''} disabled dir="ltr" className="rounded-xl bg-muted/30" />
           </div>
           <div>
-            <Label className="text-navy">رقم الهاتف</Label>
-            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
+            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+              <Phone className="w-3.5 h-3.5 text-gold" /> رقم الهاتف
+            </Label>
+            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
           </div>
           <div>
-            <Label className="text-navy">التخصص</Label>
-            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
+            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
+            </Label>
+            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
           </div>
         </div>
         <div>
-          <Label className="text-navy">نبذة تعريفية</Label>
-          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="mt-1" />
+          <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+            <FileText className="w-3.5 h-3.5 text-gold" /> نبذة تعريفية
+          </Label>
+          <Textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={4} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
         </div>
-        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
-          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+        <Button onClick={save} disabled={loading} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
+          {loading ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري الحفظ...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ التغييرات</>}
         </Button>
       </div>
     </SectionCard>
@@ -2535,14 +2626,19 @@ function SettingsTab({ user, updateUser }: any) {
   return (
     <SectionCard title="الإعدادات" description="إدارة حسابك وتفضيلاتك">
       <div className="space-y-6 max-w-2xl">
-        {/* Account header */}
-        <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border">
-          <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
+        {/* ⚡ Magical account header */}
+        <div className="relative flex items-center gap-3 p-4 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
+          <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-navy font-bold text-xl border border-white/30 shadow-md">
             {user?.name?.charAt(0)}
           </div>
-          <div className="min-w-0">
-            <div className="font-bold text-navy">{user?.name}</div>
-            <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
+          <div className="relative min-w-0">
+            <div className="font-bold text-white">{user?.name}</div>
+            <div className="text-xs text-gold/80" dir="ltr">{user?.email}</div>
           </div>
         </div>
 
@@ -2553,10 +2649,13 @@ function SettingsTab({ user, updateUser }: any) {
           </h3>
 
           <div className="space-y-4">
-            {/* Change email */}
-            <div className="p-4 rounded-lg border border-border bg-white">
-              <div className="flex items-center gap-2 mb-3">
-                <Mail className="w-4 h-4 text-navy" />
+            {/* ⚡ Change email — magical card */}
+            <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-gold" />
+                </div>
                 <div className="font-semibold text-navy text-sm">تغيير البريد الإلكتروني</div>
               </div>
               <div className="space-y-2">
@@ -2566,6 +2665,7 @@ function SettingsTab({ user, updateUser }: any) {
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder={user?.email || 'example@fia.edu'}
                   dir="ltr"
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
                 <div className="relative">
                   <Input
@@ -2574,7 +2674,7 @@ function SettingsTab({ user, updateUser }: any) {
                     onChange={(e) => setEmailPwd(e.target.value)}
                     placeholder="كلمة المرور الحالية للتأكيد"
                     dir="ltr"
-                    className="pr-3 pl-9"
+                    className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                   />
                   <button
                     type="button"
@@ -2587,17 +2687,20 @@ function SettingsTab({ user, updateUser }: any) {
                 <Button
                   onClick={saveEmail}
                   disabled={emailLoading || !newEmail || !emailPwd}
-                  className="w-full bg-navy hover:bg-navy-light"
+                  className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
                 >
                   {emailLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ البريد'}
                 </Button>
               </div>
             </div>
 
-            {/* Change password */}
-            <div className="p-4 rounded-lg border border-border bg-white">
-              <div className="flex items-center gap-2 mb-3">
-                <Lock className="w-4 h-4 text-navy" />
+            {/* ⚡ Change password — magical card */}
+            <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-gold" />
+                </div>
                 <div className="font-semibold text-navy text-sm">تغيير كلمة المرور</div>
               </div>
               <div className="space-y-2">
@@ -2608,7 +2711,7 @@ function SettingsTab({ user, updateUser }: any) {
                     onChange={(e) => setCurrentPwd(e.target.value)}
                     placeholder="كلمة المرور الحالية"
                     dir="ltr"
-                    className="pr-3 pl-9"
+                    className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                   />
                   <button
                     type="button"
@@ -2625,7 +2728,7 @@ function SettingsTab({ user, updateUser }: any) {
                     onChange={(e) => setNewPwd(e.target.value)}
                     placeholder="كلمة المرور الجديدة"
                     dir="ltr"
-                    className="pr-3 pl-9"
+                    className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                   />
                   <button
                     type="button"
@@ -2641,9 +2744,12 @@ function SettingsTab({ user, updateUser }: any) {
                   onChange={(e) => setConfirmPwd(e.target.value)}
                   placeholder="تأكيد كلمة المرور الجديدة"
                   dir="ltr"
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
                 {newPwd && confirmPwd && newPwd !== confirmPwd && (
-                  <p className="text-xs text-red-500">كلمتا المرور غير متطابقتين</p>
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <XCircle className="w-3 h-3" /> كلمتا المرور غير متطابقتين
+                  </p>
                 )}
                 {newPwd && confirmPwd && newPwd === confirmPwd && (
                   <p className="text-xs text-green-600 flex items-center gap-1">
@@ -2653,17 +2759,20 @@ function SettingsTab({ user, updateUser }: any) {
                 <Button
                   onClick={savePassword}
                   disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd || newPwd !== confirmPwd}
-                  className="w-full bg-navy hover:bg-navy-light"
+                  className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
                 >
                   {pwdLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ كلمة المرور'}
                 </Button>
               </div>
             </div>
 
-            {/* Change phone number */}
-            <div className="p-4 rounded-lg border border-border bg-white">
-              <div className="flex items-center gap-2 mb-3">
-                <User className="w-4 h-4 text-navy" />
+            {/* ⚡ Change phone — magical card */}
+            <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-gold" />
+                </div>
                 <div className="font-semibold text-navy text-sm">تغيير رقم الهاتف</div>
               </div>
               <div className="space-y-2">
@@ -2673,11 +2782,12 @@ function SettingsTab({ user, updateUser }: any) {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="رقم الهاتف الجديد"
                   dir="ltr"
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
                 <Button
                   onClick={savePhone}
                   disabled={phoneLoading || !phone || phone === user?.phone}
-                  className="w-full bg-navy hover:bg-navy-light"
+                  className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
                 >
                   {phoneLoading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ الهاتف'}
                 </Button>
@@ -2686,13 +2796,14 @@ function SettingsTab({ user, updateUser }: any) {
           </div>
         </div>
 
-        {/* ===== Notification preferences ===== */}
+        {/* ⚡ Notification preferences — magical card */}
         <div>
           <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
             <Bell className="w-4 h-4 text-gold" /> تفضيلات الإشعارات
           </h3>
-          <div className="p-4 rounded-lg border border-border bg-white flex items-center justify-between">
-            <div>
+          <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 flex items-center justify-between overflow-hidden">
+            <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+            <div className="relative">
               <div className="font-medium text-navy text-sm">إشعارات البريد الإلكتروني</div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 تنبيهات حول تأكيد التسجيل والمدفوعات والدروس الجديدة
@@ -2751,13 +2862,17 @@ function StudentCertificates({ user }: any) {
   if (items.length === 0) {
     return (
       <SectionCard title="شهاداتي" description="الشهادات الصادرة لك">
-        <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto rounded-full bg-gold/10 flex items-center justify-center mb-4">
-            <Award className="w-10 h-10 text-gold/50" />
+        {/* ⚡ Magical empty state */}
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Award className="w-10 h-10 text-gold" />
+            </div>
           </div>
-          <h3 className="font-bold text-navy mb-2">لا توجد شهادات صادرة بعد</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            تكمل دورتك بنسبة 100% ثم اطلب شهادتك من داخل الدورة. ستظهر هنا فور إصدارها من الإدارة.
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد شهادات صادرة بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+            تكمل دورتك بنسبة 100% ثم اطلب شهادتك من داخل الدورة. ستظهر هنا فور إصدارها من الإدارة ✨
           </p>
         </div>
       </SectionCard>
@@ -2767,58 +2882,76 @@ function StudentCertificates({ user }: any) {
   return (
     <>
       <SectionCard title="شهاداتي" description={`${items.length} شهادة صادرة`}>
-        <div className="grid sm:grid-cols-2 gap-5">
+        {/* ⚡ Magical compact certificate cards — 2/3 grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 fia-stagger">
           {items.map((cert) => (
-            <Card key={cert.id} className="overflow-hidden hover:shadow-xl transition-all group cursor-pointer" >
-              <div className="h-2 bg-gradient-to-r from-gold via-gold-light to-gold" />
-              <div className="bg-gradient-to-br from-navy to-navy-light p-5 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
-                <div className="relative flex items-start justify-between">
+            <Card key={cert.id} className="fia-course-card p-0 overflow-hidden cursor-pointer border border-gold/30 group">
+              {/* Top gold strip */}
+              <div className="h-2 bg-gradient-to-r from-gold via-amber-300 to-gold" />
+              {/* Magical header — navy with gold dot pattern */}
+              <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy p-4 text-white overflow-hidden">
+                <div className="absolute inset-0 opacity-25" style={{
+                  backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                  backgroundSize: '20px 20px, 16px 16px'
+                }} />
+                <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
+                <div className="relative flex items-start justify-between mb-1">
                   <div>
-                    <div className="text-[10px] text-gold uppercase tracking-widest mb-1">Future International Academy</div>
-                    <div className="text-xs text-white/70">شهادة إكمال معتمدة</div>
+                    <div className="text-[9px] text-gold uppercase tracking-widest mb-0.5">FIA</div>
+                    <div className="text-[10px] text-white/70">شهادة إكمال</div>
                   </div>
-                  <Award className="w-6 h-6 text-gold" />
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md border border-white/20">
+                    <Award className="w-5 h-5 text-navy" />
+                  </div>
+                </div>
+                {/* Status pill — with fia-status-glow */}
+                <div className="fia-status-glow relative inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 rounded-full px-2 py-0.5 text-[9px] font-bold mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  صالحة
                 </div>
               </div>
-              <div className="p-5">
-                <p className="text-[10px] text-muted-foreground mb-1">الدورة</p>
-                <h4 className="font-bold text-navy text-sm mb-3 line-clamp-2">{cert.course_title}</h4>
-                <div className="flex items-center justify-between text-xs">
+              {/* Body — compact info */}
+              <div className="p-3 space-y-2">
+                <div>
+                  <div className="text-[9px] text-muted-foreground mb-0.5">الدورة</div>
+                  <h4 className="font-bold text-navy text-xs line-clamp-2 leading-tight">{cert.course_title}</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
                   <div>
-                    <div className="text-[10px] text-muted-foreground">رقم الشهادة</div>
-                    <div className="font-mono font-bold text-navy" dir="ltr">{cert.certificate_number}</div>
+                    <div className="text-[9px] text-muted-foreground mb-0.5">رقم الشهادة</div>
+                    <div className="text-[10px] font-mono font-bold text-gold break-all" dir="ltr">{cert.certificate_number}</div>
                   </div>
-                  <div className="text-left">
-                    <div className="text-[10px] text-muted-foreground">تاريخ الإصدار</div>
-                    <div className="font-bold text-navy">
+                  <div>
+                    <div className="text-[9px] text-muted-foreground mb-0.5">الإصدار</div>
+                    <div className="text-[10px] font-bold text-navy" dir="ltr">
                       {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                     </div>
                   </div>
                 </div>
                 {cert.has_external_accreditation && cert.external_accreditation_body && (
-                  <div className="mt-3 pt-3 border-t border-border flex items-center gap-1.5 text-[10px] text-gold">
-                    <Award className="w-3 h-3" />
-                    معتمدة من: {cert.external_accreditation_body}
+                  <div className="pt-2 border-t border-border/40 flex items-center gap-1.5 text-[10px] text-gold">
+                    <Award className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">معتمدة: {cert.external_accreditation_body}</span>
                   </div>
                 )}
-              </div>
-              <div className="px-5 pb-5 flex gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1 bg-navy hover:bg-navy-light"
-                  onClick={() => setViewing(cert)}
-                >
-                  <ExternalLink className="w-3.5 h-3.5 ml-1.5" /> عرض الشهادة
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-gold/30 text-gold hover:bg-gold/10"
-                  onClick={() => setViewing(cert)}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </Button>
+                {/* Actions */}
+                <div className="flex gap-1 pt-2 border-t border-border/40">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 text-[10px] rounded-lg bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold shadow-md active:scale-[0.97] transition-all"
+                    onClick={() => setViewing(cert)}
+                  >
+                    <ExternalLink className="w-3 h-3 ml-1" /> عرض
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 w-8 p-0 border-gold/30 text-gold hover:bg-gold/10 rounded-lg"
+                    onClick={() => setViewing(cert)}
+                  >
+                    <Download className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
