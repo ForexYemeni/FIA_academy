@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar,
+  Search, Calendar, MapPin, Target, Send,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -762,13 +762,301 @@ function AdminCourses() {
 }
 
 function AdminExams() {
+  const [exams, setExams] = useState<any[]>([])
+  const [questions, setQuestions] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [tab, setTab] = useState<'exams' | 'questions'>('exams')
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    Promise.all([
+      fetch('/api/exam-questions').then(r => r.json()).catch(() => []),
+      fetch('/api/courses').then(r => r.json()).catch(() => []),
+    ]).then(([q, c]) => {
+      const qArr = Array.isArray(q) ? q : []
+      setQuestions(qArr)
+      setCourses(Array.isArray(c) ? c : [])
+      // Group questions by lesson_id to form "exams" (each exam = all questions for one lesson)
+      const examMap: Record<string, any> = {}
+      for (const question of qArr) {
+        const key = question.lesson_id || 'unassigned'
+        if (!examMap[key]) {
+          examMap[key] = {
+            lesson_id: question.lesson_id,
+            course_id: question.course_id,
+            questions: [],
+          }
+        }
+        examMap[key].questions.push(question)
+      }
+      setExams(Object.values(examMap))
+      setLoading(false)
+    })
+  }
+
+  useEffect(() => { load() }, [])
+
+  const filteredExams = exams.filter((ex) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    const course = courses.find((c) => c.id === ex.course_id)
+    return (course?.title || '').toLowerCase().includes(q)
+  })
+
+  const filteredQuestions = questions.filter((q) => {
+    if (!search.trim()) return true
+    const s = search.toLowerCase()
+    return (q.question || '').toLowerCase().includes(s) ||
+      (q.options && JSON.stringify(q.options).toLowerCase().includes(s))
+  })
+
+  const examStats = {
+    total: exams.length,
+    totalQuestions: questions.length,
+    multipleChoice: questions.filter((q) => q.question_type === 'multiple_choice').length,
+    trueFalse: questions.filter((q) => q.question_type === 'true_false').length,
+  }
+
   return (
-    <SectionCard title="الاختبارات" description="إدارة الاختبارات">
-      <div className="text-center py-12">
-        <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-        <p className="text-muted-foreground mb-4">لا توجد اختبارات</p>
-        <Button className="bg-navy hover:bg-navy-light"><Plus className="w-4 h-4 ml-1" /> اختبار جديد</Button>
+    <SectionCard
+      title="بنك الأسئلة والاختبارات"
+      description={`${exams.length} اختبار • ${questions.length} سؤال`}
+    >
+      {/* ⚡ Magical stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="fia-card-hover relative p-3 rounded-xl border border-blue-300/40 bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-10 h-10 bg-blue-500/15 rounded-full blur-lg" />
+          <div className="relative flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+              <FileText className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-[10px] text-muted-foreground">الاختبارات</div>
+              <div className="text-lg font-extrabold text-navy">{examStats.total}</div>
+            </div>
+          </div>
+        </div>
+        <div className="fia-card-hover relative p-3 rounded-xl border border-amber-300/40 bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-10 h-10 bg-amber-500/15 rounded-full blur-lg" />
+          <div className="relative flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-md">
+              <HelpCircle className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-[10px] text-muted-foreground">إجمالي الأسئلة</div>
+              <div className="text-lg font-extrabold text-navy">{examStats.totalQuestions}</div>
+            </div>
+          </div>
+        </div>
+        <div className="fia-card-hover relative p-3 rounded-xl border border-emerald-300/40 bg-gradient-to-br from-emerald-50 to-teal-50 overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-10 h-10 bg-emerald-500/15 rounded-full blur-lg" />
+          <div className="relative flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
+              <CheckCircle2 className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-[10px] text-muted-foreground">اختيار من متعدد</div>
+              <div className="text-lg font-extrabold text-navy">{examStats.multipleChoice}</div>
+            </div>
+          </div>
+        </div>
+        <div className="fia-card-hover relative p-3 rounded-xl border border-purple-300/40 bg-gradient-to-br from-purple-50 to-fuchsia-50 overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-10 h-10 bg-purple-500/15 rounded-full blur-lg" />
+          <div className="relative flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xs">T/F</span>
+            </div>
+            <div>
+              <div className="text-[10px] text-muted-foreground">صح / خطأ</div>
+              <div className="text-lg font-extrabold text-navy">{examStats.trueFalse}</div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* ⚡ Magical tabs */}
+      <div className="flex gap-2 border-b border-gold/20 pb-3 mb-4">
+        <button
+          onClick={() => setTab('exams')}
+          className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+            tab === 'exams'
+              ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+              : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+          }`}
+        >
+          {tab === 'exams' && (
+            <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+              backgroundSize: '12px 12px'
+            }} />
+          )}
+          <span className="relative flex items-center gap-1.5">
+            <FileText className="w-4 h-4" /> الاختبارات
+          </span>
+        </button>
+        <button
+          onClick={() => setTab('questions')}
+          className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+            tab === 'questions'
+              ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+              : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+          }`}
+        >
+          {tab === 'questions' && (
+            <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+              backgroundSize: '12px 12px'
+            }} />
+          )}
+          <span className="relative flex items-center gap-1.5">
+            <HelpCircle className="w-4 h-4" /> بنك الأسئلة
+          </span>
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Input placeholder={tab === 'exams' ? 'بحث باسم الدورة...' : 'بحث بنص السؤال أو الخيارات...'} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 bg-white" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold/60" />
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 mx-auto animate-spin text-gold" />
+          <p className="text-xs text-muted-foreground mt-2">جاري تحميل البيانات...</p>
+        </div>
+      ) : tab === 'exams' ? (
+        /* ⚡ Magical Exams cards */
+        filteredExams.length === 0 ? (
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <FileText className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">{search ? 'لا توجد نتائج' : 'لا توجد اختبارات بعد'}</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+              {search ? 'جرّب كلمات بحث مختلفة' : 'يتم إنشاء الاختبارات تلقائياً عند إضافة أسئلة لدروس من نوع "اختبار" في محتوى الدورات ✨'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+            {filteredExams.map((ex, i) => {
+              const course = courses.find((c) => c.id === ex.course_id)
+              const questionCount = ex.questions.length
+              return (
+                <Card key={i} className="fia-card-hover p-0 overflow-hidden border border-gold/20 hover:border-gold/40">
+                  {/* Magical header */}
+                  <div className="relative p-3 bg-gradient-to-br from-purple-600 via-purple-700 to-fuchsia-700 text-white overflow-hidden">
+                    <div className="absolute inset-0 opacity-20" style={{
+                      backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                      backgroundSize: '12px 12px'
+                    }} />
+                    <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                          {questionCount} سؤال
+                        </Badge>
+                      </div>
+                      <div className="text-xs font-bold text-white line-clamp-2">{course?.title || 'دورة غير محددة'}</div>
+                    </div>
+                  </div>
+                  {/* Body */}
+                  <div className="p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-[9px] text-muted-foreground mb-0.5">نوع</div>
+                        <div className="text-[10px] font-bold text-navy">اختبار</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-muted-foreground mb-0.5">الحالة</div>
+                        <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[9px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />
+                          نشط
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="pt-1.5 border-t border-border/40">
+                      <div className="text-[9px] text-muted-foreground mb-0.5">معرف الدرس</div>
+                      <div className="text-[10px] font-mono text-gold break-all" dir="ltr">{ex.lesson_id || '-'}</div>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )
+      ) : (
+        /* ⚡ Magical Questions list */
+        filteredQuestions.length === 0 ? (
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <HelpCircle className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">{search ? 'لا توجد نتائج' : 'لا توجد أسئلة بعد'}</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+              {search ? 'جرّب كلمات بحث مختلفة' : 'يتم إضافة الأسئلة من مدير محتوى الدورة — افتح أي دورة وأضف درساً من نوع "اختبار" ✨'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredQuestions.map((q, i) => {
+              const isMultiple = q.question_type === 'multiple_choice'
+              const isTrueFalse = q.question_type === 'true_false'
+              const course = courses.find((c) => c.id === q.course_id)
+              return (
+                <Card key={i} className="fia-card-hover p-3 border border-gold/20 hover:border-gold/40">
+                  <div className="flex items-start gap-3">
+                    {/* Type icon */}
+                    <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center shadow-md ${
+                      isMultiple
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                        : isTrueFalse
+                          ? 'bg-gradient-to-br from-purple-500 to-fuchsia-600'
+                          : 'bg-gradient-to-br from-amber-500 to-yellow-600'
+                    }`}>
+                      {isMultiple ? <CheckCircle2 className="w-5 h-5 text-white" /> : isTrueFalse ? <span className="text-white font-bold text-xs">T/F</span> : <HelpCircle className="w-5 h-5 text-white" />}
+                    </div>
+                    {/* Question + options */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <Badge className={isMultiple ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[9px]' : isTrueFalse ? 'bg-purple-500/15 text-purple-700 border-purple-500/30 text-[9px]' : 'bg-amber-500/15 text-amber-700 border-amber-500/30 text-[9px]'}>
+                          {isMultiple ? 'اختيار من متعدد' : isTrueFalse ? 'صح / خطأ' : 'سؤال'}
+                        </Badge>
+                        {course && <Badge className="bg-navy/5 text-navy border-navy/10 text-[9px]">{course.title}</Badge>}
+                      </div>
+                      <div className="font-bold text-navy text-sm mb-1 line-clamp-2">{q.question || 'سؤال بدون نص'}</div>
+                      {q.options && Array.isArray(q.options) && q.options.length > 0 && (
+                        <div className="space-y-0.5 mt-1">
+                          {q.options.slice(0, 4).map((opt: any, idx: number) => {
+                            const isCorrect = q.correct_answer === opt || q.correct_answer === idx || q.correct_answer === String(idx)
+                            return (
+                              <div key={idx} className={`text-xs flex items-center gap-1.5 ${isCorrect ? 'text-emerald-600 font-bold' : 'text-muted-foreground'}`}>
+                                {isCorrect ? <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> : <span className="w-3 h-3 flex-shrink-0 text-center text-[10px]">{String.fromCharCode(1571 + idx)}</span>}
+                                <span className="line-clamp-1">{opt}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )
+      )}
     </SectionCard>
   )
 }
@@ -2174,104 +2462,220 @@ function AdminCertificates() {
       title="الشهادات"
       description={tab === 'issued' ? `${filtered.length} شهادة صادرة` : `${requests.length} طلب شهادة`}
     >
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-border pb-3 mb-4">
-        <button onClick={() => setTab('issued')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'issued' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📄 الشهادات الصادرة</button>
-        <button onClick={() => setTab('requests')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'requests' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>📋 طلبات الشهادات {requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length > 0 && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 mr-1">{requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length}</span>}</button>
+      {/* ⚡ Magical tabs */}
+      <div className="flex gap-2 border-b border-gold/20 pb-3 mb-4">
+        <button
+          onClick={() => setTab('issued')}
+          className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+            tab === 'issued'
+              ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+              : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+          }`}
+        >
+          {tab === 'issued' && (
+            <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+              backgroundSize: '12px 12px'
+            }} />
+          )}
+          <span className="relative flex items-center gap-1.5">
+            <Award className="w-4 h-4" /> الشهادات الصادرة
+          </span>
+        </button>
+        <button
+          onClick={() => setTab('requests')}
+          className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+            tab === 'requests'
+              ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+              : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+          }`}
+        >
+          {tab === 'requests' && (
+            <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+              backgroundSize: '12px 12px'
+            }} />
+          )}
+          <span className="relative flex items-center gap-1.5">
+            <FileText className="w-4 h-4" /> طلبات الشهادات
+            {requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length > 0 && (
+              <span className="bg-gradient-to-r from-red-500 to-rose-600 text-white text-[10px] rounded-full px-1.5 py-0.5 ml-1 shadow-sm">{requests.filter(r => r.status === 'pending' || r.status === 'trainer_approved').length}</span>
+            )}
+          </span>
+        </button>
       </div>
 
       {tab === 'issued' ? (
         <>
+          {/* ⚡ Magical filter bar */}
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
-            <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+            <div className="relative flex-1">
+              <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 bg-white" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold/60" />
+            </div>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
               <option value="all">كل الحالات</option>
               <option value="صالحة">صالحة</option>
               <option value="ملغاة">ملغاة</option>
-              <option value="مستبدلة">مستبدلة (تم إعادة إصدارها)</option>
+              <option value="مستبدلة">مستبدلة</option>
             </select>
           </div>
-          <div className="space-y-2">
-            {filtered.map((c) => (
-              <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border border-border rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-mono text-gold text-xs" dir="ltr">{c.certificate_number}</span>
-                    <Badge className={c.status === 'صالحة' ? 'bg-green-500/15 text-green-600 border-green-500/30' : c.status === 'مستبدلة' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' : 'bg-red-500/15 text-red-600 border-red-500/30'}>{c.status}</Badge>
-                  </div>
-                  <div className="font-medium text-navy text-sm">{c.student_name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{c.course_title || '-'}</div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0 flex-wrap">
-                  <Button size="sm" variant="ghost" onClick={() => setPreviewCert(c)} title="معاينة الشهادة"><Eye className="w-4 h-4 text-navy" /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار (برقم جديد)" className="text-blue-600">
-                    {reissuing === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل"><Edit className="w-4 h-4 text-navy" /></Button>
-                  {c.status === 'صالحة' ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(c)} title="إلغاء"><XCircle className="w-4 h-4 text-red-500" /></Button> : <Button size="sm" variant="ghost" onClick={() => setCertRestoreTarget(c)} title="استعادة"><CheckCircle2 className="w-4 h-4 text-green-600" /></Button>}
-                  <Button size="sm" variant="ghost" onClick={() => setCertDeleteTarget(c)} title="حذف"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+
+          {filtered.length === 0 ? (
+            /* ⚡ Magical empty state */
+            <div className="text-center py-14">
+              <div className="relative inline-block mb-4">
+                <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                  <Award className="w-10 h-10 text-gold" />
                 </div>
               </div>
-            ))}
-            {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</div>}
-          </div>
+              <h3 className="font-bold text-navy text-base mb-1.5">{search ? 'لا توجد نتائج' : 'لا توجد شهادات صادرة'}</h3>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">{search ? 'جرّب كلمات بحث مختلفة' : 'ستظهر الشهادات هنا عند إصدارها ✨'}</p>
+            </div>
+          ) : (
+            /* ⚡ Magical compact certificate cards — 2/3/4 grid */
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
+              {filtered.map((c) => {
+                const isValid = c.status === 'صالحة'
+                const isCancelled = c.status === 'ملغاة'
+                const isReplaced = c.status === 'مستبدلة'
+                const theme = isValid
+                  ? { gradient: 'from-emerald-600 to-teal-700', border: 'border-emerald-400/40', glow: 'fia-status-glow' }
+                  : isCancelled
+                    ? { gradient: 'from-rose-600 to-red-700', border: 'border-rose-400/40', glow: '' }
+                    : { gradient: 'from-blue-600 to-indigo-700', border: 'border-blue-400/40', glow: '' }
+                return (
+                  <Card key={c.id} className={`fia-card-hover p-0 overflow-hidden border ${theme.border}`}>
+                    {/* Magical header */}
+                    <div className={`relative bg-gradient-to-br ${theme.gradient} p-3 text-white overflow-hidden`}>
+                      <div className="absolute inset-0 opacity-20" style={{
+                        backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                        backgroundSize: '12px 12px'
+                      }} />
+                      <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
+                            <Award className="w-5 h-5 text-white" />
+                          </div>
+                          <Badge className={`${theme.glow} bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-300 animate-pulse' : isCancelled ? 'bg-rose-300' : 'bg-blue-300'} ml-1`} />
+                            {c.status}
+                          </Badge>
+                        </div>
+                        <div className="font-mono text-[10px] font-bold text-white/90 break-all" dir="ltr">{c.certificate_number}</div>
+                      </div>
+                    </div>
+                    {/* Body */}
+                    <div className="p-3 space-y-2">
+                      <div>
+                        <div className="text-[9px] text-muted-foreground mb-0.5">المتدرب</div>
+                        <div className="font-bold text-navy text-xs line-clamp-1">{c.student_name}</div>
+                      </div>
+                      <div className="pt-1.5 border-t border-border/40">
+                        <div className="text-[9px] text-muted-foreground mb-0.5">الدورة</div>
+                        <div className="text-[10px] text-navy line-clamp-2 leading-tight">{c.course_title || '-'}</div>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex gap-1 pt-1.5 border-t border-border/40">
+                        <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-navy/5" onClick={() => setPreviewCert(c)} title="معاينة">
+                          <Eye className="w-3 h-3 ml-0.5 text-navy" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-blue-500/10" onClick={() => setReissueTarget(c)} disabled={!!reissuing} title="إعادة إصدار">
+                          {reissuing === c.id ? <Loader2 className="w-3 h-3 animate-spin text-blue-600" /> : <RefreshCw className="w-3 h-3 text-blue-600" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-navy/5" onClick={() => { setEditing(c); setOpen(true) }} title="تعديل">
+                          <Edit className="w-3 h-3 text-navy" />
+                        </Button>
+                        {isValid ? (
+                          <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-red-500/10" onClick={() => setRevokeTarget(c)} title="إلغاء">
+                            <XCircle className="w-3 h-3 text-red-500" />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-emerald-500/10" onClick={() => setCertRestoreTarget(c)} title="استعادة">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="flex-1 h-8 text-[10px] rounded-lg hover:bg-red-500/10" onClick={() => setCertDeleteTarget(c)} title="حذف">
+                          <Trash2 className="w-3 h-3 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
         </>
       ) : (
-        /* Certificate requests tab */
-        <div className="space-y-2">
-          {requests.map((r) => {
-            const badge = requestStatusBadge(r.status)
-            const completed = isCourseCompleted(r.user_id, r.course_id)
-            return (
-              <div key={r.id} className="p-3 bg-white border border-border rounded-lg">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <Badge className={badge.color}>{badge.label}</Badge>
-                  {completed && <Badge className="bg-green-500/15 text-green-600 border-green-500/30">✅ الدورة مكتملة</Badge>}
-                  {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
-                </div>
-                <div className="font-medium text-navy text-sm">{r.student_name}</div>
-                <div className="text-xs text-muted-foreground">{r.course_title || '-'}</div>
-                {r.amount > 0 && <div className="text-xs text-muted-foreground mt-1">رسوم الشهادة: {r.amount.toLocaleString()} {r.currency}</div>}
-                {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
-                {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
-                {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
-                {r.cert_number && <div className="text-xs font-mono text-green-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
-                {r.verify_code && <div className="text-xs font-mono text-green-600" dir="ltr">رمز التحقق: {r.verify_code}</div>}
-
-                {/* Action buttons based on status */}
-                <div className="flex gap-2 mt-3 pt-2 border-t border-border">
-                  {r.status === 'pending' && (
-                    <>
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
-                        <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
-                      </Button>
-                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>
-                        <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
-                      </Button>
-                    </>
-                  )}
-                  {r.status === 'trainer_approved' && (
-                    <Button size="sm" className="bg-navy hover:bg-navy-light text-gold text-xs" onClick={() => handleRequestAction(r.id, 'admin_approve', 'تمت الموافقة على الطلب')}>
-                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدير
-                    </Button>
-                  )}
-                  {r.status === 'admin_approved' && (
-                    <Button size="sm" className="bg-gold hover:bg-gold-light text-navy text-xs" onClick={() => handleRequestAction(r.id, 'issue')}>
-                      <Award className="w-3.5 h-3.5 ml-1" /> إصدار الشهادة
-                    </Button>
-                  )}
-                  {r.status === 'issued' && r.cert_number && (
-                    <a href={`/api/certificate-pdf?number=${encodeURIComponent(r.cert_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="border-gold/30 text-navy hover:bg-gold/10 text-xs">
-                        <Download className="w-3.5 h-3.5 ml-1" /> تحميل الشهادة
-                      </Button>
-                    </a>
-                  )}
+        /* ⚡ Magical Certificate requests tab */
+        <div className="space-y-3">
+          {requests.length === 0 ? (
+            <div className="text-center py-14">
+              <div className="relative inline-block mb-4">
+                <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                  <FileText className="w-10 h-10 text-gold" />
                 </div>
               </div>
-            )
-          })}
-          {requests.length === 0 && <div className="text-center py-8 text-muted-foreground">لا توجد طلبات شهادات</div>}
+              <h3 className="font-bold text-navy text-base mb-1.5">لا توجد طلبات شهادات</h3>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">ستظهر طلبات الشهادات هنا عند تقديمها ✨</p>
+            </div>
+          ) : (
+            requests.map((r) => {
+              const badge = requestStatusBadge(r.status)
+              const completed = isCourseCompleted(r.user_id, r.course_id)
+              return (
+                <Card key={r.id} className="fia-card-hover p-3 border border-gold/20 hover:border-gold/40">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <Badge className={badge.color}>{badge.label}</Badge>
+                    {completed && <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">✅ الدورة مكتملة</Badge>}
+                    {!completed && r.status === 'pending' && <Badge className="bg-red-500/15 text-red-600 border-red-500/30">⚠️ الدورة غير مكتملة</Badge>}
+                  </div>
+                  <div className="font-bold text-navy text-sm mb-1">{r.student_name}</div>
+                  <div className="text-xs text-muted-foreground mb-1">{r.course_title || '-'}</div>
+                  {r.amount > 0 && <div className="text-xs text-gold font-bold mt-1">رسوم: {r.amount.toLocaleString()} {r.currency}</div>}
+                  {r.created_at && <div className="text-[10px] text-muted-foreground mt-1" dir="ltr">طلب في: {new Date(r.created_at).toLocaleDateString('ar-EG')}</div>}
+                  {r.trainer_note && <div className="text-xs text-blue-600 mt-1">📝 ملاحظة المدرب: {r.trainer_note}</div>}
+                  {r.admin_note && <div className="text-xs text-purple-600 mt-1">📝 ملاحظة المدير: {r.admin_note}</div>}
+                  {r.cert_number && <div className="text-xs font-mono text-emerald-600 mt-1" dir="ltr">رقم الشهادة: {r.cert_number}</div>}
+                  {r.verify_code && <div className="text-xs font-mono text-emerald-600" dir="ltr">رمز التحقق: {r.verify_code}</div>}
+
+                  {/* Action buttons based on status */}
+                  <div className="flex gap-2 mt-3 pt-2 border-t border-border/40">
+                    {r.status === 'pending' && (
+                      <>
+                        <Button size="sm" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs rounded-lg shadow-md active:scale-[0.97] transition-all" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
+                          <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
+                        </Button>
+                        <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs rounded-lg" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>
+                          <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
+                        </Button>
+                      </>
+                    )}
+                    {r.status === 'trainer_approved' && (
+                      <Button size="sm" className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold text-xs rounded-lg shadow-md active:scale-[0.97] transition-all" onClick={() => handleRequestAction(r.id, 'admin_approve', 'تمت الموافقة على الطلب')}>
+                        <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدير
+                      </Button>
+                    )}
+                    {r.status === 'admin_approved' && (
+                      <Button size="sm" className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy text-xs rounded-lg shadow-md active:scale-[0.97] transition-all" onClick={() => handleRequestAction(r.id, 'issue')}>
+                        <Award className="w-3.5 h-3.5 ml-1" /> إصدار الشهادة
+                      </Button>
+                    )}
+                    {r.status === 'issued' && r.cert_number && (
+                      <a href={`/api/certificate-pdf?number=${encodeURIComponent(r.cert_number)}&format=pdf`} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="border-gold/30 text-navy hover:bg-gold/10 text-xs rounded-lg">
+                          <Download className="w-3.5 h-3.5 ml-1" /> تحميل الشهادة
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                </Card>
+              )
+            })
+          )}
         </div>
       )}
 
@@ -2279,38 +2683,61 @@ function AdminCertificates() {
 
       {revokeTarget && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeReason('') } }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>إلغاء الشهادة</DialogTitle></DialogHeader>
-            <div className="space-y-3 py-4">
-              <div className="bg-red-50 border border-red-500/30 p-3 rounded-lg text-sm">
+          <DialogContent className="sm:max-w-md p-0 border-0">
+            {/* Magical header */}
+            <div className="relative bg-gradient-to-br from-red-600 to-rose-700 p-5 text-white overflow-hidden rounded-t-xl">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-white">
+                  <XCircle className="w-5 h-5" /> إلغاء الشهادة
+                </DialogTitle>
+              </DialogHeader>
+            </div>
+            <div className="space-y-3 p-5">
+              <div className="bg-red-50 border border-red-500/30 p-3 rounded-xl">
                 <div className="font-bold text-red-700">{revokeTarget.student_name}</div>
                 <div className="text-xs text-red-600 font-mono" dir="ltr">{revokeTarget.certificate_number}</div>
                 <div className="text-xs text-red-600 mt-1">{revokeTarget.course_title}</div>
               </div>
-              <div><Label>سبب الإلغاء *</Label><Textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={3} placeholder="مثال: خطأ في بيانات المتدرب..." className="mt-1" /></div>
+              <div><Label className="text-navy font-bold">سبب الإلغاء *</Label><Textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={3} placeholder="مثال: خطأ في بيانات المتدرب..." className="mt-1 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" /></div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }}>إلغاء</Button>
-              <Button onClick={revoke} className="bg-red-500 hover:bg-red-600 text-white">تأكيد الإلغاء</Button>
-            </DialogFooter>
+            <div className="flex justify-end gap-2 p-4 bg-muted/20 border-t border-border">
+              <Button variant="outline" onClick={() => { setRevokeTarget(null); setRevokeReason('') }} className="rounded-xl">إلغاء</Button>
+              <Button onClick={revoke} className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all">تأكيد الإلغاء</Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
       {previewCert && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setPreviewCert(null) }}>
-          <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
-            <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-gold" /> معاينة الشهادة — {previewCert.certificate_number}
+          <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto p-0 border-0">
+            {/* Magical header */}
+            <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy p-5 text-white overflow-hidden rounded-t-xl">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+              <button onClick={() => setPreviewCert(null)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center z-10 backdrop-blur-sm">
+                <X className="w-4 h-4 text-white" />
+              </button>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-white">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md">
+                    <Award className="w-5 h-5 text-navy" />
+                  </div>
+                  معاينة الشهادة — <span className="font-mono text-gold" dir="ltr">{previewCert.certificate_number}</span>
                 </DialogTitle>
-                <button onClick={() => setPreviewCert(null)} className="text-muted-foreground hover:text-navy">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </DialogHeader>
-            <CertificateViewer certificate={previewCert} onClose={() => setPreviewCert(null)} />
+              </DialogHeader>
+            </div>
+            <div className="p-5">
+              <CertificateViewer certificate={previewCert} onClose={() => setPreviewCert(null)} />
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -2999,18 +3426,43 @@ function AdminFounder({ user }: any) {
   return (
     <SectionCard title="المؤسس والفريق" description="إدارة معلومات المؤسس وأعضاء الفريق بشكل احترافي">
       <div className="space-y-5">
-        <div className="flex gap-2 border-b border-border pb-3">
+        {/* ⚡ Magical tab buttons */}
+        <div className="flex gap-2 border-b border-gold/20 pb-3">
           <button
             onClick={() => setTab('founder')}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'founder' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+            className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+              tab === 'founder'
+                ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+                : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+            }`}
           >
-            👑 المؤسس
+            {tab === 'founder' && (
+              <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+                backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                backgroundSize: '12px 12px'
+              }} />
+            )}
+            <span className="relative flex items-center gap-1.5">
+              <Crown className="w-4 h-4" /> المؤسس
+            </span>
           </button>
           <button
             onClick={() => setTab('team')}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === 'team' ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}
+            className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+              tab === 'team'
+                ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+                : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+            }`}
           >
-            👥 الفريق القيادي
+            {tab === 'team' && (
+              <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+                backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                backgroundSize: '12px 12px'
+              }} />
+            )}
+            <span className="relative flex items-center gap-1.5">
+              <Users className="w-4 h-4" /> الفريق القيادي
+            </span>
           </button>
         </div>
 
@@ -3044,185 +3496,336 @@ function AdminSite() {
 
   return (
     <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-border pb-3 mb-4 flex-wrap">
+      {/* ⚡ Magical tab buttons with icons */}
+      <div className="flex gap-2 border-b border-gold/20 pb-3 mb-4 flex-wrap">
         {[
-          { id: 'basic', label: 'معلومات أساسية' },
-          { id: 'about', label: 'من نحن' },
-          { id: 'policies', label: 'السياسات' },
-          { id: 'social', label: 'التواصل' },
-          { id: 'visibility', label: 'الإظهار' },
-        ].map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id as any)}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${tab === t.id ? 'bg-navy text-gold' : 'text-navy hover:bg-muted'}`}>
-            {t.label}
-          </button>
-        ))}
+          { id: 'basic',      label: 'معلومات أساسية', icon: Building2 },
+          { id: 'about',      label: 'من نحن',         icon: BookOpen },
+          { id: 'policies',   label: 'السياسات',       icon: Shield },
+          { id: 'social',     label: 'التواصل',         icon: MessageSquare },
+          { id: 'visibility', label: 'الإظهار',        icon: Eye },
+        ].map((t) => {
+          const TabIcon = t.icon
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as any)}
+              className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
+                tab === t.id
+                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
+                  : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+              }`}
+            >
+              {tab === t.id && (
+                <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+                  backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                  backgroundSize: '12px 12px'
+                }} />
+              )}
+              <span className="relative flex items-center gap-1.5">
+                <TabIcon className="w-4 h-4" /> {t.label}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="space-y-4 max-w-3xl">
-        {/* BASIC */}
+        {/* BASIC — magical card */}
         {tab === 'basic' && (
           <div className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>اسم الأكاديمية (عربي)</Label><Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="mt-1" /></div>
-              <div><Label>اسم الأكاديمية (إنجليزي)</Label><Input value={settings.academy_name_en || ''} onChange={(e) => setSettings({ ...settings, academy_name_en: e.target.value })} dir="ltr" className="mt-1" /></div>
-              <div><Label>الاختصار</Label><Input value={settings.academy_short || ''} onChange={(e) => setSettings({ ...settings, academy_short: e.target.value })} dir="ltr" className="mt-1" /></div>
-              <div><Label>الهاتف</Label><Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="mt-1" /></div>
-              <div><Label>البريد</Label><Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="mt-1" /></div>
-              <div><Label>العنوان</Label><Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="mt-1" /></div>
+            <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-gold" />
+                </div>
+                معلومات الأكاديمية
+              </h3>
+              <div className="relative grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-gold" /> اسم الأكاديمية (عربي)</Label>
+                  <Input value={settings.academy_name || ''} onChange={(e) => setSettings({ ...settings, academy_name: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><BookOpen className="w-3.5 h-3.5 text-gold" /> اسم الأكاديمية (إنجليزي)</Label>
+                  <Input value={settings.academy_name_en || ''} onChange={(e) => setSettings({ ...settings, academy_name_en: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Tag className="w-3.5 h-3.5 text-gold" /> الاختصار</Label>
+                  <Input value={settings.academy_short || ''} onChange={(e) => setSettings({ ...settings, academy_short: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Mail className="w-3.5 h-3.5 text-gold" /> الهاتف</Label>
+                  <Input value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Mail className="w-3.5 h-3.5 text-gold" /> البريد</Label>
+                  <Input value={settings.email || ''} onChange={(e) => setSettings({ ...settings, email: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><MapPin className="w-3.5 h-3.5 text-gold" /> العنوان</Label>
+                  <Input value={settings.address || ''} onChange={(e) => setSettings({ ...settings, address: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+              </div>
             </div>
-            <div className="border-t border-border pt-4">
-              <h3 className="font-bold text-navy mb-3">تكامل تيليجرام (لرفع الفيديوهات)</h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div><Label>Bot Token</Label><Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
-                <div><Label>Channel ID</Label><Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="mt-1 font-mono text-xs" /></div>
+
+            <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4 text-white" />
+                </div>
+                تكامل تيليجرام (لرفع الفيديوهات)
+              </h3>
+              <div className="relative grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Lock className="w-3.5 h-3.5 text-gold" /> Bot Token</Label>
+                  <Input value={settings.telegram_bot_token || ''} onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })} dir="ltr" className="font-mono text-xs rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Mail className="w-3.5 h-3.5 text-gold" /> Channel ID</Label>
+                  <Input value={settings.telegram_channel_id || ''} onChange={(e) => setSettings({ ...settings, telegram_channel_id: e.target.value })} dir="ltr" className="font-mono text-xs rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ABOUT US */}
+        {/* ABOUT US — magical card */}
         {tab === 'about' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
-              💡 يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
-            </div>
-            <div>
-              <Label>رؤيتنا</Label>
-              <textarea value={settings.about_vision || ''} onChange={(e) => setSettings({ ...settings, about_vision: e.target.value })}
-                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رؤية الأكاديمية..." />
-            </div>
-            <div>
-              <Label>رسالتنا</Label>
-              <textarea value={settings.about_mission || ''} onChange={(e) => setSettings({ ...settings, about_mission: e.target.value })}
-                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب رسالة الأكاديمية..." />
-            </div>
-            <div>
-              <Label>قيمنا</Label>
-              <textarea value={settings.about_values || ''} onChange={(e) => setSettings({ ...settings, about_values: e.target.value })}
-                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب قيم الأكاديمية..." />
-            </div>
-            <div>
-              <Label>فريقنا</Label>
-              <textarea value={settings.about_team || ''} onChange={(e) => setSettings({ ...settings, about_team: e.target.value })}
-                className="mt-1 w-full min-h-[100px] p-3 border border-input rounded-md text-sm" placeholder="اكتب وصف فريق الأكاديمية..." />
+            <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-white" />
+                </div>
+                محتوى صفحة "من نحن"
+              </h3>
+              <p className="relative text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-gold" />
+                يظهر محتوى هذه الحقول في صفحة "من نحن" عند الضغط على الروابط السريعة.
+              </p>
+              <div className="relative space-y-4">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Eye className="w-3.5 h-3.5 text-gold" /> رؤيتنا</Label>
+                  <textarea value={settings.about_vision || ''} onChange={(e) => setSettings({ ...settings, about_vision: e.target.value })}
+                    className="w-full min-h-[100px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب رؤية الأكاديمية..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Target className="w-3.5 h-3.5 text-gold" /> رسالتنا</Label>
+                  <textarea value={settings.about_mission || ''} onChange={(e) => setSettings({ ...settings, about_mission: e.target.value })}
+                    className="w-full min-h-[100px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب رسالة الأكاديمية..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Award className="w-3.5 h-3.5 text-gold" /> قيمنا</Label>
+                  <textarea value={settings.about_values || ''} onChange={(e) => setSettings({ ...settings, about_values: e.target.value })}
+                    className="w-full min-h-[100px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب قيم الأكاديمية..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Users className="w-3.5 h-3.5 text-gold" /> فريقنا</Label>
+                  <textarea value={settings.about_team || ''} onChange={(e) => setSettings({ ...settings, about_team: e.target.value })}
+                    className="w-full min-h-[100px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب وصف فريق الأكاديمية..." />
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* POLICIES */}
+        {/* POLICIES — magical card */}
         {tab === 'policies' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
-              💡 تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
-            </div>
-            <div>
-              <Label>سياسة الخصوصية</Label>
-              <textarea value={settings.policy_privacy || ''} onChange={(e) => setSettings({ ...settings, policy_privacy: e.target.value })}
-                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الخصوصية..." />
-            </div>
-            <div>
-              <Label>شروط الاستخدام</Label>
-              <textarea value={settings.policy_terms || ''} onChange={(e) => setSettings({ ...settings, policy_terms: e.target.value })}
-                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب شروط الاستخدام..." />
-            </div>
-            <div>
-              <Label>سياسة الاسترداد</Label>
-              <textarea value={settings.policy_refund || ''} onChange={(e) => setSettings({ ...settings, policy_refund: e.target.value })}
-                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب سياسة الاسترداد..." />
-            </div>
-            <div>
-              <Label>الدعم والمساعدة</Label>
-              <textarea value={settings.policy_support || ''} onChange={(e) => setSettings({ ...settings, policy_support: e.target.value })}
-                className="mt-1 w-full min-h-[150px] p-3 border border-input rounded-md text-sm" placeholder="اكتب معلومات الدعم..." />
+            <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-white" />
+                </div>
+                السياسات والشروط
+              </h3>
+              <p className="relative text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-gold" />
+                تظهر هذه السياسات في صفحات منفصلة عند الضغط على روابط الفوتر.
+              </p>
+              <div className="relative space-y-4">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Shield className="w-3.5 h-3.5 text-gold" /> سياسة الخصوصية</Label>
+                  <textarea value={settings.policy_privacy || ''} onChange={(e) => setSettings({ ...settings, policy_privacy: e.target.value })}
+                    className="w-full min-h-[150px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب سياسة الخصوصية..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><FileText className="w-3.5 h-3.5 text-gold" /> شروط الاستخدام</Label>
+                  <textarea value={settings.policy_terms || ''} onChange={(e) => setSettings({ ...settings, policy_terms: e.target.value })}
+                    className="w-full min-h-[150px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب شروط الاستخدام..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><RefreshCw className="w-3.5 h-3.5 text-gold" /> سياسة الاسترداد</Label>
+                  <textarea value={settings.policy_refund || ''} onChange={(e) => setSettings({ ...settings, policy_refund: e.target.value })}
+                    className="w-full min-h-[150px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب سياسة الاسترداد..." />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><HelpCircle className="w-3.5 h-3.5 text-gold" /> الدعم والمساعدة</Label>
+                  <textarea value={settings.policy_support || ''} onChange={(e) => setSettings({ ...settings, policy_support: e.target.value })}
+                    className="w-full min-h-[150px] p-3 border border-gold/30 rounded-xl text-sm focus:border-gold focus:ring-gold/30 focus:outline-none" placeholder="اكتب معلومات الدعم..." />
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* SOCIAL */}
+        {/* SOCIAL — magical themed cards per platform */}
         {tab === 'social' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
-              💡 كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
-            </div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-gold" />
+              كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
+            </p>
             {/* Facebook */}
-            <div className="border border-border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="font-bold">فيسبوك</Label>
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} />
-                  تفعيل
+            <div className="relative p-4 rounded-xl border border-blue-300/40 bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-blue-500/15 rounded-full blur-xl" />
+              <div className="relative flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md">
+                    <span className="text-white font-bold text-sm">f</span>
+                  </div>
+                  <Label className="font-bold text-blue-800">فيسبوك</Label>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <span className={`font-bold ${settings.social_facebook_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {settings.social_facebook_enabled ? 'مفعّل' : 'متوقف'}
+                  </span>
+                  <div className="relative">
+                    <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} className="sr-only" />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_facebook_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_facebook_enabled ? 'right-0.5' : 'right-5'}`} />
+                  </div>
                 </label>
               </div>
-              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm" />
+              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm rounded-lg border-blue-300/40 focus:border-blue-500 focus:ring-blue-500/30 bg-white" />
             </div>
             {/* Telegram */}
-            <div className="border border-border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="font-bold">تيليجرام (قناة أو يوزر)</Label>
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} />
-                  تفعيل
+            <div className="relative p-4 rounded-xl border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-blue-50 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-cyan-500/15 rounded-full blur-xl" />
+              <div className="relative flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md">
+                    <Send className="w-4 h-4 text-white" />
+                  </div>
+                  <Label className="font-bold text-cyan-800">تيليجرام (قناة أو يوزر)</Label>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <span className={`font-bold ${settings.social_telegram_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {settings.social_telegram_enabled ? 'مفعّل' : 'متوقف'}
+                  </span>
+                  <div className="relative">
+                    <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} className="sr-only" />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_telegram_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_telegram_enabled ? 'right-0.5' : 'right-5'}`} />
+                  </div>
                 </label>
               </div>
-              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm" />
+              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm rounded-lg border-cyan-300/40 focus:border-cyan-500 focus:ring-cyan-500/30 bg-white" />
             </div>
             {/* WhatsApp */}
-            <div className="border border-border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="font-bold">واتساب (قناة)</Label>
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} />
-                  تفعيل
+            <div className="relative p-4 rounded-xl border border-emerald-300/40 bg-gradient-to-br from-emerald-50 to-green-50 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-emerald-500/15 rounded-full blur-xl" />
+              <div className="relative flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-md">
+                    <Phone className="w-4 h-4 text-white" />
+                  </div>
+                  <Label className="font-bold text-emerald-800">واتساب (قناة)</Label>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <span className={`font-bold ${settings.social_whatsapp_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {settings.social_whatsapp_enabled ? 'مفعّل' : 'متوقف'}
+                  </span>
+                  <div className="relative">
+                    <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} className="sr-only" />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_whatsapp_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_whatsapp_enabled ? 'right-0.5' : 'right-5'}`} />
+                  </div>
                 </label>
               </div>
-              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm" />
+              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm rounded-lg border-emerald-300/40 focus:border-emerald-500 focus:ring-emerald-500/30 bg-white" />
             </div>
             {/* SMS */}
-            <div className="border border-border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="font-bold">رقم للمراسلات النصية (SMS)</Label>
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} />
-                  تفعيل
+            <div className="relative p-4 rounded-xl border border-amber-300/40 bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-amber-500/15 rounded-full blur-xl" />
+              <div className="relative flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-md">
+                    <MessageSquare className="w-4 h-4 text-white" />
+                  </div>
+                  <Label className="font-bold text-amber-800">رقم للمراسلات النصية (SMS)</Label>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <span className={`font-bold ${settings.social_sms_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {settings.social_sms_enabled ? 'مفعّل' : 'متوقف'}
+                  </span>
+                  <div className="relative">
+                    <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} className="sr-only" />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_sms_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_sms_enabled ? 'right-0.5' : 'right-5'}`} />
+                  </div>
                 </label>
               </div>
-              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm" />
+              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm rounded-lg border-amber-300/40 focus:border-amber-500 focus:ring-amber-500/30 bg-white" />
             </div>
           </div>
         )}
 
-        {/* VISIBILITY */}
+        {/* VISIBILITY — magical toggle cards */}
         {tab === 'visibility' && (
           <div className="space-y-4">
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 text-xs text-muted-foreground">
-              💡 تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
-            </div>
-            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
-                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-gold" />
+              تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
+            </p>
+            <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 flex items-center justify-between overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-md">
+                  <Briefcase className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-navy text-sm">إظهار قسم الشركاء</div>
+                  <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم الشركاء في الصفحة الرئيسية</div>
+                </div>
               </div>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} />
-                تفعيل
+              <label className="relative cursor-pointer flex-shrink-0">
+                <input type="checkbox" checked={settings.show_partners || false} onChange={(e) => setSettings({ ...settings, show_partners: e.target.checked })} className="sr-only" />
+                <div className={`w-12 h-6 rounded-full transition-colors ${settings.show_partners ? 'bg-emerald-500' : 'bg-muted'}`} />
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.show_partners ? 'right-0.5' : 'right-6'}`} />
               </label>
             </div>
-            <div className="border border-border rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
-                <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+            <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 flex items-center justify-between overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-md">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-navy text-sm">إظهار قسم التراخيص</div>
+                  <div className="text-xs text-muted-foreground">إذا تم الإيقاف، لن يظهر قسم التراخيص في الصفحة الرئيسية</div>
+                </div>
               </div>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} />
-                تفعيل
+              <label className="relative cursor-pointer flex-shrink-0">
+                <input type="checkbox" checked={settings.show_licenses || false} onChange={(e) => setSettings({ ...settings, show_licenses: e.target.checked })} className="sr-only" />
+                <div className={`w-12 h-6 rounded-full transition-colors ${settings.show_licenses ? 'bg-emerald-500' : 'bg-muted'}`} />
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.show_licenses ? 'right-0.5' : 'right-6'}`} />
               </label>
             </div>
           </div>
         )}
 
-        <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
+        {/* Save button — magical */}
+        <div className="pt-4 border-t border-gold/20">
+          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
+            {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري الحفظ...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ الإعدادات</>}
+          </Button>
+        </div>
       </div>
     </SectionCard>
   )
