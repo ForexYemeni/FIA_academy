@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-import { requireAdmin } from "@/lib/admin-auth"
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
@@ -17,7 +16,6 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { question, answer, category, display_order } = await req.json()
     if (!question || !answer) {
@@ -42,7 +40,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -60,7 +57,6 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('faqs').delete().eq('id', id)

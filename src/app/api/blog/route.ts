@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-import { requireAdmin } from "@/lib/admin-auth"
 // Generate a URL-friendly ASCII slug from a title — strips Arabic and other
 // non-ASCII characters entirely (URL encoding of Arabic is fragile across
 // CDNs and routers), falls back to a random short ID.
@@ -51,7 +50,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { title, excerpt, body, cover, author_id, tags } = await req.json()
     if (!title || !body) {
@@ -90,7 +88,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -111,7 +108,6 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('blog_posts').delete().eq('id', id)
