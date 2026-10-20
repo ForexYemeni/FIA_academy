@@ -74,10 +74,9 @@ export async function GET(req: NextRequest) {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': 'Range',
-      // ⚡ Expose Range header so PDF.js can request byte ranges for
-      // efficient streaming of large PDFs (it sends `Range: bytes=0-...`
-      // to download only the needed portion)
-      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+      // ⚡ Expose Content-Length so PDF.js (when fetching as ArrayBuffer)
+      // can show download progress
+      'Access-Control-Expose-Headers': 'Content-Length',
       // ⚡ Disable caching — Telegram file URLs contain the bot token
       // and expire eventually. Caching could leak stale URLs.
       'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -85,8 +84,13 @@ export async function GET(req: NextRequest) {
     if (contentLength) {
       headers['Content-Length'] = contentLength
     }
-    // Tell clients we support range requests (PDF.js uses this)
-    headers['Accept-Ranges'] = 'bytes'
+    // ⚡ NOTE: We intentionally do NOT set 'Accept-Ranges: bytes' because
+    // we don't actually support Range requests in this proxy (we'd
+    // need to parse the Range header and request the right slice from
+    // upstream). If we falsely advertised Range support, PDF.js would
+    // try to use it and get the wrong data back. The client-side
+    // CustomPdfViewer fetches the PDF as a single ArrayBuffer to avoid
+    // this issue entirely.
 
     return new NextResponse(upstream.body, {
       status: 200,

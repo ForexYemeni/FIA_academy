@@ -168,14 +168,79 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {/* ⚡ Auto-complete hint banner — shown only when the lesson
                 isn't completed yet, so the student knows what to do. */}
             {!completedLessons?.has(lesson.id) && (
-              <div className="mb-4 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-white border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
+              <div className="mb-3 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-white border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                 {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً. (إذا تعذّر تحميل الفيديو، سيظهر زر "تخطّي الدرس" خلال 15 ثانية)'}
                 {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً (المحتوى القصير يُكمل خلال 3 ثوانٍ).'}
-                {lesson.lesson_type === 'pdf' && 'تصفّح الملف لمدة 15 ثانية ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'pdf' && 'مرّر لقراءة الملف كاملاً. يُكمل الدرس تلقائياً عند الوصول للصفحة الأخيرة.'}
                 {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً. (إذا لم يوجد أسئلة، سيُكمل الدرس تلقائياً)'}
               </div>
             )}
+
+            {/* ⚡ Lesson navigation — MOVED TO TOP of body so it's
+                ALWAYS visible on mobile (without scrolling past the
+                PDF viewer). On phones the PDF viewer's 600px height +
+                the hint banner pushed the bottom navigation out of
+                view, making the student think the navigation had
+                disappeared. Now it's the first thing they see after
+                the hint banner. */}
+            {(prev || next) && (
+              <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-navy/5 to-white border border-gold/20">
+                <div className="flex items-center justify-between gap-2">
+                  {isPrevAvailable ? (
+                    <button
+                      onClick={() => onNavigate?.(prev!.lesson)}
+                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20 flex-shrink-0"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                      <div className="text-right min-w-0">
+                        <div className="text-[10px] text-gold/70">الدرس السابق</div>
+                        <div className="text-xs font-medium text-gold truncate max-w-[120px]">{prev!.lesson.title}</div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-muted-foreground/40 flex-shrink-0">البداية</div>
+                  )}
+
+                  <div className="text-xs text-navy/70 font-bold px-3 py-1.5 rounded-full bg-navy/5 border border-gold/20 flex-shrink-0">
+                    {currentIdx + 1} / {allLessons.length}
+                  </div>
+
+                  {next ? (
+                    isNextLocked ? (
+                      // ⚡ Next lesson is locked — show disabled button with lock icon
+                      <button
+                        disabled
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-500 rounded-xl cursor-not-allowed border border-gray-200 flex-shrink-0"
+                        title="أكمل الدرس الحالي أولاً"
+                      >
+                        <div className="text-left min-w-0">
+                          <div className="text-[10px] text-gray-500/70 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> مقفل
+                          </div>
+                          <div className="text-xs font-medium truncate max-w-[120px]">{next.lesson.title}</div>
+                        </div>
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onNavigate?.(next.lesson)}
+                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20 flex-shrink-0"
+                      >
+                        <div className="text-left min-w-0">
+                          <div className="text-[10px] text-gold/70">الدرس التالي</div>
+                          <div className="text-xs font-medium text-gold truncate max-w-[120px]">{next.lesson.title}</div>
+                        </div>
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                    )
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-muted-foreground/40 flex-shrink-0">النهاية</div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Render the lesson based on type — each component fires
                 onComplete when the student actually finishes viewing. */}
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
@@ -183,60 +248,6 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
-
-          {/* Navigation — magical gradient buttons */}
-          {(prev || next) && (
-            <div className="px-4 md:px-6 pb-4 md:pb-5 pt-2 bg-gradient-to-b from-navy/5 to-white border-t border-gold/15">
-              <div className="flex items-center justify-between gap-2 pt-4">
-                {isPrevAvailable ? (
-                  <Button
-                    onClick={() => onNavigate?.(prev!.lesson)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                    <div className="text-right">
-                      <div className="text-[10px] text-gold/70">السابق</div>
-                      <div className="text-xs font-medium text-gold truncate max-w-[150px]">{prev!.lesson.title}</div>
-                    </div>
-                  </Button>
-                ) : <div />}
-
-                <div className="text-xs text-navy/60 font-medium px-3 py-1.5 rounded-full bg-navy/5 border border-gold/20">
-                  {currentIdx + 1} / {allLessons.length}
-                </div>
-
-                {next ? (
-                  isNextLocked ? (
-                    // ⚡ Next lesson is locked — show disabled button with lock icon
-                    <Button
-                      disabled
-                      className="flex items-center gap-2 bg-gray-200 text-gray-500 rounded-xl cursor-not-allowed border border-gray-300"
-                      title="أكمل الدرس الحالي أولاً"
-                    >
-                      <div className="text-left">
-                        <div className="text-[10px] text-gray-500/70 flex items-center gap-1">
-                          <Lock className="w-2.5 h-2.5" /> مقفل
-                        </div>
-                        <div className="text-xs font-medium truncate max-w-[150px]">{next.lesson.title}</div>
-                      </div>
-                      <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => onNavigate?.(next.lesson)}
-                      className="flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20"
-                    >
-                      <div className="text-left">
-                        <div className="text-[10px] text-gold/70">التالي</div>
-                        <div className="text-xs font-medium text-gold truncate max-w-[150px]">{next.lesson.title}</div>
-                      </div>
-                      <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                  )
-                ) : <div />}
-              </div>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>
