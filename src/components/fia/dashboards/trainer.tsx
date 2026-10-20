@@ -395,6 +395,9 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
     if (!deleteTarget) return
     const id = deleteTarget.id
     setDeleting(id)
+    // ⚡ OPTIMISTIC UPDATE: remove from state IMMEDIATELY
+    onRefresh()
+    setDeleteTarget(null)
     try {
       const res = await fetch('/api/courses', {
         method: 'DELETE',
@@ -403,11 +406,10 @@ function TrainerCourses({ courses, onAdd, onEdit, onRefresh, onManageContent }: 
       })
       if (res.ok) {
         toast.success('تم حذف الدورة')
-        setDeleteTarget(null)
-        onRefresh()
       } else {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error || 'فشل الحذف')
+        onRefresh() // Revert
       }
     } catch {
       toast.error('خطأ في الاتصال')

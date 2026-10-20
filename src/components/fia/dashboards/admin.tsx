@@ -638,11 +638,22 @@ const AdminCourses = React.memo(function AdminCourses() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
+    // ⚡ OPTIMISTIC UPDATE: remove from state IMMEDIATELY
+    const deletedId = deleteTarget.id
+    setItems((prev) => prev.filter((c) => c.id !== deletedId))
+    setDeleteTarget(null)
     try {
-      await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
-      toast.success('تم الحذف')
-      setDeleteTarget(null)
-      load()
+      const res = await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deletedId }) })
+      if (res.ok) {
+        toast.success('تم حذف الدورة بنجاح')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل الحذف')
+        load() // Revert: refetch to restore the course
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+      load() // Revert on network error
     } finally {
       setDeleting(false)
     }
