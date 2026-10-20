@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Save, Loader2, X, Crown, Star, Award, User,
   Phone, Mail, Briefcase, Eye, Target, Trophy, Linkedin, Twitter, Plus as PlusIcon, FileUp, PenTool,
+  Sparkles, Globe, Lock, Layers,
 } from 'lucide-react'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 
@@ -160,128 +161,153 @@ export function TeamEditor({ filterRole }: { filterRole?: 'founder' | 'leader' |
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* ⚡ Magical header with add button */}
+      <div className="flex items-center justify-between relative">
         <div>
-          <h3 className="font-bold text-navy text-lg">
+          <h3 className="font-bold text-navy text-lg flex items-center gap-2">
+            <span className="w-1 h-6 bg-gradient-to-b from-gold to-amber-500 rounded-full" />
             {filterRole === 'founder' ? 'المؤسس' : filterRole === 'leader' ? 'الفريق القيادي' : 'أعضاء الفريق'}
           </h3>
-          <p className="text-sm text-muted-foreground">{members.length} عضو</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{members.length} عضو</p>
         </div>
         {!filterRole || filterRole !== 'founder' ? (
-          <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}>
+          <Button className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all" onClick={() => { setEditing(null); setOpen(true) }}>
             <Plus className="w-4 h-4 ml-1" /> عضو جديد
           </Button>
         ) : members.length === 0 ? (
-          <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}>
+          <Button className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-md active:scale-[0.97] transition-all" onClick={() => { setEditing(null); setOpen(true) }}>
             <Plus className="w-4 h-4 ml-1" /> إضافة المؤسس
           </Button>
         ) : null}
       </div>
 
       {members.length === 0 ? (
-        <Card className="p-12 text-center">
-          <User className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground mb-4">لا يوجد أعضاء بعد</p>
-          <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}>
+        /* ⚡ Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <User className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد أعضاء بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4">أضف أول عضو بالضغط على زر "عضو جديد" ✨</p>
+          <Button className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md" onClick={() => { setEditing(null); setOpen(true) }}>
             <Plus className="w-4 h-4 ml-1" /> إضافة أول عضو
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="grid lg:grid-cols-2 gap-4">
+        /* ⚡ Magical member cards — 2 columns with gradient headers */
+        <div className="grid lg:grid-cols-2 gap-4 fia-stagger">
           {members.map((m) => {
             const role = ROLE_BADGE[m.role] || ROLE_BADGE.team
             const RoleIcon = role.icon
             const quals = parseArray(m.qualifications)
             const achs = parseArray(m.achievements)
+            const isFounder = m.role === 'founder'
             return (
-              <Card key={m.id} className="overflow-hidden">
-                <div className="bg-fia-gradient p-5 text-white">
-                  <div className="flex items-start gap-4">
+              <Card key={m.id} className={`fia-card-hover overflow-hidden border ${isFounder ? 'border-gold/40' : 'border-gold/20'} hover:border-gold/40`}>
+                {/* ⚡ Magical gradient header */}
+                <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy p-5 text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-25" style={{
+                    backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '24px 24px, 18px 18px'
+                  }} />
+                  <div className="absolute -top-8 -right-8 w-24 h-24 bg-gold/15 rounded-full blur-2xl" />
+                  {isFounder && (
+                    <div className="absolute -top-2 left-2 text-gold/20 text-6xl">
+                      <Crown className="w-12 h-12" />
+                    </div>
+                  )}
+                  <div className="relative flex items-start gap-4">
                     {m.avatar ? (
-                      <img src={m.avatar} alt={m.name} className="w-20 h-20 rounded-full object-cover border-4 border-gold/30 flex-shrink-0" />
+                      <img src={m.avatar} alt={m.name} className="w-20 h-20 rounded-xl object-cover border-2 border-gold/40 flex-shrink-0 shadow-md" />
                     ) : (
-                      <div className="w-20 h-20 rounded-full bg-gold/20 flex items-center justify-center border-4 border-gold/30">
+                      <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-gold/20 to-amber-500/20 flex items-center justify-center border-2 border-gold/40 shadow-md">
                         <span className="text-3xl text-gold font-bold">{m.name?.charAt(0)}</span>
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-bold text-lg truncate">{m.name}</h3>
-                        <Badge className={`${role.color} flex-shrink-0`}>
-                          <RoleIcon className="w-3 h-3 ml-1" /> {role.label}
-                        </Badge>
+                        {isFounder && <Crown className="w-4 h-4 text-amber-400 flex-shrink-0" />}
                       </div>
-                      <p className="text-gold text-sm font-semibold mb-2">{m.title}</p>
-                      <p className="text-white/70 text-xs">{m.specialization}</p>
+                      <Badge className={`${role.color} flex-shrink-0 mb-2 inline-flex items-center gap-1`}>
+                        <RoleIcon className="w-3 h-3" /> {role.label}
+                      </Badge>
+                      <p className="text-gold text-sm font-semibold mb-1">{m.title}</p>
+                      {m.specialization && <p className="text-white/70 text-xs line-clamp-1">{m.specialization}</p>}
                     </div>
                   </div>
                 </div>
 
+                {/* Body — compact info */}
                 <div className="p-5 space-y-3">
                   {m.bio && (
                     <div>
-                      <div className="text-xs font-semibold text-navy mb-1 flex items-center gap-1">
-                        <User className="w-3.5 h-3.5" /> نبذة تعريفية
+                      <div className="text-xs font-bold text-navy mb-1 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-gold" /> نبذة تعريفية
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-3">{m.bio}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{m.bio}</p>
                     </div>
                   )}
 
-                  {m.vision && (
-                    <div>
-                      <div className="text-xs font-semibold text-navy mb-1 flex items-center gap-1">
-                        <Eye className="w-3.5 h-3.5 text-gold" /> الرؤية
+                  <div className="grid grid-cols-2 gap-3">
+                    {m.vision && (
+                      <div>
+                        <div className="text-xs font-bold text-navy mb-1 flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-gold" /> الرؤية
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{m.vision}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{m.vision}</p>
-                    </div>
-                  )}
-
-                  {m.mission && (
-                    <div>
-                      <div className="text-xs font-semibold text-navy mb-1 flex items-center gap-1">
-                        <Target className="w-3.5 h-3.5 text-gold" /> الرسالة
+                    )}
+                    {m.mission && (
+                      <div>
+                        <div className="text-xs font-bold text-navy mb-1 flex items-center gap-1.5">
+                          <Target className="w-3.5 h-3.5 text-gold" /> الرسالة
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{m.mission}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{m.mission}</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {quals.length > 0 && (
                     <div>
-                      <div className="text-xs font-semibold text-navy mb-1 flex items-center gap-1">
+                      <div className="text-xs font-bold text-navy mb-1 flex items-center gap-1.5">
                         <Award className="w-3.5 h-3.5 text-gold" /> المؤهلات
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {quals.slice(0, 3).map((q, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{q}</Badge>
+                          <Badge key={i} variant="outline" className="text-xs bg-gold/5 border-gold/30 text-navy">{q}</Badge>
                         ))}
-                        {quals.length > 3 && <Badge variant="outline" className="text-xs">+{quals.length - 3}</Badge>}
+                        {quals.length > 3 && <Badge variant="outline" className="text-xs bg-muted/30">+{quals.length - 3}</Badge>}
                       </div>
                     </div>
                   )}
 
                   {achs.length > 0 && (
                     <div>
-                      <div className="text-xs font-semibold text-navy mb-1 flex items-center gap-1">
+                      <div className="text-xs font-bold text-navy mb-1 flex items-center gap-1.5">
                         <Trophy className="w-3.5 h-3.5 text-gold" /> الإنجازات
                       </div>
                       <ul className="text-xs text-muted-foreground list-disc pr-4 space-y-0.5">
                         {achs.slice(0, 2).map((a, i) => <li key={i}>{a}</li>)}
-                        {achs.length > 2 && <li>+ {achs.length - 2} إنجاز آخر</li>}
+                        {achs.length > 2 && <li className="text-gold">+ {achs.length - 2} إنجاز آخر</li>}
                       </ul>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 pt-2 border-t border-border text-xs text-muted-foreground">
-                    {m.email && <span className="flex items-center gap-1" dir="ltr"><Mail className="w-3 h-3" /> {m.email}</span>}
-                    {m.phone && <span className="flex items-center gap-1" dir="ltr"><Phone className="w-3 h-3" /> {m.phone}</span>}
-                    {m.years_experience ? <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {m.years_experience} سنة خبرة</span> : null}
+                  <div className="flex items-center gap-3 pt-2 border-t border-border/40 text-xs text-muted-foreground">
+                    {m.email && <span className="flex items-center gap-1" dir="ltr"><Mail className="w-3 h-3 text-gold/60" /> <span className="truncate">{m.email}</span></span>}
+                    {m.phone && <span className="flex items-center gap-1" dir="ltr"><Phone className="w-3 h-3 text-gold/60" /> {m.phone}</span>}
+                    {m.years_experience ? <span className="flex items-center gap-1"><Briefcase className="w-3 h-3 text-gold/60" /> {m.years_experience} سنة</span> : null}
                   </div>
 
-                  <div className="flex gap-2 pt-3 border-t border-border">
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditing(m); setOpen(true) }}>
+                  <div className="flex gap-2 pt-3 border-t border-border/40">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => { setEditing(m); setOpen(true) }}>
                       <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => setDeleteTarget(m)}>
+                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-lg" onClick={() => setDeleteTarget(m)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -464,20 +490,43 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={() => onOpenChange(false)}
-          className="absolute top-3 left-3 w-8 h-8 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center z-50"
-        >
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
-        <DialogHeader>
-          <DialogTitle className="text-navy text-lg">
-            {editing ? 'تعديل العضو' : 'إضافة عضو جديد'} — {role === 'founder' ? 'المؤسس' : role === 'leader' ? 'قائد' : 'فريق'}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0">
+        {/* ⚡ Magical gradient header */}
+        <div className={`relative p-5 pb-6 text-white overflow-hidden ${
+          role === 'founder'
+            ? 'bg-gradient-to-br from-gold via-amber-500 to-yellow-600'
+            : role === 'leader'
+              ? 'bg-gradient-to-br from-navy via-navy-light to-navy'
+              : 'bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-700'
+        }`}>
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+          <button
+            onClick={() => onOpenChange(false)}
+            className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center z-50 backdrop-blur-sm"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+          <div className="relative flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+              {role === 'founder' ? <Crown className="w-7 h-7 text-white" /> : role === 'leader' ? <Star className="w-7 h-7 text-white" /> : <User className="w-7 h-7 text-white" />}
+            </div>
+            <div>
+              <DialogTitle className={`text-xl font-bold tracking-tight ${role === 'founder' ? 'text-navy' : 'text-white'}`}>
+                {editing ? 'تعديل العضو' : 'إضافة عضو جديد'}
+              </DialogTitle>
+              <p className={`text-xs mt-0.5 flex items-center gap-1.5 ${role === 'founder' ? 'text-navy/80' : 'text-white/80'}`}>
+                <Sparkles className="w-3 h-3" />
+                {role === 'founder' ? 'المؤسس — صلاحيات كاملة' : role === 'leader' ? 'قائد — صلاحيات إدارية' : 'عضو فريق'}
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <div className="space-y-4 py-4">
+        <div className="p-5 space-y-4">
           {/* Avatar — always available (even before save) */}
           <div className="flex justify-center p-2">
             <AvatarUploader
@@ -493,12 +542,16 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           {/* Basic: Name + Title + Role in one row */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <Label className="text-xs">الاسم الكامل *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: د. هاني الشافعي" className="mt-1 text-base font-medium" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <User className="w-3.5 h-3.5 text-gold" /> الاسم الكامل *
+              </Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: د. هاني الشافعي" className="text-base font-medium rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
             </div>
             <div>
-              <Label className="text-xs">الدور</Label>
-              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Star className="w-3.5 h-3.5 text-gold" /> الدور
+              </Label>
+              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
                 <option value="founder">المؤسس</option>
                 <option value="leader">قائد</option>
                 <option value="team">فريق</option>
@@ -506,26 +559,32 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             </div>
           </div>
           <div>
-            <Label className="text-xs">المسمى الوظيفي</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: المؤسس والمدير التنفيذي" className="mt-1" />
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
+            </Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: المؤسس والمدير التنفيذي" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
           </div>
 
           {/* Login credentials — for founder/leader only */}
           {(role === 'founder' || role === 'leader') && (
-            <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+            <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
               <div>
-                <Label className="text-xs">البريد لتسجيل الدخول</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="member@fia.edu" />
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Mail className="w-3.5 h-3.5 text-gold" /> البريد لتسجيل الدخول
+                </Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="member@fia.edu" />
               </div>
               <div>
-                <Label className="text-xs">كلمة المرور</Label>
-                <Input value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="••••••••" />
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور
+                </Label>
+                <Input value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="••••••••" />
               </div>
             </div>
           )}
 
           {/* Unified text field — all professional info in one place */}
-          <div className="border-t border-border pt-4">
+          <div className="border-t border-gold/20 pt-4">
             <Label className="text-sm font-bold text-navy flex items-center gap-2 mb-2">
               <Award className="w-4 h-4 text-gold" /> المعلومات المهنية
             </Label>
@@ -534,7 +593,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             </p>
             <div className="flex flex-wrap gap-1 mb-3">
               {['التخصص:', 'النبذة المهنية:', 'الرؤية:', 'الرسالة:', 'المؤهلات:', 'الإنجازات:', 'التكريمات:'].map(k => (
-                <Badge key={k} variant="outline" className="text-[10px] bg-gold/5 border-gold/20 text-navy">{k}</Badge>
+                <Badge key={k} variant="outline" className="text-[10px] bg-gold/5 border-gold/30 text-navy">{k}</Badge>
               ))}
             </div>
             <Textarea
@@ -563,65 +622,79 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
 • درّب أكثر من 3,000 ممارس صحي
 • طبيب سابق لدى اليونيسف
 • نشر أكثر من 20 بحثًا علميًا`}
-              className="mt-1 font-mono text-sm leading-relaxed"
+              className="mt-1 font-mono text-sm leading-relaxed rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
               dir="rtl"
             />
           </div>
 
-          {/* Live preview */}
+          {/* Live preview — magical */}
           {(parsed.bio || parsed.vision || parsed.qualifications.length > 0 || parsed.achievements.length > 0) && (
-            <div className="bg-muted/30 rounded-lg p-3 border border-border">
-              <div className="text-xs font-bold text-navy mb-2">معاينة البيانات المُقسّمة:</div>
-              <div className="space-y-2">
-                {parsed.specialization && <div className="text-xs"><span className="font-semibold text-navy">التخصص:</span> <span className="text-muted-foreground">{parsed.specialization}</span></div>}
-                {parsed.bio && <div className="text-xs"><span className="font-semibold text-navy">النبذة:</span> <span className="text-muted-foreground line-clamp-2">{parsed.bio}</span></div>}
-                {parsed.vision && <div className="text-xs"><span className="font-semibold text-navy">الرؤية:</span> <span className="text-muted-foreground line-clamp-1">{parsed.vision}</span></div>}
-                {parsed.mission && <div className="text-xs"><span className="font-semibold text-navy">الرسالة:</span> <span className="text-muted-foreground line-clamp-1">{parsed.mission}</span></div>}
-                {parsed.qualifications.length > 0 && (
-                  <div className="text-xs"><span className="font-semibold text-navy">المؤهلات:</span> {parsed.qualifications.length} مؤهل</div>
-                )}
-                {parsed.achievements.length > 0 && (
-                  <div className="text-xs"><span className="font-semibold text-navy">الإنجازات:</span> {parsed.achievements.length} إنجاز</div>
-                )}
+            <div className="relative bg-gradient-to-br from-gold/5 to-amber-50/30 rounded-xl p-3 border border-gold/30 overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <div className="relative">
+                <div className="text-xs font-bold text-navy mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-gold" /> معاينة البيانات المُقسّمة:
+                </div>
+                <div className="space-y-1.5">
+                  {parsed.specialization && <div className="text-xs"><span className="font-bold text-navy">التخصص:</span> <span className="text-muted-foreground">{parsed.specialization}</span></div>}
+                  {parsed.bio && <div className="text-xs"><span className="font-bold text-navy">النبذة:</span> <span className="text-muted-foreground line-clamp-2">{parsed.bio}</span></div>}
+                  {parsed.vision && <div className="text-xs"><span className="font-bold text-navy">الرؤية:</span> <span className="text-muted-foreground line-clamp-1">{parsed.vision}</span></div>}
+                  {parsed.mission && <div className="text-xs"><span className="font-bold text-navy">الرسالة:</span> <span className="text-muted-foreground line-clamp-1">{parsed.mission}</span></div>}
+                  {parsed.qualifications.length > 0 && (
+                    <div className="text-xs flex items-center gap-1.5"><Award className="w-3 h-3 text-gold" /> <span className="font-bold text-navy">المؤهلات:</span> <span className="text-emerald-600 font-bold">{parsed.qualifications.length} مؤهل</span></div>
+                  )}
+                  {parsed.achievements.length > 0 && (
+                    <div className="text-xs flex items-center gap-1.5"><Trophy className="w-3 h-3 text-gold" /> <span className="font-bold text-navy">الإنجازات:</span> <span className="text-emerald-600 font-bold">{parsed.achievements.length} إنجاز</span></div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {/* Contact info — compact */}
-          <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+          <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
             <div>
-              <Label className="text-xs">البريد</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="example@fia.edu" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Mail className="w-3.5 h-3.5 text-gold" /> البريد
+              </Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="example@fia.edu" />
             </div>
             <div>
-              <Label className="text-xs">الهاتف</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="+967 7XX XXX XXX" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Phone className="w-3.5 h-3.5 text-gold" /> الهاتف
+              </Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="+967 7XX XXX XXX" />
             </div>
             <div>
-              <Label className="text-xs">LinkedIn</Label>
-              <Input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="https://..." />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Globe className="w-3.5 h-3.5 text-gold" /> LinkedIn
+              </Label>
+              <Input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="https://..." />
             </div>
             <div>
-              <Label className="text-xs">Twitter</Label>
-              <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} dir="ltr" className="mt-1 text-sm" placeholder="@username" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Globe className="w-3.5 h-3.5 text-gold" /> Twitter
+              </Label>
+              <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="@username" />
             </div>
           </div>
 
           {/* Signature — founder only */}
           {role === 'founder' && (
-          <div className="border-t border-border pt-4">
+          <div className="border-t border-gold/20 pt-4">
             <h3 className="font-bold text-navy text-sm mb-2 flex items-center gap-2">
               <PenTool className="w-4 h-4 text-gold" /> توقيع المؤسس (يظهر في الشهادات بعد الاعتماد)
             </h3>
-            <div className="bg-gold/5 border border-gold/30 rounded-lg p-3 mb-3">
-              <p className="text-[10px] text-muted-foreground mb-3">
-                💡 التوقيع لا يظهر في الشهادة افتراضياً. بمجرد رفع التوقيع هنا وحفظه، سيتم إظهاره في شهادات المتدربين مع اسم الموقّع ومنصبه.
+            <div className="bg-gradient-to-br from-gold/5 to-amber-50/30 border border-gold/30 rounded-xl p-3 mb-3 relative overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+              <p className="text-[10px] text-muted-foreground mb-3 relative">
+                💡 التوقيع لا يظهر في الشهادة افتراضياً. بمجرد رفعه هنا وحفظه، سيظهر في شهادات المتدربين مع اسم الموقّع ومنصبه.
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 relative">
                 {signature ? (
-                  <img src={signature} alt="توقيع" className="h-14 w-auto bg-white border border-gold/30 rounded" />
+                  <img src={signature} alt="توقيع" className="h-14 w-auto bg-white border border-gold/30 rounded-lg" />
                 ) : (
-                  <div className="h-14 w-28 bg-muted/30 border-2 border-dashed border-gold/30 rounded flex items-center justify-center">
+                  <div className="h-14 w-28 bg-muted/30 border-2 border-dashed border-gold/30 rounded-lg flex items-center justify-center">
                     <span className="text-[10px] text-muted-foreground">لا يوجد توقيع</span>
                   </div>
                 )}
@@ -630,7 +703,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
                   const fd = new FormData(); fd.append('file', f); fd.append('folder', 'signatures')
                   try { const r = await fetch('/api/upload/image', { method: 'POST', body: fd }); const d = await r.json(); if (d.url) { setSignature(d.url); toast.success('تم رفع التوقيع') } else toast.error('فشل') } catch { toast.error('خطأ') }
                 }} />
-                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('sig-upload')?.click()}>
+                <Button type="button" variant="outline" size="sm" className="rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => document.getElementById('sig-upload')?.click()}>
                   <FileUp className="w-3.5 h-3.5 ml-1" /> رفع التوقيع
                 </Button>
                 {signature && <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => setSignature(null)}>إزالة</Button>}
@@ -640,21 +713,25 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
             {/* Signatory name + position — shown ONLY when signature is approved */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">اسم الموقّع (يظهر أسفل التوقيع)</Label>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <User className="w-3.5 h-3.5 text-gold" /> اسم الموقّع
+                </Label>
                 <Input
                   value={signatoryName}
                   onChange={(e) => setSignatoryName(e.target.value)}
                   placeholder="د. هاني الشافعي"
-                  className="text-sm"
+                  className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
               </div>
               <div>
-                <Label className="text-xs">منصب الموقّع</Label>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-gold" /> منصب الموقّع
+                </Label>
                 <Input
                   value={signatoryPosition}
                   onChange={(e) => setSignatoryPosition(e.target.value)}
                   placeholder="المدير التنفيذي"
-                  className="text-sm"
+                  className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
               </div>
             </div>
@@ -665,24 +742,28 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           )}
 
           {/* Years + order */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
             <div>
-              <Label className="text-xs">سنوات الخبرة</Label>
-              <Input type="number" value={yearsExp || ''} onChange={(e) => setYearsExp(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" placeholder="0" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-gold" /> سنوات الخبرة
+              </Label>
+              <Input type="number" value={yearsExp || ''} onChange={(e) => setYearsExp(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="0" />
             </div>
             <div>
-              <Label className="text-xs">ترتيب العرض</Label>
-              <Input type="number" value={displayOrder || ''} onChange={(e) => setDisplayOrder(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="mt-1 text-sm" placeholder="0" />
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Layers className="w-3.5 h-3.5 text-gold" /> ترتيب العرض
+              </Label>
+              <Input type="number" value={displayOrder || ''} onChange={(e) => setDisplayOrder(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="0" />
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-navy hover:bg-navy-light">
+        <div className="flex items-center justify-end gap-2 p-4 bg-muted/20 border-t border-border">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
+          <Button onClick={handleSave} disabled={saving} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
             {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : <><Save className="w-4 h-4 ml-1" /> حفظ</>}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
