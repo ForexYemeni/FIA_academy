@@ -160,9 +160,9 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {!completedLessons?.has(lesson.id) && (
               <div className="mb-4 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-white border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً.'}
-                {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً.'}
-                {lesson.lesson_type === 'pdf' && 'تصفّح الملف لمدة 30 ثانية ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً. (إذا تعذّر تحميل الفيديو، سيظهر زر "تخطّي الدرس" خلال 15 ثانية)'}
+                {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً (المحتوى القصير يُكمل خلال 3 ثوانٍ).'}
+                {lesson.lesson_type === 'pdf' && 'تصفّح الملف لمدة 15 ثانية ليُكتمل الدرس تلقائياً.'}
                 {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً.'}
               </div>
             )}
@@ -238,17 +238,56 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
 // the end (or to 95% — the last 5% is sometimes cut off by Telegram's
 // encoding, so we accept 95% as "watched"). The onEnded event also fires
 // onComplete as a backup. We only fire once per video session.
+//
+// ⚡ FALLBACK for broken / non-loading videos:
+// If the video fails to load (Telegram link broken, file deleted, etc.),
+// the student would otherwise be stuck forever — the lesson stays
+// locked because they can never reach 95%. We track:
+//   - timeoutElapsed: true if the video hasn't fired 'loadeddata' within
+//     15 seconds of the resolvedUrl being set
+//   - hasError: true if the <video> onError event fires
+// In either case, we show a "تخطّي الدرس (الفيديو غير متاح)" button that
+// lets the student mark the lesson as complete so they can move on.
+// This is a manual escape hatch — it does NOT auto-fire; the student
+// must click it explicitly so they don't accidentally skip content.
 function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => void }) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [videoLoaded, setVideoLoaded] = useState(false)
+  const [videoFailed, setVideoFailed] = useState(false)
   const firedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
-  // Reset the fired flag whenever the resolved URL changes (i.e. new
-  // lesson opened in the modal).
+  // Reset the fired flag + failure states whenever the resolved URL
+  // changes (i.e. new lesson opened in the modal).
   useEffect(() => {
     firedRef.current = false
+    setVideoLoaded(false)
+    setVideoFailed(false)
+  }, [resolvedUrl])
+
+  // ⚡ Track whether the video actually started loading. If it doesn't
+  // fire 'loadeddata' within 15 seconds, treat it as broken and show
+  // the "skip lesson" button. Telegram file URLs expire after a while
+  // and the video can silently fail to start.
+  useEffect(() => {
+    if (!resolvedUrl) return
+    setVideoLoaded(false)
+    setVideoFailed(false)
+    const timer = setTimeout(() => {
+      // Only treat as failed if 'loadeddata' hasn't fired yet
+      setVideoFailed((prevFailed) => {
+        // Check current loaded state via the video element directly
+        const v = videoRef.current
+        if (v && v.readyState >= 2) {
+          // HAS data — already loaded, don't mark as failed
+          return false
+        }
+        return true
+      })
+    }, 15000)
+    return () => clearTimeout(timer)
   }, [resolvedUrl])
 
   // Resolve Telegram message links (https://t.me/c/CHANNEL_ID/MSG_ID) to direct file URLs
@@ -384,83 +423,160 @@ function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => voi
 
   // ⚡ Magical video container — navy gradient frame with gold border
   return (
-    <div className="relative p-2 bg-gradient-to-br from-navy via-navy-light to-navy rounded-xl border-2 border-gold/30 shadow-md overflow-hidden">
-      <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
-        backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1px, transparent 1px)',
-        backgroundSize: '24px 24px'
-      }} />
-      <div className="relative bg-black rounded-lg overflow-hidden">
-        <video
-          ref={videoRef}
-          controls
-          controlsList="nodownload noremoteplayback noplaybackrate"
-          disablePictureInPicture
-          className="w-full h-auto max-h-[480px]"
-          onContextMenu={(e) => e.preventDefault()}
-          onEnded={() => {
-            // ⚡ Backup: when the video actually reaches the end
-            if (!firedRef.current && onComplete) {
-              firedRef.current = true
-              onComplete()
-            }
-          }}
-          onTimeUpdate={(e) => {
-            // ⚡ Primary: when the student reaches 95% of the video,
-            // mark the lesson as complete. We use 95% (not 100%) to
-            // account for the last few seconds being cut off by some
-            // Telegram video encodings.
-            if (firedRef.current || !onComplete) return
-            const v = e.currentTarget
-            if (!v || !v.duration) return
-            const ratio = v.currentTime / v.duration
-            if (ratio >= 0.95) {
-              firedRef.current = true
-              onComplete()
-            }
-          }}
-        >
-          <source src={resolvedUrl} type="video/mp4" />
-          متصفحك لا يدعم تشغيل الفيديو
-        </video>
-        <style jsx>{`
-          video::-webkit-media-controls-download-button { display: none; }
-          video::-internal-media-controls-overlay-cast-button { display: none; }
-        `}</style>
+    <div className="relative space-y-3">
+      <div className="relative p-2 bg-gradient-to-br from-navy via-navy-light to-navy rounded-xl border-2 border-gold/30 shadow-md overflow-hidden">
+        <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '24px 24px'
+        }} />
+        <div className="relative bg-black rounded-lg overflow-hidden">
+          <video
+            ref={videoRef}
+            controls
+            controlsList="nodownload noremoteplayback noplaybackrate"
+            disablePictureInPicture
+            className="w-full h-auto max-h-[480px]"
+            onContextMenu={(e) => e.preventDefault()}
+            onLoadedData={() => {
+              // ⚡ Video successfully loaded — clear failure state
+              setVideoLoaded(true)
+              setVideoFailed(false)
+            }}
+            onError={(e) => {
+              // ⚡ Video element fired an error — mark as failed so the
+              // skip-lesson button appears. This catches broken URLs,
+              // CORS issues, expired Telegram file links, etc.
+              console.warn('[VideoPlayer] video element error', e)
+              setVideoFailed(true)
+            }}
+            onEnded={() => {
+              // ⚡ Backup: when the video actually reaches the end
+              if (!firedRef.current && onComplete) {
+                firedRef.current = true
+                onComplete()
+              }
+            }}
+            onTimeUpdate={(e) => {
+              // ⚡ Primary: when the student reaches 95% of the video,
+              // mark the lesson as complete. We use 95% (not 100%) to
+              // account for the last few seconds being cut off by some
+              // Telegram video encodings.
+              if (firedRef.current || !onComplete) return
+              const v = e.currentTarget
+              if (!v || !v.duration) return
+              const ratio = v.currentTime / v.duration
+              if (ratio >= 0.95) {
+                firedRef.current = true
+                onComplete()
+              }
+            }}
+          >
+            <source src={resolvedUrl} type="video/mp4" />
+            متصفحك لا يدعم تشغيل الفيديو
+          </video>
+          <style jsx>{`
+            video::-webkit-media-controls-download-button { display: none; }
+            video::-internal-media-controls-overlay-cast-button { display: none; }
+          `}</style>
+        </div>
       </div>
+
+      {/* ⚡ Skip-lesson escape hatch — shown ONLY when the video is
+          broken or hasn't loaded within 15 seconds. The student must
+          click it explicitly (no auto-skip) so they don't accidentally
+          miss content. The button has a clear "broken video" label so
+          the student knows it's a fallback, not a normal action. */}
+      {videoFailed && !firedRef.current && (
+        <div className="relative p-3 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-300/60 overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0 text-xs">
+              <div className="font-bold text-amber-800 mb-0.5">الفيديو غير متاح</div>
+              <div className="text-amber-700">تعذّر تحميل الفيديو. يمكنك تخطّي هذا الدرس للمتابعة.</div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (firedRef.current || !onComplete) return
+                firedRef.current = true
+                onComplete()
+                toast.success('تم تخطّي الدرس')
+              }}
+              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl shadow-md active:scale-95 transition-all flex-shrink-0"
+            >
+              تخطّي الدرس
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ============== Text Content — Magical Reading Experience ==============
-// ⚡ onComplete fires when the student scrolls the text content to the
-// bottom (or after a 30-second dwell time as a fallback for very short
-// content that doesn't trigger a scroll). We only fire once per
-// lesson session.
+// ⚡ onComplete fires when the student reads the text content:
+//   1. For SHORT content (fits in viewport — no scrollbar): fires after
+//      a 3-second dwell (long enough to read 1-5 lines but not annoying).
+//   2. For LONG content (requires scrolling): fires when student
+//      scrolls to within 30px of the bottom.
+//   3. Safety net: if neither fires within 12 seconds, fire anyway
+//      (we don't want the student stuck — content is finite, the
+//      student can't be expected to wait forever).
+// Each fire is debounced — we only fire ONCE per lesson session.
 function TextContent({ content, onComplete }: { content?: string; onComplete?: () => void }) {
   const [copied, setCopied] = useState(false)
   const firedRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const dwellTimerRef = useRef<any>(null)
+  const shortDwellTimerRef = useRef<any>(null)
+  const safetyNetTimerRef = useRef<any>(null)
 
-  // Reset the fired flag + start the dwell timer when content changes.
+  // ⚡ Fire onComplete exactly once, with all timers cleaned up.
+  const fireNow = () => {
+    if (firedRef.current) return
+    if (!onComplete) return
+    firedRef.current = true
+    if (shortDwellTimerRef.current) { clearTimeout(shortDwellTimerRef.current); shortDwellTimerRef.current = null }
+    if (safetyNetTimerRef.current) { clearTimeout(safetyNetTimerRef.current); safetyNetTimerRef.current = null }
+    onComplete()
+  }
+
+  // Reset the fired flag + start the timers when content changes.
   useEffect(() => {
     firedRef.current = false
-    // ⚡ Dwell fallback: if the text content is short enough to fit in
-    // the viewport without scrolling, the student can never trigger
-    // the "scrolled to bottom" event. As a safety net, fire onComplete
-    // after 30 seconds of viewing (matches the hint we show in the
-    // banner). If they scroll to bottom before that, the scroll handler
-    // fires first and cancels this timer.
-    if (onComplete && content) {
-      dwellTimerRef.current = setTimeout(() => {
-        if (!firedRef.current) {
-          firedRef.current = true
-          onComplete()
-        }
-      }, 30000)
-    }
+    if (!onComplete || !content) return
+
+    // ⚡ Safety net: fire after 12 seconds regardless of scroll — we
+    // don't want the student to wait forever if neither the
+    // short-dwell nor the scroll-to-bottom fired.
+    safetyNetTimerRef.current = setTimeout(() => {
+      fireNow()
+    }, 12000)
+
+    // ⚡ Short content dwell: check after a 600ms delay (gives the
+    // browser time to layout the content + measure scrollHeight
+    // accurately). If scrollHeight <= clientHeight, the content fits
+    // in the viewport (no scrollbar) — fire after a 3-second reading
+    // dwell so the student has time to read it.
+    const measureTimer = setTimeout(() => {
+      const el = scrollContainerRef.current
+      if (!el) return
+      // No scrollbar — content fits entirely in view
+      const hasScrollbar = el.scrollHeight > el.clientHeight + 2
+      if (!hasScrollbar) {
+        shortDwellTimerRef.current = setTimeout(() => {
+          fireNow()
+        }, 3000) // 3-second read time for short content
+      }
+      // If there IS a scrollbar, the onScroll handler in the JSX
+      // below will fire onComplete when the student scrolls to bottom.
+    }, 600)
+
     return () => {
-      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current)
+      if (measureTimer) clearTimeout(measureTimer)
+      if (shortDwellTimerRef.current) { clearTimeout(shortDwellTimerRef.current); shortDwellTimerRef.current = null }
+      if (safetyNetTimerRef.current) { clearTimeout(safetyNetTimerRef.current); safetyNetTimerRef.current = null }
     }
   }, [content, onComplete])
   if (!content) {
@@ -594,10 +710,7 @@ function TextContent({ content, onComplete }: { content?: string; onComplete?: (
           const el = e.currentTarget
           const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
           if (distanceFromBottom <= 30) {
-            firedRef.current = true
-            // Cancel the dwell-timer fallback since we already fired
-            if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current)
-            onComplete()
+            fireNow()
           }
         }}
         className="relative px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto"
@@ -611,10 +724,11 @@ function TextContent({ content, onComplete }: { content?: string; onComplete?: (
 }
 
 // ============== PDF Viewer ==============
-// ⚡ onComplete fires after the student has had the PDF open for 30
+// ⚡ onComplete fires after the student has had the PDF open for 15
 // seconds. We can't easily track scroll position inside the Google
 // Docs Viewer iframe (cross-origin), so we use a dwell-time fallback.
-// 30 seconds matches the hint we show in the banner.
+// 15 seconds is enough for the student to glance through the file
+// without making them wait too long for the next lesson to unlock.
 function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void }) {
   const firedRef = useRef(false)
 
@@ -626,7 +740,7 @@ function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void 
         firedRef.current = true
         onComplete()
       }
-    }, 30000)
+    }, 15000)
     return () => clearTimeout(timer)
   }, [url, onComplete])
   if (!url) {
