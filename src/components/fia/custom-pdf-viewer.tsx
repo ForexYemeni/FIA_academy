@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   FileUp, AlertCircle, Loader2, Sparkles, Lock,
-  ChevronRight, ChevronLeft, ZoomIn, ZoomOut,
+  ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -15,22 +15,32 @@ if (typeof window !== 'undefined') {
   ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 }
 
-// ============== Custom PDF.js Viewer (no Google, no iframe) ==============
-// Renders PDF pages to <canvas> using pdfjs-dist. The student can:
-// - Navigate pages (Prev/Next buttons + page counter + thumbnail dots)
-// - Zoom in / out (custom scale buttons + auto-fit option)
-// - See the page as a high-resolution image (cannot download the .pdf)
+// ============== Custom PDF.js Viewer — Continuous Scroll ==============
+// Renders ALL PDF pages in a single scrollable container, stacked
+// vertically. This is what users expect from a real PDF viewer (Chrome,
+// Adobe Reader, etc.) — NOT one-page-at-a-time arrow navigation.
+//
+// The student:
+// - Sees ALL pages stacked vertically (like a real PDF)
+// - Scrolls / swipes / drags naturally up & down to read
+// - Pages render on-demand as they scroll into view (lazy rendering)
+// - Each page is rendered to its own <canvas> for crisp, sharp text
 // - Right-click is disabled (no "Save As...")
 //
-// ⚡ RENDERING QUALITY:
-// - Uses devicePixelRatio (capped at 2x) for crisp rendering on retina
-// - Auto-fits the canvas to the container width (no horizontal scroll)
-// - Re-renders on window resize to keep the auto-fit correct
+// ⚡ RENDERING STRATEGY (lazy on-demand):
+// - We render the page the user is currently viewing (visible)
+// - We also pre-render the page before + after it (smooth scrolling)
+// - We DON'T render all pages at once (would freeze the browser on
+//   large PDFs — each page render takes ~200ms)
+// - We observe which page is in view via IntersectionObserver
+// - We update the page indicator (X / Y) as the user scrolls
+// - We auto-complete the lesson when the user reaches the LAST page
 //
-// ⚡ NAVIGATION BETWEEN LESSONS:
-// - The "Next lesson" button is shown at the bottom (after the toolbar)
-// - It's only locked (disabled) if the CURRENT lesson isn't completed
-// - The student can navigate to the previous lesson freely
+// ⚡ PROTECTION:
+// - All pages are <canvas> elements (image data, not raw PDF)
+// - No iframe, no Google, no external URLs in the DOM
+// - Right-click disabled on every canvas
+// - Drag disabled on every canvas (onDragStart preventDefault)
 export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
   url: string
   filename: string
@@ -38,19 +48,23 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
   firedRef: React.MutableRefObject<boolean>
 }) {
   const [numPages, setNumPages] = useState(0)
-  const [pageNum, setPageNum] = useState(1)
-  const [scale, setScale] = useState(1.0)
-  const [autoFit, setAutoFit] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [rendering, setRendering] = useState(false)
   const [containerWidth, setContainerWidth] = useState(0)
-  const [effectiveScale, setEffectiveScale] = useState(1.0)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [pageHeights, setPageHeights] = useState<number[]>([])
+  const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set())
+  const [showTopBtn, setShowTopBtn] = useState(false)
+  const [showBottomBtn, setShowBottomBtn] = useState(false)
+
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
   const pdfDocRef = useRef<any>(null)
-  const renderTaskRef = useRef<any>(null)
-  const pageRef = useRef<any>(null)
+  const renderTasksRef = useRef<Map<number, any>>(new Map())
+  const pagesRef = useRef<any[]>([])
+  const ioRef = useRef<IntersectionObserver | null>(null)
+  const lastCompletedPage = useRef(0)
 
   // ⚡ Auto-complete after 15s dwell (safety net).
   useEffect(() => {
@@ -63,27 +77,6 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
     }, 15000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ⚡ Measure the container width — used for auto-fit calculation.
-  // Re-measures on window resize so the PDF re-fits when the modal
-  // resizes (e.g. orientation change on mobile).
-  useEffect(() => {
-    if (!containerRef.current) return
-    const measure = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth)
-      }
-    }
-    measure()
-    // Also use ResizeObserver for accurate container-size tracking
-    const ro = new ResizeObserver(measure)
-    ro.observe(containerRef.current)
-    window.addEventListener('resize', measure)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', measure)
-    }
   }, [])
 
   // ⚡ Load the PDF document.
@@ -106,6 +99,21 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         if (cancelled) return
         pdfDocRef.current = doc
         setNumPages(doc.numPages)
+        // Pre-fetch ALL page metadata (width/height at scale 1) so we
+        // can lay out the pages with the correct heights before any
+        // rendering happens. This gives a smooth scroll without jumps
+        // as pages render in.
+        const pages: any[] = []
+        const heights: number[] = []
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i)
+          if (cancelled) return
+          pages.push(page)
+          pagesRef.current = pages
+          const viewport = page.getViewport({ scale: 1 })
+          heights.push(viewport.height / viewport.width) // aspect ratio (h/w)
+        }
+        setPageHeights(heights)
         setLoading(false)
       } catch (e: any) {
         console.warn('[CustomPdfViewer] Failed to load PDF:', e)
@@ -130,123 +138,160 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
     }
   }, [url])
 
-  // ⚡ Compute effective scale based on auto-fit + manual zoom.
-  // Whenever pageNum, containerWidth, scale, or autoFit changes,
-  // we re-fetch the page (cached) and recompute the scale.
+  // ⚡ Measure the container width — used to compute the rendering
+  // scale for each page (auto-fit to container width).
   useEffect(() => {
-    if (!pdfDocRef.current || loading || error) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const doc = pdfDocRef.current
-        const page = await doc.getPage(pageNum)
-        if (cancelled) return
-        pageRef.current = page
-        if (autoFit && containerWidth > 0) {
-          // ⚡ Auto-fit: scale so the PDF's natural width fits the
-          // container width exactly (minus 32px padding).
-          const viewportAtScale1 = page.getViewport({ scale: 1 })
-          const padding = 32
-          const availableWidth = Math.max(200, containerWidth - padding)
-          const fitScale = availableWidth / viewportAtScale1.width
-          // Apply the user's zoom multiplier on top of auto-fit baseline
-          const eff = fitScale * scale
-          setEffectiveScale(eff)
-        } else {
-          // Manual mode: use scale directly
-          setEffectiveScale(scale)
-        }
-      } catch (e: any) {
-        if (e?.name !== 'RenderingCancelledException') {
-          console.warn('[CustomPdfViewer] Auto-fit failed:', e)
-        }
+    if (!containerRef.current) return
+    const measure = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth)
       }
-    })()
-    return () => { cancelled = true }
-  }, [autoFit, containerWidth, pageNum, loading, error, scale])
-
-  // ⚡ Render the current page to the canvas with the effective scale.
-  useEffect(() => {
-    if (!pdfDocRef.current || !canvasRef.current || loading || error || !pageRef.current || !effectiveScale) return
-    let cancelled = false
-    setRendering(true)
-    ;(async () => {
-      try {
-        const page = pageRef.current
-        const canvas = canvasRef.current
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        // ⚡ Cap DPR at 2 for performance — anything higher is overkill
-        const dpr = Math.min(window.devicePixelRatio || 1, 2)
-        const viewport = page.getViewport({ scale: effectiveScale })
-        // ⚡ Set canvas internal size (in device pixels) for crisp rendering
-        canvas.width = Math.floor(viewport.width * dpr)
-        canvas.height = Math.floor(viewport.height * dpr)
-        // ⚡ Set canvas display size (in CSS pixels)
-        canvas.style.width = `${viewport.width}px`
-        canvas.style.height = `${viewport.height}px`
-        // ⚡ Reset transform and apply DPR scaling
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        // ⚡ Cancel any in-flight render task to avoid race conditions
-        if (renderTaskRef.current) {
-          try { renderTaskRef.current.cancel() } catch {}
-        }
-        const renderTask = page.render({ canvasContext: ctx, viewport })
-        renderTaskRef.current = renderTask
-        await renderTask.promise
-        if (cancelled) return
-        setRendering(false)
-      } catch (e: any) {
-        if (e?.name !== 'RenderingCancelledException') {
-          console.warn('[CustomPdfViewer] Render failed:', e)
-        }
-        setRendering(false)
-      }
-    })()
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(containerRef.current)
+    window.addEventListener('resize', measure)
     return () => {
-      cancelled = true
-      if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel() } catch {}
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  // ⚡ Render a single page to its canvas.
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current || !containerWidth) return
+    const page = pagesRef.current[pageNum - 1]
+    if (!page) return
+    const canvas = canvasRefs.current[pageNum - 1]
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Cancel any in-flight render for this page
+    const existingTask = renderTasksRef.current.get(pageNum)
+    if (existingTask) {
+      try { existingTask.cancel() } catch {}
+    }
+
+    // ⚡ Compute scale: fit width to container (minus 32px padding).
+    const padding = 32
+    const availableWidth = Math.max(200, containerWidth - padding)
+    const viewportAtScale1 = page.getViewport({ scale: 1 })
+    const fitScale = availableWidth / viewportAtScale1.width
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const viewport = page.getViewport({ scale: fitScale })
+
+    // Set canvas internal size (device pixels for crisp rendering)
+    canvas.width = Math.floor(viewport.width * dpr)
+    canvas.height = Math.floor(viewport.height * dpr)
+    // Set canvas display size (CSS pixels)
+    canvas.style.width = `${viewport.width}px`
+    canvas.style.height = `${viewport.height}px`
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+    try {
+      const renderTask = page.render({ canvasContext: ctx, viewport })
+      renderTasksRef.current.set(pageNum, renderTask)
+      await renderTask.promise
+      renderTasksRef.current.delete(pageNum)
+      setRenderedPages((prev) => new Set(prev).add(pageNum))
+    } catch (e: any) {
+      if (e?.name !== 'RenderingCancelledException') {
+        console.warn('[CustomPdfViewer] Render failed for page', pageNum, e)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageNum, effectiveScale, loading, error])
+  }, [containerWidth])
 
-  // ⚡ Auto-complete the lesson when the student reaches the LAST page.
+  // ⚡ IntersectionObserver to track which page is currently in view.
+  // When a page becomes visible, we:
+  //   1. Update the page indicator (X / Y)
+  //   2. Trigger render for the visible page + 1 page above + 1 below
+  //   3. If the visible page is the last page, auto-complete the lesson
   useEffect(() => {
-    if (!onComplete || !numPages || pageNum < numPages) return
-    if (firedRef.current) return
-    const timer = setTimeout(() => {
-      if (!firedRef.current) {
-        firedRef.current = true
-        onComplete()
-      }
-    }, 1000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageNum, numPages])
+    if (!numPages || loading || error || !containerRef.current) return
 
-  // ⚡ Keyboard navigation (Left/Right arrows + Home/End)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (loading || error) return
-      if (e.key === 'ArrowLeft') {
-        setPageNum((p) => Math.min(numPages, p + 1))
-      } else if (e.key === 'ArrowRight') {
-        setPageNum((p) => Math.max(1, p - 1))
-      } else if (e.key === 'Home') {
-        setPageNum(1)
-      } else if (e.key === 'End') {
-        setPageNum(numPages)
+    const io = new IntersectionObserver(
+      (entries) => {
+        let topPage = currentPage
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            const pageNum = Number((entry.target as HTMLElement).dataset.pageNum)
+            if (pageNum > 0) {
+              topPage = pageNum
+            }
+          }
+        }
+        if (topPage !== currentPage) {
+          setCurrentPage(topPage)
+          // Render this page + neighbors
+          renderPage(topPage)
+          if (topPage > 1) renderPage(topPage - 1)
+          if (topPage < numPages) renderPage(topPage + 1)
+          // ⚡ Auto-complete when reaching the LAST page
+          if (topPage === numPages && !firedRef.current && onComplete) {
+            setTimeout(() => {
+              if (!firedRef.current) {
+                firedRef.current = true
+                onComplete()
+              }
+            }, 1500)
+          }
+        }
+      },
+      {
+        root: containerRef.current,
+        // ⚡ Trigger when ≥50% of the page is visible
+        threshold: [0.5, 0.75, 1.0],
       }
+    )
+    ioRef.current = io
+
+    // Observe all page placeholder divs
+    pageRefs.current.forEach((el) => {
+      if (el) io.observe(el)
+    })
+
+    return () => {
+      io.disconnect()
+      ioRef.current = null
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [numPages, loading, error])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numPages, loading, error, containerWidth, renderPage])
 
-  const gotoPrev = () => setPageNum((p) => Math.max(1, p - 1))
-  const gotoNext = () => setPageNum((p) => Math.min(numPages, p + 1))
+  // ⚡ Initial render: render page 1 + page 2 once container width is known
+  useEffect(() => {
+    if (!containerWidth || loading || error || !numPages) return
+    renderPage(1)
+    if (numPages > 1) renderPage(2)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerWidth, loading, error, numPages])
+
+  // ⚡ Track scroll position to show/hide "scroll to top" button
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return
+    const scrollTop = containerRef.current.scrollTop
+    const scrollHeight = containerRef.current.scrollHeight
+    const clientHeight = containerRef.current.clientHeight
+    setShowTopBtn(scrollTop > 200)
+    setShowBottomBtn(scrollTop + clientHeight < scrollHeight - 200)
+  }, [])
+
+  const scrollToTop = () => {
+    containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const scrollToBottom = () => {
+    if (!containerRef.current) return
+    containerRef.current.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
+  }
+  const jumpToPage = (pageNum: number) => {
+    const el = pageRefs.current[pageNum - 1]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   if (loading) {
     return (
@@ -267,7 +312,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
             <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
           </Badge>
         </div>
-        <div className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy" style={{ height: '500px' }}>
+        <div className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy" style={{ height: '600px' }}>
           <div className="absolute inset-0 opacity-25" style={{
             backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
             backgroundSize: '24px 24px, 18px 18px'
@@ -330,51 +375,35 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         </Badge>
       </div>
 
-      {/* ⚡ Magical gold-bordered PDF frame with our own controls */}
+      {/* ⚡ Magical gold-bordered PDF frame with continuous scroll */}
       <div
         className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy/5 to-white"
         onContextMenu={(e) => e.preventDefault()}
       >
-        {/* Toolbar — page navigation + zoom (magical navy gradient) */}
-        <div className="relative flex items-center justify-between gap-2 px-3 py-2.5 bg-gradient-to-l from-navy via-navy-light to-navy text-white border-b border-gold/20">
+        {/* Top sticky toolbar — page indicator (magical navy gradient) */}
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-l from-navy via-navy-light to-navy text-white border-b border-gold/20">
           {/* Decorative dot pattern */}
-          <div className="absolute inset-0 opacity-20" style={{
+          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
             backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1px, transparent 1px)',
             backgroundSize: '24px 24px'
           }} />
-
-          {/* Page navigation group */}
-          <div className="relative flex items-center gap-1">
-            <button
-              onClick={gotoPrev}
-              disabled={pageNum <= 1}
-              className="w-9 h-9 rounded-lg bg-white/10 hover:bg-gold/20 active:bg-gold/30 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10"
-              title="الصفحة السابقة (Arrow Right)"
-            >
-              <ChevronRight className="w-4 h-4 text-gold" />
-            </button>
-            <div className="px-3 py-1.5 text-xs font-bold text-gold bg-white/10 rounded-lg min-w-[70px] text-center border border-white/10">
-              {pageNum} / {numPages || '?'}
-            </div>
-            <button
-              onClick={gotoNext}
-              disabled={pageNum >= numPages}
-              className="w-9 h-9 rounded-lg bg-white/10 hover:bg-gold/20 active:bg-gold/30 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border border-white/10"
-              title="الصفحة التالية (Arrow Left)"
-            >
-              <ChevronLeft className="w-4 h-4 text-gold" />
-            </button>
+          {/* Filename (truncated) */}
+          <div className="relative text-xs font-bold text-gold truncate max-w-[140px]">
+            {filename}
           </div>
-
-          {/* Page dots indicator (visible if pages <= 12, desktop only) */}
+          {/* Page indicator */}
+          <div className="relative px-3 py-1 text-xs font-bold text-gold bg-white/10 rounded-lg min-w-[70px] text-center border border-white/10">
+            {currentPage} / {numPages}
+          </div>
+          {/* Page jump buttons (compact, ≤12 pages only) */}
           {numPages > 0 && numPages <= 12 && (
             <div className="relative hidden md:flex items-center gap-1">
               {Array.from({ length: numPages }, (_, i) => (
                 <button
                   key={i}
-                  onClick={() => setPageNum(i + 1)}
+                  onClick={() => jumpToPage(i + 1)}
                   className={`h-1.5 rounded-full transition-all ${
-                    i + 1 === pageNum
+                    i + 1 === currentPage
                       ? 'bg-gold w-4'
                       : 'bg-white/30 hover:bg-white/60 w-1.5'
                   }`}
@@ -383,56 +412,81 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
               ))}
             </div>
           )}
-
-          {/* Zoom controls group */}
-          <div className="relative flex items-center gap-1">
-            <button
-              onClick={() => { setAutoFit(false); setScale((s) => Math.max(0.4, s - 0.2)) }}
-              className="w-9 h-9 rounded-lg bg-white/10 hover:bg-gold/20 active:bg-gold/30 flex items-center justify-center transition-all active:scale-95 border border-white/10"
-              title="تصغير"
-            >
-              <ZoomOut className="w-4 h-4 text-gold" />
-            </button>
-            <button
-              onClick={() => { setAutoFit(true); setScale(1.0) }}
-              className="px-2.5 py-1.5 text-xs font-medium text-gold bg-white/10 rounded-lg min-w-[60px] text-center border border-white/10 hover:bg-gold/20 transition-all active:scale-95"
-              title={autoFit ? 'ملاءمة تلقائية (اضغط للتكبير اليدوي)' : 'العودة للملاءمة التلقائية'}
-            >
-              {autoFit ? 'ملاءمة' : `${Math.round(scale * 100)}%`}
-            </button>
-            <button
-              onClick={() => { setAutoFit(false); setScale((s) => Math.min(3, s + 0.2)) }}
-              className="w-9 h-9 rounded-lg bg-white/10 hover:bg-gold/20 active:bg-gold/30 flex items-center justify-center transition-all active:scale-95 border border-white/10"
-              title="تكبير"
-            >
-              <ZoomIn className="w-4 h-4 text-gold" />
-            </button>
-          </div>
+          <Badge className="relative bg-emerald-500/15 text-emerald-300 border-emerald-400/30 text-[10px] flex-shrink-0">
+            <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
+          </Badge>
         </div>
 
-        {/* Canvas render area — scrollable, right-click disabled */}
+        {/* ⚡ Continuous scroll area — ALL pages stacked vertically */}
         <div
           ref={containerRef}
-          className="relative overflow-auto flex items-center justify-center p-4"
+          onScroll={handleScroll}
+          className="relative overflow-y-auto overflow-x-hidden"
           style={{
-            height: '500px',
-            background: 'linear-gradient(135deg, rgba(10,30,55,0.04) 0%, rgba(212,175,55,0.04) 100%)'
+            height: '600px',
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch', // iOS smooth scrolling
+            background: 'linear-gradient(180deg, rgba(10,30,55,0.06) 0%, rgba(212,175,55,0.04) 100%)'
           }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <canvas
-            ref={canvasRef}
-            onContextMenu={(e) => e.preventDefault()}
-            onDragStart={(e) => e.preventDefault()}
-            className="shadow-2xl rounded-md bg-white"
-            style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
-          />
-          {/* Rendering overlay spinner (appears briefly when re-rendering) */}
-          {rendering && !loading && (
-            <div className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-lg bg-navy/80 backdrop-blur-sm text-gold text-xs flex items-center gap-2 border border-gold/30 shadow-md">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>جاري العرض...</span>
-            </div>
+          <div className="py-4 px-4 space-y-3">
+            {Array.from({ length: numPages }, (_, i) => {
+              const pageNum = i + 1
+              const aspectRatio = pageHeights[i] || 1.414 // A4 fallback
+              // Placeholder height: containerWidth - 32 padding, multiplied by aspect ratio
+              const placeholderWidth = Math.max(200, containerWidth - 32)
+              const placeholderHeight = containerWidth > 0 ? placeholderWidth * aspectRatio : 600
+              return (
+                <div
+                  key={pageNum}
+                  data-page-num={pageNum}
+                  ref={(el) => { pageRefs.current[i] = el }}
+                  className="relative bg-white shadow-2xl rounded-md overflow-hidden mx-auto"
+                  style={{
+                    width: containerWidth > 0 ? `${containerWidth - 32}px` : '100%',
+                    // ⚡ Reserve space for the canvas BEFORE it renders,
+                    // so the scroll height is correct from the start
+                    // (no jumps when pages render in)
+                    minHeight: `${placeholderHeight}px`,
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  <canvas
+                    ref={(el) => { canvasRefs.current[i] = el }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
+                    className="block w-full h-auto"
+                    style={{ display: 'block' }}
+                  />
+                  {/* Page number watermark (top-left corner) */}
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-navy/70 backdrop-blur-sm text-gold text-[10px] font-bold border border-gold/30 pointer-events-none">
+                    {pageNum} / {numPages}
+                  </div>
+                  {/* Loading placeholder (shown until page renders) */}
+                  {!renderedPages.has(pageNum) && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-center">
+                        <Loader2 className="w-6 h-6 text-navy/40 animate-spin mx-auto mb-2" />
+                        <p className="text-xs text-navy/40 font-medium">صفحة {pageNum}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ⚡ Floating scroll-to-top button (appears after scrolling down) */}
+          {showTopBtn && (
+            <button
+              onClick={scrollToTop}
+              className="sticky bottom-4 left-4 z-10 w-10 h-10 rounded-full bg-gradient-to-br from-navy to-navy-light text-gold shadow-lg border border-gold/30 flex items-center justify-center active:scale-95 transition-all hover:shadow-xl"
+              title="التمرير للأعلى"
+              style={{ position: 'absolute', bottom: '16px', left: '16px' }}
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
           )}
         </div>
 
@@ -440,23 +494,23 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         {numPages > 0 && (
           <div className="px-3 py-2 bg-gradient-to-l from-navy/10 to-white border-t border-gold/20">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-navy/70">صفحة {pageNum} من {numPages}</span>
+              <span className="text-[10px] font-bold text-navy/70">صفحة {currentPage} من {numPages}</span>
               <div className="flex-1 h-1.5 bg-navy/10 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-l from-gold via-amber-400 to-gold transition-all duration-300 rounded-full"
-                  style={{ width: `${(pageNum / Math.max(1, numPages)) * 100}%` }}
+                  style={{ width: `${(currentPage / Math.max(1, numPages)) * 100}%` }}
                 />
               </div>
-              <span className="text-[10px] font-bold text-navy/70">{Math.round((pageNum / Math.max(1, numPages)) * 100)}%</span>
+              <span className="text-[10px] font-bold text-navy/70">{Math.round((currentPage / Math.max(1, numPages)) * 100)}%</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* ⚡ Bottom hint + keyboard shortcuts */}
+      {/* ⚡ Bottom hint */}
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <Sparkles className="w-3 h-3 text-gold/60" />
-        استخدم أزرار التنقل أو الأسهم ← → في الكيبورد للتنقل بين الصفحات
+        مرّر لأعلى أو أسفل لقراءة الملف كاملاً — مثل عارض PDF الحقيقي
       </div>
     </div>
   )
