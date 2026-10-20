@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar, MapPin, Target, Send, Facebook,
+  Search, Calendar, MapPin, Target, Send, Facebook, Phone,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -3773,102 +3773,95 @@ function AdminSite() {
         {/* SOCIAL — magical themed cards per platform */}
         {tab === 'social' && (
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-gold" />
-              كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.
-            </p>
-            {/* Facebook */}
-            <div className="relative p-4 rounded-xl border border-blue-300/40 bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
-              <div className="absolute -top-4 -right-4 w-12 h-12 bg-blue-500/15 rounded-full blur-xl" />
-              <div className="relative flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md">
-                    <Facebook className="w-4 h-4 text-white" fill="currentColor" />
-                  </div>
-                  <Label className="font-bold text-blue-800">فيسبوك</Label>
-                </div>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <span className={`font-bold ${settings.social_facebook_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                    {settings.social_facebook_enabled ? 'مفعّل' : 'متوقف'}
-                  </span>
-                  <div className="relative">
-                    <input type="checkbox" checked={!!settings.social_facebook_enabled} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} className="sr-only" />
-                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_facebook_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_facebook_enabled ? 'right-0.5' : 'right-5'}`} />
-                  </div>
-                </label>
-              </div>
-              <Input value={settings.social_facebook || ''} onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })} dir="ltr" placeholder="https://facebook.com/..." className="text-sm rounded-lg border-blue-300/40 focus:border-blue-500 focus:ring-blue-500/30 bg-white" />
+              <span>كل رابط يمكن تفعيله/إيقافه بشكل مستقل. لا يظهر في الفوتر إلا عند التفعيل.</span>
             </div>
-            {/* Telegram */}
-            <div className="relative p-4 rounded-xl border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-blue-50 overflow-hidden">
-              <div className="absolute -top-4 -right-4 w-12 h-12 bg-cyan-500/15 rounded-full blur-xl" />
-              <div className="relative flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md">
-                    <Send className="w-4 h-4 text-white" />
+
+            {/* Helper function to render each social platform card */}
+            {[
+              {
+                key: 'facebook',
+                label: 'فيسبوك',
+                placeholder: 'https://facebook.com/...',
+                iconBg: 'from-blue-600 to-blue-800',
+                cardBg: 'from-blue-50 to-indigo-50',
+                border: 'border-blue-300/40',
+                glow: 'bg-blue-500/15',
+                icon: <Facebook className="w-4 h-4 text-white" />,
+                labelText: 'text-blue-800',
+              },
+              {
+                key: 'telegram',
+                label: 'تيليجرام (قناة أو يوزر)',
+                placeholder: '@username أو https://t.me/...',
+                iconBg: 'from-cyan-500 to-blue-600',
+                cardBg: 'from-cyan-50 to-blue-50',
+                border: 'border-cyan-300/40',
+                glow: 'bg-cyan-500/15',
+                icon: <Send className="w-4 h-4 text-white" />,
+                labelText: 'text-cyan-800',
+              },
+              {
+                key: 'whatsapp',
+                label: 'واتساب (قناة)',
+                placeholder: 'https://wa.me/... أو رقم',
+                iconBg: 'from-emerald-500 to-green-600',
+                cardBg: 'from-emerald-50 to-green-50',
+                border: 'border-emerald-300/40',
+                glow: 'bg-emerald-500/15',
+                icon: <Phone className="w-4 h-4 text-white" />,
+                labelText: 'text-emerald-800',
+              },
+              {
+                key: 'sms',
+                label: 'رقم للمراسلات النصية (SMS)',
+                placeholder: '+9677XX...',
+                iconBg: 'from-amber-500 to-yellow-600',
+                cardBg: 'from-amber-50 to-yellow-50',
+                border: 'border-amber-300/40',
+                glow: 'bg-amber-500/15',
+                icon: <MessageSquare className="w-4 h-4 text-white" />,
+                labelText: 'text-amber-800',
+              },
+            ].map((platform: any) => {
+              const enabledKey = `social_${platform.key}_enabled`
+              const urlKey = `social_${platform.key}`
+              const isEnabled = Boolean((settings as any)[enabledKey])
+              return (
+                <div key={platform.key} className={`relative p-4 rounded-xl border ${platform.border} bg-gradient-to-br ${platform.cardBg} overflow-hidden`}>
+                  <div className={`absolute -top-4 -right-4 w-12 h-12 ${platform.glow} rounded-full blur-xl pointer-events-none`} />
+                  <div className="relative flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${platform.iconBg} flex items-center justify-center shadow-md`}>
+                        {platform.icon}
+                      </div>
+                      <Label className={`font-bold ${platform.labelText}`}>{platform.label}</Label>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs cursor-pointer">
+                      <span className={`font-bold ${isEnabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                        {isEnabled ? 'مفعّل' : 'متوقف'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, [enabledKey]: !isEnabled })}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${isEnabled ? 'bg-emerald-500' : 'bg-muted'}`}
+                        aria-pressed={isEnabled}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${isEnabled ? 'right-0.5' : 'right-5'}`} />
+                      </button>
+                    </div>
                   </div>
-                  <Label className="font-bold text-cyan-800">تيليجرام (قناة أو يوزر)</Label>
+                  <Input
+                    value={((settings as any)[urlKey] as string) || ''}
+                    onChange={(e) => setSettings({ ...settings, [urlKey]: e.target.value })}
+                    dir="ltr"
+                    placeholder={platform.placeholder}
+                    className="text-sm rounded-lg bg-white"
+                  />
                 </div>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <span className={`font-bold ${settings.social_telegram_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                    {settings.social_telegram_enabled ? 'مفعّل' : 'متوقف'}
-                  </span>
-                  <div className="relative">
-                    <input type="checkbox" checked={!!settings.social_telegram_enabled} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} className="sr-only" />
-                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_telegram_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_telegram_enabled ? 'right-0.5' : 'right-5'}`} />
-                  </div>
-                </label>
-              </div>
-              <Input value={settings.social_telegram || ''} onChange={(e) => setSettings({ ...settings, social_telegram: e.target.value })} dir="ltr" placeholder="@username أو https://t.me/..." className="text-sm rounded-lg border-cyan-300/40 focus:border-cyan-500 focus:ring-cyan-500/30 bg-white" />
-            </div>
-            {/* WhatsApp */}
-            <div className="relative p-4 rounded-xl border border-emerald-300/40 bg-gradient-to-br from-emerald-50 to-green-50 overflow-hidden">
-              <div className="absolute -top-4 -right-4 w-12 h-12 bg-emerald-500/15 rounded-full blur-xl" />
-              <div className="relative flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-md">
-                    <Phone className="w-4 h-4 text-white" />
-                  </div>
-                  <Label className="font-bold text-emerald-800">واتساب (قناة)</Label>
-                </div>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <span className={`font-bold ${settings.social_whatsapp_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                    {settings.social_whatsapp_enabled ? 'مفعّل' : 'متوقف'}
-                  </span>
-                  <div className="relative">
-                    <input type="checkbox" checked={!!settings.social_whatsapp_enabled} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} className="sr-only" />
-                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_whatsapp_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_whatsapp_enabled ? 'right-0.5' : 'right-5'}`} />
-                  </div>
-                </label>
-              </div>
-              <Input value={settings.social_whatsapp || ''} onChange={(e) => setSettings({ ...settings, social_whatsapp: e.target.value })} dir="ltr" placeholder="https://wa.me/... أو رقم" className="text-sm rounded-lg border-emerald-300/40 focus:border-emerald-500 focus:ring-emerald-500/30 bg-white" />
-            </div>
-            {/* SMS */}
-            <div className="relative p-4 rounded-xl border border-amber-300/40 bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden">
-              <div className="absolute -top-4 -right-4 w-12 h-12 bg-amber-500/15 rounded-full blur-xl" />
-              <div className="relative flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-md">
-                    <MessageSquare className="w-4 h-4 text-white" />
-                  </div>
-                  <Label className="font-bold text-amber-800">رقم للمراسلات النصية (SMS)</Label>
-                </div>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <span className={`font-bold ${settings.social_sms_enabled ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                    {settings.social_sms_enabled ? 'مفعّل' : 'متوقف'}
-                  </span>
-                  <div className="relative">
-                    <input type="checkbox" checked={!!settings.social_sms_enabled} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} className="sr-only" />
-                    <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_sms_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_sms_enabled ? 'right-0.5' : 'right-5'}`} />
-                  </div>
-                </label>
-              </div>
-              <Input value={settings.social_sms || ''} onChange={(e) => setSettings({ ...settings, social_sms: e.target.value })} dir="ltr" placeholder="+9677XX..." className="text-sm rounded-lg border-amber-300/40 focus:border-amber-500 focus:ring-amber-500/30 bg-white" />
-            </div>
+              )
+            })}
           </div>
         )}
 
