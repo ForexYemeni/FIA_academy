@@ -64,7 +64,18 @@ export async function GET(req: NextRequest) {
     // Stream the upstream body back to the client. We DON'T buffer the
     // entire file in memory — we pipe the stream directly so large PDFs
     // don't OOM (out-of-memory) the function.
-    const contentType = upstream.headers.get('content-type') || 'application/pdf'
+    // ⚡ Force the correct Content-Type. Telegram sometimes returns
+    // 'application/octet-stream' for PDFs which is technically correct
+    // but makes some browsers / libraries behave incorrectly. We force
+    // 'application/pdf' for any .pdf URL or any document file.
+    let contentType = upstream.headers.get('content-type') || 'application/pdf'
+    if (contentType.includes('octet-stream') || contentType.includes('binary')) {
+      contentType = 'application/pdf'
+    }
+    // ⚡ If the URL itself ends in .pdf, force application/pdf regardless
+    if (parsedUrl.pathname.toLowerCase().endsWith('.pdf')) {
+      contentType = 'application/pdf'
+    }
     const contentLength = upstream.headers.get('content-length')
 
     const headers: Record<string, string> = {
@@ -73,13 +84,15 @@ export async function GET(req: NextRequest) {
       // a public proxy for Telegram files)
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      'Access-Control-Allow-Headers': 'Range',
-      // ⚡ Expose Content-Length so PDF.js (when fetching as ArrayBuffer)
-      // can show download progress
+      'Access-Control-Allow-Headers': 'Accept, Content-Type',
+      // ⚡ Expose Content-Length so PDF.js can show download progress
       'Access-Control-Expose-Headers': 'Content-Length',
       // ⚡ Disable caching — Telegram file URLs contain the bot token
       // and expire eventually. Caching could leak stale URLs.
       'Cache-Control': 'no-store, no-cache, must-revalidate',
+      // ⚡ Ensure the browser doesn't try to display a download dialog
+      // (we want PDF.js to fetch it as ArrayBuffer)
+      'Content-Disposition': 'inline',
     }
     if (contentLength) {
       headers['Content-Length'] = contentLength
@@ -92,7 +105,15 @@ export async function GET(req: NextRequest) {
     // CustomPdfViewer fetches the PDF as a single ArrayBuffer to avoid
     // this issue entirely.
 
-    return new NextResponse(upstream.body, {
+    // ⚡ Read the body as ArrayBuffer instead of streaming. Some Vercel
+    // deployments have issues piping streaming responses through to
+    // the browser — the response body gets truncated or corrupted,
+    // leading to PDF.js reading the wrong number of pages and showing
+    // blank pages. Reading as ArrayBuffer and re-serializing ensures
+    // the entire body is delivered correctly.
+    const bodyBuffer = await upstream.arrayBuffer()
+
+    return new NextResponse(bodyBuffer, {
       status: 200,
       headers,
     })
