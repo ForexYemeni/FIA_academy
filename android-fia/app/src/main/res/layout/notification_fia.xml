@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ⚡ Custom notification layout for FIA Academy — premium navy/gold theme.
+  Used by NotificationPollService for the native notification popup when
+  the app is in the background. Matches the in-app toast design.
+
+  Layout structure:
+    - Top: gold accent line (2dp)
+    - Body: horizontal row with:
+      - Icon container (40x40 rounded square, gold background)
+        - Icon (white bell)
+      - Text column (RTL):
+        - App name (10sp, navy, bold)
+        - Title (14sp, navy, bold)
+        - Body (12sp, gray, max 2 lines)
+    - Time: shown on the right (10sp, gray)
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notif_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/white"
+    android:padding="0dp">
+
+    <!-- ⚡ Top accent line (gold) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#D4AF37" />
+
+    <!-- ⚡ Main content row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp">
+
+        <!-- ⚡ Icon container (40x40 rounded square, gold background) -->
+        <FrameLayout
+            android:id="@+id/notif_icon_container"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="#D4AF37"
+            android:layout_marginEnd="12dp">
+
+            <ImageView
+                android:id="@+id/notif_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_notification"
+                android:tint="#FFFFFF"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <!-- ⚡ Text column (RTL) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layoutDirection="rtl"
+            android:layout_marginEnd="8dp">
+
+            <!-- App name (small, navy, bold) -->
+            <TextView
+                android:id="@+id/notif_app_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="أكاديمية المستقبل الدولية"
+                android:textSize="10sp"
+                android:textColor="#0A1F44"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp" />
+
+            <!-- Title (larger, navy, bold) -->
+            <TextView
+                android:id="@+id/notif_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="إشعار جديد"
+                android:textSize="14sp"
+                android:textColor="#0A1F44"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginBottom="2dp" />
+
+            <!-- Body (smaller, gray, max 2 lines) -->
+            <TextView
+                android:id="@+id/notif_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="#6B6B6B"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+
+        <!-- ⚡ Time (right side, small, gray) -->
+        <TextView
+            android:id="@+id/notif_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="الآن"
+            android:textSize="10sp"
+            android:textColor="#9B9B9B"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+</LinearLayout>

@@ -205,6 +205,18 @@ class NotificationPollService : Service() {
         )
 
         val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        // ⚡ Premium custom notification with custom layout —
+        // matches the magical navy/gold theme of the in-app toast.
+        // We use a RemoteViews with a custom layout (notification_fia.xml)
+        // to render the icon with a gradient + the title + body in a
+        // beautiful card-style layout, instead of the default Android
+        // notification style.
+        val customLayout = try {
+            android.widget.RemoteViews(packageName, R.layout.notification_fia)
+        } catch (e: Exception) {
+            null
+        }
+
         val notif = NotificationCompat.Builder(this, CHANNEL_NOTIFICATIONS)
             .setSmallIcon(R.drawable.ic_notification)  // white bell — proper Android notification icon
             .setContentTitle(title)
@@ -217,7 +229,22 @@ class NotificationPollService : Service() {
             .setVibrate(longArrayOf(0, 250, 100, 250))
             .setAutoCancel(true)
             .setColor(0xFFD4AF37.toInt())  // gold accent for the small icon background
+            .setColorized(true)
             .setContentIntent(pendingIntent)
+            .apply {
+                if (customLayout != null) {
+                    setCustomContentView(customLayout)
+                    setCustomBigContentView(customLayout)
+                    // ⚡ Set the title + body into the custom layout
+                    customLayout.setTextViewText(R.id.notif_title, title)
+                    customLayout.setTextViewText(R.id.notif_body, body)
+                    customLayout.setTextViewText(R.id.notif_app_name, "أكاديمية المستقبل الدولية")
+                    // Set the icon — use a colored version of the bell icon
+                    customLayout.setImageViewResource(R.id.notif_icon, R.drawable.ic_notification)
+                    // Apply gold tint to the icon
+                    customLayout.setInt(R.id.notif_icon_container, "setBackgroundColor", 0xFFD4AF37.toInt())
+                }
+            }
             .build()
 
         try {
