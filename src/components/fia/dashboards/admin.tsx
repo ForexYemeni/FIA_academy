@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar, MapPin, Target, Send,
+  Search, Calendar, MapPin, Target, Send, Facebook,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -3039,103 +3039,154 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{initial ? 'تعديل مدرب' : 'إضافة مدرب جديد'}</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-4">
-          {/* Avatar upload */}
-          <div className="flex items-center gap-4">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-0 border-0">
+        {/* ⚡ Magical gradient header */}
+        <div className="relative bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-700 p-5 pb-6 text-white overflow-hidden rounded-t-2xl">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+          <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 backdrop-blur-sm">
+            <X className="w-4 h-4 text-white" />
+          </button>
+          <div className="relative flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+              <GraduationCap className="w-7 h-7 text-white" strokeWidth={2.2} />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold tracking-tight text-white">
+                {initial ? 'تعديل المدرب' : 'إضافة مدرب جديد'}
+              </DialogTitle>
+              <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" />
+                {initial ? 'تحديث بيانات المدرب' : 'إضافة مدرب جديد للأكاديمية'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-b from-emerald-50/30 to-white p-5 space-y-4">
+          {/* ⚡ Magical avatar upload */}
+          <div className="relative flex items-center gap-4 p-3 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+            <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
             <div className="relative flex-shrink-0">
-              <Avatar className="w-16 h-16 border-2 border-gold/30">
+              <Avatar className="w-16 h-16 border-2 border-gold/40 shadow-md">
                 <AvatarImage src={form.avatar || ''} />
-                <AvatarFallback className="bg-navy text-gold text-xl">{form.name?.charAt(0) || '؟'}</AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-br from-navy to-navy-light text-gold text-xl">{form.name?.charAt(0) || '؟'}</AvatarFallback>
               </Avatar>
               <input type="file" accept="image/*" className="hidden" id="trainer-avatar" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f) }} />
               <button
                 onClick={() => document.getElementById('trainer-avatar')?.click()}
                 disabled={uploadingAvatar}
-                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gold text-navy flex items-center justify-center text-xs disabled:opacity-50"
+                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-gold to-amber-500 text-navy flex items-center justify-center text-xs disabled:opacity-50 shadow-md border border-white/30 active:scale-95 transition-transform"
                 title="رفع صورة"
               >
                 {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
               </button>
             </div>
-            <div className="flex-1">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم المدرب *" className="text-base font-medium" />
+            <div className="flex-1 relative">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <User className="w-3.5 h-3.5 text-gold" /> اسم المدرب *
+              </Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم المدرب" className="text-base font-medium rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
             </div>
           </div>
 
-          {/* Quick selects */}
+          {/* ⚡ Magical Quick selects */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">المسمى</Label>
-              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Award className="w-3.5 h-3.5 text-gold" /> المسمى
+              </Label>
+              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
                 <option value="">— اختر —</option>
                 {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <Label className="text-xs">التخصص</Label>
-              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background text-sm">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
+              </Label>
+              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
                 <option value="">— اختر —</option>
                 {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Email + Password */}
-          <div><Label className="text-xs">البريد الإلكتروني *</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="mt-1" placeholder="example@fia.edu" />
-          </div>
+          {/* ⚡ Magical Email */}
           <div>
-            <Label className="text-xs">كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}</Label>
-            <div className="relative mt-1">
-              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" placeholder="••••••••" />
-              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <Mail className="w-3.5 h-3.5 text-gold" /> البريد الإلكتروني *
+            </Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="example@fia.edu" />
+          </div>
+
+          {/* ⚡ Magical Password */}
+          <div>
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}
+            </Label>
+            <div className="relative">
+              <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 pl-10" placeholder="••••••••" />
+              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy">
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          {/* Phone */}
-          <div><Label className="text-xs">الهاتف</Label>
-            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="mt-1" placeholder="+967 7XX XXX XXX" />
-          </div>
-
-          {/* Professional Complete Bio — نبذة تعريفية احترافية واحدة */}
-          <div className="border-t border-border pt-4">
-            <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs font-bold text-navy">النبذة التعريفية الكاملة</Label>
-              <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
-            </div>
-            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-              اكتب نبذة واحدة متكاملة واحترافية عن المدرب — تظهر بالضبط كما تكتبها هنا في حساب المدرب وفي الصفحة الرئيسية عند الضغط على المدرب.
-              <br />
-              <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ، مثل: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
-            </p>
-            <textarea
-              value={form.bio || ''}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              className="w-full min-h-[260px] p-4 border border-input rounded-lg text-sm leading-relaxed bg-background focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/40 transition-all"
-              placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
-            />
-            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
-              <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
-              <span>{(form.bio || '').length} حرف</span>
-            </div>
-          </div>
-
-          {/* Years experience */}
+          {/* ⚡ Magical Phone */}
           <div>
-            <Label className="text-xs">سنوات الخبرة</Label>
-            <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} className="mt-1" placeholder="0" />
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <Phone className="w-3.5 h-3.5 text-gold" /> الهاتف
+            </Label>
+            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="+967 7XX XXX XXX" />
+          </div>
+
+          {/* ⚡ Magical bio — with gold gradient card */}
+          <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+            <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-gold" /> النبذة التعريفية الكاملة
+                </Label>
+                <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+                اكتب نبذة واحدة متكاملة عن المدرب — تظهر كما تكتبها في حساب المدرب وفي الصفحة الرئيسية.
+                <br />
+                <span className="text-navy/70">يُنصح بتقسيم النص على فقرات مفصولة بسطر فارغ.</span>
+              </p>
+              <textarea
+                value={form.bio || ''}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                className="w-full min-h-[200px] p-3 border border-gold/30 rounded-xl text-sm leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition-all"
+                placeholder={"مثال:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على الدكتوراه في الموارد البشرية. يمتلك خبرة تتجاوز 15 عاماً.\n\n🎓 المؤهلات\n• بكالوريوس آداب\n• دكتوراه في التخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية\n• مؤلف لـ 6 كتب في طبعات دولية"}
+              />
+              <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> استخدم الأسطر الفارغة لفصل الفقرات</span>
+                <span>{(form.bio || '').length} حرف</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ⚡ Magical Years experience */}
+          <div>
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-gold" /> سنوات الخبرة
+            </Label>
+            <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="0" />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-          <Button onClick={save} disabled={saving} className="bg-navy hover:bg-navy-light">
-            {saving ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري...</> : 'حفظ'}
+
+        <div className="flex items-center justify-end gap-2 p-4 bg-muted/20 border-t border-border">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
+          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
+            {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ</>}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -3480,50 +3531,95 @@ function AdminSite() {
   const [settings, setSettings] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
+  const [passwordDialog, setPasswordDialog] = useState<{ password: string; pendingSettings: any } | null>(null)
+  const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
-  const save = async () => {
+
+  // Save with Telegram-protection: if Telegram token/channel_id changed,
+  // prompt for password first; otherwise save directly.
+  const save = async (overridePassword?: string) => {
     setSaving(true)
     try {
-      const res = await fetch('/api/site-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+      const body = { ...settings }
+      if (overridePassword) {
+        body.user_id = user?.id
+        body.password = overridePassword
+      }
+      const res = await fetch('/api/site-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
       if (!res.ok) {
-        const data = await res.json()
+        // If 403 = Telegram protection triggered → open password dialog
+        if (res.status === 403 && data.error?.includes('تيليجرام')) {
+          setPasswordDialog({ password: '', pendingSettings: settings })
+          setSaving(false)
+          return
+        }
         toast.error(data.error || 'فشل الحفظ')
       } else {
         toast.success('تم الحفظ بنجاح')
+        setPasswordDialog(null)
       }
     } catch { toast.error('فشل') } finally { setSaving(false) }
   }
 
+  const confirmSaveWithPassword = async () => {
+    if (!passwordDialog?.password) {
+      toast.error('أدخل كلمة المرور')
+      return
+    }
+    await save(passwordDialog.password)
+  }
+
   return (
     <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
-      {/* ⚡ Magical tab buttons with icons */}
-      <div className="flex gap-2 border-b border-gold/20 pb-3 mb-4 flex-wrap">
+      {/* ⚡ Magical tabs — premium style */}
+      <div className="relative flex gap-2 border-b border-gold/30 pb-3 mb-5 flex-wrap overflow-hidden">
+        {/* Magical background glow */}
+        <div className="absolute -top-8 -right-8 w-24 h-24 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
         {[
-          { id: 'basic',      label: 'معلومات أساسية', icon: Building2 },
-          { id: 'about',      label: 'من نحن',         icon: BookOpen },
-          { id: 'policies',   label: 'السياسات',       icon: Shield },
-          { id: 'social',     label: 'التواصل',         icon: MessageSquare },
-          { id: 'visibility', label: 'الإظهار',        icon: Eye },
+          { id: 'basic',      label: 'معلومات أساسية', icon: Building2,    gradient: 'from-blue-500 to-indigo-600' },
+          { id: 'about',      label: 'من نحن',         icon: BookOpen,     gradient: 'from-purple-500 to-fuchsia-600' },
+          { id: 'policies',   label: 'السياسات',       icon: Shield,       gradient: 'from-slate-600 to-gray-700' },
+          { id: 'social',     label: 'التواصل',         icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
+          { id: 'visibility', label: 'الإظهار',        icon: Eye,          gradient: 'from-emerald-500 to-teal-600' },
         ].map((t) => {
           const TabIcon = t.icon
+          const isActive = tab === t.id
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id as any)}
-              className={`relative px-5 py-2.5 rounded-xl text-sm font-bold transition-all border overflow-hidden ${
-                tab === t.id
-                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md border-gold/40'
-                  : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5'
+              className={`relative px-5 py-3 rounded-2xl text-sm font-bold transition-all border overflow-hidden group ${
+                isActive
+                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-lg border-gold/50'
+                  : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5 hover:-translate-y-0.5'
               }`}
             >
-              {tab === t.id && (
-                <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
-                  backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
-                  backgroundSize: '12px 12px'
-                }} />
+              {isActive && (
+                <>
+                  {/* Magical dot pattern */}
+                  <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px)',
+                    backgroundSize: '12px 12px, 10px 10px'
+                  }} />
+                  {/* Top magical strip */}
+                  <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-l from-gold via-amber-300 to-gold" />
+                </>
               )}
-              <span className="relative flex items-center gap-1.5">
-                <TabIcon className="w-4 h-4" /> {t.label}
+              <span className="relative flex items-center gap-2">
+                {/* Icon — colored circle when inactive, gold icon when active */}
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+                  isActive
+                    ? 'bg-gradient-to-br from-gold to-amber-500 text-navy shadow-md'
+                    : `bg-gradient-to-br ${t.gradient} text-white group-hover:scale-110 transition-transform`
+                }`}>
+                  <TabIcon className="w-4 h-4" strokeWidth={2.2} />
+                </span>
+                <span>{t.label}</span>
               </span>
             </button>
           )
@@ -3687,7 +3783,7 @@ function AdminSite() {
               <div className="relative flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md">
-                    <span className="text-white font-bold text-sm">f</span>
+                    <Facebook className="w-4 h-4 text-white" fill="currentColor" />
                   </div>
                   <Label className="font-bold text-blue-800">فيسبوك</Label>
                 </div>
@@ -3696,7 +3792,7 @@ function AdminSite() {
                     {settings.social_facebook_enabled ? 'مفعّل' : 'متوقف'}
                   </span>
                   <div className="relative">
-                    <input type="checkbox" checked={settings.social_facebook_enabled || false} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} className="sr-only" />
+                    <input type="checkbox" checked={!!settings.social_facebook_enabled} onChange={(e) => setSettings({ ...settings, social_facebook_enabled: e.target.checked })} className="sr-only" />
                     <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_facebook_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_facebook_enabled ? 'right-0.5' : 'right-5'}`} />
                   </div>
@@ -3719,7 +3815,7 @@ function AdminSite() {
                     {settings.social_telegram_enabled ? 'مفعّل' : 'متوقف'}
                   </span>
                   <div className="relative">
-                    <input type="checkbox" checked={settings.social_telegram_enabled || false} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} className="sr-only" />
+                    <input type="checkbox" checked={!!settings.social_telegram_enabled} onChange={(e) => setSettings({ ...settings, social_telegram_enabled: e.target.checked })} className="sr-only" />
                     <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_telegram_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_telegram_enabled ? 'right-0.5' : 'right-5'}`} />
                   </div>
@@ -3742,7 +3838,7 @@ function AdminSite() {
                     {settings.social_whatsapp_enabled ? 'مفعّل' : 'متوقف'}
                   </span>
                   <div className="relative">
-                    <input type="checkbox" checked={settings.social_whatsapp_enabled || false} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} className="sr-only" />
+                    <input type="checkbox" checked={!!settings.social_whatsapp_enabled} onChange={(e) => setSettings({ ...settings, social_whatsapp_enabled: e.target.checked })} className="sr-only" />
                     <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_whatsapp_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_whatsapp_enabled ? 'right-0.5' : 'right-5'}`} />
                   </div>
@@ -3765,7 +3861,7 @@ function AdminSite() {
                     {settings.social_sms_enabled ? 'مفعّل' : 'متوقف'}
                   </span>
                   <div className="relative">
-                    <input type="checkbox" checked={settings.social_sms_enabled || false} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} className="sr-only" />
+                    <input type="checkbox" checked={!!settings.social_sms_enabled} onChange={(e) => setSettings({ ...settings, social_sms_enabled: e.target.checked })} className="sr-only" />
                     <div className={`w-10 h-5 rounded-full transition-colors ${settings.social_sms_enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.social_sms_enabled ? 'right-0.5' : 'right-5'}`} />
                   </div>
@@ -3822,11 +3918,73 @@ function AdminSite() {
 
         {/* Save button — magical */}
         <div className="pt-4 border-t border-gold/20">
-          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
+          <Button onClick={() => save()} disabled={saving} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
             {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري الحفظ...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ الإعدادات</>}
           </Button>
         </div>
       </div>
+
+      {/* ⚡ Magical password-confirm dialog (Telegram protection) */}
+      {passwordDialog && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) setPasswordDialog(null) }}>
+          <DialogContent className="sm:max-w-md p-0 border-0">
+            {/* Magical header */}
+            <div className="relative bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 p-5 text-white overflow-hidden rounded-t-2xl">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+              <button onClick={() => setPasswordDialog(null)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 backdrop-blur-sm">
+                <X className="w-4 h-4 text-white" />
+              </button>
+              <div className="relative flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
+                  <Lock className="w-7 h-7 text-white" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold tracking-tight text-white">
+                    تأكيد تغيير إعدادات تيليجرام
+                  </DialogTitle>
+                  <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3" />
+                    حماية الإعدادات الحساسة
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-amber-50 border border-amber-500/30 p-3 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                  <p className="font-bold mb-1">لماذا نطلب كلمة المرور؟</p>
+                  <p className="leading-relaxed">إعدادات تيليجرام تتحكم برفع الصور والفيديوهات والإشعارات. أي خطأ فيها قد يوقف جميع عمليات الرفع في التطبيق. نطلب كلمة المرور لتأكيد التغيير.</p>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Lock className="w-3.5 h-3.5 text-gold" /> كلمة مرور حسابك
+                </Label>
+                <Input
+                  type="password"
+                  value={passwordDialog.password}
+                  onChange={(e) => setPasswordDialog({ ...passwordDialog, password: e.target.value })}
+                  dir="ltr"
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                  placeholder="••••••••"
+                  onKeyDown={(e) => { if (e.key === 'Enter') confirmSaveWithPassword() }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 p-4 bg-muted/20 border-t border-border">
+              <Button variant="outline" onClick={() => setPasswordDialog(null)} className="rounded-xl">إلغاء</Button>
+              <Button onClick={confirmSaveWithPassword} disabled={saving || !passwordDialog.password} className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
+                {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> تأكيد وحفظ</>}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </SectionCard>
   )
 }
