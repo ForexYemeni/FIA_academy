@@ -11,8 +11,8 @@ android {
         applicationId = "academy.fia.future"
         minSdk = 24
         targetSdk = 34
-        versionCode = 23
-        versionName = "2.4.4"
+        versionCode = 24
+        versionName = "2.4.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

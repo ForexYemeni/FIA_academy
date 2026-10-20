@@ -47,7 +47,7 @@ class NotificationPollService : Service() {
         private const val CHANNEL_SERVICE = "fia-service"
         private const val CHANNEL_NOTIFICATIONS = "fia-notifications"
         private const val NOTIF_SERVICE_ID = 1
-        private const val POLL_INTERVAL_MS = 5000L
+        private const val POLL_INTERVAL_MS = 30000L  // 30 seconds — balance between responsiveness and battery
         private const val PREFS_NAME = "fia-prefs"
         private const val PREF_USER_ID = "user_id"
         private const val PREF_SEEN_IDS = "notif_seen_ids"
@@ -107,34 +107,69 @@ class NotificationPollService : Service() {
     }
 
     private fun pollOnce() {
-        val userId = prefs?.getString(PREF_USER_ID, null) ?: return
+        val userId = prefs?.getString(PREF_USER_ID, null) ?: run {
+            Log.d(TAG, "No user_id in prefs — skipping poll (user not logged in)")
+            return
+        }
         val seenIds = getSeenIds()
         val url = URL("$API_BASE/api/notifications?user_id=$userId")
         try {
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 4000
-                readTimeout = 4000
+                connectTimeout = 8000
+                readTimeout = 8000
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Cache-Control", "no-cache")
             }
             val code = conn.responseCode
-            if (code != 200) return
+            if (code != 200) {
+                Log.w(TAG, "Poll returned HTTP $code — will retry on next poll")
+                return
+            }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
-            if (body.isEmpty() || body[0] != '[') return
+            if (body.isEmpty() || body[0] != '[') {
+                Log.d(TAG, "Poll body is not a JSON array — skipping")
+                return
+            }
             val arr = org.json.JSONArray(body)
-            // Mark all existing IDs as seen on the first poll —
-            // avoids spamming the user with old notifications when
-            // they re-open the app.
+            // ⚡ Mark only OLD notifications (older than 5 minutes) as
+            // seen on the first poll. This avoids spamming the user
+            // with all the backlog of old chat messages when they re-
+            // open the app, BUT still fires a notification for any
+            // notification that was created within the last 5 minutes
+            // (e.g. an admin just approved a payment 1 minute ago).
+            //
+            // The previous logic (mark ALL as seen on first poll) was
+            // too aggressive — it meant if the admin created a
+            // notification while the user's app was closed, and the
+            // user reopened the app later, the notification would be
+            // silently swallowed without ever being shown to the
+            // user. This was the root cause of "لايوصل اي اشعارات
+            // منبثقة خارج التطبيق ابدا".
             if (firstPoll) {
+                Log.d(TAG, "First poll: marking notifications older than 5 min as seen")
+                val fiveMinAgo = System.currentTimeMillis() - (5 * 60 * 1000)
                 for (i in 0 until arr.length()) {
                     val n = arr.optJSONObject(i)
                     val id = n?.optString("id") ?: continue
-                    seenIds.add(id)
+                    val createdAt = n.optString("created_at", "")
+                    // Try to parse the ISO timestamp
+                    val createdAtMs = try {
+                        // Parse "2026-10-21T12:34:56.789+00:00" format
+                        val cleaned = createdAt.replace("Z", "+00:00").substring(0, 19)
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                        sdf.parse(cleaned)?.time ?: 0L
+                    } catch (_: Exception) { 0L }
+                    if (createdAtMs > 0 && createdAtMs < fiveMinAgo) {
+                        seenIds.add(id)
+                    }
                 }
                 saveSeenIds(seenIds)
                 firstPoll = false
-                return
+                // ⚡ Don't return — continue to fire notifications for
+                // any new (recent) items not in seenIds.
             }
             // Fire a native notification for each new item we haven't
             // seen yet.
@@ -142,17 +177,23 @@ class NotificationPollService : Service() {
             for (i in 0 until arr.length()) {
                 val n = arr.optJSONObject(i) ?: continue
                 val id = n.optString("id")
-                if (seenIds.contains(id)) continue
+                if (id.isEmpty() || seenIds.contains(id)) continue
                 seenIds.add(id)
-                fireNotification(
-                    n.optString("title", "إشعار جديد"),
-                    n.optString("body", ""),
-                    n.optString("link", "/")
-                )
+                val title = n.optString("title", "إشعار جديد")
+                val body = n.optString("body", "")
+                val link = n.optString("link", "/")
+                Log.d(TAG, "🔔 Firing native notification: $title")
+                fireNotification(title, body, link)
                 newCount++
             }
-            if (newCount > 0) saveSeenIds(seenIds)
-        } catch (_: Exception) {
+            if (newCount > 0) {
+                saveSeenIds(seenIds)
+                Log.d(TAG, "Fired $newCount new notifications")
+            } else {
+                Log.d(TAG, "No new notifications this poll (already seen all)")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Poll network error: ${e.message}")
             // Network error — silent, will retry on next poll
         }
     }
