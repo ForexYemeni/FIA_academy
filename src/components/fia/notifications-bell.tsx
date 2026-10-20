@@ -132,23 +132,26 @@ export function NotificationsBell() {
     }
   }, [])
 
-  // Helper — fire sound + toast + browser notification for a new
-  // notification object. Used by BOTH Realtime INSERT handler AND
-  // the polling fallback, so the experience is identical.
+  // Helper — fire external notification for a new notification object.
+  // ⚡ USER REQUESTED: NO in-app toasts. ONLY external native OS
+  // notifications (shown in the notification shade, even when the app
+  // is fully closed). No sound, no in-app toast — only the native
+  // notification via the APK bridge + Service Worker.
+  //
+  // In the FIA APK, the NotificationPollService (Kotlin foreground
+  // service) polls the backend and fires native OS notifications on
+  // every new item. So we DON'T need to fire a duplicate notification
+  // from the web side here — that would cause duplicates.
+  //
+  // For regular browsers (no APK), we still fire a browser
+  // notification via the Service Worker. This is shown in the OS
+  // notification shade (Windows) or banner (macOS) — not as an in-app
+  // toast.
   const announceNotification = (n: any) => {
-    // 1) Sound — each type has a distinct professional tone.
-    // Try to unlock audio first (in case it's still suspended).
-    try {
-      tryUnlockAudio()
-      playSoundForNotification(n.type)
-    } catch {}
-    // 2) In-app professional toast with per-type styling.
-    try { showNotificationToast(n) } catch {}
-    // 3) External browser notification via Service Worker.
-    //    Service Worker showNotification is MORE RELIABLE than
-    //    new Notification() — it works on mobile Chrome, Android,
-    //    desktop, and even when the tab is in the background. It
-    //    also gives us proper click handling + vibration.
+    // ⚡ NO in-app toast — user explicitly requested.
+    // ⚡ NO sound — user explicitly requested.
+    // ⚡ ONLY external browser notification via Service Worker (for
+    // regular browsers, NOT APK — APK uses NotificationPollService).
     try {
       const payload = { type: 'SHOW_NOTIFICATION', title: n.title, body: n.body, link: n.link, tag: n.id }
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
