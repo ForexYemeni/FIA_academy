@@ -3041,35 +3041,31 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-0 border-0">
         {/* ⚡ Magical gradient header */}
-        <div className="relative bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-700 p-5 pb-6 text-white overflow-hidden rounded-t-2xl">
-          <div className="absolute inset-0 opacity-25" style={{
-            backgroundImage: 'radial-gradient(circle at 12% 50%, white 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
-            backgroundSize: '24px 24px, 18px 18px'
+        <div className="relative bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-700 p-5 pb-6 text-white overflow-hidden">
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+            backgroundSize: '14px 14px'
           }} />
           <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-          <button onClick={() => onOpenChange(false)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 backdrop-blur-sm">
-            <X className="w-4 h-4 text-white" />
-          </button>
-          <div className="relative flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30">
-              <GraduationCap className="w-7 h-7 text-white" strokeWidth={2.2} />
-            </div>
-            <div>
-              <DialogTitle className="text-xl font-bold tracking-tight text-white">
+          <DialogHeader className="relative">
+            <DialogTitle className="text-xl font-bold tracking-tight text-white flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/30 flex-shrink-0">
+                <GraduationCap className="w-5 h-5 text-white" strokeWidth={2.2} />
+              </div>
+              <span>
                 {initial ? 'تعديل المدرب' : 'إضافة مدرب جديد'}
-              </DialogTitle>
-              <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" />
-                {initial ? 'تحديث بيانات المدرب' : 'إضافة مدرب جديد للأكاديمية'}
-              </p>
-            </div>
-          </div>
+                <span className="block text-xs font-normal text-white/80 mt-0.5 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  {initial ? 'تحديث بيانات المدرب' : 'إضافة مدرب جديد للأكاديمية'}
+                </span>
+              </span>
+            </DialogTitle>
+          </DialogHeader>
         </div>
 
         <div className="bg-gradient-to-b from-emerald-50/30 to-white p-5 space-y-4">
-          {/* ⚡ Magical avatar upload */}
-          <div className="relative flex items-center gap-4 p-3 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
-            <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          {/* Avatar upload — simple, no nested divs that could break */}
+          <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
               <Avatar className="w-16 h-16 border-2 border-gold/40 shadow-md">
                 <AvatarImage src={form.avatar || ''} />
@@ -3079,13 +3075,14 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
               <button
                 onClick={() => document.getElementById('trainer-avatar')?.click()}
                 disabled={uploadingAvatar}
-                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-gold to-amber-500 text-navy flex items-center justify-center text-xs disabled:opacity-50 shadow-md border border-white/30 active:scale-95 transition-transform"
+                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-gold to-amber-500 text-navy flex items-center justify-center text-xs disabled:opacity-50 shadow-md border border-white/30"
                 title="رفع صورة"
+                type="button"
               >
                 {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
               </button>
             </div>
-            <div className="flex-1 relative">
+            <div className="flex-1">
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <User className="w-3.5 h-3.5 text-gold" /> اسم المدرب *
               </Label>
@@ -3093,7 +3090,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             </div>
           </div>
 
-          {/* ⚡ Magical Quick selects */}
+          {/* Quick selects */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -3101,7 +3098,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
               </Label>
               <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
                 <option value="">— اختر —</option>
-                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                {TITLES.map((t: string) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
@@ -3110,12 +3107,12 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
               </Label>
               <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
                 <option value="">— اختر —</option>
-                {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                {SPECIALIZATIONS.map((s: string) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
 
-          {/* ⚡ Magical Email */}
+          {/* Email */}
           <div>
             <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
               <Mail className="w-3.5 h-3.5 text-gold" /> البريد الإلكتروني *
@@ -3123,10 +3120,10 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="example@fia.edu" />
           </div>
 
-          {/* ⚡ Magical Password */}
+          {/* Password */}
           <div>
             <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-              <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور {initial && '(اتركها فارغة للإبقاء)'}
+              <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور {initial ? '(اتركها فارغة للإبقاء)' : ''}
             </Label>
             <div className="relative">
               <Input type={showPwd ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 pl-10" placeholder="••••••••" />
@@ -3136,7 +3133,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             </div>
           </div>
 
-          {/* ⚡ Magical Phone */}
+          {/* Phone */}
           <div>
             <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
               <Phone className="w-3.5 h-3.5 text-gold" /> الهاتف
@@ -3144,35 +3141,24 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
             <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="+967 7XX XXX XXX" />
           </div>
 
-          {/* ⚡ Magical bio — with gold gradient card */}
-          <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
-            <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs font-bold text-navy flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-gold" /> النبذة التعريفية الكاملة
-                </Label>
-                <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
-              </div>
-              <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-                اكتب نبذة واحدة متكاملة عن المدرب — تظهر كما تكتبها في حساب المدرب وفي الصفحة الرئيسية.
-                <br />
-                <span className="text-navy/70">يُنصح بتقسيم النص على فقرات مفصولة بسطر فارغ.</span>
-              </p>
-              <textarea
-                value={form.bio || ''}
-                onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                className="w-full min-h-[200px] p-3 border border-gold/30 rounded-xl text-sm leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition-all"
-                placeholder={"مثال:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على الدكتوراه في الموارد البشرية. يمتلك خبرة تتجاوز 15 عاماً.\n\n🎓 المؤهلات\n• بكالوريوس آداب\n• دكتوراه في التخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية\n• مؤلف لـ 6 كتب في طبعات دولية"}
-              />
-              <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> استخدم الأسطر الفارغة لفصل الفقرات</span>
-                <span>{(form.bio || '').length} حرف</span>
-              </div>
+          {/* Bio — full textarea */}
+          <div>
+            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+              <FileText className="w-3.5 h-3.5 text-gold" /> النبذة التعريفية الكاملة
+            </Label>
+            <textarea
+              value={form.bio || ''}
+              onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              className="w-full min-h-[200px] p-3 border border-gold/30 rounded-xl text-sm leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold transition-all"
+              placeholder={"مثال:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على الدكتوراه. يمتلك خبرة تتجاوز 15 عاماً.\n\n🎓 المؤهلات\n• بكالوريوس آداب\n• دكتوراه في التخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية\n• مؤلف لـ 6 كتب في طبعات دولية"}
+            />
+            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> استخدم الأسطر الفارغة لفصل الفقرات</span>
+              <span>{(form.bio || '').length} حرف</span>
             </div>
           </div>
 
-          {/* ⚡ Magical Years experience */}
+          {/* Years experience */}
           <div>
             <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
               <Briefcase className="w-3.5 h-3.5 text-gold" /> سنوات الخبرة
@@ -3181,12 +3167,13 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 p-4 bg-muted/20 border-t border-border">
+        {/* Footer */}
+        <DialogFooter className="p-4 bg-muted/20 border-t border-border">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">إلغاء</Button>
           <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
             {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ</>}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
