@@ -840,16 +840,38 @@ function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
 
   // ⚡ Load the PDF document. We use pdfjsLib.getDocument which fetches
   // the PDF in the background and parses it via the worker.
+  //
+  // ⚡ CORS FIX: Telegram file URLs (https://api.telegram.org/file/bot.../...)
+  // don't return CORS headers, so the browser blocks the fetch and the
+  // student sees 'فشل في تحميل ملف PDF. قد يكون الرابط منتهي الصلاحية.'
+  //
+  // We route the fetch through our own /api/pdf-proxy endpoint which:
+  //   - Fetches the PDF server-side (no CORS restriction server-side)
+  //   - Re-serves it with `Access-Control-Allow-Origin: *`
+  //   - Streams the bytes back so large PDFs don't OOM
+  //
+  // For data: URIs (local upload fallback), we use them directly — no
+  // proxy needed (data URIs are same-origin).
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     ;(async () => {
       try {
+        // ⚡ Determine the URL to fetch. Use the proxy for Telegram URLs
+        // to avoid CORS issues. Use the URL directly for data: URIs
+        // (local upload fallback) and same-origin URLs.
+        let fetchUrl = url
+        if (url.startsWith('https://api.telegram.org/')) {
+          fetchUrl = `/api/pdf-proxy?url=${encodeURIComponent(url)}`
+        }
         const loadingTask = (pdfjsLib as any).getDocument({
-          url,
-          disableAutoFetch: true,
-          disableStream: true,
+          url: fetchUrl,
+          // ⚡ Re-enable streaming + auto-fetch for the proxied URL —
+          // our proxy supports Range requests, so PDF.js can download
+          // only the bytes it needs (faster for large PDFs).
+          disableAutoFetch: false,
+          disableStream: false,
         })
         const doc = await loadingTask.promise
         if (cancelled) return
@@ -859,7 +881,17 @@ function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
       } catch (e: any) {
         console.warn('[CustomPdfViewer] Failed to load PDF:', e)
         if (cancelled) return
-        setError('فشل في تحميل ملف PDF. قد يكون الرابط منتهي الصلاحية.')
+        // ⚡ Provide more specific error messages based on the failure
+        const errMsg = String(e?.message || '')
+        let userMsg = 'فشل في تحميل ملف PDF.'
+        if (errMsg.includes('CORS') || errMsg.includes('fetch') || errMsg.includes('network')) {
+          userMsg = 'فشل في تحميل ملف PDF بسبب مشكلة في الشبكة. تأكد من اتصالك بالإنترنت.'
+        } else if (errMsg.includes('Invalid PDF') || errMsg.includes('password')) {
+          userMsg = 'الملف ليس PDF صالح أو محمي بكلمة مرور.'
+        } else if (errMsg.includes('proxy')) {
+          userMsg = 'فشل في تحميل ملف PDF. قد يكون الرابط منتهي الصلاحية.'
+        }
+        setError(userMsg)
         setLoading(false)
       }
     })()
