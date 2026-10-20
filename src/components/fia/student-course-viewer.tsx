@@ -58,6 +58,17 @@ export function StudentCourseViewer({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null)
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set())
+  // ⚡ Local enrollment state — kept in sync with the prop, but also
+  // updated by our internal poller when the admin approves the payment
+  // while the student is sitting in the locked state. Without this,
+  // the student would have to navigate back + reopen the course to see
+  // the unlocked content.
+  const [currentEnrollment, setCurrentEnrollment] = useState<any>(enrollment)
+
+  // Keep local state in sync if the parent passes a fresh enrollment
+  useEffect(() => {
+    setCurrentEnrollment(enrollment)
+  }, [enrollment])
 
   const loadModules = async () => {
     setLoading(true)
@@ -66,7 +77,7 @@ export function StudentCourseViewer({
       const data = await res.json()
       const mods = Array.isArray(data) ? data : []
       setModules(mods)
-      // Auto-expand first module
+      // Auto-expand first UNLOCKED module (sequential progression)
       if (mods.length > 0) {
         setExpanded(new Set([mods[0].id]))
       }
@@ -82,10 +93,63 @@ export function StudentCourseViewer({
     if (stored) {
       try {
         const arr = JSON.parse(stored)
+        // ⚡ Cleanup: only keep lesson IDs that actually exist in this
+        // course's modules. This prevents stale localStorage from a
+        // previous course version from making the course look
+        // "completed" when the lessons no longer exist.
+        // We filter after modules load — for now, store the raw set and
+        // clean it up in a separate effect once modules are available.
         setCompletedLessons(new Set(arr))
       } catch {}
     }
   }, [course.id])
+
+  // ⚡ Cleanup stale completed-lesson IDs once modules load. If the
+  // trainer restructured the course (deleted/renamed lessons), the old
+  // localStorage entries are removed so the course doesn't falsely
+  // show as completed.
+  useEffect(() => {
+    if (modules.length === 0) return
+    const allLessonIds = new Set(modules.flatMap((m) => (m.lessons || []).map((l) => l.id)))
+    setCompletedLessons((prev) => {
+      const cleaned = new Set<string>()
+      prev.forEach((id) => {
+        if (allLessonIds.has(id)) cleaned.add(id)
+      })
+      if (cleaned.size !== prev.size) {
+        const key = `fia_completed_lessons_${course.id}`
+        localStorage.setItem(key, JSON.stringify(Array.from(cleaned)))
+      }
+      return cleaned
+    })
+  }, [modules, course.id])
+
+  // ⚡ POLLING: while the enrollment is pending admin approval, poll
+  // /api/enrollments every 4s so the course unlocks INSTANTLY when the
+  // admin clicks "approve" — no manual refresh needed. Stops polling
+  // once the payment_status is no longer 'pending'.
+  useEffect(() => {
+    const payStatus = currentEnrollment?.payment_status
+    if (payStatus !== 'pending') return
+    const userId = currentEnrollment?.user_id
+    if (!userId) return
+    let active = true
+    const interval = setInterval(async () => {
+      if (!active) return
+      try {
+        const res = await fetch(`/api/enrollments?user_id=${userId}&course_id=${course.id}`)
+        const data = await res.json()
+        const found = Array.isArray(data) && data.length > 0 ? data[0] : null
+        if (found && found.payment_status !== 'pending') {
+          setCurrentEnrollment(found)
+          if (found.payment_status === 'confirmed' || found.payment_status === 'completed' || found.payment_status === 'free') {
+            toast.success('✅ تم تأكيد دفعك! الدورة متاحة الآن')
+          }
+        }
+      } catch {}
+    }, 4000)
+    return () => { active = false; clearInterval(interval) }
+  }, [currentEnrollment?.payment_status, currentEnrollment?.user_id, course.id])
 
   const toggleModule = (id: string) => {
     setExpanded((prev) => {
@@ -98,13 +162,18 @@ export function StudentCourseViewer({
 
   const markComplete = async (lesson: Lesson) => {
     const next = new Set(completedLessons)
+    // ⚡ Auto-complete by VIEWING — this function is now called only
+    // from the LessonPreviewModal's onLessonComplete callback. The
+    // student no longer has a manual "mark complete" circle button.
+    // We only ADD completion (never toggle off) — viewing the lesson
+    // once is enough; we don't let the student un-complete.
     if (next.has(lesson.id)) {
-      next.delete(lesson.id)
-    } else {
-      next.add(lesson.id)
-      toast.success(`أكملت درس: ${lesson.title}`)
+      // Already complete — nothing to do (no toggle-off)
+      return
     }
+    next.add(lesson.id)
     setCompletedLessons(next)
+    toast.success(`✅ أكملت درس: ${lesson.title}`)
     // Persist in localStorage
     const key = `fia_completed_lessons_${course.id}`
     localStorage.setItem(key, JSON.stringify(Array.from(next)))
@@ -118,7 +187,7 @@ export function StudentCourseViewer({
 
     // Update enrollment via API
     try {
-      const enr = enrollment
+      const enr = currentEnrollment
       if (enr && enr.id) {
         const updateBody: any = { progress: pct }
         if (isAllDone) {
@@ -156,8 +225,8 @@ export function StudentCourseViewer({
   // ACCESS CONTROL
   // ============================================================
   const isFree = course?.price_type === 'مجانية' || course?.price === 0
-  const payStatus = enrollment?.payment_status
-  const hasAccess = enrollment && payStatus && payStatus !== 'pending'
+  const payStatus = currentEnrollment?.payment_status
+  const hasAccess = currentEnrollment && payStatus && payStatus !== 'pending'
 
   if (!hasAccess) {
     return (
@@ -179,7 +248,7 @@ export function StudentCourseViewer({
             </div>
             <h2 className="text-2xl font-bold mb-2">هذه الدورة محمية</h2>
             <p className="text-white/80 mb-6 max-w-md mx-auto">
-              {enrollment && payStatus === 'pending'
+              {currentEnrollment && payStatus === 'pending'
                 ? 'تم استلام إثبات الدفع، بانتظار موافقة الإدارة. سيتم تفعيل الدورة فور تأكيد الدفع.'
                 : isFree
                   ? 'اضغط على زر "سجّل الآن" للتسجيل المجاني ثم فتح الدورة.'
@@ -278,7 +347,7 @@ export function StudentCourseViewer({
         <ArrowRight className="w-4 h-4 ml-1" /> العودة لدوراتي
       </Button>
 
-      {/* ⚡ Modules and lessons — magical accordion */}
+      {/* ⚡ Modules and lessons — magical accordion with SEQUENTIAL progression */}
       {modules.length === 0 ? (
         /* Magical empty state */
         <div className="text-center py-14">
@@ -298,26 +367,58 @@ export function StudentCourseViewer({
             const lessons = m.lessons || []
             const moduleCompleted = lessons.length > 0 && lessons.every((l) => completedLessons.has(l.id))
             const moduleProgress = lessons.length > 0 ? Math.round((lessons.filter((l) => completedLessons.has(l.id)).length / lessons.length) * 100) : 0
+
+            // ⚡ SEQUENTIAL MODULE PROGRESSION
+            // A module is "passable" if it's empty (zero lessons — trainer
+            // hasn't added any yet, don't block progression) OR all its
+            // lessons are completed.
+            // The first module is ALWAYS unlocked. Subsequent modules
+            // are locked until the previous module (by position) is
+            // "passable". This enforces strict order: the student CANNOT
+            // open module 2 before completing module 1.
+            const isModulePassable = (prevMod: Module) => {
+              const prevLessons = prevMod.lessons || []
+              if (prevLessons.length === 0) return true // empty module doesn't block
+              return prevLessons.every((l) => completedLessons.has(l.id))
+            }
+            const moduleLocked = idx > 0 && !isModulePassable(modules[idx - 1])
+
             return (
-              <Card key={m.id} className="overflow-hidden border border-gold/20 hover:border-gold/40 transition-colors">
+              <Card key={m.id} className={`overflow-hidden border transition-colors ${
+                moduleLocked
+                  ? 'border-gray-200 opacity-90'
+                  : 'border-gold/20 hover:border-gold/40'
+              }`}>
                 <button
-                  onClick={() => toggleModule(m.id)}
-                  className="w-full flex items-center justify-between p-4 bg-gradient-to-l from-muted/30 to-white border-b border-gold/10 hover:from-gold/5 hover:to-white transition-all text-right"
+                  onClick={() => !moduleLocked && toggleModule(m.id)}
+                  disabled={moduleLocked}
+                  className={`w-full flex items-center justify-between p-4 border-b transition-all text-right ${
+                    moduleLocked
+                      ? 'bg-gradient-to-l from-gray-50 to-white border-gray-100 cursor-not-allowed'
+                      : 'bg-gradient-to-l from-muted/30 to-white border-gold/10 hover:from-gold/5 hover:to-white'
+                  }`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     {/* Module number badge — magical gradient */}
                     <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-md ${
-                      moduleCompleted
-                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
-                        : 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold border border-gold/30'
+                      moduleLocked
+                        ? 'bg-gray-200 text-gray-500'
+                        : moduleCompleted
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                          : 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold border border-gold/30'
                     }`}>
-                      {moduleCompleted ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
+                      {moduleLocked ? <Lock className="w-4 h-4" /> : moduleCompleted ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-navy flex items-center gap-2">
                         {m.title}
                         {moduleCompleted && (
                           <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[9px]">مكتملة ✓</Badge>
+                        )}
+                        {moduleLocked && (
+                          <Badge className="bg-gray-200 text-gray-600 border-gray-300 text-[9px] flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> مقفلة
+                          </Badge>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
@@ -326,17 +427,24 @@ export function StudentCourseViewer({
                         ) : (
                           <span>{lessons.length} درس</span>
                         )}
-                        {lessons.length > 0 && !moduleCompleted && (
+                        {lessons.length > 0 && !moduleCompleted && !moduleLocked && (
                           <span className="text-gold font-bold">• {moduleProgress}%</span>
+                        )}
+                        {moduleLocked && (
+                          <span className="text-gray-500 font-medium">أكمل الوحدة السابقة لفتحها</span>
                         )}
                       </div>
                     </div>
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isExpanded ? 'bg-gold text-navy rotate-180' : 'bg-navy/5 text-gold'}`}>
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                      moduleLocked
+                        ? 'bg-gray-100 text-gray-400'
+                        : isExpanded ? 'bg-gold text-navy rotate-180' : 'bg-navy/5 text-gold'
+                    }`}>
+                      {moduleLocked ? <Lock className="w-3.5 h-3.5" /> : isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </div>
                 </button>
-                {isExpanded && (
+                {isExpanded && !moduleLocked && (
                   <div className="p-3 space-y-2 bg-gradient-to-b from-white to-muted/10">
                     {lessons.length === 0 ? (
                       <div className="text-center py-4 text-sm text-muted-foreground">لا توجد دروس في هذه الوحدة بعد</div>
@@ -345,11 +453,15 @@ export function StudentCourseViewer({
                         const type = LESSON_TYPES[l.lesson_type] || LESSON_TYPES.text
                         const Icon = type.icon
                         const isCompleted = completedLessons.has(l.id)
-                        // ⚡ Sequential access: a lesson is locked if the previous lesson
-                        // in the SAME module is not yet completed. The FIRST lesson in each
-                        // module is always unlocked. Preview lessons (is_preview) are always
-                        // unlocked so visitors can sample them.
-                        const isLocked = li > 0 && !isCompleted && !completedLessons.has(lessons[li - 1].id) && !l.is_preview
+                        // ⚡ Sequential access WITHIN the module:
+                        // A lesson is locked if the previous lesson in
+                        // the SAME module is not yet completed. The FIRST
+                        // lesson in the module is always unlocked (since
+                        // the module itself is unlocked by the outer
+                        // moduleLocked check).
+                        // We no longer bypass preview lessons — the user
+                        // explicitly asked for strict order enforcement.
+                        const isLocked = li > 0 && !isCompleted && !completedLessons.has(lessons[li - 1].id)
                         return (
                           <div
                             key={l.id}
@@ -390,6 +502,9 @@ export function StudentCourseViewer({
                                   {isLocked && (
                                     <span className="text-[9px] text-muted-foreground flex-shrink-0">🔒 أكمل الدرس السابق</span>
                                   )}
+                                  {isCompleted && (
+                                    <span className="text-[9px] text-emerald-600 font-bold flex-shrink-0">تمت المشاهدة ✓</span>
+                                  )}
                                 </div>
                                 {l.duration_minutes ? (
                                   <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -398,24 +513,25 @@ export function StudentCourseViewer({
                                 ) : null}
                               </div>
                             </button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => !isLocked && markComplete(l)}
-                              disabled={isLocked}
-                              className={`flex-shrink-0 ${isLocked ? 'opacity-30 cursor-not-allowed' : ''}`}
-                              title={isLocked ? 'أكمل الدرس السابق أولاً' : isCompleted ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}
-                            >
-                              {isCompleted ? (
-                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                              ) : (
-                                <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 hover:border-emerald-500 transition-colors" />
-                              )}
-                            </Button>
+                            {/* ⚡ NO manual mark-complete button — completion
+                                happens automatically when the student
+                                actually views the lesson (video watched to
+                                end / text scrolled to bottom / pdf dwell /
+                                exam passed). The LessonPreviewModal fires
+                                onLessonComplete(lesson) which calls our
+                                markComplete(lesson) handler. */}
                           </div>
                         )
                       })
                     )}
+                  </div>
+                )}
+                {moduleLocked && (
+                  <div className="p-3 bg-gradient-to-b from-gray-50 to-white">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 justify-center py-2">
+                      <Lock className="w-3.5 h-3.5" />
+                      أكمل كل دروس الوحدة السابقة لفتح هذه الوحدة
+                    </div>
                   </div>
                 )}
               </Card>
@@ -449,12 +565,18 @@ export function StudentCourseViewer({
         </div>
       )}
 
-      {/* Lesson preview modal */}
+      {/* Lesson preview modal — passes onLessonComplete so viewing the
+          lesson auto-completes it (video end / text scroll-bottom / pdf
+          dwell / exam pass). Passes completedLessons so the modal's
+          Next button can be disabled when the next lesson is locked
+          (sequential progression enforced inside the modal too). */}
       <LessonPreviewModal
         open={!!previewLesson}
         onOpenChange={(o) => { if (!o) setPreviewLesson(null) }}
         lesson={previewLesson}
         modules={modules}
+        completedLessons={completedLessons}
+        onLessonComplete={(l: Lesson) => { markComplete(l) }}
         onNavigate={(l) => setPreviewLesson(l)}
       />
     </div>

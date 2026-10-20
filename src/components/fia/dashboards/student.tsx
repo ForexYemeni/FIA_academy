@@ -256,30 +256,78 @@ export function StudentDashboard() {
   }, [user?.id])
 
   // ⚡ REAL-TIME: enrollments — when admin approves a payment, the
-  // enrollment is updated/created. Student sees the course appear instantly.
+  // student sees the course open INSTANTLY (no manual refresh needed).
+  //
+  // IMPORTANT: enrollments are stored in the `payments` table (not an
+  // `enrollments` table). The previous subscription on `enrollments`
+  // never fired because that table doesn't exist. We now subscribe
+  // to `payments` filtered by user_id, and on any INSERT/UPDATE we
+  // reload the enrollments from /api/enrollments (which dedupes +
+  // normalizes the raw payment rows into proper enrollment objects).
   useEffect(() => {
     if (!user?.id) return
     let channel: any
+    let debounce: any
+    const triggerReload = () => {
+      // Debounce — multiple payment rows can update in quick succession
+      // when admin approves (the API also updates duplicate rows).
+      // We only need one reload.
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        loadEnrollments()
+      }, 400)
+    }
     try {
       channel = supabasePublic
-        .channel(`enrollments-realtime-student:${user.id}`)
+        .channel(`payments-realtime-student:${user.id}`)
         .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'enrollments', filter: `user_id=eq.${user.id}` },
-          (payload: any) => {
-            setEnrollments((prev) => [payload.new, ...prev])
+          { event: 'INSERT', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
+          () => {
             toast.success('📚 تم تسجيلك في دورة جديدة!')
+            triggerReload()
           }
         )
         .on('postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'enrollments', filter: `user_id=eq.${user.id}` },
+          { event: 'UPDATE', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
           (payload: any) => {
-            setEnrollments((prev) => prev.map((e) => e.id === payload.new.id ? { ...e, ...payload.new } : e))
+            // ⚡ When the admin flips status to 'مكتمل' (approved), the
+            // course opens immediately for the student. Show a toast and
+            // reload enrollments to pick up the new payment_status.
+            const newStatus = payload?.new?.status
+            if (newStatus === 'مكتمل' || newStatus === 'completed' || newStatus === 'paid') {
+              toast.success('✅ تم تأكيد دفعك! الدورة متاحة الآن')
+            } else if (newStatus === 'ملغي' || newStatus === 'cancelled' || newStatus === 'failed') {
+              toast.error('❌ تم رفض الدفع. يرجى التواصل مع الإدارة')
+            }
+            triggerReload()
           }
         )
         .subscribe()
     } catch {}
-    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+    return () => {
+      if (debounce) clearTimeout(debounce)
+      try { supabasePublic.removeChannel(channel) } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  // ⚡ POLLING FALLBACK: Realtime subscriptions use the anon key + RLS,
+  // but `payments` has RLS enabled with no anon SELECT policy. That
+  // means the Realtime subscription may silently fail to fire. To
+  // guarantee the student sees the approval INSTANTLY (≤5s) even if
+  // Realtime doesn't fire, we poll /api/enrollments every 5 seconds
+  // WHILE the student has at least one pending enrollment. Once all
+  // enrollments are non-pending, polling stops to save bandwidth.
+  useEffect(() => {
+    if (!user?.id) return
+    const hasPending = enrollments.some((e: any) => e.payment_status === 'pending')
+    if (!hasPending) return
+    const interval = setInterval(() => {
+      loadEnrollments()
+    }, 5000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, enrollments])
 
   // ⚡ REAL-TIME: certificates — when admin issues a certificate,
   // the student sees it appear INSTANTLY in "شهاداتي".
