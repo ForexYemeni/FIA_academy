@@ -1803,45 +1803,69 @@ function Exams({ userId, courses }: any) {
   return (
     <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك في دوراتك المسجّلة">
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+        /* ⚡ Magical loading state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-3">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
+          </div>
           <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
         </div>
       ) : exams.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
-            <FileText className="w-10 h-10 text-muted-foreground/50" />
+        /* ⚡ Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <FileText className="w-10 h-10 text-gold" />
+            </div>
           </div>
-          <p className="text-base font-semibold text-navy mb-1">لا توجد اختبارات متاحة لك حالياً</p>
-          <p className="text-xs text-muted-foreground">
-            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة.
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد اختبارات متاحة لك حالياً</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة ✨
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        /* ⚡ Magical exam cards — 2/3/4 grid */
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
           {exams.map((exam: any, i: number) => (
-            <div
-              key={exam.id || i}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-4 h-4 text-navy" />
+            <Card key={exam.id || i} className="fia-card-hover p-0 overflow-hidden cursor-default border border-gold/20 hover:border-gold/40">
+              {/* ⚡ Magical header — purple gradient */}
+              <div className="relative p-3 bg-gradient-to-br from-purple-600 via-purple-700 to-fuchsia-700 text-white overflow-hidden">
+                <div className="absolute inset-0 opacity-20" style={{
+                  backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                  backgroundSize: '12px 12px'
+                }} />
+                <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                      <Clock className="w-2.5 h-2.5 ml-0.5" /> {exam.duration_minutes ? `${exam.duration_minutes} د` : 'غير محدد'}
+                    </Badge>
                   </div>
-                  <div className="font-semibold text-navy text-sm">{exam.name}</div>
-                </div>
-                <div className="text-xs text-muted-foreground mr-11 flex flex-wrap items-center gap-x-2">
-                  {exam.course_title && <span>{exam.course_title}</span>}
-                  {exam.duration_minutes ? <span>• {exam.duration_minutes} دقيقة</span> : null}
+                  <h3 className="font-bold text-white text-xs line-clamp-2 leading-tight">{exam.name}</h3>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button size="sm" className="bg-navy hover:bg-navy-light">
-                  ابدأ الاختبار
+
+              {/* ⚡ Magical body */}
+              <div className="p-3 space-y-2">
+                {exam.course_title && (
+                  <div className="pt-1 border-t border-border/40">
+                    <div className="text-[9px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                      <BookOpen className="w-2.5 h-2.5 text-gold/60" /> الدورة
+                    </div>
+                    <div className="text-[10px] text-navy font-bold line-clamp-2 leading-tight">{exam.course_title}</div>
+                  </div>
+                )}
+                {/* Start button — magical gradient */}
+                <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all">
+                  <Sparkles className="w-3 h-3 ml-1" /> ابدأ الاختبار
                 </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -1850,23 +1874,20 @@ function Exams({ userId, courses }: any) {
 }
 
 function Results() {
-  // NOTE: Exam results are not currently stored in a dedicated table — the
-  // platform doesn't persist a per-student score for each exam yet. Once that
-  // backend exists, this component should fetch and render the real results.
-  // For now we show a professional empty state so students aren't shown fake
-  // placeholder data.
   return (
     <SectionCard title="نتائجي" description="سجل نتائج الاختبارات التي أتممتها">
-      <div className="text-center py-16">
-        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
-          <TrendingUp className="w-10 h-10 text-muted-foreground/50" />
+      {/* ⚡ Magical empty state */}
+      <div className="text-center py-14">
+        <div className="relative inline-block mb-4">
+          <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+          <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+            <TrendingUp className="w-10 h-10 text-gold" />
+          </div>
         </div>
-        <p className="text-base font-semibold text-navy mb-1">
-          لا توجد نتائج بعد — لم تقم بأي اختبار بعد
-        </p>
+        <h3 className="font-bold text-navy text-base mb-1.5">لا توجد نتائج بعد</h3>
         <p className="text-xs text-muted-foreground max-w-md mx-auto">
           عند إكمالك لأحد الاختبارات في دوراتك المسجّلة، ستظهر نتيجتك وتفاصيلها هنا مع
-          النسبة المئوية وحالة النجاح أو الرسوب.
+          النسبة المئوية وحالة النجاح أو الرسوب ✨
         </p>
       </div>
     </SectionCard>
