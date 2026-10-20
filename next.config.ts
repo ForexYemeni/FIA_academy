@@ -24,6 +24,12 @@ const nextConfig: NextConfig = {
     '@napi-rs/canvas',
     'bwip-js',
   ],
+  // ⚡ Transpile these ESM-only packages so Next.js can bundle them
+  // correctly. pdfjs-dist ships .mjs files which need transpilation
+  // for proper Webpack bundling.
+  transpilePackages: [
+    'pdfjs-dist',
+  ],
   // === IMAGE OPTIMIZATION ===
   // Enable Next.js's built-in image optimization — it converts
   // uploaded images to WebP/AVIF on the fly + caches them at the
