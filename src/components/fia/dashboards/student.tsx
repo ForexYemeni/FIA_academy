@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
-  Sparkles, Star, PlayCircle, Phone, Briefcase,
+  Sparkles, Star, PlayCircle, Phone, Briefcase, XCircle,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -390,7 +390,7 @@ export function StudentDashboard() {
   )
 }
 
-function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
+const Overview = React.memo(function Overview({ user, courses, certificates, enrollments, onViewCourse }: any) {
   // Helper: determine if a course can be opened by the student.
   // Returns { canOpen, reason, enrollment } so the UI can decide what
   // to do when the user clicks "عرض الدورة".
@@ -547,9 +547,9 @@ function Overview({ user, courses, certificates, enrollments, onViewCourse }: an
       </SectionCard>
     </div>
   )
-}
+})
 
-function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
+const MyCourses = React.memo(function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
   const [requesting, setRequesting] = useState<string | null>(null)
 
   const requestCertificate = async (course: any) => {
@@ -686,9 +686,9 @@ function MyCourses({ courses, enrollments, onContinue, studentName }: any) {
       )}
     </SectionCard>
   )
-}
+})
 
-function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse, initialCourse, onInitialCourseConsumed, setPayments, setEnrollments }: any) {
+const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse, initialCourse, onInitialCourseConsumed, setPayments, setEnrollments }: any) {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -1302,7 +1302,7 @@ function BrowseCourses({ courses, enrollments, userId, onEnrolled, onViewCourse,
       )}
     </SectionCard>
   )
-}
+})
 
 function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, userId }: any) {
   const [selectedMethod, setSelectedMethod] = useState<any>(methods[0] || null)
@@ -2004,7 +2004,7 @@ function Certificates({ certificates }: any) {
   )
 }
 
-function Payments({ payments, userId, courses }: any) {
+const Payments = React.memo(function Payments({ payments, userId, courses }: any) {
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
   // Filter by the current user's id so we never display someone else's payments.
   const myPayments = (payments || []).filter((p: any) => p.user_id === userId)
@@ -2225,9 +2225,9 @@ function Payments({ payments, userId, courses }: any) {
     </Dialog>
     </>
   )
-}
+})
 
-function Profile({ profile, setProfile, user, updateUser }: any) {
+const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser }: any) {
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
@@ -2310,7 +2310,7 @@ function Profile({ profile, setProfile, user, updateUser }: any) {
       </div>
     </SectionCard>
   )
-}
+})
 
 function Notifications({ userId, enrollments, courses }: any) {
   const [notifs, setNotifs] = useState<any[]>([])
@@ -2510,7 +2510,7 @@ function Notifications({ userId, enrollments, courses }: any) {
   )
 }
 
-function SettingsTab({ user, updateUser }: any) {
+const SettingsTab = React.memo(function SettingsTab({ user, updateUser }: any) {
   // Email change state — uses /api/auth/change-credentials
   const [newEmail, setNewEmail] = useState('')
   const [emailPwd, setEmailPwd] = useState('')
@@ -2874,13 +2874,13 @@ function SettingsTab({ user, updateUser }: any) {
       </div>
     </SectionCard>
   )
-}
+})
 
 // ============================================================================
 // StudentCertificates — shows certificates issued to this student by the admin
 // (or by themselves after passing exams / requesting them after course completion).
 // ============================================================================
-function StudentCertificates({ user }: any) {
+const StudentCertificates = React.memo(function StudentCertificates({ user }: any) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewing, setViewing] = useState<any | null>(null)
@@ -3024,4 +3024,4 @@ function StudentCertificates({ user }: any) {
       </Dialog>
     </>
   )
-}
+})

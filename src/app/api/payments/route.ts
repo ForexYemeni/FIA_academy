@@ -10,6 +10,8 @@ import { tgPaymentApproved, tgPaymentRejected as tgReject } from '@/lib/telegram
 export async function GET(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get('user_id')
+    const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
+    const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
     let query = supabaseAdmin
       .from('payments')
       .select('*')
@@ -19,6 +21,9 @@ export async function GET(req: NextRequest) {
       .neq('method', 'certificate_request')
       .order('date', { ascending: false })
     if (userId) query = query.eq('user_id', userId)
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1)
+    }
     const { data, error } = await query
     if (error) throw error
     return NextResponse.json(data || [])
