@@ -1103,11 +1103,56 @@ class FIANativeBridge(private val activity: MainActivity) {
     }
 
     /**
+     * ⚡ Chunked save for large images/PDFs. Android's
+     * @JavascriptInterface has a practical limit on String argument
+     * size (~1-2MB). Large PNG files (>3MB base64) can be truncated
+     * or fail silently. This method receives the data as a JSON
+     * array of base64 chunks, concatenates them, then saves the
+     * full base64 string.
+     *
+     * Called from JS as:
+     *   bridge.saveImageToGalleryChunked(JSON.stringify(chunks), 'image/png', filename)
+     */
+    @JavascriptInterface
+    fun saveImageToGalleryChunked(chunksJson: String, mimeType: String, filename: String): Boolean {
+        try {
+            val chunks = org.json.JSONArray(chunksJson)
+            val sb = StringBuilder()
+            for (i in 0 until chunks.length()) {
+                sb.append(chunks.getString(i))
+            }
+            return activity.saveBase64ImageToGallery(sb.toString(), mimeType, filename)
+        } catch (e: Exception) {
+            android.util.Log.e("FIA-Bridge", "saveImageToGalleryChunked failed", e)
+            return false
+        }
+    }
+
+    /**
      * Saves a base64-encoded PDF to the device's Downloads folder.
      */
     @JavascriptInterface
     fun savePdfToDownloads(base64Data: String, filename: String): Boolean {
         return activity.saveBase64ImageToGallery(base64Data, "application/pdf", filename)
+    }
+
+    /**
+     * ⚡ Chunked save for large PDFs.
+     * Same concept as saveImageToGalleryChunked.
+     */
+    @JavascriptInterface
+    fun savePdfToDownloadsChunked(chunksJson: String, filename: String): Boolean {
+        try {
+            val chunks = org.json.JSONArray(chunksJson)
+            val sb = StringBuilder()
+            for (i in 0 until chunks.length()) {
+                sb.append(chunks.getString(i))
+            }
+            return activity.saveBase64ImageToGallery(sb.toString(), "application/pdf", filename)
+        } catch (e: Exception) {
+            android.util.Log.e("FIA-Bridge", "savePdfToDownloadsChunked failed", e)
+            return false
+        }
     }
 
     /**

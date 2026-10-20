@@ -45,7 +45,7 @@ class NotificationPollService : Service() {
     companion object {
         private const val TAG = "FIA-PollService"
         private const val CHANNEL_SERVICE = "fia-service"
-        private const val CHANNEL_NOTIFICATIONS = "fia-notifications"
+        private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v3"  // ⚡ NEW channel ID — Android caches channel importance, so the previous 'fia-notifications' was stuck at IMPORTANCE_MIN from an older APK. New ID = fresh IMPORTANCE_HIGH channel.
         private const val NOTIF_SERVICE_ID = 1
         private const val POLL_INTERVAL_MS = 30000L  // 30 seconds — balance between responsiveness and battery
         private const val PREFS_NAME = "fia-prefs"
@@ -92,6 +92,17 @@ class NotificationPollService : Service() {
 
         // Launch the polling loop
         scope.launch {
+            // ⚡ Fire the first poll IMMEDIATELY (don't wait 30s).
+            // The user might have just logged in (the service is
+            // started when MainActivity launches, but the user_id is
+            // set later via setUserId). We want to poll as soon as
+            // possible to catch any notifications that arrived while
+            // the app was closed.
+            try {
+                pollOnce()
+            } catch (e: Exception) {
+                Log.w(TAG, "First poll error", e)
+            }
             while (true) {
                 try {
                     pollOnce()
@@ -133,23 +144,21 @@ class NotificationPollService : Service() {
                 return
             }
             val arr = org.json.JSONArray(body)
-            // ⚡ Mark only OLD notifications (older than 5 minutes) as
-            // seen on the first poll. This avoids spamming the user
-            // with all the backlog of old chat messages when they re-
-            // open the app, BUT still fires a notification for any
-            // notification that was created within the last 5 minutes
-            // (e.g. an admin just approved a payment 1 minute ago).
+            // ⚡ Mark only OLD notifications (older than 30 seconds) as
+            // seen on the first poll. This means: any notification
+            // created in the last 30 seconds WILL fire (even on first
+            // poll). Older notifications (e.g. chat messages from
+            // hours ago) are silently marked as seen to avoid
+            // spamming the user with the backlog.
             //
-            // The previous logic (mark ALL as seen on first poll) was
-            // too aggressive — it meant if the admin created a
-            // notification while the user's app was closed, and the
-            // user reopened the app later, the notification would be
-            // silently swallowed without ever being shown to the
-            // user. This was the root cause of "لايوصل اي اشعارات
-            // منبثقة خارج التطبيق ابدا".
+            // 30 seconds is short enough that real new notifications
+            // (which arrived while the app was closed) will fire,
+            // but long enough to skip notifications that arrived
+            // during the SAME session (when the app was already open
+            // and showed them via Realtime).
             if (firstPoll) {
-                Log.d(TAG, "First poll: marking notifications older than 5 min as seen")
-                val fiveMinAgo = System.currentTimeMillis() - (5 * 60 * 1000)
+                Log.d(TAG, "First poll: marking notifications older than 30s as seen")
+                val thirtySecAgo = System.currentTimeMillis() - (30 * 1000)
                 for (i in 0 until arr.length()) {
                     val n = arr.optJSONObject(i)
                     val id = n?.optString("id") ?: continue
@@ -162,7 +171,7 @@ class NotificationPollService : Service() {
                         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
                         sdf.parse(cleaned)?.time ?: 0L
                     } catch (_: Exception) { 0L }
-                    if (createdAtMs > 0 && createdAtMs < fiveMinAgo) {
+                    if (createdAtMs > 0 && createdAtMs < thirtySecAgo) {
                         seenIds.add(id)
                     }
                 }
