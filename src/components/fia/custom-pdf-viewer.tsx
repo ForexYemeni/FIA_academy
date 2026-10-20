@@ -80,20 +80,57 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
   }, [])
 
   // ⚡ Load the PDF document.
+  //
+  // ⚡ WHY WE FETCH AS ARRAYBUFFER (not URL):
+  // When PDF.js gets a URL, it sends multiple HTTP Range requests to
+  // download chunks of the file. Our /api/pdf-proxy doesn't support
+  // Range requests properly (it returns the FULL file for every
+  // request). This causes PDF.js to:
+  //   1. Get the full file multiple times (wasted bandwidth)
+  //   2. Fail to parse the file correctly (it expects chunks, gets
+  //      full data each time)
+  //   3. Show WRONG page count (e.g. shows 6 pages when the PDF has 2)
+  //   4. Render BLANK pages (the parsed pages are corrupted)
+  //
+  // SOLUTION: Fetch the PDF as a complete ArrayBuffer in one HTTP
+  // request, then pass the raw bytes to PDF.js via the `data` option.
+  // PDF.js will parse the entire document from memory — no Range
+  // requests, no streaming, no corruption. This is the most reliable
+  // way to use PDF.js when you can't guarantee Range request support.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     ;(async () => {
       try {
+        // ⚡ Determine the URL to fetch. Use the proxy for Telegram URLs
+        // to avoid CORS issues.
         let fetchUrl = url
         if (url.startsWith('https://api.telegram.org/')) {
           fetchUrl = `/api/pdf-proxy?url=${encodeURIComponent(url)}`
         }
+        // ⚡ Fetch the PDF as a single ArrayBuffer. This avoids all the
+        // Range request issues. We use a generous timeout (60s) so
+        // large PDFs on slow connections don't fail.
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 60000)
+        const response = await fetch(fetchUrl, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/pdf,*/*' },
+        })
+        clearTimeout(timeout)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        const arrayBuffer = await response.arrayBuffer()
+        if (cancelled) return
+        // ⚡ Pass the raw bytes to PDF.js via the `data` option. This
+        // bypasses the URL loader entirely and uses the in-memory data.
         const loadingTask = (pdfjsLib as any).getDocument({
-          url: fetchUrl,
-          disableAutoFetch: false,
-          disableStream: false,
+          data: new Uint8Array(arrayBuffer),
+          // ⚡ These options are irrelevant for `data` mode but kept for safety
+          disableAutoFetch: true,
+          disableStream: true,
         })
         const doc = await loadingTask.promise
         if (cancelled) return
@@ -120,7 +157,9 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         if (cancelled) return
         const errMsg = String(e?.message || '')
         let userMsg = 'فشل في تحميل ملف PDF.'
-        if (errMsg.includes('CORS') || errMsg.includes('fetch') || errMsg.includes('network')) {
+        if (e?.name === 'AbortError') {
+          userMsg = 'انتهت مهلة تحميل الملف (أكثر من 60 ثانية). حاول مرة أخرى.'
+        } else if (errMsg.includes('CORS') || errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to fetch')) {
           userMsg = 'فشل في تحميل ملف PDF بسبب مشكلة في الشبكة. تأكد من اتصالك بالإنترنت.'
         } else if (errMsg.includes('Invalid PDF') || errMsg.includes('password')) {
           userMsg = 'الملف ليس PDF صالح أو محمي بكلمة مرور.'
@@ -312,7 +351,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
             <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
           </Badge>
         </div>
-        <div className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy" style={{ height: '600px' }}>
+        <div className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy" style={{ height: '450px' }}>
           <div className="absolute inset-0 opacity-25" style={{
             backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
             backgroundSize: '24px 24px, 18px 18px'
@@ -423,7 +462,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
           onScroll={handleScroll}
           className="relative overflow-y-auto overflow-x-hidden"
           style={{
-            height: '600px',
+            height: '450px',
             scrollBehavior: 'smooth',
             WebkitOverflowScrolling: 'touch', // iOS smooth scrolling
             background: 'linear-gradient(180deg, rgba(10,30,55,0.06) 0%, rgba(212,175,55,0.04) 100%)'
