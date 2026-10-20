@@ -209,7 +209,7 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
       const res = await fetch('/api/modules', {
         method: moduleDialog.editing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(moduleDialog.editing ? { id: moduleDialog.editing.id, ...data } : { course_id: courseId, ...data }),
+        body: JSON.stringify(moduleDialog.editing ? { id: moduleDialog.editing.id, course_id: courseId, ...data } : { course_id: courseId, ...data }),
       })
       const result = await res.json()
       if (res.ok && result) {

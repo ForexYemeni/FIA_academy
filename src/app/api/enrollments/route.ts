@@ -78,11 +78,22 @@ function toEnrollment(p: StoredEnrollment): any {
     payment_status = 'pending'
   }
 
+  // ⚡ Fix: 'status' should reflect COURSE completion, not PAYMENT completion.
+  // The raw payment status 'مكتمل' means "payment approved" NOT "course finished".
+  // Only return 'completed' when progress >= 100 (all lessons done).
+  // Otherwise return 'active' (course in progress).
+  let enrollmentStatus = 'active'
+  if (progress >= 100 && (isApprovedStatus || isFree)) {
+    enrollmentStatus = 'completed'
+  } else if (isPendingStatus || (!isApprovedStatus && !isFree)) {
+    enrollmentStatus = 'pending'
+  }
+
   return {
     id: p.id,
     user_id: p.user_id,
     course_id: p.course_id,
-    status: p.status || 'active',
+    status: enrollmentStatus,
     progress,
     payment_status,
     amount_paid: p.amount || 0,
@@ -90,7 +101,7 @@ function toEnrollment(p: StoredEnrollment): any {
     payment_method: p.method,
     payment_reference: p.reference,
     enrolled_at: p.date,
-    completed_at: null,
+    completed_at: enrollmentStatus === 'completed' ? p.date : null,
   }
 }
 
