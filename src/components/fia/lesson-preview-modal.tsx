@@ -10,29 +10,13 @@ import {
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy, Loader2,
-  Sparkles, Lock, ChevronRight, ChevronLeft, ZoomIn, ZoomOut,
+  Sparkles, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
-// ⚡ PDF.js — used to render PDF files inside the app WITHOUT relying
-// on Google Docs Viewer. The previous Google-based viewer showed a
-// toolbar with "Open in new tab" arrow that allowed the student to
-// download the PDF. PDF.js renders pages directly to a <canvas>
-// element we control — no Google UI, no external buttons, no way to
-// download the raw file.
-import * as pdfjsLib from 'pdfjs-dist'
-
-// ⚡ Configure the worker once at module load time. The worker is a
-// separate JS file that pdfjs spawns in a background thread to parse
-// the PDF without blocking the main UI thread.
-//
-// We've copied the worker file to /public/pdf.worker.min.mjs so it's
-// served as a static asset by Next.js. This avoids any bundler
-// complexity (Next.js uses Webpack, not Vite, so `?url` imports
-// don't work natively). The worker loads from our own origin
-// (same-origin), which is required for the worker to start.
-if (typeof window !== 'undefined') {
-  ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
-}
+// ⚡ CustomPdfViewer is a separate component (extracted for clarity)
+// that uses pdf.js to render PDFs inside the app without Google Docs
+// Viewer. It handles its own pdfjs import + worker setup.
+import { CustomPdfViewer } from '@/components/fia/custom-pdf-viewer'
 
 interface Lesson {
   id: string
@@ -111,11 +95,17 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
   const prev = currentIdx > 0 ? allLessons[currentIdx - 1] : null
   const next = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null
 
-  // ⚡ Determine if the NEXT lesson is locked — it's locked if the
-  // current lesson isn't completed yet (sequential progression).
-  // We disable the Next button in that case so the student can't
-  // jump ahead without finishing the current lesson.
-  const isNextLocked = next ? !completedLessons?.has(next.lesson.id) && !completedLessons?.has(lesson.id) : false
+  // ⚡ Determine if the NEXT lesson is locked — it's locked ONLY if
+  // the CURRENT lesson isn't completed yet (sequential progression).
+  // Previously the condition was wrong: it checked BOTH current and
+  // next — which meant if the student navigated back to a completed
+  // lesson, the next button would unlock, but going FORWARD required
+  // both lessons to be complete (which is impossible).
+  //
+  // Correct logic: next is locked if current lesson hasn't been
+  // completed yet. The student must complete the current lesson before
+  // they can move to the next one.
+  const isNextLocked = next ? !completedLessons?.has(lesson.id) : false
   const isPrevAvailable = prev !== null
 
   const type = LESSON_TYPES[lesson.lesson_type] || LESSON_TYPES.text
@@ -799,311 +789,6 @@ function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void 
       onComplete={onComplete}
       firedRef={firedRef}
     />
-  )
-}
-
-// ============== Custom PDF.js Viewer (no Google, no iframe) ==============
-// Renders PDF pages to <canvas> using pdfjs-dist. The student can:
-// - Navigate pages (Prev/Next buttons + page counter)
-// - Zoom in / out (+ / - buttons + zoom indicator)
-// - See the page as an image (cannot download the .pdf)
-// - Right-click is disabled (no "Save As...")
-// The PDF.js worker is loaded from our own origin (no third-party CDN).
-function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
-  url: string
-  filename: string
-  onComplete?: () => void
-  firedRef: React.MutableRefObject<boolean>
-}) {
-  const [numPages, setNumPages] = useState(0)
-  const [pageNum, setPageNum] = useState(1)
-  const [scale, setScale] = useState(1.2)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const pdfDocRef = useRef<any>(null)
-  const renderTaskRef = useRef<any>(null)
-
-  // ⚡ Auto-complete after 15s dwell (safety net — the student can also
-  // manually complete by reaching the last page, see useEffect below).
-  useEffect(() => {
-    if (!onComplete) return
-    const timer = setTimeout(() => {
-      if (!firedRef.current) {
-        firedRef.current = true
-        onComplete()
-      }
-    }, 15000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ⚡ Load the PDF document. We use pdfjsLib.getDocument which fetches
-  // the PDF in the background and parses it via the worker.
-  //
-  // ⚡ CORS FIX: Telegram file URLs (https://api.telegram.org/file/bot.../...)
-  // don't return CORS headers, so the browser blocks the fetch and the
-  // student sees 'فشل في تحميل ملف PDF. قد يكون الرابط منتهي الصلاحية.'
-  //
-  // We route the fetch through our own /api/pdf-proxy endpoint which:
-  //   - Fetches the PDF server-side (no CORS restriction server-side)
-  //   - Re-serves it with `Access-Control-Allow-Origin: *`
-  //   - Streams the bytes back so large PDFs don't OOM
-  //
-  // For data: URIs (local upload fallback), we use them directly — no
-  // proxy needed (data URIs are same-origin).
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    ;(async () => {
-      try {
-        // ⚡ Determine the URL to fetch. Use the proxy for Telegram URLs
-        // to avoid CORS issues. Use the URL directly for data: URIs
-        // (local upload fallback) and same-origin URLs.
-        let fetchUrl = url
-        if (url.startsWith('https://api.telegram.org/')) {
-          fetchUrl = `/api/pdf-proxy?url=${encodeURIComponent(url)}`
-        }
-        const loadingTask = (pdfjsLib as any).getDocument({
-          url: fetchUrl,
-          // ⚡ Re-enable streaming + auto-fetch for the proxied URL —
-          // our proxy supports Range requests, so PDF.js can download
-          // only the bytes it needs (faster for large PDFs).
-          disableAutoFetch: false,
-          disableStream: false,
-        })
-        const doc = await loadingTask.promise
-        if (cancelled) return
-        pdfDocRef.current = doc
-        setNumPages(doc.numPages)
-        setLoading(false)
-      } catch (e: any) {
-        console.warn('[CustomPdfViewer] Failed to load PDF:', e)
-        if (cancelled) return
-        // ⚡ Provide more specific error messages based on the failure
-        const errMsg = String(e?.message || '')
-        let userMsg = 'فشل في تحميل ملف PDF.'
-        if (errMsg.includes('CORS') || errMsg.includes('fetch') || errMsg.includes('network')) {
-          userMsg = 'فشل في تحميل ملف PDF بسبب مشكلة في الشبكة. تأكد من اتصالك بالإنترنت.'
-        } else if (errMsg.includes('Invalid PDF') || errMsg.includes('password')) {
-          userMsg = 'الملف ليس PDF صالح أو محمي بكلمة مرور.'
-        } else if (errMsg.includes('proxy')) {
-          userMsg = 'فشل في تحميل ملف PDF. قد يكون الرابط منتهي الصلاحية.'
-        }
-        setError(userMsg)
-        setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-      try { pdfDocRef.current?.destroy?.() } catch {}
-      pdfDocRef.current = null
-    }
-  }, [url])
-
-  // ⚡ Render the current page to the canvas. Re-renders whenever the
-  // page number or zoom level changes.
-  useEffect(() => {
-    if (!pdfDocRef.current || !canvasRef.current || loading || error) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const doc = pdfDocRef.current
-        const page = await doc.getPage(pageNum)
-        if (cancelled) return
-        const canvas = canvasRef.current
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        const viewport = page.getViewport({ scale })
-        const dpr = window.devicePixelRatio || 1
-        canvas.width = viewport.width * dpr
-        canvas.height = viewport.height * dpr
-        canvas.style.width = `${viewport.width}px`
-        canvas.style.height = `${viewport.height}px`
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
-        ctx.scale(dpr, dpr)
-        if (renderTaskRef.current) {
-          try { renderTaskRef.current.cancel() } catch {}
-        }
-        const renderTask = page.render({ canvasContext: ctx, viewport })
-        renderTaskRef.current = renderTask
-        await renderTask.promise
-        if (cancelled) return
-      } catch (e: any) {
-        if (e?.name !== 'RenderingCancelledException') {
-          console.warn('[CustomPdfViewer] Render failed:', e)
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
-      if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel() } catch {}
-      }
-    }
-  }, [pageNum, scale, loading, error])
-
-  // ⚡ Auto-complete the lesson when the student reaches the LAST page.
-  useEffect(() => {
-    if (!onComplete || !numPages || pageNum < numPages) return
-    if (firedRef.current) return
-    const timer = setTimeout(() => {
-      if (!firedRef.current) {
-        firedRef.current = true
-        onComplete()
-      }
-    }, 1000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageNum, numPages])
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <div className="relative flex items-center gap-3 p-3 bg-gradient-to-br from-white to-gold/5 border border-gold/30 rounded-xl overflow-hidden">
-          <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
-          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center shadow-md flex-shrink-0 border border-gold/20">
-            <FileUp className="w-5 h-5 text-gold" />
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <div className="font-bold text-navy text-sm truncate">{filename}</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              جاري تحميل الملف...
-            </div>
-          </div>
-          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px] flex-shrink-0">
-            <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
-          </Badge>
-        </div>
-        <div className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy" style={{ height: '600px' }}>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gold/30 rounded-full blur-2xl animate-pulse" />
-              <Loader2 className="relative w-12 h-12 text-gold animate-spin" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-3">
-        <div className="relative flex items-center gap-3 p-3 bg-rose-500/5 border border-rose-500/30 rounded-xl overflow-hidden">
-          <div className="absolute top-0 right=0 left-0 h-1 bg-gradient-to-l from-rose-500 via-red-400 to-rose-500 opacity-70" />
-          <div className="relative w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center shadow-md flex-shrink-0">
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <div className="font-bold text-navy text-sm truncate">{filename}</div>
-            <div className="text-xs text-rose-700">{error}</div>
-          </div>
-        </div>
-        {onComplete && !firedRef.current && (
-          <Button onClick={() => { firedRef.current = true; onComplete(); toast.success('تم تخطّي الدرس') }} className="w-full bg-amber-500 hover:bg-amber-600 text-white">
-            تخطّي الدرس (الملف غير متاح)
-          </Button>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* ⚡ Magical file info card with Protected badge */}
-      <div className="relative flex items-center gap-3 p-3 bg-gradient-to-br from-white to-gold/5 border border-gold/30 rounded-xl overflow-hidden">
-        <div className="absolute top-0 right=0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
-        <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center shadow-md flex-shrink-0 border border-gold/20">
-          <FileUp className="w-5 h-5 text-gold" />
-        </div>
-        <div className="relative min-w-0 flex-1">
-          <div className="font-bold text-navy text-sm truncate">{filename}</div>
-          <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-gold/60" />
-            ملف PDF — معاينة محمية داخل التطبيق
-          </div>
-        </div>
-        <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px] flex-shrink-0">
-          <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
-        </Badge>
-      </div>
-
-      {/* ⚡ Magical gold-bordered PDF frame with our own controls */}
-      <div
-        className="relative rounded-xl border-2 border-gold/30 shadow-md overflow-hidden bg-gradient-to-br from-navy/5 to-white"
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        {/* Toolbar — page navigation + zoom (all our own buttons) */}
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-l from-navy to-navy-light text-white border-b border-gold/20">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPageNum((p) => Math.max(1, p - 1))}
-              disabled={pageNum <= 1}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-gold/20 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="الصفحة السابقة"
-            >
-              <ChevronRight className="w-4 h-4 text-gold" />
-            </button>
-            <div className="px-3 py-1 text-xs font-medium text-gold bg-white/10 rounded-lg min-w-[80px] text-center">
-              {pageNum} / {numPages || '?'}
-            </div>
-            <button
-              onClick={() => setPageNum((p) => Math.min(numPages, p + 1))}
-              disabled={pageNum >= numPages}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-gold/20 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="الصفحة التالية"
-            >
-              <ChevronLeft className="w-4 h-4 text-gold" />
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setScale((s) => Math.max(0.6, s - 0.2))}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-gold/20 flex items-center justify-center transition-all active:scale-95"
-              title="تصغير"
-            >
-              <ZoomOut className="w-4 h-4 text-gold" />
-            </button>
-            <div className="px-2 py-1 text-xs font-medium text-gold bg-white/10 rounded-lg min-w-[55px] text-center">
-              {Math.round(scale * 100)}%
-            </div>
-            <button
-              onClick={() => setScale((s) => Math.min(3, s + 0.2))}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-gold/20 flex items-center justify-center transition-all active:scale-95"
-              title="تكبير"
-            >
-              <ZoomIn className="w-4 h-4 text-gold" />
-            </button>
-          </div>
-        </div>
-
-        {/* Canvas render area — scrollable, right-click disabled */}
-        <div
-          className="relative overflow-auto flex items-center justify-center p-4"
-          style={{ height: '550px', background: 'linear-gradient(135deg, rgba(10,30,55,0.05) 0%, rgba(212,175,55,0.05) 100%)' }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <canvas
-            ref={canvasRef}
-            onContextMenu={(e) => e.preventDefault()}
-            onDragStart={(e) => e.preventDefault()}
-            className="shadow-lg rounded-md"
-            style={{ maxWidth: '100%', height: 'auto' }}
-          />
-        </div>
-      </div>
-
-      {/* Page navigation hint — bottom row */}
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Sparkles className="w-3 h-3 text-gold/60" />
-        استخدم أزرار التنقل في الأعلى للتنقل بين صفحات الملف
-      </div>
-    </div>
   )
 }
 
