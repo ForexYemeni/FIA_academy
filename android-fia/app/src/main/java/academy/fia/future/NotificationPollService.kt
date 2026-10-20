@@ -160,39 +160,15 @@ class NotificationPollService : Service() {
     private fun fireNotification(title: String, body: String, link: String) {
         val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // ⚡ STEP 1: Send a broadcast to MainActivity so it can inject JS
-        // into the WebView to update the UI INSTANTLY (sub-100ms).
-        // This is the bridge that makes the web UI feel as real-time as
-        // the native notifications.
-        try {
-            val broadcastIntent = Intent(MainActivity.ACTION_NEW_NOTIFICATION).apply {
-                setPackage(packageName)  // Restrict to our own app
-                putExtra(MainActivity.EXTRA_NOTIF_TITLE, title)
-                putExtra(MainActivity.EXTRA_NOTIF_BODY, body)
-                putExtra(MainActivity.EXTRA_NOTIF_LINK, link)
-                putExtra(MainActivity.EXTRA_NOTIF_TYPE, "poll")
-            }
-            sendBroadcast(broadcastIntent)
-            Log.d(TAG, "⚡ Sent notification broadcast to WebView: $title")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to send notification broadcast", e)
-        }
-
-        // ⚡ STEP 1.5: If the app is in the FOREGROUND, DON'T fire a native
-        // OS notification. The in-app toast (rendered by the web
-        // notifications-bell component after receiving our broadcast
-        // above) is enough — firing both the in-app toast AND the
-        // native notification creates the duplicate notifications
-        // the user reported seeing in the screenshot (9 duplicates of
-        // the same chat message).
+        // ⚡ USER REQUESTED: NO in-app toasts. ONLY external native OS
+        // notifications. We ALWAYS fire the native notification, even
+        // when the app is in the foreground or fully closed.
         //
-        // We only fire the native OS notification when the app is in
-        // the BACKGROUND (so the user sees it in the notification shade
-        // and can tap to open the app).
-        if (isAppInForeground()) {
-            Log.d(TAG, "App is in foreground — skipping native notification (in-app toast already shown)")
-            return
-        }
+        // We also DON'T broadcast to MainActivity anymore — the
+        // notifications-bell component no longer shows an in-app toast
+        // (per user's explicit request). So the broadcast would just
+        // be wasted work + could cause UI jitter (the bell counter
+        // updates from Realtime subscription already).
 
         // Deep-link intent — opens MainActivity with the hash URL
         val intent = Intent(this, MainActivity::class.java).apply {

@@ -52,18 +52,17 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // ⚡ Use html2canvas (NOT html-to-image) for the PNG. html2canvas
-      // handles Arabic fonts and complex CSS gradients better than
-      // html-to-image (which sometimes produces blurry text).
-      // scale=4 → 4x resolution for ultra-sharp PNG (suitable for
-      // printing and zooming).
-      const html2canvas = (await import('html2canvas')).default
+      // ⚡ STEP 1: Render the cert element to a high-res canvas via
+      // html2canvas. scale=4 → 4x resolution for crisp PNG (suitable
+      // for printing and zooming).
+      const html2canvasModule = await import('html2canvas')
+      const html2canvas = html2canvasModule.default
       const sourceCanvas = await html2canvas(certRef.current, {
         scale: 4,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-      })
+      } as any)
 
       // ⚡ Re-draw onto a clean canvas with explicit white background
       // to ensure consistent sRGB color profile (no LAB color issues
@@ -159,82 +158,98 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     try {
       // ⚡ STEP 1: Render the cert element to a high-res canvas via
       // html2canvas. scale=4 → 4x resolution for crisp PDF.
-      const html2canvas = (await import('html2canvas')).default
+      const html2canvasModule2 = await import('html2canvas')
+      const html2canvas = html2canvasModule2.default
       const sourceCanvas = await html2canvas(certRef.current, {
         scale: 4,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-      })
+      } as any)
 
       // ⚡ STEP 1.5: Re-draw the source canvas onto a new canvas with
-      // an explicit white background. This solves two issues:
-      //   1. jsPDF fails with "Attempting to parse an unsupported
-      //      color 'function' lab" when the canvas has a LAB ICC
-      //      color profile (which happens on some devices/browsers).
-      //   2. Drawing onto a fresh RGB canvas with a white background
-      //      flattens any transparency and forces a clean sRGB color
-      //      profile, which jsPDF handles correctly.
+      // an explicit white background. This flattens any transparency
+      // and ensures a clean sRGB color profile (no LAB ICC issues).
       const cleanCanvas = document.createElement('canvas')
       cleanCanvas.width = sourceCanvas.width
       cleanCanvas.height = sourceCanvas.height
       const cleanCtx = cleanCanvas.getContext('2d')!
-      // Fill with white FIRST (so any transparent pixels in the
-      // source become white, not black)
       cleanCtx.fillStyle = '#ffffff'
       cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
-      // Then draw the source canvas on top
       cleanCtx.drawImage(sourceCanvas, 0, 0)
 
-      // ⚡ STEP 2: Convert the clean canvas to a PDF via jsPDF.
-      // We use landscape A4 (297x210mm) since the cert is wider than
-      // tall. The canvas image is placed to fill the entire page,
-      // maintaining the cert's aspect ratio.
-      const { jsPDF } = await import('jspdf')
-      // ⚡ Use JPEG instead of PNG for the image data — JPEG is
-      // always RGB (no LAB color profile issues) and the file is
-      // smaller. Quality 0.95 is near-lossless for the visible
-      // quality.
-      const imgData = cleanCanvas.toDataURL('image/jpeg', 0.95)
-      const imgWidth = cleanCanvas.width
-      const imgHeight = cleanCanvas.height
-      // Use landscape A4: 297 x 210 mm
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
+      // ⚡ STEP 2: Convert the clean canvas to JPEG bytes.
+      // We use JPEG (not PNG) because:
+      //   1. JPEG is always RGB (no LAB color profile issues)
+      //   2. Smaller file size
+      //   3. Quality 0.95 is near-lossless for visible quality
+      // pdf-lib embeds the JPEG bytes directly without parsing color
+      // profiles — so it doesn't trigger the "unsupported color
+      // 'function' lab" error that jsPDF was throwing.
+      const jpegBlob = await new Promise<Blob>((resolve, reject) => {
+        cleanCanvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob)
+            else reject(new Error('Failed to convert canvas to JPEG'))
+          },
+          'image/jpeg',
+          0.95
+        )
       })
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      // ⚡ Calculate the image position so it's centered on the page
-      // while maintaining the cert's aspect ratio.
+      const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
+
+      // ⚡ STEP 3: Use pdf-lib (not jsPDF) to create the PDF.
+      // pdf-lib doesn't parse ICC color profiles when embedding images,
+      // so it doesn't have the "unsupported color 'function' lab"
+      // error that jsPDF has. It just embeds the JPEG bytes as-is.
+      const { PDFDocument } = await import('pdf-lib')
+      const pdfDoc = await PDFDocument.create()
+      const embeddedImage = await pdfDoc.embedJpg(jpegBytes)
+      // ⚡ Page size: matches the cert's aspect ratio exactly (no
+      // white borders, no margins). Width = 297mm (A4 landscape),
+      // height = 297 / imgRatio.
+      const imgWidth = embeddedImage.width
+      const imgHeight = embeddedImage.height
       const imgRatio = imgWidth / imgHeight
-      let finalWidth = pdfWidth
-      let finalHeight = pdfWidth / imgRatio
-      // If the cert is taller than the page's aspect ratio, fit by
-      // height instead
-      if (finalHeight > pdfHeight) {
-        finalHeight = pdfHeight
-        finalWidth = pdfHeight * imgRatio
+      let pageWidth = 297
+      let pageHeight = pageWidth / imgRatio
+      // If too tall, fit by height instead (max A4 height = 210mm)
+      const maxPageHeight = 210
+      if (pageHeight > maxPageHeight) {
+        pageHeight = maxPageHeight
+        pageWidth = pageHeight * imgRatio
       }
-      const offsetX = (pdfWidth - finalWidth) / 2
-      const offsetY = (pdfHeight - finalHeight) / 2
-      pdf.addImage(imgData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight, undefined, 'FAST')
+      const page = pdfDoc.addPage([pageWidth, pageHeight])
+      // Draw the image to fill the entire page (no margins, no borders).
+      page.drawImage(embeddedImage, {
+        x: 0,
+        y: 0,
+        width: pageWidth,
+        height: pageHeight,
+      })
 
-      // ⚡ STEP 3: Get the PDF as a base64 string (without the data:
-      // prefix) so we can pass it to the APK's native bridge.
-      const pdfBase64 = pdf.output('datauristring')
-      const pdfBytes = pdf.output('arraybuffer')
+      // ⚡ STEP 4: Serialize the PDF to bytes.
+      const pdfBytes = await pdfDoc.save()
+      // Convert Uint8Array to base64 for the APK bridge.
+      let pdfBase64 = ''
+      try {
+        // Use chunks to avoid call stack overflow on large PDFs
+        const CHUNK_SIZE = 0x8000
+        for (let i = 0; i < pdfBytes.length; i += CHUNK_SIZE) {
+          const chunk = pdfBytes.subarray(i, i + CHUNK_SIZE)
+          pdfBase64 += String.fromCharCode.apply(null, Array.from(chunk))
+        }
+        pdfBase64 = btoa(pdfBase64)
+      } catch (e) {
+        console.warn('[FIA] base64 conversion failed:', e)
+      }
 
-      // ⚡ STEP 4: If inside the FIA APK WebView, save via the native
+      // ⚡ STEP 5: If inside the FIA APK WebView, save via the native
       // bridge (which writes to Downloads/FIA via MediaStore).
       if (isAndroidWebView()) {
         const bridge = (window as any).FIANativeBridge
-        if (bridge && typeof bridge.savePdfToDownloads === 'function') {
-          // Strip the "data:application/pdf;base64," prefix
-          const base64Data = pdfBase64.substring(pdfBase64.indexOf(',') + 1)
-          const saved = bridge.savePdfToDownloads(base64Data, filename)
+        if (bridge && typeof bridge.savePdfToDownloads === 'function' && pdfBase64) {
+          const saved = bridge.savePdfToDownloads(pdfBase64, filename)
           if (saved) {
             try {
               bridge.showToast('تم حفظ الشهادة PDF في مجلد التنزيلات ✓', 'long')
@@ -251,8 +266,8 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         }
       }
 
-      // ⚡ STEP 5: Regular browser path — trigger blob download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      // ⚡ STEP 6: Regular browser path — trigger blob download
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
