@@ -30,17 +30,19 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
    *   5. Draw the SVG onto a canvas
    *   6. Export the canvas as PNG via toDataURL
    *
-   * Quality: we set pixelRatio=2 (so a 720x508 cert becomes 1440x1016
-   * — high-res). The output PNG is then handed to the APK's
+   * Quality: we set pixelRatio=4 (so a 720x508 cert becomes 2880x2032
+   * — ultra-high-res for sharp printing and zooming). We DON'T force
+   * width/height — we let htmlToImage measure the actual element
+   * size, so the PNG matches the on-screen cert 100%.
+   *
+   * The output PNG is then handed to the APK's
    * FIANativeBridge.saveImageToGallery() (which writes it to
    * Pictures/FIA via MediaStore) or downloaded directly via blob+anchor
    * in a regular browser.
    *
    * This GUARANTEES that what the user sees on screen = what gets
-   * saved to gallery — same design, same proportions, same colors.
-   * The previous flow fetched a server-generated PNG that had a
-   * DIFFERENT design than the JSX rendering — the user complained
-   * "الشهادة تظهر مختلفة و سيئة".
+   * saved to gallery — same design, same proportions, same colors,
+   * same sharp quality.
    */
   const downloadAsImage = async () => {
     if (!certRef.current) {
@@ -50,18 +52,17 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // Convert JSX cert to PNG via html-to-image
-      // pixelRatio=2 for 2x resolution (high quality)
+      // ⚡ Convert JSX cert to PNG via html-to-image
+      // pixelRatio=4 for 4x resolution (ultra-high quality)
+      // DON'T force width/height — let htmlToImage measure the
+      // actual element so the PNG matches the on-screen cert 100%
       const dataUrl = await htmlToImage.toPng(certRef.current, {
-        pixelRatio: 2,
+        pixelRatio: 4,
         cacheBust: true,
         backgroundColor: '#ffffff',
-        // Skip fonts that may not load — the JSX uses system fonts
-        // and inline styles, so this should work without font embeds
         skipFonts: false,
-        // Maximum width / height for the resulting image
-        width: 720,
-        height: 508,
+        // Don't specify width/height — use the element's natural size
+        // This ensures the PNG matches the on-screen cert 100%.
         style: {
           margin: '0',
           transform: 'none',
@@ -123,24 +124,122 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
   }
 
   /**
-   * PDF download — uses the server-generated PDF from /api/certificate-pdf
-   * (since html-to-image can only produce PNG, not PDF).
+   * ⚡ PDF download — generates a PDF that's a 100% match of the
+   * on-screen JSX certificate. We use html2canvas to render the cert
+   * element to a high-resolution canvas, then jsPDF to wrap that
+   * canvas as a single-page PDF in landscape orientation.
+   *
+   * This GUARANTEES that the PDF matches what the user sees on screen —
+   * same design, same colors, same proportions. The previous flow
+   * fetched a server-generated PDF that had a DIFFERENT design than
+   * the JSX rendering — the user complained "الشهادة تظهر مختلفة
+   * تماماً عن الشهادة التي تعرض".
+   *
+   * For the APK: we generate the PDF client-side, then pass the
+   * base64-encoded bytes to FIANativeBridge.savePdfToDownloads which
+   * writes it to the public Downloads/FIA folder via MediaStore.
+   *
+   * For regular browsers: we trigger a normal blob download with
+   * the certificate number in the filename.
    */
   const downloadPdf = async () => {
+    if (!certRef.current) {
+      toast.error('لا يمكن العثور على عنصر الشهادة')
+      return
+    }
     setPdfDownloading(true)
+    const filename = `FIA-Certificate-${certificate.certificate_number}.pdf`
     try {
-      const { downloadCertificateFile } = await import('@/lib/certificate-download')
-      await downloadCertificateFile({
-        certificateNumber: certificate.certificate_number,
-        format: 'pdf',
-        onStatus: (msg, kind) => {
-          if (kind === 'success') toast.success(msg)
-          else if (kind === 'error') toast.error(msg)
-          else toast.info(msg)
-        },
+      // ⚡ STEP 1: Render the cert element to a high-res canvas via
+      // html2canvas. scale=4 → 4x resolution for crisp PDF.
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(certRef.current, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
       })
-    } catch (e) {
-      toast.error('فشل تحميل PDF')
+
+      // ⚡ STEP 2: Convert the canvas to a PDF via jsPDF.
+      // We use landscape A4 (297x210mm) since the cert is wider than
+      // tall. The canvas image is placed to fill the entire page,
+      // maintaining the cert's aspect ratio.
+      const { jsPDF } = await import('jspdf')
+      const imgData = canvas.toDataURL('image/png', 1.0) // full quality
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      // Use landscape A4: 297 x 210 mm
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      })
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      // ⚡ Calculate the image position so it's centered on the page
+      // while maintaining the cert's aspect ratio.
+      const imgRatio = imgWidth / imgHeight
+      const pdfRatio = pdfWidth / pdfHeight
+      let finalWidth = pdfWidth
+      let finalHeight = pdfWidth / imgRatio
+      // If the cert is taller than the page's aspect ratio, fit by
+      // height instead
+      if (finalHeight > pdfHeight) {
+        finalHeight = pdfHeight
+        finalWidth = pdfHeight * imgRatio
+      }
+      const offsetX = (pdfWidth - finalWidth) / 2
+      const offsetY = (pdfHeight - finalHeight) / 2
+      pdf.addImage(imgData, 'PNG', offsetX, offsetY, finalWidth, finalHeight, undefined, 'FAST')
+
+      // ⚡ STEP 3: Get the PDF as a base64 string (without the data:
+      // prefix) so we can pass it to the APK's native bridge.
+      const pdfBase64 = pdf.output('datauristring')
+      const pdfBytes = pdf.output('arraybuffer')
+
+      // ⚡ STEP 4: If inside the FIA APK WebView, save via the native
+      // bridge (which writes to Downloads/FIA via MediaStore).
+      if (isAndroidWebView()) {
+        const bridge = (window as any).FIANativeBridge
+        if (bridge && typeof bridge.savePdfToDownloads === 'function') {
+          // Strip the "data:application/pdf;base64," prefix
+          const base64Data = pdfBase64.substring(pdfBase64.indexOf(',') + 1)
+          const saved = bridge.savePdfToDownloads(base64Data, filename)
+          if (saved) {
+            try {
+              bridge.showToast('تم حفظ الشهادة PDF في مجلد التنزيلات ✓', 'long')
+            } catch {}
+            try {
+              bridge.vibrate('[50]')
+            } catch {}
+            toast.success('تم تنزيل الشهادة PDF إلى مجلد التنزيلات ✓')
+            return
+          } else {
+            toast.error('فشل الحفظ المباشر — جاري المحاولة عبر المتصفح')
+            // Fall through to blob download
+          }
+        }
+      }
+
+      // ⚡ STEP 5: Regular browser path — trigger blob download
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      a.rel = 'noopener noreferrer'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => {
+        try { URL.revokeObjectURL(blobUrl) } catch {}
+        try { document.body.removeChild(a) } catch {}
+      }, 2000)
+      toast.success('تم تنزيل الشهادة PDF ✓')
+    } catch (e: any) {
+      console.error('[FIA] PDF generation failed:', e)
+      toast.error('فشل إنشاء ملف PDF: ' + (e?.message || ''))
     } finally {
       setPdfDownloading(false)
     }
