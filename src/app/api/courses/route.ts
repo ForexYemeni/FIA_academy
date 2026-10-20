@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(data)
     }
     const includeDrafts = req.nextUrl.searchParams.get('include_drafts') === 'true'
+    const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
+    const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
     let query = supabaseAdmin
       .from('courses')
       .select('*')
@@ -67,6 +69,10 @@ export async function GET(req: NextRequest) {
     // This is enforced at the API level so no student client can bypass it.
     if (!includeDrafts) {
       query = query.neq('status', 'مسودة')
+    }
+    // ⚡ Pagination: if limit is specified, apply range filtering
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1)
     }
     const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error

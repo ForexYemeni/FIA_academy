@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
@@ -26,7 +27,10 @@ async function listNewTables() {
   return existing
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = await requireAdmin(req)
+  if (authError) return authError
+
   const tables = await listNewTables()
   const present = tables.filter((t) => t.exists).map((t) => t.name)
   const missing = tables.filter((t) => !t.exists).map((t) => t.name)
