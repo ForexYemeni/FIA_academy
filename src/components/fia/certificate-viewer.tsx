@@ -52,32 +52,53 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // ⚡ STEP 1: Render the cert element to a high-res canvas via
-      // html2canvas. scale=4 → 4x resolution for crisp PNG (suitable
-      // for printing and zooming).
-      const html2canvasModule = await import('html2canvas')
-      const html2canvas = html2canvasModule.default
-      const sourceCanvas = await html2canvas(certRef.current, {
-        scale: 4,
-        useCORS: true,
+      // ⚡ Use html-to-image (NOT html2canvas) for the PNG.
+      // html-to-image uses the SVG+foreignObject trick which renders
+      // the cert exactly as the browser sees it — including all CSS
+      // gradients, drop-shadows, and Arabic fonts. html2canvas
+      // re-implements CSS rendering in JavaScript, which has known
+      // bugs with `filter: drop-shadow()` and complex gradients.
+      //
+      // pixelRatio=4 → 4x resolution for ultra-sharp PNG
+      // (suitable for printing and zooming).
+      const htmlToImage = await import('html-to-image')
+      const dataUrl = await htmlToImage.toPng(certRef.current, {
+        pixelRatio: 4,
+        cacheBust: true,
         backgroundColor: '#ffffff',
-        logging: false,
-      } as any)
+        skipFonts: false,
+        // Don't specify width/height — use the element's natural size
+        style: {
+          margin: '0',
+          transform: 'none',
+        }
+      })
 
-      // ⚡ Re-draw onto a clean canvas with explicit white background
-      // to ensure consistent sRGB color profile (no LAB color issues
-      // when the PNG is opened in different apps).
+      // ⚡ Convert the data URL to a canvas (so we can flatten the
+      // alpha channel and ensure consistent sRGB color profile).
+      // This avoids any LAB ICC profile issues when the PNG is opened
+      // in different gallery apps.
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('Failed to load image'))
+        img.src = dataUrl
+      })
+
       const cleanCanvas = document.createElement('canvas')
-      cleanCanvas.width = sourceCanvas.width
-      cleanCanvas.height = sourceCanvas.height
+      cleanCanvas.width = img.naturalWidth
+      cleanCanvas.height = img.naturalHeight
       const cleanCtx = cleanCanvas.getContext('2d')!
+      // Fill with white FIRST (so any transparent pixels become
+      // white, not black)
       cleanCtx.fillStyle = '#ffffff'
       cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
-      cleanCtx.drawImage(sourceCanvas, 0, 0)
+      // Then draw the image on top
+      cleanCtx.drawImage(img, 0, 0)
 
-      // Get PNG data URL (full quality)
-      const dataUrl = cleanCanvas.toDataURL('image/png', 1.0)
-      const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1)
+      // Get final PNG data URL (full quality)
+      const finalDataUrl = cleanCanvas.toDataURL('image/png', 1.0)
+      const base64Data = finalDataUrl.substring(finalDataUrl.indexOf(',') + 1)
 
       // If inside FIA APK WebView, use the native bridge to save
       // directly to the gallery — this is the guaranteed path.
@@ -107,7 +128,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
 
       // Regular browser path — or fallback in WebView if bridge failed
       // Convert the data URL to a blob and trigger a download
-      const blob = await (await fetch(dataUrl)).blob()
+      const blob = await (await fetch(finalDataUrl)).blob()
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
@@ -131,15 +152,16 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
 
   /**
    * ⚡ PDF download — generates a PDF that's a 100% match of the
-   * on-screen JSX certificate. We use html2canvas to render the cert
-   * element to a high-resolution canvas, then jsPDF to wrap that
-   * canvas as a single-page PDF in landscape orientation.
+   * on-screen JSX certificate. We use html-to-image to render the cert
+   * element to a high-resolution canvas (using SVG+foreignObject which
+   * handles Arabic fonts + CSS gradients + drop-shadows correctly),
+   * then pdf-lib to embed that canvas as a single-page PDF.
    *
-   * This GUARANTEES that the PDF matches what the user sees on screen —
-   * same design, same colors, same proportions. The previous flow
-   * fetched a server-generated PDF that had a completely different design than
-   * the JSX rendering — the user complained "الشهادة تظهر مختلفة
-   * تماماً عن الشهادة التي تعرض".
+   * ⚡ Why pdf-lib (not jsPDF)?
+   * jsPDF has known issues parsing LAB ICC color profiles embedded in
+   * some canvas outputs. The error was:
+   *   "Attempting to parse an unsupported color 'function' lab"
+   * pdf-lib is more modern and handles color profiles correctly.
    *
    * For the APK: we generate the PDF client-side, then pass the
    * base64-encoded bytes to FIANativeBridge.savePdfToDownloads which
@@ -157,28 +179,44 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     const filename = `FIA-Certificate-${certificate.certificate_number}.pdf`
     try {
       // ⚡ STEP 1: Render the cert element to a high-res canvas via
-      // html2canvas. scale=4 → 4x resolution for crisp PDF.
-      const html2canvasModule2 = await import('html2canvas')
-      const html2canvas = html2canvasModule2.default
-      const sourceCanvas = await html2canvas(certRef.current, {
-        scale: 4,
-        useCORS: true,
+      // html-to-image. pixelRatio=4 → 4x resolution for crisp PDF.
+      // We use html-to-image (not html2canvas) because it uses
+      // SVG+foreignObject which renders the cert EXACTLY as the
+      // browser sees it (including drop-shadow, gradients, Arabic
+      // fonts). html2canvas re-implements CSS in JS, which has bugs.
+      const htmlToImage = await import('html-to-image')
+      const dataUrl = await htmlToImage.toPng(certRef.current, {
+        pixelRatio: 4,
+        cacheBust: true,
         backgroundColor: '#ffffff',
-        logging: false,
-      } as any)
+        skipFonts: false,
+        style: {
+          margin: '0',
+          transform: 'none',
+        }
+      })
 
-      // ⚡ STEP 1.5: Re-draw the source canvas onto a new canvas with
-      // an explicit white background. This flattens any transparency
-      // and ensures a clean sRGB color profile (no LAB ICC issues).
+      // ⚡ STEP 2: Convert the data URL to an Image element, then
+      // draw onto a fresh canvas with a white background. This:
+      //   1. Flattens any transparency
+      //   2. Forces a clean sRGB color profile (no LAB ICC issues)
+      //   3. Avoids any color profile parsing errors in pdf-lib
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('Failed to load image'))
+        img.src = dataUrl
+      })
+
       const cleanCanvas = document.createElement('canvas')
-      cleanCanvas.width = sourceCanvas.width
-      cleanCanvas.height = sourceCanvas.height
+      cleanCanvas.width = img.naturalWidth
+      cleanCanvas.height = img.naturalHeight
       const cleanCtx = cleanCanvas.getContext('2d')!
       cleanCtx.fillStyle = '#ffffff'
       cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
-      cleanCtx.drawImage(sourceCanvas, 0, 0)
+      cleanCtx.drawImage(img, 0, 0)
 
-      // ⚡ STEP 2: Convert the clean canvas to JPEG bytes.
+      // ⚡ STEP 3: Convert the clean canvas to JPEG bytes.
       // We use JPEG (not PNG) because:
       //   1. JPEG is always RGB (no LAB color profile issues)
       //   2. Smaller file size
@@ -198,7 +236,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       })
       const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
 
-      // ⚡ STEP 3: Use pdf-lib (not jsPDF) to create the PDF.
+      // ⚡ STEP 4: Use pdf-lib (not jsPDF) to create the PDF.
       // pdf-lib doesn't parse ICC color profiles when embedding images,
       // so it doesn't have the "unsupported color 'function' lab"
       // error that jsPDF has. It just embeds the JPEG bytes as-is.
@@ -228,7 +266,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         height: pageHeight,
       })
 
-      // ⚡ STEP 4: Serialize the PDF to bytes.
+      // ⚡ STEP 5: Serialize the PDF to bytes.
       const pdfBytes = await pdfDoc.save()
       // Convert Uint8Array to base64 for the APK bridge.
       let pdfBase64 = ''
@@ -244,7 +282,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         console.warn('[FIA] base64 conversion failed:', e)
       }
 
-      // ⚡ STEP 5: If inside the FIA APK WebView, save via the native
+      // ⚡ STEP 6: If inside the FIA APK WebView, save via the native
       // bridge (which writes to Downloads/FIA via MediaStore).
       if (isAndroidWebView()) {
         const bridge = (window as any).FIANativeBridge
@@ -266,7 +304,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         }
       }
 
-      // ⚡ STEP 6: Regular browser path — trigger blob download
+      // ⚡ STEP 7: Regular browser path — trigger blob download
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
