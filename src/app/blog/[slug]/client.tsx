@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Calendar, Eye, ArrowRight, Clock, Share2, Copy, MessageCircle,
-  Facebook, Twitter, Bookmark, ChevronUp, Home,
+  Facebook, Twitter, Bookmark, ChevronUp, Home, Sparkles, BookOpen,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -70,7 +70,7 @@ export default function BlogPostClient({ post, related }: { post: any; related: 
         />
       </div>
 
-      {/* Hero — full-bleed cover image */}
+      {/* Hero — full-bleed cover image with magical overlay */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden bg-navy">
         {post.cover ? (
           <>
@@ -82,8 +82,16 @@ export default function BlogPostClient({ post, related }: { post: any; related: 
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-navy via-navy-light to-navy" />
         )}
+        {/* Magical gold dot pattern overlay */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px'
+        }} />
+        {/* Magical gold glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 -left-12 w-32 h-32 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
         <div className="container relative mx-auto px-4 lg:px-6 py-12 max-w-4xl text-white">
-          <a href="/" className="inline-flex items-center gap-1 text-white/70 hover:text-gold mb-6 text-xs">
+          <a href="/" className="inline-flex items-center gap-1 text-white/70 hover:text-gold mb-6 text-xs transition-colors">
             <Home className="w-3.5 h-3.5" /> الرئيسية
           </a>
           {post.tags && (
@@ -93,6 +101,10 @@ export default function BlogPostClient({ post, related }: { post: any; related: 
               ))}
             </div>
           )}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/15 border border-gold/30 mb-4">
+            <Sparkles className="w-3.5 h-3.5 text-gold" />
+            <span className="text-[11px] font-bold text-gold">مقال أكاديمي معتمد</span>
+          </div>
           <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">{post.title}</h1>
           <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
             <span className="flex items-center gap-1.5">
@@ -109,76 +121,92 @@ export default function BlogPostClient({ post, related }: { post: any; related: 
         </div>
       </section>
 
-      {/* Article body */}
+      {/* Article body — magical card */}
       <article className="container mx-auto px-4 lg:px-6 max-w-3xl py-12">
-        {/* Lead paragraph (excerpt) */}
-        {post.excerpt && (
-          <p className="text-xl md:text-2xl text-navy/80 leading-relaxed mb-8 border-r-4 border-gold pr-4 font-medium">
-            {post.excerpt}
-          </p>
-        )}
+        <div className="relative rounded-2xl border border-gold/30 bg-white p-6 md:p-10 shadow-md overflow-hidden">
+          {/* Top gold strip */}
+          <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+          {/* Magical glow */}
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Body — paragraphs with proper spacing */}
-        <div className="prose prose-lg max-w-none">
-          {paragraphs.length > 0 ? (
-            paragraphs.map((p: string, i: number) => (
-              <p key={i} className="text-navy/90 leading-loose mb-6 text-lg whitespace-pre-wrap">
-                {p}
-              </p>
-            ))
-          ) : (
-            <p className="text-navy/90 leading-loose text-lg whitespace-pre-wrap">{post.body}</p>
+          {/* Lead paragraph (excerpt) */}
+          {post.excerpt && (
+            <p className="relative text-xl md:text-2xl text-navy/80 leading-relaxed mb-8 border-r-4 border-gold pr-4 font-medium">
+              {post.excerpt}
+            </p>
           )}
-        </div>
 
-        {/* Share bar */}
-        <div className="mt-12 pt-8 border-t border-border">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-navy flex items-center gap-1">
-                <Share2 className="w-4 h-4 text-gold" /> شارك المقال
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={shareWhatsApp} className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors" title="واتساب">
-                <MessageCircle className="w-5 h-5" />
-              </button>
-              <button onClick={shareTelegram} className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors" title="تيليجرام">
-                <Share2 className="w-5 h-5" />
-              </button>
-              <button onClick={shareFacebook} className="w-10 h-10 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors" title="فيسبوك">
-                <Facebook className="w-5 h-5" />
-              </button>
-              <button onClick={shareTwitter} className="w-10 h-10 rounded-full bg-gray-900 hover:bg-black text-white flex items-center justify-center transition-colors" title="تويتر / X">
-                <Twitter className="w-5 h-5" />
-              </button>
-              <button onClick={copyLink} className="w-10 h-10 rounded-full bg-navy hover:bg-navy-light text-gold flex items-center justify-center transition-colors" title="نسخ الرابط">
-                <Copy className="w-5 h-5" />
-              </button>
+          {/* Body — paragraphs with proper spacing */}
+          <div className="relative prose prose-lg max-w-none">
+            {paragraphs.length > 0 ? (
+              paragraphs.map((p: string, i: number) => (
+                <p key={i} className="text-navy/90 leading-loose mb-6 text-lg whitespace-pre-wrap">
+                  {p}
+                </p>
+              ))
+            ) : (
+              <p className="text-navy/90 leading-loose text-lg whitespace-pre-wrap">{post.body}</p>
+            )}
+          </div>
+
+          {/* Share bar */}
+          <div className="relative mt-12 pt-8 border-t border-border">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-navy flex items-center gap-1">
+                  <Share2 className="w-4 h-4 text-gold" /> شارك المقال
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={shareWhatsApp} className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors" title="واتساب">
+                  <MessageCircle className="w-5 h-5" />
+                </button>
+                <button onClick={shareTelegram} className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors" title="تيليجرام">
+                  <Share2 className="w-5 h-5" />
+                </button>
+                <button onClick={shareFacebook} className="w-10 h-10 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors" title="فيسبوك">
+                  <Facebook className="w-5 h-5" />
+                </button>
+                <button onClick={shareTwitter} className="w-10 h-10 rounded-full bg-gray-900 hover:bg-black text-white flex items-center justify-center transition-colors" title="تويتر / X">
+                  <Twitter className="w-5 h-5" />
+                </button>
+                <button onClick={copyLink} className="w-10 h-10 rounded-full bg-navy hover:bg-navy-light text-gold flex items-center justify-center transition-colors" title="نسخ الرابط">
+                  <Copy className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </article>
 
-      {/* Related posts */}
+      {/* Related posts — magical cards */}
       {related && related.length > 0 && (
         <section className="bg-gradient-to-b from-navy/5 to-white py-16 border-t border-border">
           <div className="container mx-auto px-4 lg:px-6 max-w-5xl">
             <div className="text-center mb-10">
-              <Badge className="bg-navy/5 text-navy border-navy/10 mb-3">مقالات ذات صلة</Badge>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/15 border border-gold/30 mb-3">
+                <BookOpen className="w-3.5 h-3.5 text-gold" />
+                <span className="text-[11px] font-bold text-gold">مقالات ذات صلة</span>
+              </div>
               <h2 className="text-2xl md:text-3xl font-bold text-navy">اقرأ أيضاً</h2>
             </div>
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5 fia-stagger">
               {related.map((p) => (
                 <a key={p.id} href={`/blog/${p.slug}`} className="block group">
-                  <Card className="overflow-hidden card-hover h-full flex flex-col">
+                  <Card className="relative overflow-hidden card-hover h-full flex flex-col border-gold/30">
+                    {/* Top gold strip */}
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70 z-10" />
                     {p.cover ? (
                       <div className="aspect-video overflow-hidden bg-navy">
                         <img src={p.cover} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
                     ) : (
-                      <div className="aspect-video bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-                        <Eye className="w-10 h-10 text-gold/40" />
+                      <div className="aspect-video bg-gradient-to-br from-navy to-navy-light flex items-center justify-center relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-20" style={{
+                          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px)',
+                          backgroundSize: '24px 24px'
+                        }} />
+                        <BookOpen className="w-10 h-10 text-gold/60 relative" />
                       </div>
                     )}
                     <div className="p-4 flex-1">

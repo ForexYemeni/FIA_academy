@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar, MapPin, Target, Send, Facebook, Phone,
+  Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -1629,9 +1629,22 @@ function AdminPayments() {
 
   return (
     <SectionCard title="المدفوعات" description={`${filtered.length} من ${items.length} معاملة`}>
+      {/* ⚡ Magical search + filter */}
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <Input placeholder="بحث برقم المعاملة أو الطريقة..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-input rounded-md bg-background text-sm">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold/70 pointer-events-none" />
+          <Input
+            placeholder="بحث برقم المعاملة أو الطريقة..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pr-10 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm font-medium text-navy focus:border-gold focus:ring-gold/30 outline-none"
+        >
           <option value="all">كل الحالات</option>
           <option value="قيد الانتظار">قيد الانتظار</option>
           <option value="مكتمل">مكتمل</option>
@@ -1639,116 +1652,233 @@ function AdminPayments() {
         </select>
       </div>
 
-      <div className="space-y-2">
+      {/* ⚡ Magical state-aware stats strip */}
+      {items.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="relative p-2.5 rounded-xl border border-amber-300/50 bg-gradient-to-br from-amber-50 to-amber-50/20 overflow-hidden">
+            <div className="absolute -top-2 -right-2 w-10 h-10 bg-amber-300/30 rounded-full blur-xl" />
+            <div className="relative flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] text-amber-700 font-medium truncate">قيد الانتظار</div>
+                <div className="text-sm font-bold text-amber-700">{items.filter((p) => p.status === 'قيد الانتظار').length}</div>
+              </div>
+            </div>
+          </div>
+          <div className="relative p-2.5 rounded-xl border border-emerald-300/50 bg-gradient-to-br from-emerald-50 to-emerald-50/20 overflow-hidden">
+            <div className="absolute -top-2 -right-2 w-10 h-10 bg-emerald-300/30 rounded-full blur-xl" />
+            <div className="relative flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] text-emerald-700 font-medium truncate">مكتمل</div>
+                <div className="text-sm font-bold text-emerald-700">{items.filter((p) => p.status === 'مكتمل').length}</div>
+              </div>
+            </div>
+          </div>
+          <div className="relative p-2.5 rounded-xl border border-rose-300/50 bg-gradient-to-br from-rose-50 to-rose-50/20 overflow-hidden">
+            <div className="absolute -top-2 -right-2 w-10 h-10 bg-rose-300/30 rounded-full blur-xl" />
+            <div className="relative flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-4 h-4 text-rose-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] text-rose-700 font-medium truncate">ملغي</div>
+                <div className="text-sm font-bold text-rose-700">{items.filter((p) => p.status === 'ملغي').length}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚡ Magical payment cards grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 fia-stagger">
         {filtered.map((p) => {
           const course = getCourse(p.course_id)
           const proofUrl = extractProofUrl(p.reference)
           const isPending = p.status === 'قيد الانتظار'
+          const isCompleted = p.status === 'مكتمل'
           const couponCode = getCouponCode(p)
           const ref = cleanReference(p.reference)
           const currency = getCurrency(p)
           const hasCoupon = !!couponCode
+          const stateGradient = isCompleted
+            ? 'from-emerald-500 to-teal-600'
+            : p.status === 'ملغي'
+              ? 'from-rose-500 to-red-600'
+              : 'from-amber-500 to-orange-600'
+          const stateBadge = isCompleted
+            ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
+            : p.status === 'ملغي'
+              ? 'bg-rose-500/15 text-rose-600 border-rose-500/30'
+              : 'bg-amber-500/15 text-amber-600 border-amber-500/30'
           return (
             <div
               key={p.id}
-              className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white border rounded-lg ${
-                hasCoupon
-                  ? 'border-r-4 border-r-red-500 ring-1 ring-red-500/20 bg-red-50/30'
-                  : 'border-border'
-              }`}
+              className={`group relative overflow-hidden rounded-2xl bg-white border ${hasCoupon ? 'border-rose-300/60 ring-1 ring-rose-500/15' : 'border-gray-200/60'} hover:shadow-lg transition-all fia-card-hover`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-bold text-navy text-sm" dir="ltr">
-                    {p.amount?.toLocaleString()} {currency}
-                  </span>
-                  <Badge className={
-                    p.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
-                    : p.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
-                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                  }>{p.status}</Badge>
-                  {proofUrl && <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">📎 إثبات دفع</Badge>}
-                  {hasCoupon && (
-                    <Badge className="bg-red-500/15 text-red-600 border-red-500/40 font-mono" dir="ltr">
-                      🎟️ كوبون: {couponCode}
-                    </Badge>
-                  )}
+              {/* Top state-aware gradient strip */}
+              <div className={`h-1.5 bg-gradient-to-r ${stateGradient}`} />
+              {/* Coupon corner ribbon */}
+              {hasCoupon && (
+                <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/40 text-rose-600 text-[10px] font-mono font-bold" dir="ltr">
+                  🎟️ {couponCode}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {course ? <span className="font-medium text-navy">{course.title}</span> : 'دورة غير محددة'}
-                  {' • '}
-                  <span>{p.method || '-'}</span>
-                  {' • '}
-                  <span dir="ltr">{ref || '-'}</span>
+              )}
+              <div className="p-4">
+                {/* Amount + status */}
+                <div className="flex items-start justify-between mb-3 gap-2">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-0.5">المبلغ</div>
+                    <div className="font-extrabold text-navy text-base" dir="ltr">
+                      {p.amount?.toLocaleString()} <span className="text-xs font-bold text-gold">{currency}</span>
+                    </div>
+                  </div>
+                  <Badge className={`text-[10px] font-bold border ${stateBadge}`}>{p.status}</Badge>
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}</div>
-              </div>
-              <div className="flex gap-1 flex-shrink-0">
-                <Button size="sm" variant="ghost" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
-                  <Eye className="w-4 h-4 text-navy" />
-                </Button>
-                {isPending && (
-                  <>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs" onClick={() => updateStatus(p.id, 'مكتمل')}>
-                      <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> قبول
-                    </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs" onClick={() => openRejectDialog(p)}>
-                      <XCircle className="w-3.5 h-3.5 ml-1" /> رفض
-                    </Button>
-                  </>
+                {/* Method + course + reference */}
+                <div className="space-y-1.5 mb-3">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <CreditCard className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                    <span className="font-medium text-navy truncate">{p.method || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <BookOpen className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                    <span className="text-muted-foreground truncate flex-1">
+                      {course ? course.title : 'دورة غير محددة'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground" dir="ltr">
+                    <Hash className="w-3 h-3 text-gold/60 flex-shrink-0" />
+                    <span className="truncate">{ref || '-'}</span>
+                  </div>
+                </div>
+                {/* Proof indicator */}
+                {proofUrl && (
+                  <a
+                    href={proofUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mb-3 text-[10px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" /> إثبات دفع مرفق
+                  </a>
                 )}
+                {/* Date + actions */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <div className="text-[10px] text-muted-foreground" dir="ltr">
+                    {p.date ? new Date(p.date).toLocaleDateString('ar-EG') : '-'}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-navy hover:bg-navy/5 rounded-lg" onClick={() => setSelectedPayment(p)} title="عرض التفاصيل">
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    {isPending && (
+                      <>
+                        <Button size="sm" className="h-8 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-lg shadow-sm" onClick={() => updateStatus(p.id, 'مكتمل')}>
+                          <CheckCircle2 className="w-3.5 h-3.5 ml-0.5" /> قبول
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 px-2 border-rose-500/40 text-rose-500 hover:bg-rose-500/10 text-[11px] rounded-lg" onClick={() => openRejectDialog(p)}>
+                          <XCircle className="w-3.5 h-3.5 ml-0.5" /> رفض
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )
         })}
-        {!filtered.length && <div className="text-center py-8 text-muted-foreground">{search ? 'لا توجد نتائج' : 'لا توجد مدفوعات'}</div>}
       </div>
 
-      {/* Payment detail modal with proof image */}
+      {/* ⚡ Magical empty state */}
+      {!filtered.length && (
+        <div className="text-center py-16">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              {search ? <Search className="w-10 h-10 text-gold" /> : <Inbox className="w-10 h-10 text-gold" />}
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">{search ? 'لا توجد نتائج مطابقة' : 'لا توجد مدفوعات بعد'}</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            {search ? 'جرّب تعديل البحث أو الفلتر ✨' : 'ستظهر طلبات الدفع الجديدة هنا فور إرسالها ✨'}
+          </p>
+        </div>
+      )}
+
+      {/* === Payment detail modal — magical === */}
       {selectedPayment && (
         <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedPayment(null) }}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>تفاصيل المعاملة</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
+          <DialogContent className="sm:max-w-lg p-0 overflow-hidden" showCloseButton={!rejecting}>
+            {/* Navy gradient header */}
+            <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-6 pt-6 pb-5 text-center overflow-hidden">
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+                backgroundSize: '24px 24px, 18px 18px'
+              }} />
+              <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+              <div className="relative w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center mb-3 shadow-md border border-white/30">
+                <CreditCard className="w-7 h-7 text-navy" />
+              </div>
+              <h2 className="relative text-lg font-bold text-white leading-tight">تفاصيل المعاملة</h2>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
               {(() => {
                 const couponCode = getCouponCode(selectedPayment)
                 const currency = getCurrency(selectedPayment)
                 const hasCoupon = !!couponCode
                 return (
-                  <div className={`p-4 rounded-lg flex items-center justify-between ${hasCoupon ? 'bg-red-50 border-2 border-red-500' : 'bg-gold/10 border border-gold/30'}`}>
-                    <span className={`text-sm font-semibold ${hasCoupon ? 'text-red-700' : 'text-navy'}`}>
+                  <div className={`relative p-4 rounded-xl flex items-center justify-between overflow-hidden ${hasCoupon ? 'bg-gradient-to-br from-rose-50 to-rose-50/30 border-2 border-rose-500' : 'bg-gradient-to-br from-gold/10 to-gold/5 border border-gold/30'}`}>
+                    <div className="absolute -top-3 -right-3 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+                    <span className={`relative text-sm font-semibold ${hasCoupon ? 'text-rose-700' : 'text-navy'}`}>
                       {hasCoupon ? '⚠ المبلغ بعد الخصم:' : 'المبلغ:'}
                     </span>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`text-xl font-extrabold ${hasCoupon ? 'text-red-600' : 'text-gold'}`} dir="ltr">
+                    <div className="relative flex flex-col items-end gap-1">
+                      <span className={`text-xl font-extrabold ${hasCoupon ? 'text-rose-600' : 'text-gold'}`} dir="ltr">
                         {selectedPayment.amount?.toLocaleString()} {currency}
                       </span>
                       {hasCoupon && (
-                        <span className="text-[11px] text-red-600 font-mono" dir="ltr">🎟️ {couponCode}</span>
+                        <span className="text-[11px] text-rose-600 font-mono" dir="ltr">🎟️ {couponCode}</span>
                       )}
                     </div>
                   </div>
                 )
               })()}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">طريقة الدفع</div><div className="text-sm font-medium">{selectedPayment.method || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">التاريخ</div><div className="text-sm font-medium" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">رقم المعاملة</div><div className="text-sm font-medium font-mono" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div></div>
-                <div className="bg-muted/30 p-3 rounded-lg"><div className="text-xs text-muted-foreground">الحالة</div>
-                  <Badge className={
-                    selectedPayment.status === 'مكتمل' ? 'bg-green-500/15 text-green-600 border-green-500/30'
-                    : selectedPayment.status === 'ملغي' ? 'bg-red-500/15 text-red-600 border-red-500/30'
-                    : 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                  }>{selectedPayment.status}</Badge>
+                <div className="relative p-3 rounded-xl bg-muted/30 overflow-hidden">
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gold/10 rounded-full blur-lg" />
+                  <div className="relative text-xs text-muted-foreground mb-0.5">طريقة الدفع</div>
+                  <div className="relative text-sm font-bold text-navy">{selectedPayment.method || '-'}</div>
+                </div>
+                <div className="relative p-3 rounded-xl bg-muted/30 overflow-hidden">
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gold/10 rounded-full blur-lg" />
+                  <div className="relative text-xs text-muted-foreground mb-0.5">التاريخ</div>
+                  <div className="relative text-sm font-bold text-navy" dir="ltr">{selectedPayment.date ? new Date(selectedPayment.date).toLocaleDateString('ar-EG') : '-'}</div>
+                </div>
+                <div className="relative p-3 rounded-xl bg-muted/30 overflow-hidden">
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gold/10 rounded-full blur-lg" />
+                  <div className="relative text-xs text-muted-foreground mb-0.5">رقم المعاملة</div>
+                  <div className="relative text-sm font-bold font-mono text-navy" dir="ltr">{cleanReference(selectedPayment.reference) || '-'}</div>
+                </div>
+                <div className="relative p-3 rounded-xl bg-muted/30 overflow-hidden">
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gold/10 rounded-full blur-lg" />
+                  <div className="relative text-xs text-muted-foreground mb-0.5">الحالة</div>
+                  <Badge className={`relative ${selectedPayment.status === 'مكتمل' ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : selectedPayment.status === 'ملغي' ? 'bg-rose-500/15 text-rose-600 border-rose-500/30' : 'bg-amber-500/15 text-amber-600 border-amber-500/30'}`}>{selectedPayment.status}</Badge>
                 </div>
               </div>
               {(() => {
                 const course = getCourse(selectedPayment.course_id)
                 return course ? (
-                  <div className="bg-muted/30 p-3 rounded-lg">
-                    <div className="text-xs text-muted-foreground">الدورة</div>
-                    <div className="text-sm font-medium text-navy">{course.title}</div>
-                    <div className="text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
+                  <div className="relative p-3 rounded-xl bg-muted/30 overflow-hidden">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gold/10 rounded-full blur-lg" />
+                    <div className="relative text-xs text-muted-foreground mb-0.5">الدورة</div>
+                    <div className="relative text-sm font-bold text-navy">{course.title}</div>
+                    <div className="relative text-xs text-muted-foreground">{course.price_type === 'مجانية' || course.price === 0 ? 'مجانية' : `${course.price?.toLocaleString()} ${course.currency || 'ر.ي'}`}</div>
                   </div>
                 ) : null
               })()}
@@ -1758,9 +1888,11 @@ function AdminPayments() {
                 const proofUrl = extractProofUrl(selectedPayment.reference)
                 return proofUrl ? (
                   <div>
-                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">📎 إثبات الدفع</div>
-                    <div className="rounded-lg overflow-hidden border-2 border-gold/30">
-                      <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain rounded-lg mx-auto" />
+                    <div className="text-sm font-bold text-navy mb-2 flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4 text-gold" /> إثبات الدفع
+                    </div>
+                    <div className="rounded-xl overflow-hidden border-2 border-gold/30 shadow-md">
+                      <img src={proofUrl} alt="إثبات الدفع" className="max-w-full max-h-64 object-contain mx-auto" />
                     </div>
                   </div>
                 ) : (
@@ -1770,18 +1902,18 @@ function AdminPayments() {
 
               {selectedPayment.status === 'قيد الانتظار' && (
                 <div className="flex gap-2 pt-2">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
+                  <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
                     <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
                   </Button>
-                  <Button variant="outline" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => openRejectDialog(selectedPayment)} disabled={rejecting}>
+                  <Button variant="outline" className="flex-1 border-rose-500/40 text-rose-500 hover:bg-rose-500/10 rounded-xl" onClick={() => openRejectDialog(selectedPayment)} disabled={rejecting}>
                     <XCircle className="w-4 h-4 ml-1" /> رفض الدفع
                   </Button>
                 </div>
               )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedPayment(null)}>إغلاق</Button>
-            </DialogFooter>
+            <div className="px-6 pb-6 flex justify-end">
+              <Button variant="outline" onClick={() => setSelectedPayment(null)} className="rounded-xl">إغلاق</Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -1789,12 +1921,17 @@ function AdminPayments() {
       {/* === REJECTION DIALOG — Professional design matching ConfirmDialog === */}
       <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) closeRejectDialog() }}>
         <DialogContent className="sm:max-w-md p-0 overflow-hidden" showCloseButton={!rejecting}>
-          {/* === Red gradient header === */}
-          <div className="bg-gradient-to-br from-red-500 to-red-600 px-6 pt-6 pb-5 text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3">
+          {/* === Red gradient header with magical dot pattern === */}
+          <div className="relative bg-gradient-to-br from-red-500 to-red-600 px-6 pt-6 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 1.5px), radial-gradient(circle at 80% 70%, #fecaca 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px'
+            }} />
+            <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/15 rounded-full blur-2xl" />
+            <div className="relative w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3 border border-white/30">
               <AlertTriangle className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-lg font-bold text-white leading-tight">
+            <h2 className="relative text-lg font-bold text-white leading-tight">
               تأكيد رفض المعاملة
             </h2>
           </div>
@@ -4116,30 +4253,42 @@ const DZ_SECTION_LABELS: Record<string, string> = {
     <>
     <SectionCard title="الحساب والأمان" description="تغيير البريد الإلكتروني وكلمة المرور للمؤسس">
       <div className="space-y-5 max-w-2xl">
-        {/* Current account info */}
-        <div className="bg-muted/30 p-4 rounded-lg border border-border">
-          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
-              {user?.name?.charAt(0)}
-            </div>
-            <div>
-              <div className="font-bold text-navy">{user?.name}</div>
-              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
-            </div>
+        {/* ⚡ Magical account header */}
+        <div className="relative flex items-center gap-3 p-4 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
+          <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-navy font-bold text-xl border border-white/30 shadow-md">
+            {user?.name?.charAt(0)}
+          </div>
+          <div className="relative min-w-0">
+            <div className="font-bold text-white">{user?.name}</div>
+            <div className="text-xs text-gold/80" dir="ltr">{user?.email}</div>
           </div>
         </div>
 
-        {/* Security verification */}
-        <div>
-          <Label className="text-navy font-semibold">كلمة المرور الحالية *</Label>
-          <div className="relative mt-1">
+        {/* ⚡ Magical security verification card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Lock className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">التحقق الأمني</div>
+          </div>
+          <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+            <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور الحالية <span className="text-red-500">*</span>
+          </Label>
+          <div className="relative">
             <Input
               type={showCurrent ? 'text' : 'password'}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
               dir="ltr"
+              className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
             />
             <button
               type="button"
@@ -4152,40 +4301,51 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
         </div>
 
-        {/* New email */}
-        <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
-            <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
-          </h3>
-          <div>
-            <Label>البريد الجديد</Label>
-            <Input
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder={user?.email || 'example@fia.edu'}
-              dir="ltr"
-              className="mt-1"
-            />
-            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+        {/* ⚡ Magical change email card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Mail className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">تغيير البريد الإلكتروني</div>
           </div>
+          <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+            <Mail className="w-3.5 h-3.5 text-gold" /> البريد الجديد
+          </Label>
+          <Input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder={user?.email || 'example@fia.edu'}
+            dir="ltr"
+            className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+          />
+          <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
         </div>
 
-        {/* New password */}
-        <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
-            <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
-          </h3>
+        {/* ⚡ Magical change password card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <KeyRound className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">تغيير كلمة المرور</div>
+          </div>
           <div className="space-y-3">
             <div>
-              <Label>كلمة المرور الجديدة</Label>
-              <div className="relative mt-1">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور الجديدة
+              </Label>
+              <div className="relative">
                 <Input
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
                   dir="ltr"
+                  className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
                 <button
                   type="button"
@@ -4197,17 +4357,21 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               </div>
             </div>
             <div>
-              <Label>تأكيد كلمة المرور</Label>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-gold" /> تأكيد كلمة المرور
+              </Label>
               <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 dir="ltr"
-                className="mt-1"
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
               />
               {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">كلمتا المرور غير متطابقتين</p>
+                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                  <XCircle className="w-3 h-3" /> كلمتا المرور غير متطابقتين
+                </p>
               )}
               {newPassword && confirmPassword && newPassword === confirmPassword && (
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
@@ -4219,16 +4383,26 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           </div>
         </div>
 
-        <Button onClick={save} disabled={loading || !currentPassword} className="bg-navy hover:bg-navy-light">
-          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+        <Button
+          onClick={save}
+          disabled={loading || !currentPassword}
+          className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
+        >
+          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
         </Button>
       </div>
     </SectionCard>
 
-    {/* ===== Danger Zone ===== */}
-    <div className="mt-6 rounded-xl border-2 border-red-500/40 bg-red-500/5 overflow-hidden max-w-2xl">
+    {/* ===== Danger Zone — magical ===== */}
+    <div className="mt-6 rounded-2xl border-2 border-red-500/40 bg-red-500/5 overflow-hidden max-w-2xl relative">
+      {/* Magical dot pattern overlay */}
+      <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 20% 30%, #ef4444 1.5px, transparent 1.5px), radial-gradient(circle at 80% 70%, #f87171 1px, transparent 1px)',
+        backgroundSize: '24px 24px, 18px 18px'
+      }} />
+      <div className="absolute -top-8 -right-8 w-32 h-32 bg-red-500/15 rounded-full blur-2xl pointer-events-none" />
       {/* Header bar */}
-      <div className="flex items-center gap-3 p-4 bg-red-500/10 border-b border-red-500/30">
+      <div className="relative flex items-center gap-3 p-4 bg-red-500/10 border-b border-red-500/30">
         <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
           <AlertTriangle className="w-5 h-5 text-red-600" />
         </div>
@@ -4239,7 +4413,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
       </div>
 
       {/* Body */}
-      <div className="p-4 space-y-4">
+      <div className="relative p-4 space-y-4">
         <p className="text-sm text-navy">
           سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
         </p>
@@ -4249,7 +4423,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         <Button
           variant="outline"
           onClick={() => setDzOpen(true)}
-          className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700"
+          className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700 rounded-xl"
         >
           <Trash2 className="w-4 h-4 ml-1" /> حذف جميع البيانات
         </Button>
@@ -4270,7 +4444,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               value={dzSection}
               onChange={(e) => setDzSection(e.target.value)}
               disabled={dzSectionLoading}
-              className="flex-1 h-10 px-3 text-sm border border-red-500/30 rounded-md bg-white"
+              className="flex-1 h-10 px-3 text-sm border border-red-500/30 rounded-xl bg-white focus:border-red-500 focus:ring-red-500/20 outline-none"
             >
               <option value="">— اختر القسم —</option>
               <option value="courses">📚 الدورات (وكافة تبعاتها)</option>
@@ -4291,7 +4465,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
               variant="outline"
               disabled={!dzSection || dzSectionLoading}
               onClick={() => setDzSectionOpen(true)}
-              className="border-red-500/40 text-red-600 hover:bg-red-500/10"
+              className="border-red-500/40 text-red-600 hover:bg-red-500/10 rounded-xl"
             >
               {dzSectionLoading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Trash2 className="w-4 h-4 ml-1" />}
               حذف القسم
@@ -4329,7 +4503,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
                   setOrphanPreviewLoading(false)
                 }
               }}
-              className="border-orange-500/40 text-orange-600 hover:bg-orange-500/10"
+              className="border-orange-500/40 text-orange-600 hover:bg-orange-500/10 rounded-xl"
             >
               <Brush className="w-4 h-4 ml-1" /> معاينة وتنظيف اليتامى
             </Button>
@@ -4492,12 +4666,17 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Top: red gradient with icon */}
-          <div className="bg-gradient-to-br from-red-500 to-red-600 p-6 text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-2">
+          {/* Top: red gradient with icon + magical dot pattern */}
+          <div className="relative bg-gradient-to-br from-red-500 to-red-600 p-6 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 1.5px), radial-gradient(circle at 80% 70%, #fecaca 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px'
+            }} />
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/15 rounded-full blur-2xl" />
+            <div className="relative w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-2 border border-white/30">
               <AlertTriangle className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-white text-lg font-bold">حذف جميع البيانات</h3>
+            <h3 className="relative text-white text-lg font-bold">حذف جميع البيانات</h3>
           </div>
 
           {/* Body */}
