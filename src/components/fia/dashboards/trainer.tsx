@@ -6,6 +6,7 @@ import {
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
   GraduationCap, Crown, Calendar, Clock,
+  Phone, Briefcase, Sparkles, Award, KeyRound, Save,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -1154,69 +1155,135 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
   return (
     <SectionCard title="الملف الشخصي" description="إدارة معلوماتك — كل التعديلات تُحفظ مباشرة في قاعدة البيانات وتظهر فوراً في حساب الإدارة والصفحة الرئيسية">
       <div className="space-y-6 max-w-3xl">
-        <div className="flex flex-col items-center gap-4 p-6 bg-gradient-to-br from-navy/5 to-gold/5 rounded-xl border border-gold/20">
-          <AvatarUploader
-            userId={user.id}
-            role="trainer"
-            initialUrl={profile.avatar || user?.avatar}
-            name={profile.name}
-            size="xl"
-            onUploaded={handleAvatarUploaded}
-          />
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">صورة المدرب الرسمية — تظهر في حساب الإدارة والصفحة الرئيسية</p>
+        {/* ⚡ Magical avatar section with gold gradient + dot pattern */}
+        <div className="relative flex flex-col items-center gap-4 p-6 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy via-navy-light to-navy overflow-hidden">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
+          <div className="relative">
+            <AvatarUploader
+              userId={user.id}
+              role="trainer"
+              initialUrl={profile.avatar || user?.avatar}
+              name={profile.name}
+              size="xl"
+              onUploaded={handleAvatarUploaded}
+            />
+          </div>
+          <div className="relative text-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/15 border border-gold/30 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-gold" />
+              <span className="text-[11px] font-bold text-gold">صورة المدرب الرسمية</span>
+            </div>
+            <p className="text-xs text-white/70 max-w-xs">تظهر في حساب الإدارة والصفحة الرئيسية</p>
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <Label>الاسم الكامل</Label>
-            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="mt-1" />
+        {/* ⚡ Magical form fields card */}
+        <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-16 h-16 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                <User className="w-4 h-4 text-gold" />
+              </div>
+              <h3 className="font-bold text-navy text-sm">المعلومات الأساسية</h3>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <User className="w-3.5 h-3.5 text-gold" /> الاسم الكامل
+                </Label>
+                <Input
+                  value={profile.name}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
+                </Label>
+                <Input
+                  value={profile.specialization}
+                  onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Mail className="w-3.5 h-3.5 text-gold" /> البريد الإلكتروني
+                </Label>
+                <Input
+                  value={user?.email || ''}
+                  disabled
+                  dir="ltr"
+                  className="rounded-xl border-gold/20 bg-muted/40"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                  <Phone className="w-3.5 h-3.5 text-gold" /> الهاتف
+                </Label>
+                <Input
+                  value={profile.phone}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                  dir="ltr"
+                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Award className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
+              </Label>
+              <Input
+                value={profile.title}
+                onChange={(e) => setProfile({ ...profile, title: e.target.value })}
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+              />
+            </div>
           </div>
-          <div>
-            <Label>التخصص</Label>
-            <Input value={profile.specialization} onChange={(e) => setProfile({ ...profile, specialization: e.target.value })} className="mt-1" />
-          </div>
-          <div>
-            <Label>البريد الإلكتروني</Label>
-            <Input value={user?.email || ''} disabled dir="ltr" className="mt-1" />
-          </div>
-          <div>
-            <Label>الهاتف</Label>
-            <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="mt-1" />
-          </div>
-        </div>
-        <div>
-          <Label>المسمى الوظيفي</Label>
-          <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="mt-1" />
         </div>
 
-        {/* Unified professional bio — same field as admin's TrainerDialog */}
-        <div className="border-t border-border pt-4">
-          <div className="flex items-center justify-between mb-1">
-            <Label className="font-bold text-navy">النبذة التعريفية الكاملة</Label>
-            <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
-          </div>
-          <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-            اكتب نبذة واحدة متكاملة واحترافية عن نفسك — تظهر بنفس الصيغة في حساب الإدارة وفي الصفحة الرئيسية عند الضغط على بطاقتك.
-            <br />
-            <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
-          </p>
-          <Textarea
-            value={profile.bio || ''}
-            onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-            rows={12}
-            className="mt-1 min-h-[260px] leading-relaxed focus:ring-gold/40 focus:border-gold/40"
-            placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
-          />
-          <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
-            <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
-            <span>{(profile.bio || '').length} حرف</span>
+        {/* ⚡ Magical bio card */}
+        <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-16 h-16 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1">
+              <Label className="font-bold text-navy text-sm flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-gold" /> النبذة التعريفية الكاملة
+              </Label>
+              <Badge variant="outline" className="text-[10px] bg-gold/10 text-gold border-gold/30">احترافي</Badge>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+              اكتب نبذة واحدة متكاملة واحترافية عن نفسك — تظهر بنفس الصيغة في حساب الإدارة وفي الصفحة الرئيسية عند الضغط على بطاقتك.
+              <br />
+              <span className="text-navy/70">يُنصح بتقسيم النص على شكل فقرات مفصولة بسطر فارغ: مقدمة شخصية، المؤهلات العلمية، الإنجازات والمساهمات.</span>
+            </p>
+            <Textarea
+              value={profile.bio || ''}
+              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              rows={12}
+              className="min-h-[260px] leading-relaxed rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+              placeholder={"مثال احترافي:\n\nمدرب ومحاضر دولي وخبير في التعليم الطبي، حاصل على شهادة الدكتوراه في الموارد البشرية والتخطيط الاستراتيجي. يمتلك خبرة تتجاوز 15 عاماً في تدريب الكوادر الصحية على المستوى المحلي والدولي.\n\n🎓 المؤهلات العلمية\n• بكالوريوس آداب وعلوم إنسانية\n• ماستر حقوق وعلوم سياسية\n• دكتوراه في الموارد البشرية والتخطيط الاستراتيجي\n\n🏆 الإنجازات\n• مشارك في عدة مؤتمرات دولية متخصصة\n• مؤلف لـ 6 كتب في طبعات دولية\n• مدرب معتمد من عدة هيئات صحية"}
+            />
+            <div className="flex items-center justify-between mt-2 text-[10px] text-muted-foreground">
+              <span>💡 استخدم الأسطر الفارغة لفصل الفقرات</span>
+              <span>{(profile.bio || '').length} حرف</span>
+            </div>
           </div>
         </div>
 
-        <Button onClick={save} disabled={loading} className="bg-navy hover:bg-navy-light">
-          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
+        <Button
+          onClick={save}
+          disabled={loading}
+          className="w-full sm:w-auto bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
+        >
+          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : <><Save className="w-4 h-4 ml-1" /> حفظ التغييرات</>}
         </Button>
       </div>
     </SectionCard>
@@ -1293,30 +1360,42 @@ function TrainerAccountSettings({ user, updateUser, logout }: any) {
   return (
     <SectionCard title="الحساب والأمان" description="تغيير البريد الإلكتروني وكلمة المرور">
       <div className="space-y-5 max-w-2xl">
-        {/* Current account info */}
-        <div className="bg-muted/30 p-4 rounded-lg border border-border">
-          <div className="text-xs text-muted-foreground mb-1">الحساب الحالي:</div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-navy flex items-center justify-center text-gold font-bold text-xl border-2 border-gold/30">
-              {user?.name?.charAt(0)}
-            </div>
-            <div>
-              <div className="font-bold text-navy">{user?.name}</div>
-              <div className="text-xs text-muted-foreground" dir="ltr">{user?.email}</div>
-            </div>
+        {/* ⚡ Magical account header */}
+        <div className="relative flex items-center gap-3 p-4 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
+          <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-navy font-bold text-xl border border-white/30 shadow-md">
+            {user?.name?.charAt(0)}
+          </div>
+          <div className="relative min-w-0">
+            <div className="font-bold text-white">{user?.name}</div>
+            <div className="text-xs text-gold/80" dir="ltr">{user?.email}</div>
           </div>
         </div>
 
-        {/* Security verification */}
-        <div>
-          <Label className="text-navy font-semibold">كلمة المرور الحالية *</Label>
-          <div className="relative mt-1">
+        {/* ⚡ Magical security verification card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Lock className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">التحقق الأمني</div>
+          </div>
+          <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+            <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور الحالية <span className="text-red-500">*</span>
+          </Label>
+          <div className="relative">
             <Input
               type={showCurrent ? 'text' : 'password'}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
               dir="ltr"
+              className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
             />
             <button
               type="button"
@@ -1329,40 +1408,51 @@ function TrainerAccountSettings({ user, updateUser, logout }: any) {
           <p className="text-xs text-muted-foreground mt-1">مطلوبة للتأكد من صلاحية التغيير</p>
         </div>
 
-        {/* New email */}
-        <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
-            <Mail className="w-4 h-4 text-gold" /> تغيير البريد الإلكتروني
-          </h3>
-          <div>
-            <Label>البريد الجديد</Label>
-            <Input
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder={user?.email || 'example@fia.edu'}
-              dir="ltr"
-              className="mt-1"
-            />
-            <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
+        {/* ⚡ Magical change email card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Mail className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">تغيير البريد الإلكتروني</div>
           </div>
+          <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+            <Mail className="w-3.5 h-3.5 text-gold" /> البريد الجديد
+          </Label>
+          <Input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder={user?.email || 'example@fia.edu'}
+            dir="ltr"
+            className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+          />
+          <p className="text-xs text-muted-foreground mt-1">اتركه فارغاً إذا لم ترد تغيير البريد</p>
         </div>
 
-        {/* New password */}
-        <div className="border-t border-border pt-4">
-          <h3 className="font-bold text-navy text-sm mb-3 flex items-center gap-2">
-            <Lock className="w-4 h-4 text-gold" /> تغيير كلمة المرور
-          </h3>
+        {/* ⚡ Magical change password card */}
+        <div className="relative p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <KeyRound className="w-4 h-4 text-gold" />
+            </div>
+            <div className="font-semibold text-navy text-sm">تغيير كلمة المرور</div>
+          </div>
           <div className="space-y-3">
             <div>
-              <Label>كلمة المرور الجديدة</Label>
-              <div className="relative mt-1">
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <Lock className="w-3.5 h-3.5 text-gold" /> كلمة المرور الجديدة
+              </Label>
+              <div className="relative">
                 <Input
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
                   dir="ltr"
+                  className="pr-3 pl-9 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 />
                 <button
                   type="button"
@@ -1374,17 +1464,21 @@ function TrainerAccountSettings({ user, updateUser, logout }: any) {
               </div>
             </div>
             <div>
-              <Label>تأكيد كلمة المرور</Label>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-gold" /> تأكيد كلمة المرور
+              </Label>
               <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 dir="ltr"
-                className="mt-1"
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
               />
               {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">كلمتا المرور غير متطابقتين</p>
+                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                  <X className="w-3 h-3" /> كلمتا المرور غير متطابقتين
+                </p>
               )}
               {newPassword && confirmPassword && newPassword === confirmPassword && (
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
@@ -1396,8 +1490,12 @@ function TrainerAccountSettings({ user, updateUser, logout }: any) {
           </div>
         </div>
 
-        <Button onClick={save} disabled={loading || !currentPassword} className="bg-navy hover:bg-navy-light">
-          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : 'حفظ التغييرات'}
+        <Button
+          onClick={save}
+          disabled={loading || !currentPassword}
+          className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all"
+        >
+          {loading ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : <><Save className="w-4 h-4 ml-1" /> حفظ التغييرات</>}
         </Button>
       </div>
     </SectionCard>
@@ -1498,65 +1596,83 @@ function TrainerNotifs({ courses }: { courses: any[] }) {
       description="آخر التسجيلات في دوراتك التدريبية"
     >
       {loading ? (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
-          <p className="text-muted-foreground text-sm">جاري تحميل الإشعارات...</p>
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <Loader2 className="w-8 h-8 text-navy animate-spin" />
+          <p className="text-sm text-muted-foreground">جاري تحميل الإشعارات...</p>
         </div>
       ) : notifs.length === 0 ? (
-        <div className="text-center py-12">
-          <Bell className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">لا توجد إشعارات</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            ستظهر هنا إشعارات التسجيل الجديدة في دوراتك
+        <div className="text-center py-16">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Bell className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد إشعارات</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            ستظهر هنا إشعارات التسجيل الجديدة في دوراتك ✨
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {notifs.map((n) => (
-            <div
-              key={n.id}
-              className="p-4 bg-gold/5 border border-gold/20 rounded-lg flex items-start gap-3"
-            >
-              <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center text-gold font-bold flex-shrink-0 border border-gold/30 overflow-hidden">
-                {n.studentAvatar ? (
-                  <img src={n.studentAvatar} alt={n.studentName} className="w-full h-full object-cover" />
-                ) : (
-                  <UserPlus className="w-5 h-5" />
-                )}
+        <div className="space-y-3 fia-stagger">
+          {notifs.map((n) => {
+            const stateGradient = n.isFree
+              ? 'from-emerald-500 to-teal-600'
+              : 'from-gold to-amber-500'
+            return (
+              <div
+                key={n.id}
+                className="relative overflow-hidden rounded-2xl bg-white border border-gray-200/60 hover:shadow-lg transition-all fia-card-hover"
+              >
+                {/* Top state-aware gradient strip */}
+                <div className={`h-1.5 bg-gradient-to-r ${stateGradient}`} />
+                <div className="p-4 flex items-start gap-3">
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute inset-0 bg-gold/15 rounded-full blur-md" />
+                    <div className="relative w-10 h-10 rounded-full bg-navy flex items-center justify-center text-gold font-bold border border-gold/30 overflow-hidden">
+                      {n.studentAvatar ? (
+                        <img src={n.studentAvatar} alt={n.studentName} className="w-full h-full object-cover" />
+                      ) : (
+                        <UserPlus className="w-5 h-5" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-navy text-sm flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      متدرب جديد في دورتك
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium text-navy">{n.studentName}</span>
+                      {' '}انضم إلى{' '}
+                      <span className="font-medium text-navy">{n.courseTitle}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <Badge
+                        className={
+                          n.isFree
+                            ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs'
+                            : 'bg-gold/15 text-gold border-gold/30 text-xs'
+                        }
+                      >
+                        {n.isFree ? 'مجانية' : `${(n.amountPaid || 0).toLocaleString()} ${n.currency || 'ر.ي'}`}
+                      </Badge>
+                      {n.paymentStatus === 'pending' && (
+                        <Badge variant="outline" className="border-amber-500/30 text-amber-600 text-xs">
+                          <Clock className="w-3 h-3 ml-0.5" /> بانتظار الدفع
+                        </Badge>
+                      )}
+                      {n.enrolledAt && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(n.enrolledAt)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-navy text-sm">
-                  متدرب جديد في دورتك
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  <span className="font-medium text-navy">{n.studentName}</span>
-                  {' '}انضم إلى{' '}
-                  <span className="font-medium text-navy">{n.courseTitle}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <Badge
-                    className={
-                      n.isFree
-                        ? 'bg-green-500/15 text-green-600 border-green-500/30 text-xs'
-                        : 'bg-gold/15 text-gold border-gold/30 text-xs'
-                    }
-                  >
-                    {n.isFree ? 'مجانية' : `${(n.amountPaid || 0).toLocaleString()} ${n.currency || 'ر.ي'}`}
-                  </Badge>
-                  {n.paymentStatus === 'pending' && (
-                    <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 text-xs">
-                      بانتظار الدفع
-                    </Badge>
-                  )}
-                  {n.enrolledAt && (
-                    <span className="text-xs text-muted-foreground">
-                      {formatRelativeTime(n.enrolledAt)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </SectionCard>
@@ -1567,7 +1683,22 @@ function TrainerSettings() {
   return (
     <SectionCard title="الإعدادات" description="إعدادات حسابك">
       <div className="space-y-6 max-w-2xl">
-        <Button variant="outline">تغيير كلمة المرور</Button>
+        {/* ⚡ Magical placeholder settings card */}
+        <div className="relative p-5 rounded-2xl border border-gold/30 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -right-4 w-16 h-16 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+              <Lock className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <div className="font-bold text-navy text-sm">الأمان والخصوصية</div>
+              <div className="text-xs text-muted-foreground">إدارة بيانات الدخول وكلمة المرور من قسم الحساب والأمان</div>
+            </div>
+          </div>
+          <Button variant="outline" className="rounded-xl border-gold/30 text-navy hover:bg-gold/10">
+            <KeyRound className="w-4 h-4 ml-1" /> تغيير كلمة المرور
+          </Button>
+        </div>
       </div>
     </SectionCard>
   )

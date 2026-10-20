@@ -2445,35 +2445,62 @@ function Notifications({ userId, enrollments, courses }: any) {
         </div>
       ) : notifs.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
-            <Bell className="w-10 h-10 text-muted-foreground/50" />
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Bell className="w-10 h-10 text-gold" />
+            </div>
           </div>
-          <p className="text-base font-semibold text-navy mb-1">لا توجد إشعارات</p>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد إشعارات</h3>
           <p className="text-xs text-muted-foreground max-w-md mx-auto">
-            ستظهر هنا تنبيهات عند تأكيد تسجيلك في الدورات أو عند إضافة دروس جديدة.
+            ستظهر هنا تنبيهات عند تأكيد تسجيلك في الدورات أو عند إضافة دروس جديدة ✨
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 fia-stagger">
           {notifs.map((n) => {
             const Icon = n.icon
+            // Determine state-aware gradient based on icon color
+            const isSuccess = n.iconBg?.includes('green')
+            const isGold = n.iconBg?.includes('gold')
+            const isBlue = n.iconBg?.includes('blue')
+            const isPurple = n.iconBg?.includes('purple')
+            const stateGradient = isGold
+              ? 'from-gold to-amber-500'
+              : isSuccess
+                ? 'from-emerald-500 to-teal-600'
+                : isPurple
+                  ? 'from-purple-500 to-indigo-600'
+                  : isBlue
+                    ? 'from-blue-500 to-indigo-600'
+                    : 'from-amber-500 to-orange-600'
             return (
               <div
                 key={n.id}
-                className="p-4 rounded-lg border border-border bg-gold/5 flex items-start gap-3"
+                className="relative overflow-hidden rounded-2xl bg-white border border-gray-200/60 hover:shadow-lg transition-all fia-card-hover"
               >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${n.iconBg}`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-navy text-sm">{n.title}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
-                </div>
-                {n.time && (
-                  <div className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap" dir="rtl">
-                    {n.time}
+                {/* Top state-aware gradient strip */}
+                <div className={`h-1.5 bg-gradient-to-r ${stateGradient}`} />
+                <div className="p-4 flex items-start gap-3">
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute inset-0 bg-gold/15 rounded-xl blur-md" />
+                    <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${n.iconBg} border border-gold/20`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
                   </div>
-                )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-navy text-sm flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      {n.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">{n.desc}</div>
+                  </div>
+                  {n.time && (
+                    <div className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap" dir="rtl">
+                      {n.time}
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}

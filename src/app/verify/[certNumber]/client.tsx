@@ -16,16 +16,21 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
 
   if (!certificate) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-red-50 px-4" dir="rtl">
-        <Card className="p-10 text-center max-w-md border-red-500/30 shadow-xl">
-          <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-4">
-            <XCircle className="w-12 h-12 text-red-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-white to-rose-50 px-4" dir="rtl">
+        <Card className="relative p-10 text-center max-w-md border-rose-500/40 shadow-xl overflow-hidden">
+          <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-rose-500 via-red-400 to-rose-500 opacity-70" />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-rose-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-rose-500/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center shadow-xl border border-white/30">
+              <XCircle className="w-10 h-10 text-white" />
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-navy mb-2">الشهادة غير موجودة</h1>
-          <p className="text-sm text-muted-foreground mb-6">
+          <h1 className="relative text-2xl font-bold text-navy mb-2">الشهادة غير موجودة</h1>
+          <p className="relative text-sm text-muted-foreground mb-6">
             لم نتمكن من العثور على شهادة بهذا الرقم. تأكد من صحة الرقم أو تواصل مع الإدارة.
           </p>
-          <a href="/" className="inline-block bg-navy text-white px-6 py-3 rounded-lg font-bold text-sm">العودة للرئيسية</a>
+          <a href="/" className="relative inline-block bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-6 py-3 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all">العودة للرئيسية</a>
         </Card>
       </div>
     )
@@ -80,15 +85,20 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy/5 via-white to-gold/5 py-12 px-4" dir="rtl">
       <div className="max-w-5xl mx-auto">
-        {/* Status banner */}
-        <div className={`text-center mb-8 ${isVerified ? 'text-green-600' : 'text-red-600'}`}>
-          <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-3 ${isVerified ? 'bg-green-100' : 'bg-red-100'} shadow-md`}>
-            {isVerified ? <CheckCircle2 className="w-12 h-12 text-green-600" /> : <XCircle className="w-12 h-12 text-red-500" />}
+        {/* ⚡ Magical state-aware status banner */}
+        <div className="relative text-center mb-8 overflow-hidden">
+          {/* State-aware gradient backdrop */}
+          <div className={`absolute inset-0 ${isVerified ? 'bg-emerald-500/5' : 'bg-rose-500/5'} blur-2xl pointer-events-none`} />
+          <div className={`relative inline-block mb-3`}>
+            <div className={`absolute inset-0 ${isVerified ? 'bg-emerald-500/20' : 'bg-rose-500/20'} rounded-full blur-2xl animate-pulse`} />
+            <div className={`relative w-20 h-20 mx-auto rounded-2xl ${isVerified ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-rose-500 to-red-600'} flex items-center justify-center shadow-xl border border-white/30`}>
+              {isVerified ? <CheckCircle2 className="w-12 h-12 text-white" /> : <XCircle className="w-12 h-12 text-white" />}
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-navy mb-1">
+          <h1 className={`relative text-2xl font-bold ${isVerified ? 'text-emerald-600' : 'text-rose-600'} mb-1`}>
             {isVerified ? '✓ شهادة معتمدة وموثقة' : '✗ شهادة ملغاة'}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="relative text-sm text-muted-foreground">
             تم التحقق من صحة هذه الشهادة في {new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -224,13 +234,13 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
           </Card>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons — magical */}
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
           {/* Download as image */}
           <button
             onClick={downloadAsImage}
             disabled={downloading}
-            className="inline-flex items-center gap-2 bg-navy hover:bg-navy-light text-white px-6 py-3 rounded-lg font-bold text-sm shadow-md transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.97] disabled:opacity-50"
           >
             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             {downloading ? 'جاري التنزيل...' : 'تنزيل الشهادة (صورة)'}
@@ -239,7 +249,7 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
           {/* Copy cert number */}
           <button
             onClick={copyCertNumber}
-            className="inline-flex items-center gap-2 border border-gold/30 text-gold hover:bg-gold/10 px-6 py-3 rounded-lg font-bold text-sm transition-all"
+            className="inline-flex items-center gap-2 border border-gold/30 text-gold hover:bg-gold/10 px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]"
           >
             <Copy className="w-4 h-4" /> نسخ رقم الشهادة
           </button>
@@ -247,7 +257,7 @@ export default function VerifyClient({ certificate }: { certificate: any }) {
           {/* Print */}
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 border border-navy/20 text-navy hover:bg-navy/5 px-6 py-3 rounded-lg font-bold text-sm transition-all"
+            className="inline-flex items-center gap-2 border border-navy/20 text-navy hover:bg-navy/5 px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]"
           >
             <FileText className="w-4 h-4" /> طباعة / PDF
           </button>
