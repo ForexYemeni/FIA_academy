@@ -163,7 +163,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً. (إذا تعذّر تحميل الفيديو، سيظهر زر "تخطّي الدرس" خلال 15 ثانية)'}
                 {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً (المحتوى القصير يُكمل خلال 3 ثوانٍ).'}
                 {lesson.lesson_type === 'pdf' && 'تصفّح الملف لمدة 15 ثانية ليُكتمل الدرس تلقائياً.'}
-                {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً. (إذا لم يوجد أسئلة، سيُكمل الدرس تلقائياً)'}
               </div>
             )}
             {/* Render the lesson based on type — each component fires
@@ -798,6 +798,29 @@ function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void 
 // ⚡ onComplete fires when the student submits the exam with a score
 // of at least 60% (the pass threshold). Failing the exam does NOT
 // complete the lesson — the student can retry until they pass.
+//
+// ⚡ EMPTY EXAM (no questions): Auto-complete the lesson after a 2s
+// delay. The student shouldn't be stuck on a lesson with no content
+// because the trainer hasn't added questions yet.
+
+// ⚡ Helper component: fires onComplete after 2 seconds. Rendered only
+// when the exam has no questions. Lives inside the ExamPreview's JSX
+// tree so it can access onComplete + firedRef without prop drilling.
+function EmptyExamAutoComplete({ onComplete, firedRef }: { onComplete?: () => void; firedRef: React.MutableRefObject<boolean> }) {
+  useEffect(() => {
+    if (!onComplete) return
+    const timer = setTimeout(() => {
+      if (!firedRef.current) {
+        firedRef.current = true
+        onComplete()
+      }
+    }, 2000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
+}
+
 function ExamPreview({ content, title, onComplete }: { content?: string; title: string; onComplete?: () => void }) {
   const [questions, setQuestions] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -828,7 +851,13 @@ function ExamPreview({ content, title, onComplete }: { content?: string; title: 
   }, [content])
 
   if (questions.length === 0) {
-    // ⚡ Magical empty state — purple theme (exam)
+    // ⚡ Empty exam — student-friendly message (NOT the trainer's
+    // "يمكن إضافة الأسئلة بصيغة JSON عند تعديل الدرس" hint that was
+    // confusing students). The student shouldn't be stuck on a lesson
+    // that has no questions because the trainer hasn't added any yet.
+    // We auto-complete the lesson after a short 2-second delay so the
+    // student sees the "no questions yet" message before being moved on
+    // to the next lesson automatically.
     return (
       <div className="relative text-center py-12 bg-gradient-to-br from-white to-purple-500/5 border border-purple-500/30 rounded-xl overflow-hidden">
         <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-purple-500 via-purple-400 to-purple-500 opacity-70" />
@@ -839,8 +868,10 @@ function ExamPreview({ content, title, onComplete }: { content?: string; title: 
             <HelpCircle className="w-8 h-8 text-white" />
           </div>
         </div>
-        <p className="relative text-navy font-medium mb-2">لا يوجد أسئلة في هذا الاختبار</p>
-        <p className="relative text-xs text-muted-foreground">يمكن إضافة الأسئلة بصيغة JSON عند تعديل الدرس</p>
+        <p className="relative text-navy font-medium mb-2">لا يوجد أسئلة في هذا الاختبار حالياً</p>
+        <p className="relative text-xs text-muted-foreground">سيتم اعتبار الدرس مكتمل تلقائياً والمتابعة للدرس التالي</p>
+        {/* ⚡ Auto-complete the empty exam after 2 seconds */}
+        <EmptyExamAutoComplete onComplete={onComplete} firedRef={firedRef} />
       </div>
     )
   }
