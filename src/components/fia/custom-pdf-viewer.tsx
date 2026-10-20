@@ -183,11 +183,31 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
 
   // ⚡ Measure the container width — used to compute the rendering
   // scale for each page (auto-fit to container width).
+  //
+  // ⚡ CRITICAL FIX: This effect MUST depend on `loading` (and `error`)
+  // because `containerRef.current` is null while loading is true
+  // (the container div only renders after loading becomes false).
+  // If we run this effect only on mount (empty deps), it returns early
+  // because containerRef is null, and never re-runs — leaving
+  // containerWidth=0 forever. With containerWidth=0:
+  //   - renderPage() returns early at `if (!containerWidth) return`
+  //   - the eager render effect returns early at `if (!containerWidth) return`
+  //   - all pages stay stuck on the loading spinner forever
+  //   - the IntersectionObserver fires `currentPage=numPages` (the last
+  //     page is technically "in view" because the empty container is
+  //     considered intersecting), triggering false auto-completion.
+  //
+  // Adding `loading` to deps means: when loading flips from true to
+  // false, the container div is rendered, this effect re-runs, and
+  // containerWidth is measured properly.
   useEffect(() => {
     if (!containerRef.current) return
     const measure = () => {
       if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth)
+        const w = containerRef.current.clientWidth
+        // eslint-disable-next-line no-console
+        console.log(`[CustomPdfViewer] containerWidth measured: ${w}px`)
+        setContainerWidth(w)
       }
     }
     measure()
@@ -198,7 +218,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [])
+  }, [loading, error])
 
   // ⚡ Render a single page to its canvas.
   // IMPORTANT: This function uses useCallback with only containerWidth as
@@ -296,6 +316,15 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
 
   // ⚡ IntersectionObserver: ONLY updates the page indicator as the
   // student scrolls (no re-rendering — all pages render eagerly above).
+  //
+  // ⚡ SAFETY: Auto-completion only fires if:
+  //   - The current page is the LAST page
+  //   - The student is actively scrolling (currentPage changed)
+  //   - AND the last page has actually been rendered to canvas
+  //     (renderedPages state contains the page number)
+  // This prevents false completion when the container is empty
+  // (e.g. while still loading) and the IntersectionObserver thinks
+  // the last page is "in view" because there are no real pages yet.
   useEffect(() => {
     if (!numPages || loading || error || !containerRef.current) return
 
@@ -307,14 +336,20 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
             if (pageNum > 0) {
               setCurrentPage((prev) => {
                 if (pageNum !== prev) {
-                  // ⚡ Auto-complete when reaching the LAST page
+                  // ⚡ Auto-complete ONLY when the LAST page is in view
+                  // AND it has actually been rendered (canvas content
+                  // exists). Without the render check, the empty
+                  // placeholder would falsely trigger completion.
                   if (pageNum === numPages && !firedRef.current && onComplete) {
-                    setTimeout(() => {
-                      if (!firedRef.current) {
-                        firedRef.current = true
-                        onComplete()
-                      }
-                    }, 1500)
+                    // Check if this page has been rendered
+                    if (renderedPagesRef.current.has(pageNum)) {
+                      setTimeout(() => {
+                        if (!firedRef.current) {
+                          firedRef.current = true
+                          onComplete()
+                        }
+                      }, 1500)
+                    }
                   }
                   return pageNum
                 }
