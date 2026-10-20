@@ -45,6 +45,26 @@ async function fetchCourseModules(courseId: string): Promise<any[]> {
   return modules
 }
 
+// ⚡ Lookup helper: given a module id, find which course contains it.
+// Used by PUT/DELETE as a fallback when the frontend forgets to send
+// course_id (e.g. legacy modules stored without course_id field).
+// Returns the course_id or null if not found.
+async function findCourseIdByModuleId(moduleId: string): Promise<string | null> {
+  // Fetch a light slice (id + description) for every course. We only need
+  // the description to parse modules JSON. This is bounded by #courses.
+  const { data: courses, error } = await supabaseAdmin
+    .from('courses')
+    .select('id, description')
+  if (error || !courses) return null
+  for (const c of courses) {
+    const { modules } = parseCourseContent(c.description)
+    if (Array.isArray(modules) && modules.some((m) => m.id === moduleId)) {
+      return c.id
+    }
+  }
+  return null
+}
+
 async function saveCourseModules(courseId: string, modules: any[]): Promise<void> {
   // First fetch the current description to preserve the original
   const { data: course } = await supabaseAdmin
@@ -123,14 +143,25 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const { id, course_id, ...updates } = await req.json()
-    if (!id || !course_id) {
-      return NextResponse.json({ error: 'id و course_id مطلوبان' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'id required' }, { status: 400 })
     }
-    const modules = await fetchCourseModules(course_id)
+    // ⚡ Fallback: if course_id wasn't sent, look it up by scanning
+    // courses for the module with this id. This fixes the
+    // "id و course_id مطلوبان" error that happens when the
+    // ModuleDialog saves an edit without course_id in the body.
+    let resolvedCourseId = course_id
+    if (!resolvedCourseId) {
+      resolvedCourseId = await findCourseIdByModuleId(id)
+      if (!resolvedCourseId) {
+        return NextResponse.json({ error: 'Module not found in any course' }, { status: 404 })
+      }
+    }
+    const modules = await fetchCourseModules(resolvedCourseId)
     const idx = modules.findIndex((m) => m.id === id)
     if (idx === -1) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
-    modules[idx] = { ...modules[idx], ...updates, id, course_id }
-    await saveCourseModules(course_id, modules)
+    modules[idx] = { ...modules[idx], ...updates, id, course_id: resolvedCourseId }
+    await saveCourseModules(resolvedCourseId, modules)
     return NextResponse.json(modules[idx])
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -140,12 +171,21 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const { id, course_id } = await req.json()
-    if (!id || !course_id) {
-      return NextResponse.json({ error: 'id و course_id مطلوبان' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'id required' }, { status: 400 })
     }
-    const modules = await fetchCourseModules(course_id)
+    // ⚡ Same fallback as PUT — find course by module id if course_id
+    // wasn't provided.
+    let resolvedCourseId = course_id
+    if (!resolvedCourseId) {
+      resolvedCourseId = await findCourseIdByModuleId(id)
+      if (!resolvedCourseId) {
+        return NextResponse.json({ error: 'Module not found in any course' }, { status: 404 })
+      }
+    }
+    const modules = await fetchCourseModules(resolvedCourseId)
     const filtered = modules.filter((m) => m.id !== id)
-    await saveCourseModules(course_id, filtered)
+    await saveCourseModules(resolvedCourseId, filtered)
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

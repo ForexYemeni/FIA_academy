@@ -10,7 +10,7 @@ import {
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy, Loader2,
-  Sparkles,
+  Sparkles, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -39,6 +39,14 @@ interface LessonPreviewModalProps {
   onOpenChange: (o: boolean) => void
   lesson: Lesson | null
   modules?: Module[]
+  // ⚡ Set of completed lesson IDs — used to disable the Next button
+  // when the next lesson is locked (sequential progression enforced
+  // inside the modal too).
+  completedLessons?: Set<string>
+  // ⚡ Auto-complete by VIEWING — fired by the inner content component
+  // (VideoPlayer / TextContent / PdfViewer / ExamPreview) when the
+  // student actually completes viewing the lesson.
+  onLessonComplete?: (lesson: Lesson) => void
   // Optional: callback when user navigates between lessons
   onNavigate?: (lesson: Lesson) => void
 }
@@ -50,8 +58,28 @@ const LESSON_TYPES = {
   pdf: { label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30' },
 }
 
-export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], onNavigate }: LessonPreviewModalProps) {
+export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], completedLessons, onLessonComplete, onNavigate }: LessonPreviewModalProps) {
+  // ⚡ Track whether we've already fired onLessonComplete for THIS
+  // lesson. We reset when lesson.id changes. This prevents double-firing
+  // when the video onEnded event fires multiple times.
+  // IMPORTANT: hooks must be called BEFORE any early return to comply
+  // with React's Rules of Hooks (the parent always renders this modal,
+  // even when `open` is false and `lesson` is null).
+  const firedCompleteRef = useRef<string | null>(null)
+  useEffect(() => {
+    // Reset the fired flag whenever the lesson changes
+    firedCompleteRef.current = null
+  }, [lesson?.id])
+
   if (!lesson) return null
+
+  const fireComplete = () => {
+    if (!lesson || !onLessonComplete) return
+    if (firedCompleteRef.current === lesson.id) return // already fired for this lesson
+    if (completedLessons && completedLessons.has(lesson.id)) return // already completed
+    firedCompleteRef.current = lesson.id
+    onLessonComplete(lesson)
+  }
 
   // Find current lesson position across all modules
   const allLessons: { lesson: Lesson; module: Module | null }[] = []
@@ -62,6 +90,13 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
   const currentIdx = allLessons.findIndex(({ lesson: l }) => l.id === lesson.id)
   const prev = currentIdx > 0 ? allLessons[currentIdx - 1] : null
   const next = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null
+
+  // ⚡ Determine if the NEXT lesson is locked — it's locked if the
+  // current lesson isn't completed yet (sequential progression).
+  // We disable the Next button in that case so the student can't
+  // jump ahead without finishing the current lesson.
+  const isNextLocked = next ? !completedLessons?.has(next.lesson.id) && !completedLessons?.has(lesson.id) : false
+  const isPrevAvailable = prev !== null
 
   const type = LESSON_TYPES[lesson.lesson_type] || LESSON_TYPES.text
   const Icon = type.icon
@@ -104,6 +139,11 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
                         <Clock className="w-3 h-3 ml-1" /> {lesson.duration_minutes} دقيقة
                       </Badge>
                     ) : null}
+                    {completedLessons?.has(lesson.id) && (
+                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 flex-shrink-0">
+                        <CheckCircle2 className="w-3 h-3 ml-1" /> مكتمل
+                      </Badge>
+                    )}
                   </div>
                   <DialogTitle className="text-white text-base md:text-lg truncate font-bold leading-tight">
                     {lesson.title}
@@ -115,26 +155,38 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
 
           {/* Body — magical gradient background */}
           <div className="p-4 md:p-6 bg-gradient-to-b from-navy/5 to-white">
-            {/* Render the lesson based on type */}
-            {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} />}
-            {lesson.lesson_type === 'text' && <TextContent content={lesson.content} />}
-            {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} />}
-            {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} />}
+            {/* ⚡ Auto-complete hint banner — shown only when the lesson
+                isn't completed yet, so the student knows what to do. */}
+            {!completedLessons?.has(lesson.id) && (
+              <div className="mb-4 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-white border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'pdf' && 'تصفّح الملف لمدة 30 ثانية ليُكتمل الدرس تلقائياً.'}
+                {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً.'}
+              </div>
+            )}
+            {/* Render the lesson based on type — each component fires
+                onComplete when the student actually finishes viewing. */}
+            {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'text' && <TextContent content={lesson.content} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
 
           {/* Navigation — magical gradient buttons */}
           {(prev || next) && (
             <div className="px-4 md:px-6 pb-4 md:pb-5 pt-2 bg-gradient-to-b from-navy/5 to-white border-t border-gold/15">
               <div className="flex items-center justify-between gap-2 pt-4">
-                {prev ? (
+                {isPrevAvailable ? (
                   <Button
-                    onClick={() => onNavigate?.(prev.lesson)}
+                    onClick={() => onNavigate?.(prev!.lesson)}
                     className="flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20"
                   >
                     <ArrowRight className="w-4 h-4" />
                     <div className="text-right">
                       <div className="text-[10px] text-gold/70">السابق</div>
-                      <div className="text-xs font-medium text-gold truncate max-w-[150px]">{prev.lesson.title}</div>
+                      <div className="text-xs font-medium text-gold truncate max-w-[150px]">{prev!.lesson.title}</div>
                     </div>
                   </Button>
                 ) : <div />}
@@ -144,16 +196,33 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
                 </div>
 
                 {next ? (
-                  <Button
-                    onClick={() => onNavigate?.(next.lesson)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20"
-                  >
-                    <div className="text-left">
-                      <div className="text-[10px] text-gold/70">التالي</div>
-                      <div className="text-xs font-medium text-gold truncate max-w-[150px]">{next.lesson.title}</div>
-                    </div>
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
+                  isNextLocked ? (
+                    // ⚡ Next lesson is locked — show disabled button with lock icon
+                    <Button
+                      disabled
+                      className="flex items-center gap-2 bg-gray-200 text-gray-500 rounded-xl cursor-not-allowed border border-gray-300"
+                      title="أكمل الدرس الحالي أولاً"
+                    >
+                      <div className="text-left">
+                        <div className="text-[10px] text-gray-500/70 flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" /> مقفل
+                        </div>
+                        <div className="text-xs font-medium truncate max-w-[150px]">{next.lesson.title}</div>
+                      </div>
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => onNavigate?.(next.lesson)}
+                      className="flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20"
+                    >
+                      <div className="text-left">
+                        <div className="text-[10px] text-gold/70">التالي</div>
+                        <div className="text-xs font-medium text-gold truncate max-w-[150px]">{next.lesson.title}</div>
+                      </div>
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+                  )
                 ) : <div />}
               </div>
             </div>
@@ -165,10 +234,22 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], o
 }
 
 // ============== Video Player (HTML5 protected) ==============
-function VideoPlayer({ url }: { url?: string }) {
+// ⚡ onComplete fires when the student actually watches the video to
+// the end (or to 95% — the last 5% is sometimes cut off by Telegram's
+// encoding, so we accept 95% as "watched"). The onEnded event also fires
+// onComplete as a backup. We only fire once per video session.
+function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => void }) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const firedRef = useRef(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  // Reset the fired flag whenever the resolved URL changes (i.e. new
+  // lesson opened in the modal).
+  useEffect(() => {
+    firedRef.current = false
+  }, [resolvedUrl])
 
   // Resolve Telegram message links (https://t.me/c/CHANNEL_ID/MSG_ID) to direct file URLs
   useEffect(() => {
@@ -310,11 +391,33 @@ function VideoPlayer({ url }: { url?: string }) {
       }} />
       <div className="relative bg-black rounded-lg overflow-hidden">
         <video
+          ref={videoRef}
           controls
           controlsList="nodownload noremoteplayback noplaybackrate"
           disablePictureInPicture
           className="w-full h-auto max-h-[480px]"
           onContextMenu={(e) => e.preventDefault()}
+          onEnded={() => {
+            // ⚡ Backup: when the video actually reaches the end
+            if (!firedRef.current && onComplete) {
+              firedRef.current = true
+              onComplete()
+            }
+          }}
+          onTimeUpdate={(e) => {
+            // ⚡ Primary: when the student reaches 95% of the video,
+            // mark the lesson as complete. We use 95% (not 100%) to
+            // account for the last few seconds being cut off by some
+            // Telegram video encodings.
+            if (firedRef.current || !onComplete) return
+            const v = e.currentTarget
+            if (!v || !v.duration) return
+            const ratio = v.currentTime / v.duration
+            if (ratio >= 0.95) {
+              firedRef.current = true
+              onComplete()
+            }
+          }}
         >
           <source src={resolvedUrl} type="video/mp4" />
           متصفحك لا يدعم تشغيل الفيديو
@@ -329,8 +432,37 @@ function VideoPlayer({ url }: { url?: string }) {
 }
 
 // ============== Text Content — Magical Reading Experience ==============
-function TextContent({ content }: { content?: string }) {
+// ⚡ onComplete fires when the student scrolls the text content to the
+// bottom (or after a 30-second dwell time as a fallback for very short
+// content that doesn't trigger a scroll). We only fire once per
+// lesson session.
+function TextContent({ content, onComplete }: { content?: string; onComplete?: () => void }) {
   const [copied, setCopied] = useState(false)
+  const firedRef = useRef(false)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const dwellTimerRef = useRef<any>(null)
+
+  // Reset the fired flag + start the dwell timer when content changes.
+  useEffect(() => {
+    firedRef.current = false
+    // ⚡ Dwell fallback: if the text content is short enough to fit in
+    // the viewport without scrolling, the student can never trigger
+    // the "scrolled to bottom" event. As a safety net, fire onComplete
+    // after 30 seconds of viewing (matches the hint we show in the
+    // banner). If they scroll to bottom before that, the scroll handler
+    // fires first and cancels this timer.
+    if (onComplete && content) {
+      dwellTimerRef.current = setTimeout(() => {
+        if (!firedRef.current) {
+          firedRef.current = true
+          onComplete()
+        }
+      }, 30000)
+    }
+    return () => {
+      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current)
+    }
+  }, [content, onComplete])
   if (!content) {
     // ⚡ Magical empty state
     return (
@@ -450,7 +582,26 @@ function TextContent({ content }: { content?: string }) {
       <div className="h-0.5 bg-gradient-to-l from-gold via-amber-400 to-gold" />
 
       {/* Content body — clean, RTL-locked, no animations, no drop caps */}
-      <div className="relative px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        onScroll={(e) => {
+          // ⚡ Fire onComplete when the student scrolls to within 30px
+          // of the bottom of the text content. We use a 30px threshold
+          // (instead of strict 0) to be forgiving on mobile browsers
+          // where the scrollbar's exact position can be off by a few
+          // pixels due to inertia.
+          if (firedRef.current || !onComplete) return
+          const el = e.currentTarget
+          const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+          if (distanceFromBottom <= 30) {
+            firedRef.current = true
+            // Cancel the dwell-timer fallback since we already fired
+            if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current)
+            onComplete()
+          }
+        }}
+        className="relative px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto"
+      >
         <div className="max-w-3xl mx-auto" dir="rtl">
           {formatContent(content)}
         </div>
@@ -460,7 +611,24 @@ function TextContent({ content }: { content?: string }) {
 }
 
 // ============== PDF Viewer ==============
-function PdfViewer({ url }: { url?: string }) {
+// ⚡ onComplete fires after the student has had the PDF open for 30
+// seconds. We can't easily track scroll position inside the Google
+// Docs Viewer iframe (cross-origin), so we use a dwell-time fallback.
+// 30 seconds matches the hint we show in the banner.
+function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void }) {
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    firedRef.current = false
+    if (!onComplete || !url) return
+    const timer = setTimeout(() => {
+      if (!firedRef.current) {
+        firedRef.current = true
+        onComplete()
+      }
+    }, 30000)
+    return () => clearTimeout(timer)
+  }, [url, onComplete])
   if (!url) {
     // ⚡ Magical empty state
     return (
@@ -513,11 +681,15 @@ function PdfViewer({ url }: { url?: string }) {
 }
 
 // ============== Exam Preview ==============
-function ExamPreview({ content, title }: { content?: string; title: string }) {
+// ⚡ onComplete fires when the student submits the exam with a score
+// of at least 60% (the pass threshold). Failing the exam does NOT
+// complete the lesson — the student can retry until they pass.
+function ExamPreview({ content, title, onComplete }: { content?: string; title: string; onComplete?: () => void }) {
   const [questions, setQuestions] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState(0)
+  const firedRef = useRef(false)
 
   useEffect(() => {
     if (content) {
@@ -537,6 +709,8 @@ function ExamPreview({ content, title }: { content?: string; title: string }) {
     setAnswers({})
     setSubmitted(false)
     setScore(0)
+    // Reset the fired flag when content changes (new exam)
+    firedRef.current = false
   }, [content])
 
   if (questions.length === 0) {
@@ -562,9 +736,19 @@ function ExamPreview({ content, title }: { content?: string; title: string }) {
     questions.forEach((q, i) => {
       if (answers[i] === q.answer) correct++
     })
-    setScore(Math.round((correct / questions.length) * 100))
+    const finalScore = Math.round((correct / questions.length) * 100)
+    setScore(finalScore)
     setSubmitted(true)
-    toast.success(`نتيجة الاختبار: ${Math.round((correct / questions.length) * 100)}%`)
+    if (finalScore >= 60) {
+      toast.success(`🎉 اجتزت الاختبار! نتيجتك: ${finalScore}%`)
+      // ⚡ Fire onComplete only on PASS (>= 60%)
+      if (!firedRef.current && onComplete) {
+        firedRef.current = true
+        onComplete()
+      }
+    } else {
+      toast.error(`نتيجة الاختبار: ${finalScore}% — تحتاج 60% على الأقل للنجاح. أعد المحاولة.`)
+    }
   }
 
   return (
