@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+import { requireAdmin } from "@/lib/admin-auth"
 export async function GET(req: NextRequest) {
   try {
     const courseId = req.nextUrl.searchParams.get('course_id')
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { course_id, lesson_id, question_type, prompt, options, correct_answer, explanation, difficulty, points } = await req.json()
     if (!course_id || !prompt) {
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -71,6 +74,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('exam_questions').delete().eq('id', id)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgCourseCreated, tgCourseUpdated, tgCourseDeleted } from '@/lib/telegram'
 
+import { requireAdmin } from "@/lib/admin-auth"
 // Modules and lessons are stored INLINE in the course's `description`
 // field, after a `===FIA_MODULES===` separator. This is a legacy format
 // inherited from the early single-table schema.
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     let body = await req.json()
 
@@ -133,6 +135,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id, description, ...otherUpdates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -261,6 +264,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

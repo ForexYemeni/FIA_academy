@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+import { requireAdmin } from "@/lib/admin-auth"
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin.from('partners').select('*').order('since', { ascending: false })
@@ -12,6 +13,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const body = await req.json()
     const { data, error } = await supabaseAdmin.from('partners').insert(body).select().single()
@@ -23,6 +25,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id, ...updates } = await req.json()
     const { data, error } = await supabaseAdmin.from('partners').update(updates).eq('id', id).select().single()
@@ -34,6 +37,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authError = await requireAdmin(req); if (authError) return authError
   try {
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('partners').delete().eq('id', id)
