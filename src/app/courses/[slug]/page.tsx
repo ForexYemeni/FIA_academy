@@ -61,6 +61,7 @@ export async function generateStaticParams() {
       .from('courses')
       .select('slug')
       .not('slug', 'is', null)
+      .neq('status', 'مسودة')
     return (data || []).map((c: any) => ({ slug: c.slug }))
   } catch {
     return []
@@ -93,6 +94,7 @@ export default async function Page({ params }: Props) {
     .from('courses')
     .select('*')
     .eq('slug', slug)
+    .neq('status', 'مسودة')
     .maybeSingle()
 
   if (!course) {

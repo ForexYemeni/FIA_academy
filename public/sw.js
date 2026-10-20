@@ -7,8 +7,8 @@
 // data from /api/* endpoints for Realtime updates + payment status +
 // enrollment lists. Caching these would cause stale UI.
 
-const APP_SHELL_CACHE = 'fia-shell-v3'
-const DYNAMIC_CACHE = 'fia-dynamic-v3'
+const APP_SHELL_CACHE = 'fia-shell-v4'
+const DYNAMIC_CACHE = 'fia-dynamic-v4'
 
 const APP_SHELL = [
   '/',
@@ -125,7 +125,7 @@ self.addEventListener('push', (event) => {
     dir: 'rtl',
     lang: 'ar',
     requireInteraction: payload.requireInteraction === true,
-    vibrate: [200, 100, 200], // vibrate pattern on mobile
+    vibrate: [200], // single short vibrate — no repeating pattern
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })
@@ -169,7 +169,7 @@ self.addEventListener('message', (event) => {
       data: { link: link || '/' },
       dir: 'rtl',
       lang: 'ar',
-      vibrate: [200, 100, 200],
+      vibrate: [200], // single short vibrate — no repeating pattern
     })
   }
 })

@@ -123,7 +123,7 @@ export function TrainerDashboard() {
   }, [refreshTrainerProfile])
 
   const loadCourses = () => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => {
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => {
       const all = Array.isArray(d) ? d : []
       // Filter to ONLY this trainer's courses
       const mine = all.filter((c: any) => c.trainer_id === user?.id)

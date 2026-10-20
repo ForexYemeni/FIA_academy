@@ -377,19 +377,28 @@ export function NotificationsBell() {
             // when the user re-opens the app after being away.
             // But if there are notifications newer than the last time the
             // user visited (tracked via localStorage 'lastNotifSeen'),
-            // we DO announce those.
+            // we DO announce those — BUT ONLY THE MOST RECENT ONE to avoid
+            // a barrage of sounds/vibrations/toasts when multiple unread
+            // notifications accumulated while the user was away.
             const lastSeen = (() => {
               try { return localStorage.getItem('fia-last-notif-seen') || '' } catch { return '' }
             })()
             let lastSeenDate = 0
             try { lastSeenDate = lastSeen ? new Date(lastSeen).getTime() : 0 } catch {}
+            let newestToAnnounce: any = null
             for (const n of newItems) {
               recentlyAnnouncedRef.current.add(n.id)
-              // Announce only notifications newer than lastSeen
+              // Track the MOST RECENT notification newer than lastSeen
               const nDate = n.created_at ? new Date(n.created_at).getTime() : 0
               if (nDate > lastSeenDate && lastSeenDate > 0) {
-                announceNotification(n)
+                if (!newestToAnnounce || nDate > (newestToAnnounce.created_at ? new Date(newestToAnnounce.created_at).getTime() : 0)) {
+                  newestToAnnounce = n
+                }
               }
+            }
+            // Announce ONLY the most recent new notification (not all of them)
+            if (newestToAnnounce) {
+              announceNotification(newestToAnnounce)
             }
             // Cleanup
             if (recentlyAnnouncedRef.current.size > 100) {
