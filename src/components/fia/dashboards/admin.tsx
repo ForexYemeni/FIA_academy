@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   LayoutDashboard, BookOpen, FileText, Users, CreditCard,
   Award, GraduationCap, Building2, Shield, UserCog, Settings,
@@ -583,7 +583,7 @@ function AdminOverview() {
 }
 
 // ============== COURSES ==============
-function AdminCourses() {
+const AdminCourses = React.memo(function AdminCourses() {
   const [items, setItems] = useState<any[]>([])
   const [trainers, setTrainers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -799,7 +799,7 @@ function AdminCourses() {
       />
     </SectionCard>
   )
-}
+})
 
 function AdminExams() {
   const [exams, setExams] = useState<any[]>([])
@@ -1101,7 +1101,7 @@ function AdminExams() {
   )
 }
 
-function AdminStudents() {
+const AdminStudents = React.memo(function AdminStudents() {
   const [items, setItems] = useState<any[]>([])
   const [courses, setCourses] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
@@ -1426,9 +1426,9 @@ function AdminStudents() {
       />
     </SectionCard>
   )
-}
+})
 
-function AdminPayments() {
+const AdminPayments = React.memo(function AdminPayments() {
   const [items, setItems] = useState<any[]>([])
   const [courses, setCourses] = useState<any[]>([])
   const [search, setSearch] = useState('')
@@ -2053,7 +2053,7 @@ function AdminPayments() {
       </Dialog>
     </SectionCard>
   )
-}
+})
 
 function AdminPaymentMethods() {
   const [items, setItems] = useState<any[]>([])
@@ -2481,7 +2481,7 @@ function PaymentMethodDialog({ open, onOpenChange, editing, onSaved }: any) {
   )
 }
 
-function AdminCertificates() {
+const AdminCertificates = React.memo(function AdminCertificates() {
   const [items, setItems] = useState<any[]>([])
   const [requests, setRequests] = useState<any[]>([])
   const [courses, setCourses] = useState<any[]>([])
@@ -2965,9 +2965,9 @@ function AdminCertificates() {
       />
     </SectionCard>
   )
-}
+})
 
-function AdminTrainers() {
+const AdminTrainers = React.memo(function AdminTrainers() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
@@ -3132,7 +3132,7 @@ function AdminTrainers() {
       />
     </SectionCard>
   )
-}
+})
 
 function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
@@ -3356,7 +3356,7 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
   )
 }
 
-function AdminPartners() {
+const AdminPartners = React.memo(function AdminPartners() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
@@ -3488,9 +3488,9 @@ function AdminPartners() {
       />
     </SectionCard>
   )
-}
+})
 
-function AdminLicenses() {
+const AdminLicenses = React.memo(function AdminLicenses() {
   const [items, setItems] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
@@ -3633,9 +3633,9 @@ function AdminLicenses() {
       />
     </SectionCard>
   )
-}
+})
 
-function AdminFounder({ user }: any) {
+const AdminFounder = React.memo(function AdminFounder({ user }: any) {
   const [tab, setTab] = useState<'founder' | 'team'>('founder')
 
   return (
@@ -3689,9 +3689,9 @@ function AdminFounder({ user }: any) {
       </div>
     </SectionCard>
   )
-}
+})
 
-function AdminSite() {
+const AdminSite = React.memo(function AdminSite() {
   const [settings, setSettings] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
@@ -4144,7 +4144,7 @@ function AdminSite() {
       )}
     </SectionCard>
   )
-}
+})
 
 // ============== Admin Account & Security (change email + password) ==============
 function AdminAccount({ user, updateUser, logout }: any) {

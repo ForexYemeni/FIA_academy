@@ -98,10 +98,15 @@ export async function GET(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get('user_id')
     const courseId = req.nextUrl.searchParams.get('course_id')
+    const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
+    const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
 
     let query = supabaseAdmin.from('payments').select('*')
     if (userId) query = query.eq('user_id', userId)
     if (courseId) query = query.eq('course_id', courseId)
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1)
+    }
     const { data, error } = await query.order('date', { ascending: false })
     if (error) throw error
 

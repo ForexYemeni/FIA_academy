@@ -4,13 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
   try {
     const role = req.nextUrl.searchParams.get('role') || 'student'
+    const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
+    const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
 
     // Fetch all users with role='student'
-    const { data: users, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('users')
       .select('*')
       .eq('role', role)
       .order('created_at', { ascending: false })
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1)
+    }
+    const { data: users, error } = await query
 
     if (error) throw error
 
