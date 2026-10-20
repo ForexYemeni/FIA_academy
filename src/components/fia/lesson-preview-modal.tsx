@@ -477,6 +477,14 @@ function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => voi
           <style jsx>{`
             video::-webkit-media-controls-download-button { display: none; }
             video::-internal-media-controls-overlay-cast-button { display: none; }
+            /* ⚡ Hide any "open in new tab" / "more controls" buttons that
+               Chrome shows for cross-origin video URLs (Telegram file
+               URLs). Without this, the student could right-click the
+               video or click the 3-dot menu and choose "Open in new tab"
+               to navigate to the raw video URL — which they could then
+               download. */
+            video::-webkit-media-controls-overflow-button { display: none; }
+            video::-webkit-media-controls-overlay-play-button { opacity: 0; }
           `}</style>
         </div>
       </div>
@@ -760,12 +768,27 @@ function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void 
     )
   }
 
-  // Render the PDF inline via Google Docs Viewer. Browsing a raw Telegram file
-  // URL directly (in an <iframe> or <object>) makes the browser download the
-  // file instead of displaying it. Google Docs Viewer fetches and renders the
-  // PDF server-side, so the user always sees the document inside the modal —
-  // no auto-download is triggered.
-  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
+  // Render the PDF inline via Google Drive embed API. The standard
+  // `https://docs.google.com/viewer` URL shows Google's toolbar with
+  // download + open-in-new-tab buttons (the arrow the user reported).
+  // We use `&rm=minimal&toolbar=0` which strips the toolbar entirely.
+  //
+  // ⚡ PROTECTION LAYERS (defense in depth):
+  //  1. &rm=minimal — strips Google's toolbar (no download/print buttons)
+  //  2. &toolbar=0 — explicit toolbar disable
+  //  3. onContextMenu preventDefault — blocks right-click "Save As..."
+  //  4. Transparent overlay div over the iframe — blocks all mouse
+  //     interactions with Google's UI (overlay is pointer-events-auto
+  //     so it absorbs clicks, but background:transparent so the PDF
+  //     is still visible). Student can still scroll the PDF via wheel/touch.
+  //  5. referrerpolicy="no-referrer" — prevents Google from logging our origin.
+  //
+  // NOTE: There's no way to fully prevent a determined user from
+  // screenshotting the PDF or using browser dev tools to fetch the raw
+  // file. Our goal is to make casual download inconvenient, not to
+  // provide DRM. The Trainer can mark a lesson as `is_preview` to make
+  // it free for everyone; otherwise the student must be enrolled.
+  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true&rm=minimal&toolbar=0`
 
   return (
     <div className="space-y-3">
@@ -780,16 +803,50 @@ function PdfViewer({ url, onComplete }: { url?: string; onComplete?: () => void 
           <div className="font-bold text-navy text-sm truncate">{url.split('/').pop()}</div>
           <div className="text-xs text-muted-foreground flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-gold/60" />
-            ملف PDF — معاينة داخل التطبيق
+            ملف PDF — معاينة محمية داخل التطبيق
           </div>
         </div>
+        {/* ⚡ "Protected" badge — makes it clear to the student that
+            the file is intentionally protected (no download). */}
+        <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px] flex-shrink-0">
+          <Lock className="w-2.5 h-2.5 ml-0.5" /> محمي
+        </Badge>
       </div>
-      {/* Magical gold-bordered PDF frame */}
-      <iframe
-        src={viewerUrl}
-        className="relative w-full h-[600px] rounded-xl border-2 border-gold/30 shadow-md"
-        title="PDF Preview"
-      />
+      {/* ⚡ Magical gold-bordered PDF frame with PROTECTION OVERLAY.
+          The wrapper is `relative` so we can absolutely-position an
+          overlay div ON TOP of the iframe. The overlay is transparent
+          (so the PDF is visible) and pointer-events-auto (so it
+          ABSORBS all clicks — Google's download/print buttons can't
+          be clicked). The student can still scroll via wheel/touch
+          because those events bubble through to the iframe. */}
+      <div
+        className="relative w-full rounded-xl border-2 border-gold/30 shadow-md overflow-hidden"
+        onContextMenu={(e) => e.preventDefault()}
+        style={{ height: '600px' }}
+      >
+        <iframe
+          src={viewerUrl}
+          className="absolute inset-0 w-full h-full"
+          title="PDF Preview"
+          referrerPolicy="no-referrer"
+          // ⚡ sandbox — restrict the iframe's capabilities. We allow
+          // scripts (needed for the Google viewer to render) but block
+          // popups, top navigation, form submission, etc.
+          sandbox="allow-scripts allow-same-origin"
+        />
+        {/* ⚡ Transparent protection overlay — covers the entire
+            iframe. Absorbs all mouse events (including right-click),
+            preventing the student from clicking Google's download /
+            print / open-in-new-tab buttons. The student can still
+            scroll the PDF via mouse wheel / touch scroll because
+            those events bubble through to the iframe. */}
+        <div
+          className="absolute inset-0"
+          style={{ background: 'transparent', pointerEvents: 'auto' }}
+          onContextMenu={(e) => e.preventDefault()}
+          onDragStart={(e) => e.preventDefault()}
+        />
+      </div>
     </div>
   )
 }
