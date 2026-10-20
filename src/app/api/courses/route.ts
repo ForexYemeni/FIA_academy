@@ -58,10 +58,17 @@ export async function GET(req: NextRequest) {
       if (!data) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
       return NextResponse.json(data)
     }
-    const { data, error } = await supabaseAdmin
+    const includeDrafts = req.nextUrl.searchParams.get('include_drafts') === 'true'
+    let query = supabaseAdmin
       .from('courses')
       .select('*')
-      .order('created_at', { ascending: false })
+    // ⚡ Only show published courses to students/visitors.
+    // Admins pass include_drafts=true to see ALL courses (published + drafts).
+    // This is enforced at the API level so no student client can bypass it.
+    if (!includeDrafts) {
+      query = query.neq('status', 'مسودة')
+    }
+    const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
     return NextResponse.json(data || [])
   } catch (e: any) {

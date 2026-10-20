@@ -274,7 +274,7 @@ function AdminOverview() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/courses').then((r) => r.json()),
+      fetch('/api/courses?include_drafts=true').then((r) => r.json()),
       fetch('/api/trainers').then((r) => r.json()),
       fetch('/api/students?role=student').then((r) => r.json()),
       fetch('/api/payments').then((r) => r.json()),
@@ -347,7 +347,7 @@ function AdminOverview() {
       debounceTimer = setTimeout(() => {
         // Trigger the same Promise.all fetch as above
         Promise.all([
-          fetch('/api/courses').then((r) => r.json()),
+          fetch('/api/courses?include_drafts=true').then((r) => r.json()),
           fetch('/api/trainers').then((r) => r.json()),
           fetch('/api/students?role=student').then((r) => r.json()),
           fetch('/api/payments').then((r) => r.json()),
@@ -585,6 +585,7 @@ function AdminOverview() {
 // ============== COURSES ==============
 function AdminCourses() {
   const [items, setItems] = useState<any[]>([])
+  const [trainers, setTrainers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<any | null>(null)
   const [open, setOpen] = useState(false)
@@ -593,9 +594,23 @@ function AdminCourses() {
 
   const load = () => {
     setLoading(true)
-    fetch('/api/courses').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+    Promise.all([
+      fetch('/api/courses?include_drafts=true').then((r) => r.json()),
+      fetch('/api/trainers').then((r) => r.json()),
+    ]).then(([c, t]) => {
+      setItems(Array.isArray(c) ? c : [])
+      setTrainers(Array.isArray(t) ? t : [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
+
+  // ⚡ Helper: get trainer name from trainer_id
+  const getTrainerName = (trainerId: string) => {
+    if (!trainerId) return null
+    const trainer = trainers.find((t) => t.id === trainerId)
+    return trainer ? trainer.name : null
+  }
 
   // ⚡ REAL-TIME: courses — admin sees course changes INSTANTLY
   useEffect(() => {
@@ -694,9 +709,34 @@ function AdminCourses() {
               <div className="p-3">
                 <h4 className="font-bold text-navy text-sm leading-tight line-clamp-1 mb-1">{c.title}</h4>
                 {c.short_description && <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-2">{c.short_description}</p>}
+                {/* Trainer name — show if course has a trainer assigned */}
+                {(() => {
+                  const trainerName = getTrainerName(c.trainer_id)
+                  return trainerName ? (
+                    <div className="text-[10px] text-gold font-bold flex items-center gap-1 mb-2">
+                      <GraduationCap className="w-3 h-3" /> {trainerName}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mb-2">
+                      <GraduationCap className="w-3 h-3" /> غير مُسند لمدرب
+                    </div>
+                  )
+                })()}
                 {/* Badges row */}
                 <div className="flex items-center gap-1.5 flex-wrap mb-3">
                   <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-medium ${level.color}`}>{level.label}</span>
+                  {/* Status badge — visual distinction between published and draft */}
+                  {c.status === 'منشورة' ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> منشورة
+                    </span>
+                  ) : c.status === 'مسودة' ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-semibold border border-amber-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> مسودة
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-medium border border-gray-200">{status.label}</span>
+                  )}
                   {c.duration_hours > 0 && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-2.5 h-2.5" /> {c.duration_hours}س</span>
                   )}

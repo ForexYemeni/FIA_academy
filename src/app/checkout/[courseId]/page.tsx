@@ -13,6 +13,7 @@ export default async function Page({ params }: Props) {
     .from('courses')
     .select('*')
     .eq('id', courseId)
+    .neq('status', 'مسودة')
     .maybeSingle()
 
   if (!course) {
