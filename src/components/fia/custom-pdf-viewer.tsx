@@ -136,6 +136,8 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         if (cancelled) return
         pdfDocRef.current = doc
         setNumPages(doc.numPages)
+        // eslint-disable-next-line no-console
+        console.log(`[CustomPdfViewer] PDF loaded OK — ${doc.numPages} pages, ${arrayBuffer.byteLength} bytes`)
         // Pre-fetch ALL page metadata (width/height at scale 1) so we
         // can lay out the pages with the correct heights before any
         // rendering happens. This gives a smooth scroll without jumps
@@ -152,6 +154,8 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         }
         setPageHeights(heights)
         setLoading(false)
+        // eslint-disable-next-line no-console
+        console.log(`[CustomPdfViewer] All page metadata loaded, ready to render`)
       } catch (e: any) {
         console.warn('[CustomPdfViewer] Failed to load PDF:', e)
         if (cancelled) return
@@ -197,21 +201,33 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
   }, [])
 
   // ⚡ Render a single page to its canvas.
+  // IMPORTANT: This function uses useCallback with only containerWidth as
+  // a dependency. We use a ref (renderedPagesRef) to track which pages
+  // have been rendered, so we don't need to recreate this function when
+  // renderedPages changes. Recreating the function on every render would
+  // cause the eager render effect to fire infinitely (because the
+  // renderPage identity would change every time renderedPages updates).
+  const renderedPagesRef = useRef<Set<number>>(new Set())
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current || !containerWidth) return
     const page = pagesRef.current[pageNum - 1]
     if (!page) return
     const canvas = canvasRefs.current[pageNum - 1]
     if (!canvas) return
-    // Skip if already rendered (avoid re-rendering the same page)
-    if (renderedPages.has(pageNum)) return
+    // Skip if already rendered (use ref to avoid recreating renderPage
+    // whenever renderedPages state changes)
+    if (renderedPagesRef.current.has(pageNum)) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    // Mark as "in-progress" immediately to prevent duplicate renders
+    renderedPagesRef.current.add(pageNum)
 
     // Cancel any in-flight render for this page
     const existingTask = renderTasksRef.current.get(pageNum)
     if (existingTask) {
       try { existingTask.cancel() } catch {}
+      renderTasksRef.current.delete(pageNum)
     }
 
     // ⚡ Compute scale: fit width to container (minus 32px padding).
@@ -236,25 +252,26 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
       await renderTask.promise
       renderTasksRef.current.delete(pageNum)
       setRenderedPages((prev) => new Set(prev).add(pageNum))
+      // eslint-disable-next-line no-console
+      console.log(`[CustomPdfViewer] Page ${pageNum} rendered OK`)
     } catch (e: any) {
+      // ⚡ Render failed — remove from "rendered" set so we can retry
+      renderedPagesRef.current.delete(pageNum)
       if (e?.name !== 'RenderingCancelledException') {
+        // eslint-disable-next-line no-console
         console.warn('[CustomPdfViewer] Render failed for page', pageNum, e)
       }
     }
-  }, [containerWidth, renderedPages])
+  }, [containerWidth])
 
-  // ⚡ Render ALL pages when PDF is loaded (not lazy on-demand).
-  // For typical PDFs (10-50 pages) this is fast (~200ms per page in
-  // parallel). The previous IntersectionObserver-based lazy rendering
-  // was buggy — it didn't trigger initial renders reliably, leaving
-  // pages blank with just the loading spinner.
-  //
-  // We now render ALL pages in parallel when the PDF is ready and
-  // the container width is known. We render in batches of 4 to avoid
-  // overwhelming the browser (each render is CPU-heavy).
+  // ⚡ Render ALL pages when PDF is loaded.
+  // We render in batches of 4 (parallel) to avoid overwhelming the
+  // browser. Each render takes ~200ms, so a 14-page PDF takes ~700ms
+  // total in 4 batches — fast enough that the student sees the pages
+  // appear quickly without a long blank screen.
   useEffect(() => {
     if (!containerWidth || loading || error || !numPages) return
-    if (renderedPages.size >= numPages) return // already rendered all
+    if (renderedPagesRef.current.size >= numPages) return // already rendered all
     let cancelled = false
     const renderAll = async () => {
       const BATCH_SIZE = 4
@@ -265,7 +282,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         // Render this batch in parallel
         const promises: Promise<void>[] = []
         for (let p = start; p <= end; p++) {
-          if (!renderedPages.has(p)) {
+          if (!renderedPagesRef.current.has(p)) {
             promises.push(renderPage(p))
           }
         }
