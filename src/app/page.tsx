@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, lazy, Suspense } from 'react'
+import { ErrorBoundary } from '@/components/fia/error-boundary'
 import { Header } from '@/components/fia/header'
 import { LoginModal } from '@/components/fia/login-modal'
 import { LandingAuth } from '@/components/fia/landing-auth'
@@ -82,9 +83,11 @@ export default function Home() {
   if (user) {
     return (
       <Suspense fallback={<DashboardLoader />}>
-        {user.role === 'admin' ? <AdminDashboard /> :
-         user.role === 'trainer' ? <TrainerDashboard /> :
-         <StudentDashboard />}
+        <ErrorBoundary>
+          {user.role === 'admin' ? <AdminDashboard /> :
+           user.role === 'trainer' ? <TrainerDashboard /> :
+           <StudentDashboard />}
+        </ErrorBoundary>
       </Suspense>
     )
   }

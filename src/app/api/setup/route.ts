@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = await requireAdmin(req)
+  if (authError) return authError
   // Check which tables exist
   const checks = [
     { name: 'courses', required: true },
