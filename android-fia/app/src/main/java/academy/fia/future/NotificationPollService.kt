@@ -178,6 +178,22 @@ class NotificationPollService : Service() {
             Log.w(TAG, "Failed to send notification broadcast", e)
         }
 
+        // ⚡ STEP 1.5: If the app is in the FOREGROUND, DON'T fire a native
+        // OS notification. The in-app toast (rendered by the web
+        // notifications-bell component after receiving our broadcast
+        // above) is enough — firing both the in-app toast AND the
+        // native notification creates the duplicate notifications
+        // the user reported seeing in the screenshot (9 duplicates of
+        // the same chat message).
+        //
+        // We only fire the native OS notification when the app is in
+        // the BACKGROUND (so the user sees it in the notification shade
+        // and can tap to open the app).
+        if (isAppInForeground()) {
+            Log.d(TAG, "App is in foreground — skipping native notification (in-app toast already shown)")
+            return
+        }
+
         // Deep-link intent — opens MainActivity with the hash URL
         val intent = Intent(this, MainActivity::class.java).apply {
             data = android.net.Uri.parse("$API_BASE$link")
@@ -208,6 +224,34 @@ class NotificationPollService : Service() {
             notifManager.notify(System.currentTimeMillis().toInt(), notif)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to post notification", e)
+        }
+    }
+
+    /**
+     * ⚡ Checks if the app is currently in the foreground (visible to
+     * the user). Used to decide whether to fire a native OS notification
+     * — if the app is visible, the in-app toast is enough (we don't
+     * want both firing, causing duplicates).
+     */
+    private fun isAppInForeground(): Boolean {
+        return try {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val processes = activityManager.runningAppProcesses
+                val myPid = android.os.Process.myPid()
+                processes?.any {
+                    it.pid == myPid && it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+                } ?: false
+            } else {
+                // Fallback for old Android: check the top running task
+                @Suppress("DEPRECATION")
+                val tasks = activityManager.getRunningTasks(1)
+                tasks?.isNotEmpty() == true && tasks[0].topActivity?.packageName == packageName
+            }
+        } catch (e: Exception) {
+            // If anything fails, assume background (safer — we'd rather
+            // show a duplicate than miss a notification)
+            false
         }
     }
 

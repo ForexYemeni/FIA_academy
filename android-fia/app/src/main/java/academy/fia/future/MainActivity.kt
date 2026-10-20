@@ -530,7 +530,48 @@ class MainActivity : AppCompatActivity() {
             displayZoomControls = false
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            // ⚡ Disable the text selection action mode (the floating
+            // "Copy / Share / Select All" toolbar that appears when
+            // the user long-presses any text in the WebView). This is
+            // the system ActionMode that appears on top of the page
+            // and looks ugly on a custom UI like FIA.
+            //
+            // Note: We disable it on the WebView level via
+            // OnLongClickListener below. We DON'T disable selection
+            // entirely (input/textarea still need it for text editing
+            // — students need to copy course codes, certificate
+            // numbers, etc.). We just hide the floating toolbar so
+            // the user can long-press a button without triggering
+            // the text selection menu.
         }
+
+        // ⚡ Disable the long-press → text selection menu on the whole
+        // WebView. The user reported that long-pressing ANY element
+        // (button, label, card) shows the system's "Copy / Share /
+        // Select All" floating toolbar. This is the standard Android
+        // behavior, but it's confusing in a custom app where the user
+        // just wants to tap a button — they don't expect a context
+        // menu to appear.
+        //
+        // Returning true from onLongClick consumes the event,
+        // preventing the WebView from firing the default long-press
+        // behavior (which shows the text selection menu).
+        //
+        // For text selection that the user DOES want (e.g. copying
+        // a certificate number), the web side has dedicated "Copy"
+        // buttons (see certificate-viewer.tsx → copyCertNumber) that
+        // use navigator.clipboard.writeText directly — those still
+        // work because they're triggered by a normal click, not by
+        // long-press.
+        webView.setOnLongClickListener {
+            // Returning true = consume the event = no default menu
+            true
+        }
+        // Also disable the long-press haptic feedback so the device
+        // doesn't vbrate when the user long-presses (gives away that
+        // the WebView is consuming the event silently)
+        webView.isLongClickable = false
+        webView.isHapticFeedbackEnabled = false
 
         // === FIX 1: PROPER FILE PICKER ===
         // Previous APK used setType("*/*") for ALL file pick requests,
