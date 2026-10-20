@@ -44,6 +44,105 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
    * saved to gallery — same design, same proportions, same colors,
    * same sharp quality.
    */
+  /**
+   * ⚡ Renders the cert element to a high-quality PNG using html2canvas.
+   * html2canvas uses the browser's native canvas drawing API which
+   * correctly renders Arabic text (with proper ligatures, shaping,
+   * RTL direction). html-to-image uses SVG+foreignObject which has
+   * known issues with Arabic text rendering (substitutes wrong glyphs).
+   *
+   * Returns a canvas (already cleaned: white background + sRGB).
+   * This canvas can be exported as PNG (for downloadAsImage) or as
+   * JPEG bytes (for downloadPdf's pdf-lib embedding).
+   */
+  const renderCertToCleanCanvas = async (): Promise<HTMLCanvasElement> => {
+    if (!certRef.current) throw new Error('لا يمكن العثور على عنصر الشهادة')
+    // ⚡ Use html2canvas — it uses the browser's native canvas API
+    // which correctly handles Arabic text shaping, ligatures, and
+    // RTL direction. This is the KEY difference from html-to-image
+    // (which uses SVG+foreignObject and substitutes wrong Arabic
+    // glyphs).
+    // scale=4 → 4x resolution (2880x2032 for a 720x508 cert).
+    const html2canvasModule = await import('html2canvas')
+    const html2canvas = html2canvasModule.default
+    const sourceCanvas = await html2canvas(certRef.current, {
+      scale: 4,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      // Don't set width/height — let html2canvas measure the
+      // element's natural size (720x508). This ensures the full cert
+      // is captured, not just the visible viewport portion.
+    } as any)
+    // ⚡ Re-draw onto a clean canvas with explicit white background.
+    // This:
+    //   1. Flattens any transparency (PNG alpha channel)
+    //   2. Forces a clean sRGB color profile (no LAB ICC issues)
+    //   3. Avoids "unsupported color 'function' lab" errors in any
+    //      downstream PDF library
+    const cleanCanvas = document.createElement('canvas')
+    cleanCanvas.width = sourceCanvas.width
+    cleanCanvas.height = sourceCanvas.height
+    const cleanCtx = cleanCanvas.getContext('2d')!
+    cleanCtx.fillStyle = '#ffffff'
+    cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
+    cleanCtx.drawImage(sourceCanvas, 0, 0)
+    return cleanCanvas
+  }
+
+  /**
+   * Splits a large base64 string into chunks and passes them through
+   * the APK bridge in pieces (Android's @JavascriptInterface has a
+   * practical limit on the size of a single String argument — large
+   * strings can be truncated or fail to pass through). After all
+   * chunks are received, the APK concatenates and decodes.
+   *
+   * Returns true if the APK confirms the save succeeded.
+   */
+  const saveImageToGalleryChunked = async (
+    base64Data: string,
+    mimeType: string,
+    filename: string
+  ): Promise<boolean> => {
+    const bridge = (window as any).FIANativeBridge
+    if (!bridge) return false
+    // ⚡ If the APK has a chunked-save method, use it. This handles
+    // large PNG files (>1MB base64) that would fail with the simple
+    // single-string saveImageToGallery method.
+    if (typeof bridge.saveImageToGalleryChunked === 'function') {
+      try {
+        // Split into 500KB chunks (well under any reasonable limit)
+        const chunks: string[] = []
+        const CHUNK_SIZE = 500_000
+        for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
+          chunks.push(base64Data.substring(i, i + CHUNK_SIZE))
+        }
+        // Pass the chunks as a JSON array — the APK concatenates them
+        // and decodes the full base64 string at once.
+        const result = bridge.saveImageToGalleryChunked(
+          JSON.stringify(chunks),
+          mimeType,
+          filename
+        )
+        return !!result
+      } catch (e) {
+        console.warn('[FIA] chunked save failed, trying single:', e)
+        // Fall through to single-string method
+      }
+    }
+    // ⚡ Fallback to single-string method (for older APKs without the
+    // chunked method).
+    if (typeof bridge.saveImageToGallery === 'function') {
+      try {
+        return !!bridge.saveImageToGallery(base64Data, mimeType, filename)
+      } catch (e) {
+        console.warn('[FIA] single save failed:', e)
+        return false
+      }
+    }
+    return false
+  }
+
   const downloadAsImage = async () => {
     if (!certRef.current) {
       toast.error('لا يمكن العثور على عنصر الشهادة')
@@ -52,83 +151,31 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // ⚡ Use html-to-image (NOT html2canvas) for the PNG.
-      // html-to-image uses the SVG+foreignObject trick which renders
-      // the cert exactly as the browser sees it — including all CSS
-      // gradients, drop-shadows, and Arabic fonts. html2canvas
-      // re-implements CSS rendering in JavaScript, which has known
-      // bugs with `filter: drop-shadow()` and complex gradients.
-      //
-      // pixelRatio=4 → 4x resolution for ultra-sharp PNG
-      // (suitable for printing and zooming).
-      const htmlToImage = await import('html-to-image')
-      const dataUrl = await htmlToImage.toPng(certRef.current, {
-        pixelRatio: 4,
-        cacheBust: true,
-        backgroundColor: '#ffffff',
-        skipFonts: false,
-        // Don't specify width/height — use the element's natural size
-        style: {
-          margin: '0',
-          transform: 'none',
-        }
-      })
-
-      // ⚡ Convert the data URL to a canvas (so we can flatten the
-      // alpha channel and ensure consistent sRGB color profile).
-      // This avoids any LAB ICC profile issues when the PNG is opened
-      // in different gallery apps.
-      const img = new Image()
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve()
-        img.onerror = () => reject(new Error('Failed to load image'))
-        img.src = dataUrl
-      })
-
-      const cleanCanvas = document.createElement('canvas')
-      cleanCanvas.width = img.naturalWidth
-      cleanCanvas.height = img.naturalHeight
-      const cleanCtx = cleanCanvas.getContext('2d')!
-      // Fill with white FIRST (so any transparent pixels become
-      // white, not black)
-      cleanCtx.fillStyle = '#ffffff'
-      cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
-      // Then draw the image on top
-      cleanCtx.drawImage(img, 0, 0)
-
-      // Get final PNG data URL (full quality)
-      const finalDataUrl = cleanCanvas.toDataURL('image/png', 1.0)
-      const base64Data = finalDataUrl.substring(finalDataUrl.indexOf(',') + 1)
-
-      // If inside FIA APK WebView, use the native bridge to save
-      // directly to the gallery — this is the guaranteed path.
+      const cleanCanvas = await renderCertToCleanCanvas()
+      // Get full-quality PNG data URL
+      const dataUrl = cleanCanvas.toDataURL('image/png', 1.0)
+      const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1)
+      // ⚡ If inside FIA APK WebView, save via the native bridge.
+      // Use the chunked method to handle large PNG files (>1MB).
       if (isAndroidWebView()) {
-        const bridge = (window as any).FIANativeBridge
-        if (bridge && typeof bridge.saveImageToGallery === 'function') {
-          const saved = bridge.saveImageToGallery(base64Data, 'image/png', filename)
-          if (saved) {
-            // Also call showToast via the bridge for instant feedback
-            try {
-              bridge.showToast('تم حفظ الشهادة في المعرض ✓', 'long')
-            } catch {}
-            try {
-              bridge.vibrate('[50]')
-            } catch {}
-            toast.success('تم تنزيل الشهادة إلى المعرض ✓')
-            return
-          } else {
-            toast.error('فشل حفظ الصورة — جاري المحاولة عبر المتصفح')
-            // Fall through to blob+anchor approach below
-          }
+        const saved = await saveImageToGalleryChunked(base64Data, 'image/png', filename)
+        if (saved) {
+          const bridge = (window as any).FIANativeBridge
+          try {
+            bridge.showToast('تم حفظ الشهادة في المعرض ✓', 'long')
+          } catch {}
+          try {
+            bridge.vibrate('[50]')
+          } catch {}
+          toast.success('تم تنزيل الشهادة إلى المعرض ✓')
+          return
         } else {
-          // Old APK without the bridge — fall through to blob+anchor
-          toast.info('جاري فتح الصورة — اضغط مطولاً واحفظها يدوياً')
+          toast.error('فشل حفظ الصورة — جاري المحاولة عبر المتصفح')
+          // Fall through to blob download
         }
       }
-
       // Regular browser path — or fallback in WebView if bridge failed
-      // Convert the data URL to a blob and trigger a download
-      const blob = await (await fetch(finalDataUrl)).blob()
+      const blob = await (await fetch(dataUrl)).blob()
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = blobUrl
@@ -152,23 +199,26 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
 
   /**
    * ⚡ PDF download — generates a PDF that's a 100% match of the
-   * on-screen JSX certificate. We use html-to-image to render the cert
-   * element to a high-resolution canvas (using SVG+foreignObject which
-   * handles Arabic fonts + CSS gradients + drop-shadows correctly),
-   * then pdf-lib to embed that canvas as a single-page PDF.
+   * on-screen JSX certificate.
+   *
+   * Pipeline:
+   *   1. html2canvas renders the cert to a high-res canvas (4x scale)
+   *      — this correctly renders Arabic text via the browser's canvas
+   *      API (no glyph substitution issues).
+   *   2. Re-draw onto a clean canvas (white bg → sRGB color profile).
+   *   3. Export as JPEG (always RGB, no LAB ICC profile).
+   *   4. pdf-lib embeds the JPEG bytes directly into a PDF page that
+   *      matches the cert's aspect ratio exactly.
    *
    * ⚡ Why pdf-lib (not jsPDF)?
-   * jsPDF has known issues parsing LAB ICC color profiles embedded in
-   * some canvas outputs. The error was:
-   *   "Attempting to parse an unsupported color 'function' lab"
-   * pdf-lib is more modern and handles color profiles correctly.
+   * jsPDF parses ICC color profiles and fails with "unsupported color
+   * 'function' lab" when the canvas has a LAB profile. pdf-lib doesn't
+   * parse color profiles — it embeds the image bytes as-is.
    *
-   * For the APK: we generate the PDF client-side, then pass the
-   * base64-encoded bytes to FIANativeBridge.savePdfToDownloads which
-   * writes it to the public Downloads/FIA folder via MediaStore.
-   *
-   * For regular browsers: we trigger a normal blob download with
-   * the certificate number in the filename.
+   * ⚡ Why JPEG (not PNG) for the embedded image?
+   *   1. JPEG is always RGB (no ICC profile issues)
+   *   2. Smaller file size → smaller PDF → faster APK bridge transfer
+   *   3. Quality 0.95 is near-lossless for visible quality
    */
   const downloadPdf = async () => {
     if (!certRef.current) {
@@ -178,52 +228,8 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setPdfDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.pdf`
     try {
-      // ⚡ STEP 1: Render the cert element to a high-res canvas via
-      // html-to-image. pixelRatio=4 → 4x resolution for crisp PDF.
-      // We use html-to-image (not html2canvas) because it uses
-      // SVG+foreignObject which renders the cert EXACTLY as the
-      // browser sees it (including drop-shadow, gradients, Arabic
-      // fonts). html2canvas re-implements CSS in JS, which has bugs.
-      const htmlToImage = await import('html-to-image')
-      const dataUrl = await htmlToImage.toPng(certRef.current, {
-        pixelRatio: 4,
-        cacheBust: true,
-        backgroundColor: '#ffffff',
-        skipFonts: false,
-        style: {
-          margin: '0',
-          transform: 'none',
-        }
-      })
-
-      // ⚡ STEP 2: Convert the data URL to an Image element, then
-      // draw onto a fresh canvas with a white background. This:
-      //   1. Flattens any transparency
-      //   2. Forces a clean sRGB color profile (no LAB ICC issues)
-      //   3. Avoids any color profile parsing errors in pdf-lib
-      const img = new Image()
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve()
-        img.onerror = () => reject(new Error('Failed to load image'))
-        img.src = dataUrl
-      })
-
-      const cleanCanvas = document.createElement('canvas')
-      cleanCanvas.width = img.naturalWidth
-      cleanCanvas.height = img.naturalHeight
-      const cleanCtx = cleanCanvas.getContext('2d')!
-      cleanCtx.fillStyle = '#ffffff'
-      cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
-      cleanCtx.drawImage(img, 0, 0)
-
-      // ⚡ STEP 3: Convert the clean canvas to JPEG bytes.
-      // We use JPEG (not PNG) because:
-      //   1. JPEG is always RGB (no LAB color profile issues)
-      //   2. Smaller file size
-      //   3. Quality 0.95 is near-lossless for visible quality
-      // pdf-lib embeds the JPEG bytes directly without parsing color
-      // profiles — so it doesn't trigger the "unsupported color
-      // 'function' lab" error that jsPDF was throwing.
+      const cleanCanvas = await renderCertToCleanCanvas()
+      // Export as JPEG (always RGB, no LAB issues, smaller file)
       const jpegBlob = await new Promise<Blob>((resolve, reject) => {
         cleanCanvas.toBlob(
           (blob) => {
@@ -235,43 +241,35 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         )
       })
       const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
-
-      // ⚡ STEP 4: Use pdf-lib (not jsPDF) to create the PDF.
-      // pdf-lib doesn't parse ICC color profiles when embedding images,
-      // so it doesn't have the "unsupported color 'function' lab"
-      // error that jsPDF has. It just embeds the JPEG bytes as-is.
+      // Use pdf-lib to create the PDF
       const { PDFDocument } = await import('pdf-lib')
       const pdfDoc = await PDFDocument.create()
       const embeddedImage = await pdfDoc.embedJpg(jpegBytes)
-      // ⚡ Page size: matches the cert's aspect ratio exactly (no
-      // white borders, no margins). Width = 297mm (A4 landscape),
-      // height = 297 / imgRatio.
+      // Page size matches the cert's aspect ratio (no margins/borders)
       const imgWidth = embeddedImage.width
       const imgHeight = embeddedImage.height
       const imgRatio = imgWidth / imgHeight
-      let pageWidth = 297
+      let pageWidth = 297 // A4 landscape width in mm
       let pageHeight = pageWidth / imgRatio
-      // If too tall, fit by height instead (max A4 height = 210mm)
-      const maxPageHeight = 210
+      const maxPageHeight = 210 // A4 landscape height in mm
       if (pageHeight > maxPageHeight) {
         pageHeight = maxPageHeight
         pageWidth = pageHeight * imgRatio
       }
       const page = pdfDoc.addPage([pageWidth, pageHeight])
-      // Draw the image to fill the entire page (no margins, no borders).
       page.drawImage(embeddedImage, {
         x: 0,
         y: 0,
         width: pageWidth,
         height: pageHeight,
       })
-
-      // ⚡ STEP 5: Serialize the PDF to bytes.
+      // Serialize PDF to bytes
       const pdfBytes = await pdfDoc.save()
-      // Convert Uint8Array to base64 for the APK bridge.
+      // Convert to base64 for the APK bridge (chunked to handle
+      // large PDFs — Android's @JavascriptInterface has a practical
+      // limit on String argument size)
       let pdfBase64 = ''
       try {
-        // Use chunks to avoid call stack overflow on large PDFs
         const CHUNK_SIZE = 0x8000
         for (let i = 0; i < pdfBytes.length; i += CHUNK_SIZE) {
           const chunk = pdfBytes.subarray(i, i + CHUNK_SIZE)
@@ -279,32 +277,60 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         }
         pdfBase64 = btoa(pdfBase64)
       } catch (e) {
-        console.warn('[FIA] base64 conversion failed:', e)
+        console.warn('[FIA] PDF base64 conversion failed:', e)
       }
-
-      // ⚡ STEP 6: If inside the FIA APK WebView, save via the native
-      // bridge (which writes to Downloads/FIA via MediaStore).
+      // ⚡ APK path — use chunked save to handle large PDFs
       if (isAndroidWebView()) {
         const bridge = (window as any).FIANativeBridge
-        if (bridge && typeof bridge.savePdfToDownloads === 'function' && pdfBase64) {
-          const saved = bridge.savePdfToDownloads(pdfBase64, filename)
-          if (saved) {
+        if (bridge && pdfBase64) {
+          // Try chunked PDF save first
+          if (typeof bridge.savePdfToDownloadsChunked === 'function') {
             try {
-              bridge.showToast('تم حفظ الشهادة PDF في مجلد التنزيلات ✓', 'long')
-            } catch {}
+              const chunks: string[] = []
+              const CHUNK_SIZE = 500_000
+              for (let i = 0; i < pdfBase64.length; i += CHUNK_SIZE) {
+                chunks.push(pdfBase64.substring(i, i + CHUNK_SIZE))
+              }
+              const saved = bridge.savePdfToDownloadsChunked(
+                JSON.stringify(chunks),
+                filename
+              )
+              if (saved) {
+                try {
+                  bridge.showToast('تم حفظ الشهادة PDF في مجلد التنزيلات ✓', 'long')
+                } catch {}
+                try {
+                  bridge.vibrate('[50]')
+                } catch {}
+                toast.success('تم تنزيل الشهادة PDF إلى مجلد التنزيلات ✓')
+                return
+              }
+            } catch (e) {
+              console.warn('[FIA] chunked PDF save failed:', e)
+            }
+          }
+          // Fallback to single-string method
+          if (typeof bridge.savePdfToDownloads === 'function') {
             try {
-              bridge.vibrate('[50]')
-            } catch {}
-            toast.success('تم تنزيل الشهادة PDF إلى مجلد التنزيلات ✓')
-            return
-          } else {
-            toast.error('فشل الحفظ المباشر — جاري المحاولة عبر المتصفح')
-            // Fall through to blob download
+              const saved = bridge.savePdfToDownloads(pdfBase64, filename)
+              if (saved) {
+                try {
+                  bridge.showToast('تم حفظ الشهادة PDF في مجلد التنزيلات ✓', 'long')
+                } catch {}
+                try {
+                  bridge.vibrate('[50]')
+                } catch {}
+                toast.success('تم تنزيل الشهادة PDF إلى مجلد التنزيلات ✓')
+                return
+              }
+            } catch (e) {
+              console.warn('[FIA] single PDF save failed:', e)
+            }
           }
         }
+        toast.error('فشل الحفظ المباشر — جاري المحاولة عبر المتصفح')
       }
-
-      // ⚡ STEP 7: Regular browser path — trigger blob download
+      // Regular browser path — blob download
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
