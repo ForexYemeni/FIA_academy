@@ -17,8 +17,17 @@ export function Footer() {
   const academyShort = settings?.academy_short || 'FIA'
 
   return (
-    <footer className="bg-navy text-white mt-20">
-      <div className="container mx-auto px-4 lg:px-6 py-12">
+    <footer className="relative bg-gradient-to-br from-navy via-navy-light to-navy text-white mt-20 overflow-hidden">
+      {/* Top gold strip */}
+      <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70 z-10" />
+      {/* Gold dot pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+        backgroundSize: '24px 24px, 18px 18px',
+      }} />
+      {/* Gold glow circle at top */}
+      <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-64 h-32 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative container mx-auto px-4 lg:px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-3">
@@ -111,7 +120,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-white/60 text-xs">
+          <div className="text-gold/60 text-xs">
             © {new Date().getFullYear()} {academyName} ({academyShort}). جميع الحقوق محفوظة.
           </div>
         </div>

@@ -89,8 +89,12 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
 
   if (loading) {
     return (
-      <Card className="p-6 text-center">
-        <Loader2 className="w-5 h-5 mx-auto animate-spin text-navy" />
+      <Card className="p-6 text-center relative overflow-hidden border-2 border-gold/30 rounded-2xl">
+        <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }} />
+        <Loader2 className="w-6 h-6 mx-auto animate-spin text-gold relative" />
       </Card>
     )
   }
@@ -98,11 +102,16 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
   // If a certificate is already issued
   if (certificate) {
     return (
-      <Card className="p-6 bg-gradient-to-br from-gold/10 via-white to-navy/5 border-gold/30 overflow-hidden relative">
-        <div className="absolute top-4 right-4 w-32 h-32 bg-gold/10 rounded-full blur-3xl" />
+      <Card className="p-6 bg-gradient-to-br from-gold/10 via-white to-navy/5 border-2 border-gold/40 overflow-hidden relative rounded-2xl">
+        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+        <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }} />
+        <div className="absolute top-4 right-4 w-32 h-32 bg-gold/15 rounded-full blur-3xl" />
         <div className="relative text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-gold/15 flex items-center justify-center mb-3">
-            <CheckCircle2 className="w-8 h-8 text-gold" />
+          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center mb-3 shadow-md ring-4 ring-gold/20">
+            <CheckCircle2 className="w-8 h-8 text-navy" />
           </div>
           <h3 className="font-bold text-navy text-lg mb-2">🎉 شهادتك الصادرة</h3>
           <p className="font-mono text-sm text-gold mb-3" dir="ltr">{certificate.certificate_number}</p>
@@ -110,7 +119,7 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
             href={`/verify/${certificate.certificate_number}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg font-bold text-sm"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-5 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all"
           >
             <Award className="w-4 h-4" /> عرض / تحميل الشهادة
           </a>
@@ -125,13 +134,19 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
       existing.status === 'trainer_approved' ? 'معتمد من المدرب — بانتظار الإدارة' :
       'معتمد من الإدارة — جاري الإصدار'
     return (
-      <Card className="p-6 bg-yellow-500/5 border-yellow-500/30">
-        <div className="text-center">
-          <div className="w-14 h-14 mx-auto rounded-full bg-yellow-500/15 flex items-center justify-center mb-3">
-            <Clock className="w-7 h-7 text-yellow-600" />
+      <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100/50 border-2 border-amber-500/40 rounded-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-amber-400 via-amber-500 to-amber-400 opacity-70" />
+        <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }} />
+        <div className="absolute top-4 right-4 w-28 h-28 bg-amber-400/20 rounded-full blur-3xl" />
+        <div className="relative text-center">
+          <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center mb-3 shadow-md ring-4 ring-amber-400/20">
+            <Clock className="w-7 h-7 text-white" />
           </div>
           <h3 className="font-bold text-navy mb-2">طلبك قيد المراجعة</h3>
-          <Badge className="bg-yellow-500/15 text-yellow-700 border-yellow-500/30">{statusLabel}</Badge>
+          <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30">{statusLabel}</Badge>
           {existing.created_at && (
             <p className="text-xs text-muted-foreground mt-2">تاريخ الطلب: {new Date(existing.created_at).toLocaleDateString('ar-EG')}</p>
           )}
@@ -144,14 +159,20 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
   // If a request was rejected
   if (existing && existing.status === 'rejected') {
     return (
-      <Card className="p-6 bg-red-500/5 border-red-500/30">
-        <div className="text-center">
-          <div className="w-14 h-14 mx-auto rounded-full bg-red-500/15 flex items-center justify-center mb-3">
-            <X className="w-7 h-7 text-red-500" />
+      <Card className="p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 border-2 border-rose-500/40 rounded-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-rose-400 via-rose-500 to-rose-400 opacity-70" />
+        <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }} />
+        <div className="absolute top-4 right-4 w-28 h-28 bg-rose-400/20 rounded-full blur-3xl" />
+        <div className="relative text-center">
+          <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center mb-3 shadow-md ring-4 ring-rose-400/20">
+            <X className="w-7 h-7 text-white" />
           </div>
           <h3 className="font-bold text-navy mb-2">تم رفض طلبك</h3>
           {existing.admin_note && <p className="text-xs text-muted-foreground mb-3">السبب: {existing.admin_note}</p>}
-          <Button onClick={requestCertificate} disabled={requesting} size="sm" className="bg-navy hover:bg-navy-light">
+          <Button onClick={requestCertificate} disabled={requesting} size="sm" className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97]">
             {requesting ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileText className="w-4 h-4 ml-1" />}
             أعد تقديم الطلب
           </Button>
@@ -160,24 +181,31 @@ export function CertificateRequest({ courseId, courseTitle }: { courseId: string
     )
   }
 
-  // No request yet — show the request CTA
+  // No request yet — show the request CTA (magical gold gradient card)
   return (
-    <Card className="p-6 bg-gradient-to-br from-navy to-navy-light text-white border-gold/30 overflow-hidden relative">
-      <div className="absolute top-0 right-0 w-40 h-40 bg-gold/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gold/5 rounded-full blur-2xl" />
+    <Card className="p-6 bg-gradient-to-br from-gold/10 to-amber-50/50 border-2 border-gold/40 overflow-hidden relative rounded-2xl">
+      <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+      {/* Gold dot pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
+      }} />
+      {/* Gold glow circle */}
+      <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
       <div className="relative text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-gold/20 flex items-center justify-center mb-3">
-          <Award className="w-8 h-8 text-gold" />
+        <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center mb-3 shadow-md ring-4 ring-gold/20">
+          <Award className="w-8 h-8 text-navy" />
         </div>
-        <h3 className="font-bold text-lg mb-2">🎉 أكملت الدورة بنجاح!</h3>
-        <p className="text-white/70 text-sm mb-4 max-w-md mx-auto">
+        <h3 className="font-bold text-lg mb-2 text-navy">🎉 أكملت الدورة بنجاح!</h3>
+        <p className="text-navy/70 text-sm mb-4 max-w-md mx-auto">
           احصل على شهادة إكمال معتمدة من أكاديمية المستقبل الدولية — قابلة للتحقق منها عبر QR code.
           اضغط الزر أدناه لتقديم طلب الشهادة. ستتم مراجعته من الإدارة ثم يصدر لك رقم الشهادة.
         </p>
         <Button
           onClick={requestCertificate}
           disabled={requesting}
-          className="bg-gold hover:bg-gold-light text-navy font-bold"
+          className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-bold rounded-xl shadow-md active:scale-[0.97]"
         >
           {requesting ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <FileText className="w-4 h-4 ml-1" />}
           {requesting ? 'جاري إرسال الطلب...' : '📜 اطلب شهادتك الآن'}
