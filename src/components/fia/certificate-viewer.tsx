@@ -180,8 +180,41 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         </div>
       </div>
 
+      {/* === Magical outer wrapper with navy header + gold frame === */}
+      <div className="relative border-2 border-gold/30 rounded-2xl overflow-hidden shadow-xl bg-white">
+        {/* Top gold strip */}
+        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70 z-20" />
+
+        {/* === Magical navy gradient header bar === */}
+        <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-6 py-4 flex items-center gap-3 overflow-hidden">
+          {/* Gold dot pattern overlay */}
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px',
+          }} />
+          {/* Gold glow circle */}
+          <div className="absolute -top-4 -right-4 w-24 h-24 bg-gold/15 rounded-full blur-2xl" />
+          <div className="relative w-11 h-11 rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center">
+            <Award className="w-6 h-6 text-gold" />
+          </div>
+          <div className="relative">
+            <h3 className="text-gold font-bold text-base flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              شهادة إكمال معتمدة
+            </h3>
+            <p className="text-white/60 text-xs">وثيقة رسمية من أكاديمية المستقبل الدولية</p>
+          </div>
+        </div>
+
+        {/* === Certificate area with subtle gold dot pattern backdrop === */}
+        <div className="relative overflow-x-auto bg-gradient-to-b from-amber-50/40 to-white py-6">
+          {/* Subtle gold dot pattern overlay (behind certificate, in gaps) */}
+          <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle at 50% 50%, #D4AF37 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }} />
+
       {/* Fixed landscape certificate — 768×542 (export 2x = 1536×1084) */}
-      <div className="overflow-x-auto">
         <div ref={certRef} style={{ width: 720, height: 508, margin: '0 auto', position: 'relative' }}>
           {/* Gold frame — thicker + brighter */}
           <div style={{ width: '100%', height: '100%', padding: '5px', background: `linear-gradient(135deg, ${GOLD}, ${GOLD_BRIGHT}, ${GOLD_L}, ${GOLD})`, borderRadius: '8px', boxShadow: `0 4px 20px ${GOLD}40` }}>
@@ -297,17 +330,18 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
           </div>
         </div>
       </div>
+      </div>
 
       {/* Buttons */}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <button onClick={downloadAsImage} disabled={downloading} className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50">
+        <button onClick={downloadAsImage} disabled={downloading} className="inline-flex items-center gap-1.5 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-5 py-2.5 rounded-xl shadow-md active:scale-[0.97] font-bold text-sm transition-all disabled:opacity-50">
           {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {downloading ? 'جاري إنشاء الصورة...' : 'تنزيل (صورة)'}
         </button>
-        <button onClick={copyCertNumber} className="inline-flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-5 py-2.5 rounded-lg font-bold text-sm transition-all">
+        <button onClick={copyCertNumber} className="inline-flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all">
           <Copy className="w-4 h-4" /> نسخ الرقم
         </button>
-        <button onClick={downloadPdf} disabled={pdfDownloading} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50">
+        <button onClick={downloadPdf} disabled={pdfDownloading} className="inline-flex items-center gap-1.5 border border-navy/20 text-navy hover:bg-navy/5 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50">
           {pdfDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
           {pdfDownloading ? 'جاري...' : 'تنزيل PDF'}
         </button>

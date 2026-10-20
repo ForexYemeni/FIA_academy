@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertTriangle, Loader2, Trash2, Lock, Eye, EyeOff, Shield } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2, Lock, Eye, EyeOff, Shield, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
 
@@ -93,19 +93,30 @@ export function PasswordConfirmDialog({
       onClick={() => { if (!isBusy) onOpenChange(false) }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden border-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top: navy/gold gradient with Shield icon */}
-        <div className="bg-gradient-to-br from-navy to-navy-light p-6 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center mb-2">
-            <Shield className="w-8 h-8 text-gold" />
+        {/* Top: magical red gradient header with gold dot pattern + glow */}
+        <div className="relative bg-gradient-to-br from-red-600 via-rose-700 to-red-800 p-6 text-center overflow-hidden">
+          {/* Gold dot pattern overlay (white dots on red) */}
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px',
+          }} />
+          {/* Glow circle */}
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+          {/* White circle icon in header */}
+          <div className="relative w-16 h-16 mx-auto rounded-full bg-white/95 flex items-center justify-center mb-2 shadow-lg ring-4 ring-white/20">
+            <Lock className="w-8 h-8 text-red-600" />
           </div>
-          <h3 className="text-gold text-lg font-bold">{title}</h3>
+          <h3 className="relative text-white text-lg font-bold drop-shadow flex items-center justify-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-gold" />
+            {title}
+          </h3>
         </div>
 
         {/* Body */}
-        <div className="p-6 text-center">
+        <div className="bg-gradient-to-b from-gray-50/50 to-white p-6 text-center">
           {itemLabel && (
             <p className="text-sm text-gray-600 mb-1">{itemLabel}</p>
           )}
@@ -123,7 +134,7 @@ export function PasswordConfirmDialog({
           {/* Password field */}
           <div className="mb-4 text-right">
             <Label className="text-navy font-bold text-sm flex items-center gap-1 mb-1.5 justify-right">
-              <Lock className="w-3.5 h-3.5" />
+              <Lock className="w-3.5 h-3.5 text-gold" />
               كلمة المرور — تأكيد الهوية
             </Label>
             <div className="relative">
@@ -134,7 +145,7 @@ export function PasswordConfirmDialog({
                 onKeyDown={(e) => { if (e.key === 'Enter' && !isBusy) handleConfirm() }}
                 placeholder="••••••••"
                 dir="ltr"
-                className="h-12 pr-10 text-base"
+                className="h-12 pr-10 text-base rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 disabled={isBusy}
                 autoFocus
                 autoComplete="current-password"
@@ -158,14 +169,14 @@ export function PasswordConfirmDialog({
             <button
               onClick={() => onOpenChange(false)}
               disabled={isBusy}
-              className="flex-1 h-11 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors disabled:opacity-50"
             >
               إلغاء
             </button>
             <button
               onClick={handleConfirm}
               disabled={isBusy || !password.trim()}
-              className="flex-1 h-11 rounded-lg bg-navy hover:bg-navy-light text-gold font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md active:scale-[0.97]"
             >
               {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               {isBusy ? 'جاري...' : confirmLabel}
