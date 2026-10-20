@@ -345,26 +345,36 @@ export function StudentCourseViewer({
                         const type = LESSON_TYPES[l.lesson_type] || LESSON_TYPES.text
                         const Icon = type.icon
                         const isCompleted = completedLessons.has(l.id)
+                        // ⚡ Sequential access: a lesson is locked if the previous lesson
+                        // in the SAME module is not yet completed. The FIRST lesson in each
+                        // module is always unlocked. Preview lessons (is_preview) are always
+                        // unlocked so visitors can sample them.
+                        const isLocked = li > 0 && !isCompleted && !completedLessons.has(lessons[li - 1].id) && !l.is_preview
                         return (
                           <div
                             key={l.id}
                             className={`fia-card-hover flex items-center gap-3 p-3 rounded-xl border transition-all ${
                               isCompleted
                                 ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/50 border-emerald-500/30'
-                                : 'bg-white border-border hover:border-gold/30 hover:shadow-sm'
+                                : isLocked
+                                  ? 'bg-gray-50 border-gray-200 opacity-60'
+                                  : 'bg-white border-border hover:border-gold/30 hover:shadow-sm'
                             }`}
                           >
                             <button
-                              onClick={() => setPreviewLesson(l)}
-                              className="flex items-center gap-3 flex-1 text-right min-w-0"
+                              onClick={() => !isLocked && setPreviewLesson(l)}
+                              disabled={isLocked}
+                              className={`flex items-center gap-3 flex-1 text-right min-w-0 ${isLocked ? 'cursor-not-allowed' : ''}`}
                             >
                               {/* Lesson status circle — magical */}
                               <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
                                 isCompleted
                                   ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
-                                  : `bg-gradient-to-br ${type.gradient} text-white`
+                                  : isLocked
+                                    ? 'bg-gray-300 text-gray-500'
+                                    : `bg-gradient-to-br ${type.gradient} text-white`
                               }`}>
-                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-3.5 h-3.5" />}
+                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                               </div>
                               <Badge className={type.color + ' flex-shrink-0'}>
                                 <Icon className="w-3 h-3 ml-1" /> {type.label}
@@ -377,6 +387,9 @@ export function StudentCourseViewer({
                                       <Sparkles className="w-2.5 h-2.5 ml-0.5" /> معاينة
                                     </Badge>
                                   )}
+                                  {isLocked && (
+                                    <span className="text-[9px] text-muted-foreground flex-shrink-0">🔒 أكمل الدرس السابق</span>
+                                  )}
                                 </div>
                                 {l.duration_minutes ? (
                                   <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -388,9 +401,10 @@ export function StudentCourseViewer({
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => markComplete(l)}
-                              className="flex-shrink-0"
-                              title={isCompleted ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}
+                              onClick={() => !isLocked && markComplete(l)}
+                              disabled={isLocked}
+                              className={`flex-shrink-0 ${isLocked ? 'opacity-30 cursor-not-allowed' : ''}`}
+                              title={isLocked ? 'أكمل الدرس السابق أولاً' : isCompleted ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}
                             >
                               {isCompleted ? (
                                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
