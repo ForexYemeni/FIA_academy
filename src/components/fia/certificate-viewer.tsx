@@ -52,25 +52,32 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
     setDownloading(true)
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     try {
-      // ⚡ Convert JSX cert to PNG via html-to-image
-      // pixelRatio=4 for 4x resolution (ultra-high quality)
-      // DON'T force width/height — let htmlToImage measure the
-      // actual element so the PNG matches the on-screen cert 100%
-      const dataUrl = await htmlToImage.toPng(certRef.current, {
-        pixelRatio: 4,
-        cacheBust: true,
+      // ⚡ Use html2canvas (NOT html-to-image) for the PNG. html2canvas
+      // handles Arabic fonts and complex CSS gradients better than
+      // html-to-image (which sometimes produces blurry text).
+      // scale=4 → 4x resolution for ultra-sharp PNG (suitable for
+      // printing and zooming).
+      const html2canvas = (await import('html2canvas')).default
+      const sourceCanvas = await html2canvas(certRef.current, {
+        scale: 4,
+        useCORS: true,
         backgroundColor: '#ffffff',
-        skipFonts: false,
-        // Don't specify width/height — use the element's natural size
-        // This ensures the PNG matches the on-screen cert 100%.
-        style: {
-          margin: '0',
-          transform: 'none',
-        }
+        logging: false,
       })
 
-      // The dataUrl is a "data:image/png;base64,..." string
-      // Strip the prefix to get raw base64
+      // ⚡ Re-draw onto a clean canvas with explicit white background
+      // to ensure consistent sRGB color profile (no LAB color issues
+      // when the PNG is opened in different apps).
+      const cleanCanvas = document.createElement('canvas')
+      cleanCanvas.width = sourceCanvas.width
+      cleanCanvas.height = sourceCanvas.height
+      const cleanCtx = cleanCanvas.getContext('2d')!
+      cleanCtx.fillStyle = '#ffffff'
+      cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
+      cleanCtx.drawImage(sourceCanvas, 0, 0)
+
+      // Get PNG data URL (full quality)
+      const dataUrl = cleanCanvas.toDataURL('image/png', 1.0)
       const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1)
 
       // If inside FIA APK WebView, use the native bridge to save
@@ -116,7 +123,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       }, 2000)
       toast.success('تم تنزيل الشهادة')
     } catch (e: any) {
-      console.error('[FIA] html-to-image failed:', e)
+      console.error('[FIA] cert PNG failed:', e)
       toast.error('فشل إنشاء صورة الشهادة: ' + (e?.message || ''))
     } finally {
       setDownloading(false)
@@ -131,7 +138,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
    *
    * This GUARANTEES that the PDF matches what the user sees on screen —
    * same design, same colors, same proportions. The previous flow
-   * fetched a server-generated PDF that had a DIFFERENT design than
+   * fetched a server-generated PDF that had a completely different design than
    * the JSX rendering — the user complained "الشهادة تظهر مختلفة
    * تماماً عن الشهادة التي تعرض".
    *
@@ -153,21 +160,44 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       // ⚡ STEP 1: Render the cert element to a high-res canvas via
       // html2canvas. scale=4 → 4x resolution for crisp PDF.
       const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(certRef.current, {
+      const sourceCanvas = await html2canvas(certRef.current, {
         scale: 4,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
       })
 
-      // ⚡ STEP 2: Convert the canvas to a PDF via jsPDF.
+      // ⚡ STEP 1.5: Re-draw the source canvas onto a new canvas with
+      // an explicit white background. This solves two issues:
+      //   1. jsPDF fails with "Attempting to parse an unsupported
+      //      color 'function' lab" when the canvas has a LAB ICC
+      //      color profile (which happens on some devices/browsers).
+      //   2. Drawing onto a fresh RGB canvas with a white background
+      //      flattens any transparency and forces a clean sRGB color
+      //      profile, which jsPDF handles correctly.
+      const cleanCanvas = document.createElement('canvas')
+      cleanCanvas.width = sourceCanvas.width
+      cleanCanvas.height = sourceCanvas.height
+      const cleanCtx = cleanCanvas.getContext('2d')!
+      // Fill with white FIRST (so any transparent pixels in the
+      // source become white, not black)
+      cleanCtx.fillStyle = '#ffffff'
+      cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height)
+      // Then draw the source canvas on top
+      cleanCtx.drawImage(sourceCanvas, 0, 0)
+
+      // ⚡ STEP 2: Convert the clean canvas to a PDF via jsPDF.
       // We use landscape A4 (297x210mm) since the cert is wider than
       // tall. The canvas image is placed to fill the entire page,
       // maintaining the cert's aspect ratio.
       const { jsPDF } = await import('jspdf')
-      const imgData = canvas.toDataURL('image/png', 1.0) // full quality
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
+      // ⚡ Use JPEG instead of PNG for the image data — JPEG is
+      // always RGB (no LAB color profile issues) and the file is
+      // smaller. Quality 0.95 is near-lossless for the visible
+      // quality.
+      const imgData = cleanCanvas.toDataURL('image/jpeg', 0.95)
+      const imgWidth = cleanCanvas.width
+      const imgHeight = cleanCanvas.height
       // Use landscape A4: 297 x 210 mm
       const pdf = new jsPDF({
         orientation: 'landscape',
@@ -180,7 +210,6 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       // ⚡ Calculate the image position so it's centered on the page
       // while maintaining the cert's aspect ratio.
       const imgRatio = imgWidth / imgHeight
-      const pdfRatio = pdfWidth / pdfHeight
       let finalWidth = pdfWidth
       let finalHeight = pdfWidth / imgRatio
       // If the cert is taller than the page's aspect ratio, fit by
@@ -191,7 +220,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
       }
       const offsetX = (pdfWidth - finalWidth) / 2
       const offsetY = (pdfHeight - finalHeight) / 2
-      pdf.addImage(imgData, 'PNG', offsetX, offsetY, finalWidth, finalHeight, undefined, 'FAST')
+      pdf.addImage(imgData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight, undefined, 'FAST')
 
       // ⚡ STEP 3: Get the PDF as a base64 string (without the data:
       // prefix) so we can pass it to the APK's native bridge.
