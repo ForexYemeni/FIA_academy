@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
-  GraduationCap, Crown,
+  GraduationCap, Crown, Calendar, Clock,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -804,85 +804,130 @@ function TrainerStudents({ students, courses }: any) {
   return (
     <SectionCard title="متدربوّ" description={`${filteredStudents.length} متدرب${filteredStudents.length === 1 ? '' : 'ين'}`}>
       {courses.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">لا يوجد متدربون — أنشئ دورة أولاً</p>
+        /* ⚡ Magical empty state — no courses */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <BookOpen className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد متدربون بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">أنشئ دورة أولاً ليتمكن المتدربون من التسجيل فيها ✨</p>
         </div>
       ) : !enrollmentsLoaded ? (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3 animate-spin" />
-          <p className="text-muted-foreground">جاري تحميل المتدربين...</p>
+        /* ⚡ Magical loading state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-3">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
+          </div>
+          <p className="text-sm text-muted-foreground">جاري تحميل المتدربين...</p>
         </div>
       ) : filteredStudents.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">لا يوجد متدربون في دوراتك بعد</p>
+        /* ⚡ Magical empty state — no enrollments */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <Users className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد متدربون في دوراتك بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">عندما يسجّل متدربون في دوراتك سيظهرون هنا ✨</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        /* ⚡ Magical student cards — 2/3/4 grid with compact design */
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
           {filteredStudents.map((s: any) => {
             const studentEnrs = studentEnrollments(s.id)
+            const completedCount = studentEnrs.filter((e) => e.status === 'completed' || e.status === 'مكتمل').length
+            const pendingCount = studentEnrs.filter((e) => e.payment_status === 'pending').length
             return (
-              <Card key={s.id} className="overflow-hidden">
-                <div className="p-4 bg-muted/30 border-b border-border">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gold/30 bg-navy flex items-center justify-center text-gold font-bold text-lg flex-shrink-0">
+              <Card key={s.id} className="fia-card-hover p-0 overflow-hidden cursor-default border border-gold/20">
+                {/* ⚡ Magical header — navy gradient + gold dots */}
+                <div className="relative p-3 bg-gradient-to-br from-navy via-navy-light to-navy text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -left-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+                  <div className="relative flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-gold/40 bg-navy-light shadow-md flex-shrink-0">
                       {s.avatar ? (
-                        <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" />
+                        <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
                       ) : (
-                        s.name?.charAt(0)
+                        <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl bg-gradient-to-br from-gold/20 to-amber-500/20">
+                          {s.name?.charAt(0)}
+                        </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-navy">{s.name}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
-                        <span dir="ltr">{s.email}</span>
-                        {s.phone && <span dir="ltr">{s.phone}</span>}
-                        <span>تسجيل: {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
-                      </div>
+                      <div className="font-bold text-xs truncate text-white">{s.name}</div>
+                      <div className="text-[10px] text-white/70 truncate" dir="ltr">{s.email}</div>
                     </div>
-                    <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">
-                      {studentEnrs.length} دورة
-                    </Badge>
                   </div>
                 </div>
-                <div className="p-4">
-                  {studentEnrs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">لم يسجّل في أي دورة بعد</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {studentEnrs.map((e) => {
+
+                {/* ⚡ Magical body — compact stats + courses preview */}
+                <div className="p-3 space-y-2.5">
+                  {/* Stats row — mini badges */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center gap-1 bg-blue-50 text-blue-700 rounded-lg px-2 py-1.5 border border-blue-200/40">
+                      <BookOpen className="w-3 h-3 flex-shrink-0" />
+                      <span className="text-[10px] font-bold">{studentEnrs.length} دورة</span>
+                    </div>
+                    {completedCount > 0 && (
+                      <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-lg px-2 py-1.5 border border-emerald-200/40">
+                        <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                        <span className="text-[10px] font-bold">{completedCount}</span>
+                      </div>
+                    )}
+                    {pendingCount > 0 && (
+                      <div className="flex items-center gap-1 bg-amber-50 text-amber-700 rounded-lg px-2 py-1.5 border border-amber-200/40">
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        <span className="text-[10px] font-bold">{pendingCount}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Phone + date row */}
+                  <div className="grid grid-cols-1 gap-1 text-[10px]">
+                    {s.phone && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Mail className="w-2.5 h-2.5" />
+                        <span dir="ltr" className="font-medium text-navy">{s.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="w-2.5 h-2.5" />
+                      <span className="font-medium text-navy">{s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+                    </div>
+                  </div>
+
+                  {/* Course preview — first 2 courses */}
+                  {studentEnrs.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-border/40">
+                      {studentEnrs.slice(0, 2).map((e) => {
                         const course = courses?.find((c: any) => c.id === e.course_id)
                         if (!course) return null
                         const isFree = course.price_type === 'مجانية' || course.price === 0
+                        const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+                        const isPending = e.payment_status === 'pending'
                         return (
-                          <div key={e.id} className="flex items-center justify-between p-3 bg-white border border-border rounded-lg">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-lg bg-navy flex items-center justify-center flex-shrink-0">
-                                <BookOpen className="w-5 h-5 text-gold" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-medium text-navy text-sm truncate">{course.title}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {course.lessons_count || 0} درس
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <Badge className={isFree ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-gold/15 text-gold border-gold/30'}>
-                                {isFree ? 'مجانية' : 'مدفوعة'}
-                              </Badge>
-                              <Badge variant="outline" className={
-                                e.status === 'completed' ? 'border-green-500/30 text-green-600'
-                                : e.payment_status === 'pending' ? 'border-yellow-500/30 text-yellow-600'
-                                : 'border-blue-500/30 text-blue-600'
-                              }>
-                                {e.status === 'completed' ? 'مكتملة' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
-                              </Badge>
-                            </div>
+                          <div key={e.id} className="text-[10px] flex items-center justify-between gap-1 bg-muted/20 rounded px-1.5 py-1">
+                            <span className="truncate text-navy font-medium">{course.title}</span>
+                            <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              isCompleted ? 'bg-emerald-500/15 text-emerald-700 border border-emerald-500/30'
+                              : isPending ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30'
+                              : 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
+                            }`}>
+                              {isCompleted ? 'مكتمل' : isPending ? 'بانتظار' : 'قيد التعلّم'}
+                            </span>
                           </div>
                         )
                       })}
+                      {studentEnrs.length > 2 && <div className="text-[10px] text-muted-foreground text-center">+{studentEnrs.length - 2} دورة أخرى</div>}
                     </div>
                   )}
                 </div>
@@ -960,10 +1005,11 @@ function TrainerExams({ courses }: { courses: any[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard icon={FileText} label="الاختبارات" value={exams.length} color="blue" />
-        <StatCard icon={HelpCircle} label="إجمالي الأسئلة" value={totalQuestions} color="navy" />
-        <StatCard icon={BookOpen} label="دورات بها اختبارات" value={totalCoursesWithExams} color="gold" />
+      {/* ⚡ Magical StatCards row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 fia-stagger">
+        <StatCard icon={FileText}    label="الاختبارات"          value={exams.length}             color="blue"  />
+        <StatCard icon={HelpCircle}  label="إجمالي الأسئلة"      value={totalQuestions}           color="navy"  />
+        <StatCard icon={BookOpen}    label="دورات بها اختبارات" value={totalCoursesWithExams}    color="gold"  />
       </div>
 
       <SectionCard
@@ -971,54 +1017,79 @@ function TrainerExams({ courses }: { courses: any[] }) {
         description="الاختبارات المستندة إلى محتوى دوراتك التدريبية"
       >
         {loading ? (
-          <div className="text-center py-12">
-            <Loader2 className="w-8 h-8 text-navy mx-auto mb-3 animate-spin" />
-            <p className="text-muted-foreground text-sm">جاري تحميل الاختبارات...</p>
+          /* ⚡ Magical loading state */
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-3">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
+            </div>
+            <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
           </div>
         ) : exams.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-muted-foreground mb-2">لا توجد اختبارات بعد</p>
-            <p className="text-xs text-muted-foreground">
-              أنشئ دروساً من نوع "اختبار" في محتوى دوراتك لتظهر هنا
+          /* ⚡ Magical empty state */
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <FileText className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">لا توجد اختبارات بعد</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4">
+              أنشئ دروساً من نوع "اختبار" في محتوى دوراتك لتظهر هنا ✨
             </p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          /* ⚡ Magical exam cards — 2/3/4 grid */
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
             {exams.map((exam) => (
-              <Card key={exam.id} className="overflow-hidden card-hover">
-                <div className="p-4 border-b border-border bg-purple-500/5">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 flex-shrink-0">
-                      <HelpCircle className="w-3 h-3 ml-1" /> اختبار
-                    </Badge>
-                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                      {exam.questions_count} سؤال
-                    </Badge>
-                  </div>
-                  <h3 className="font-bold text-navy text-sm mb-1 line-clamp-2">{exam.title}</h3>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <BookOpen className="w-3 h-3" />
-                    <span className="truncate">{exam.course_title}</span>
+              <Card key={exam.id} className="fia-card-hover p-0 overflow-hidden cursor-default border border-gold/20 hover:border-gold/40">
+                {/* ⚡ Magical header — purple gradient with dot pattern */}
+                <div className="relative p-3 bg-gradient-to-br from-purple-600 via-purple-700 to-fuchsia-700 text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
+                        <HelpCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                        {exam.questions_count} سؤال
+                      </Badge>
+                    </div>
+                    <h3 className="font-bold text-white text-xs line-clamp-2 leading-tight">{exam.title}</h3>
                   </div>
                 </div>
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">درجة النجاح</span>
-                    <Badge variant="outline" className="text-xs">
-                      {exam.course_pass_score || 60}%
-                    </Badge>
+
+                {/* ⚡ Magical body — exam details */}
+                <div className="p-3 space-y-2">
+                  <div className="pt-1 border-t border-border/40">
+                    <div className="text-[9px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                      <BookOpen className="w-2.5 h-2.5 text-gold/60" /> الدورة
+                    </div>
+                    <div className="text-[10px] text-navy font-bold line-clamp-2 leading-tight">{exam.course_title}</div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">المدة</span>
-                    <span className="text-navy font-medium">
-                      {exam.duration_minutes ? `${exam.duration_minutes} دقيقة` : 'غير محدد'}
-                    </span>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40">
+                    <div>
+                      <div className="text-[9px] text-muted-foreground mb-0.5">درجة النجاح</div>
+                      <Badge variant="outline" className="text-[9px] font-bold">{exam.course_pass_score || 60}%</Badge>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-muted-foreground mb-0.5">المدة</div>
+                      <div className="text-[10px] font-bold text-navy">
+                        {exam.duration_minutes ? `${exam.duration_minutes} دقيقة` : 'غير محدد'}
+                      </div>
+                    </div>
                   </div>
                   {exam.is_preview && (
-                    <Badge variant="outline" className="text-xs w-full justify-center mt-2">
-                      <Eye className="w-3 h-3 ml-1" /> معاينة مجانية
-                    </Badge>
+                    <div className="pt-1 border-t border-border/40">
+                      <Badge variant="outline" className="text-[9px] w-full justify-center bg-gold/10 text-gold border-gold/30">
+                        <Eye className="w-3 h-3 ml-1" /> معاينة مجانية
+                      </Badge>
+                    </div>
                   )}
                 </div>
               </Card>

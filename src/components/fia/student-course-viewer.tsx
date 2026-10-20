@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import {
   ChevronDown, ChevronUp, Video, FileText, HelpCircle, FileUp,
   Clock, Play, Lock, CheckCircle2, ArrowRight, Loader2, BookOpen,
+  Sparkles, Star, Award, Gift,
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
 import { CourseReviews } from '@/components/fia/course-reviews'
@@ -36,11 +37,11 @@ interface Lesson {
   is_preview?: boolean
 }
 
-const LESSON_TYPES = {
-  video: { label: 'فيديو', icon: Video, color: 'bg-red-500/15 text-red-600 border-red-500/30' },
-  text: { label: 'نص', icon: FileText, color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
-  exam: { label: 'اختبار', icon: HelpCircle, color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
-  pdf: { label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30' },
+const LESSON_TYPES: Record<string, { label: string; icon: any; color: string; gradient: string }> = {
+  video: { label: 'فيديو', icon: Video, color: 'bg-red-500/15 text-red-600 border-red-500/30', gradient: 'from-red-500 to-rose-600' },
+  text: { label: 'نص', icon: FileText, color: 'bg-blue-500/15 text-blue-600 border-blue-500/30', gradient: 'from-blue-500 to-indigo-600' },
+  exam: { label: 'اختبار', icon: HelpCircle, color: 'bg-purple-500/15 text-purple-600 border-purple-500/30', gradient: 'from-purple-500 to-fuchsia-600' },
+  pdf: { label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30', gradient: 'from-emerald-500 to-teal-600' },
 }
 
 export function StudentCourseViewer({
@@ -141,22 +142,18 @@ export function StudentCourseViewer({
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin mx-auto text-navy mb-3" />
+      <div className="text-center py-14">
+        <div className="relative inline-block mb-3">
+          <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+          <Loader2 className="relative w-10 h-10 animate-spin mx-auto text-gold" />
+        </div>
         <p className="text-sm text-muted-foreground">جاري تحميل محتوى الدورة...</p>
       </div>
     )
   }
 
   // ============================================================
-  // ACCESS CONTROL — defensive double-check on the client side.
-  // Even if a buggy navigation route lets the user land here, we
-  // block rendering of paid course content unless:
-  //   (a) the student is enrolled, AND
-  //   (b) the enrollment's payment_status is NOT 'pending'
-  //       (i.e., it must be 'free' | 'confirmed' | 'completed').
-  // For free courses, the student must have an enrollment too
-  // (auto-enrollment happens when they click the card).
+  // ACCESS CONTROL
   // ============================================================
   const isFree = course?.price_type === 'مجانية' || course?.price === 0
   const payStatus = enrollment?.payment_status
@@ -165,149 +162,277 @@ export function StudentCourseViewer({
   if (!hasAccess) {
     return (
       <div className="space-y-4">
-        <div className="bg-fia-gradient rounded-2xl p-8 text-white text-center">
-          <Lock className="w-16 h-16 mx-auto mb-4 text-gold" />
-          <h2 className="text-2xl font-bold mb-2">هذه الدورة محمية</h2>
-          <p className="text-white/80 mb-6">
-            {enrollment && payStatus === 'pending'
-              ? 'تم استلام إثبات الدفع، بانتظار موافقة الإدارة. سيتم تفعيل الدورة فور تأكيد الدفع.'
-              : isFree
-                ? 'اضغط على زر "سجّل الآن" للتسجيل المجاني ثم فتح الدورة.'
-                : 'يجب إكمال عملية الدفع أولاً لفتح هذه الدورة.'}
-          </p>
-          <Button variant="outline" onClick={onBack} className="bg-white/10 text-white border-white/30 hover:bg-white/20">
-            <ArrowRight className="w-4 h-4 ml-1" /> العودة
-          </Button>
+        {/* ⚡ Magical locked state */}
+        <div className="relative overflow-hidden rounded-2xl p-8 text-white text-center bg-gradient-to-br from-navy via-navy-light to-navy shadow-xl">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-12 -right-12 w-40 h-40 bg-gold/15 rounded-full blur-3xl" />
+          <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
+          <div className="relative">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30">
+                <Lock className="w-10 h-10 text-navy" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">هذه الدورة محمية</h2>
+            <p className="text-white/80 mb-6 max-w-md mx-auto">
+              {enrollment && payStatus === 'pending'
+                ? 'تم استلام إثبات الدفع، بانتظار موافقة الإدارة. سيتم تفعيل الدورة فور تأكيد الدفع.'
+                : isFree
+                  ? 'اضغط على زر "سجّل الآن" للتسجيل المجاني ثم فتح الدورة.'
+                  : 'يجب إكمال عملية الدفع أولاً لفتح هذه الدورة.'}
+            </p>
+            <Button variant="outline" onClick={onBack} className="bg-white/10 text-white border-white/30 hover:bg-white/20 rounded-xl">
+              <ArrowRight className="w-4 h-4 ml-1" /> العودة
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Course header */}
-      <div className="bg-fia-gradient rounded-2xl overflow-hidden text-white">
-        <div className="relative h-48 bg-navy">
-          {course.cover && <img src={course.cover} alt={course.title} className="w-full h-full object-cover" />}
-          <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/60 to-transparent" />
+    <div className="space-y-5">
+      {/* ⚡ Magical course header — hero with cover, dots, and progress */}
+      <div className="relative overflow-hidden rounded-2xl shadow-xl border border-gold/30">
+        {/* Cover image with overlay */}
+        <div className="relative h-44 bg-gradient-to-br from-navy via-navy-light to-navy overflow-hidden">
+          {course.cover && (
+            <img src={course.cover} alt={course.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+          )}
+          {/* Multi-layer gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-transparent" />
+          {/* Gold dot pattern */}
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-3xl" />
+
+          {/* Content overlay */}
           <div className="absolute bottom-4 right-4 left-4">
-            <h2 className="text-2xl font-bold mb-1">{course.title}</h2>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {course.duration_hours || 0} ساعة</span>
-              <span className="flex items-center gap-1"><BookOpen className="w-4 h-4" /> {modules.length} وحدة</span>
-              <span className="flex items-center gap-1"><FileText className="w-4 h-4" /> {allLessons.length} درس</span>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {course.level && (
+                <Badge className="bg-navy/80 text-gold border-gold/30 backdrop-blur-sm">
+                  <Sparkles className="w-3 h-3 ml-1" /> {course.level}
+                </Badge>
+              )}
+              {isFree ? (
+                <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-300/40">
+                  <Gift className="w-3 h-3 ml-1" /> مجانية
+                </Badge>
+              ) : (
+                <Badge className="bg-gradient-to-r from-gold to-amber-500 text-navy border border-gold/40">
+                  <Star className="w-3 h-3 ml-1 fill-current" /> {course.price?.toLocaleString()} {course.currency || 'ر.ي'}
+                </Badge>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-white drop-shadow-lg">{course.title}</h2>
+            <div className="flex items-center gap-3 text-xs text-white/90 flex-wrap">
+              <span className="flex items-center gap-1 bg-navy/40 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                <Clock className="w-3.5 h-3.5 text-gold" /> {course.duration_hours || 0} ساعة
+              </span>
+              <span className="flex items-center gap-1 bg-navy/40 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                <BookOpen className="w-3.5 h-3.5 text-gold" /> {modules.length} وحدة
+              </span>
+              <span className="flex items-center gap-1 bg-navy/40 backdrop-blur-sm rounded-lg px-2.5 py-1">
+                <FileText className="w-3.5 h-3.5 text-gold" /> {allLessons.length} درس
+              </span>
             </div>
           </div>
         </div>
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm">تقدّمك في الدورة</span>
-            <span className="font-bold text-gold">{progress}%</span>
+
+        {/* Progress bar section — magical */}
+        <div className="relative p-4 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+          <div className="absolute -top-4 -left-4 w-12 h-12 bg-gold/15 rounded-full blur-xl" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-navy flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-gold" /> تقدّمك في الدورة
+            </span>
+            <span className={`text-sm font-extrabold px-2.5 py-0.5 rounded-full ${
+              progress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' :
+              progress > 50 ? 'bg-gradient-to-r from-gold to-amber-500 text-navy' :
+              'bg-navy/10 text-navy'
+            }`}>
+              {progress}%
+            </span>
           </div>
-          <div className="bg-white/20 rounded-full h-2 overflow-hidden">
-            <div className="bg-gold h-full transition-all" style={{ width: `${progress}%` }} />
+          <Progress value={progress} className="h-2.5" />
+          <div className="text-xs text-muted-foreground mt-2 flex items-center justify-between">
+            <span>{completedCount} من {allLessons.length} درس مكتمل</span>
+            {progress === 100 && allLessons.length > 0 && (
+              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                <Award className="w-3.5 h-3.5" /> أكملت الدورة!
+              </span>
+            )}
           </div>
-          <div className="text-xs text-white/70 mt-2">{completedCount} من {allLessons.length} درس مكتمل</div>
         </div>
       </div>
 
-      <Button variant="ghost" onClick={onBack} className="text-navy hover:bg-navy/5">
+      {/* Back button — magical */}
+      <Button variant="ghost" onClick={onBack} className="text-navy hover:bg-navy/5 rounded-xl">
         <ArrowRight className="w-4 h-4 ml-1" /> العودة لدوراتي
       </Button>
 
-      {/* Modules and lessons */}
+      {/* ⚡ Modules and lessons — magical accordion */}
       {modules.length === 0 ? (
-        <Card className="p-12 text-center">
-          <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">لا توجد وحدات في هذه الدورة بعد</p>
-        </Card>
+        /* Magical empty state */
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <BookOpen className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد وحدات في هذه الدورة بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">سيقوم المدرب بإضافة الوحدات والدروس قريباً ✨</p>
+        </div>
       ) : (
-        modules.map((m, idx) => {
-          const isExpanded = expanded.has(m.id)
-          const lessons = m.lessons || []
-          const moduleCompleted = lessons.every((l) => completedLessons.has(l.id))
-          return (
-            <Card key={m.id} className="overflow-hidden">
-              <button
-                onClick={() => toggleModule(m.id)}
-                className="w-full flex items-center justify-between p-4 bg-muted/30 border-b border-border hover:bg-muted/50 transition-colors text-right"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                    moduleCompleted ? 'bg-green-500 text-white' : 'bg-navy text-gold'
-                  }`}>
-                    {moduleCompleted ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
+        <div className="space-y-3 fia-stagger">
+          {modules.map((m, idx) => {
+            const isExpanded = expanded.has(m.id)
+            const lessons = m.lessons || []
+            const moduleCompleted = lessons.length > 0 && lessons.every((l) => completedLessons.has(l.id))
+            const moduleProgress = lessons.length > 0 ? Math.round((lessons.filter((l) => completedLessons.has(l.id)).length / lessons.length) * 100) : 0
+            return (
+              <Card key={m.id} className="overflow-hidden border border-gold/20 hover:border-gold/40 transition-colors">
+                <button
+                  onClick={() => toggleModule(m.id)}
+                  className="w-full flex items-center justify-between p-4 bg-gradient-to-l from-muted/30 to-white border-b border-gold/10 hover:from-gold/5 hover:to-white transition-all text-right"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Module number badge — magical gradient */}
+                    <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-md ${
+                      moduleCompleted
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                        : 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold border border-gold/30'
+                    }`}>
+                      {moduleCompleted ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-navy flex items-center gap-2">
+                        {m.title}
+                        {moduleCompleted && (
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[9px]">مكتملة ✓</Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                        {m.description ? (
+                          <span className="truncate">{m.description}</span>
+                        ) : (
+                          <span>{lessons.length} درس</span>
+                        )}
+                        {lessons.length > 0 && !moduleCompleted && (
+                          <span className="text-gold font-bold">• {moduleProgress}%</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isExpanded ? 'bg-gold text-navy rotate-180' : 'bg-navy/5 text-gold'}`}>
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-navy">{m.title}</div>
-                    <div className="text-xs text-muted-foreground">{m.description || `${lessons.length} درس`}</div>
-                  </div>
-                  {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                </div>
-              </button>
-              {isExpanded && (
-                <div className="p-3 space-y-2">
-                  {lessons.length === 0 ? (
-                    <div className="text-center py-4 text-sm text-muted-foreground">لا توجد دروس في هذه الوحدة</div>
-                  ) : (
-                    lessons.map((l, li) => {
-                      const type = LESSON_TYPES[l.lesson_type] || LESSON_TYPES.text
-                      const Icon = type.icon
-                      const isCompleted = completedLessons.has(l.id)
-                      return (
-                        <div key={l.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                          isCompleted ? 'bg-green-500/5 border-green-500/30' : 'bg-white border-border hover:shadow-sm'
-                        }`}>
-                          <button
-                            onClick={() => setPreviewLesson(l)}
-                            className="flex items-center gap-3 flex-1 text-right min-w-0"
+                </button>
+                {isExpanded && (
+                  <div className="p-3 space-y-2 bg-gradient-to-b from-white to-muted/10">
+                    {lessons.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground">لا توجد دروس في هذه الوحدة بعد</div>
+                    ) : (
+                      lessons.map((l, li) => {
+                        const type = LESSON_TYPES[l.lesson_type] || LESSON_TYPES.text
+                        const Icon = type.icon
+                        const isCompleted = completedLessons.has(l.id)
+                        return (
+                          <div
+                            key={l.id}
+                            className={`fia-card-hover flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                              isCompleted
+                                ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/50 border-emerald-500/30'
+                                : 'bg-white border-border hover:border-gold/30 hover:shadow-sm'
+                            }`}
                           >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              isCompleted ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
-                            }`}>
-                              {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Play className="w-4 h-4" />}
-                            </div>
-                            <Badge className={type.color + ' flex-shrink-0'}>
-                              <Icon className="w-3 h-3 ml-1" /> {type.label}
-                            </Badge>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-navy text-sm flex items-center gap-2 truncate">
-                                {l.title}
-                                {l.is_preview && <Badge variant="outline" className="text-xs">معاينة مجانية</Badge>}
+                            <button
+                              onClick={() => setPreviewLesson(l)}
+                              className="flex items-center gap-3 flex-1 text-right min-w-0"
+                            >
+                              {/* Lesson status circle — magical */}
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                                isCompleted
+                                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                                  : `bg-gradient-to-br ${type.gradient} text-white`
+                              }`}>
+                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-3.5 h-3.5" />}
                               </div>
-                              {l.duration_minutes ? (
-                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {l.duration_minutes} دقيقة
+                              <Badge className={type.color + ' flex-shrink-0'}>
+                                <Icon className="w-3 h-3 ml-1" /> {type.label}
+                              </Badge>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-navy text-sm flex items-center gap-2 truncate">
+                                  {l.title}
+                                  {l.is_preview && (
+                                    <Badge variant="outline" className="text-[9px] bg-gold/10 text-gold border-gold/30 flex-shrink-0">
+                                      <Sparkles className="w-2.5 h-2.5 ml-0.5" /> معاينة
+                                    </Badge>
+                                  )}
                                 </div>
-                              ) : null}
-                            </div>
-                          </button>
-                          <Button size="sm" variant="ghost" onClick={() => markComplete(l)} className="flex-shrink-0" title={isCompleted ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}>
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : (
-                              <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30" />
-                            )}
-                          </Button>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-            </Card>
-          )
-        })
+                                {l.duration_minutes ? (
+                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="w-3 h-3" /> {l.duration_minutes} دقيقة
+                                  </div>
+                                ) : null}
+                              </div>
+                            </button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => markComplete(l)}
+                              className="flex-shrink-0"
+                              title={isCompleted ? 'إلغاء الإكمال' : 'تحديد كمكتمل'}
+                            >
+                              {isCompleted ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 hover:border-emerald-500 transition-colors" />
+                              )}
+                            </Button>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
       )}
 
-      {/* Course reviews — students can rate courses they're enrolled in */}
-      <Card className="p-6">
-        <CourseReviews courseId={course.id} allowAdd={true} />
+      {/* ⚡ Course reviews — magical container */}
+      <Card className="p-6 border-2 border-gold/30 shadow-sm relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+          backgroundSize: '14px 14px'
+        }} />
+        <div className="relative">
+          <CourseReviews courseId={course.id} allowAdd={true} />
+        </div>
       </Card>
 
-      {/* Certificate request — visible when course is fully completed */}
+      {/* ⚡ Certificate request — visible when course is fully completed (magical) */}
       {progress === 100 && allLessons.length > 0 && (
-        <CertificateRequest courseId={course.id} courseTitle={course.title} />
+        <div className="relative p-5 rounded-2xl bg-gradient-to-br from-gold/10 to-amber-50/50 border-2 border-gold/40 overflow-hidden">
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px'
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/20 rounded-full blur-2xl" />
+          <div className="relative">
+            <CertificateRequest courseId={course.id} courseTitle={course.title} />
+          </div>
+        </div>
       )}
 
       {/* Lesson preview modal */}
