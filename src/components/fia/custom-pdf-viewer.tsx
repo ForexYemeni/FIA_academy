@@ -203,6 +203,8 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
     if (!page) return
     const canvas = canvasRefs.current[pageNum - 1]
     if (!canvas) return
+    // Skip if already rendered (avoid re-rendering the same page)
+    if (renderedPages.has(pageNum)) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
@@ -239,41 +241,69 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
         console.warn('[CustomPdfViewer] Render failed for page', pageNum, e)
       }
     }
-  }, [containerWidth])
+  }, [containerWidth, renderedPages])
 
-  // ⚡ IntersectionObserver to track which page is currently in view.
-  // When a page becomes visible, we:
-  //   1. Update the page indicator (X / Y)
-  //   2. Trigger render for the visible page + 1 page above + 1 below
-  //   3. If the visible page is the last page, auto-complete the lesson
+  // ⚡ Render ALL pages when PDF is loaded (not lazy on-demand).
+  // For typical PDFs (10-50 pages) this is fast (~200ms per page in
+  // parallel). The previous IntersectionObserver-based lazy rendering
+  // was buggy — it didn't trigger initial renders reliably, leaving
+  // pages blank with just the loading spinner.
+  //
+  // We now render ALL pages in parallel when the PDF is ready and
+  // the container width is known. We render in batches of 4 to avoid
+  // overwhelming the browser (each render is CPU-heavy).
+  useEffect(() => {
+    if (!containerWidth || loading || error || !numPages) return
+    if (renderedPages.size >= numPages) return // already rendered all
+    let cancelled = false
+    const renderAll = async () => {
+      const BATCH_SIZE = 4
+      for (let batch = 0; batch * BATCH_SIZE < numPages; batch++) {
+        if (cancelled) return
+        const start = batch * BATCH_SIZE + 1
+        const end = Math.min(numPages, start + BATCH_SIZE - 1)
+        // Render this batch in parallel
+        const promises: Promise<void>[] = []
+        for (let p = start; p <= end; p++) {
+          if (!renderedPages.has(p)) {
+            promises.push(renderPage(p))
+          }
+        }
+        await Promise.allSettled(promises)
+      }
+    }
+    renderAll()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerWidth, loading, error, numPages])
+
+  // ⚡ IntersectionObserver: ONLY updates the page indicator as the
+  // student scrolls (no re-rendering — all pages render eagerly above).
   useEffect(() => {
     if (!numPages || loading || error || !containerRef.current) return
 
     const io = new IntersectionObserver(
       (entries) => {
-        let topPage = currentPage
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
             const pageNum = Number((entry.target as HTMLElement).dataset.pageNum)
             if (pageNum > 0) {
-              topPage = pageNum
+              setCurrentPage((prev) => {
+                if (pageNum !== prev) {
+                  // ⚡ Auto-complete when reaching the LAST page
+                  if (pageNum === numPages && !firedRef.current && onComplete) {
+                    setTimeout(() => {
+                      if (!firedRef.current) {
+                        firedRef.current = true
+                        onComplete()
+                      }
+                    }, 1500)
+                  }
+                  return pageNum
+                }
+                return prev
+              })
             }
-          }
-        }
-        if (topPage !== currentPage) {
-          setCurrentPage(topPage)
-          // Render this page + neighbors
-          renderPage(topPage)
-          if (topPage > 1) renderPage(topPage - 1)
-          if (topPage < numPages) renderPage(topPage + 1)
-          // ⚡ Auto-complete when reaching the LAST page
-          if (topPage === numPages && !firedRef.current && onComplete) {
-            setTimeout(() => {
-              if (!firedRef.current) {
-                firedRef.current = true
-                onComplete()
-              }
-            }, 1500)
           }
         }
       },
@@ -295,15 +325,7 @@ export function CustomPdfViewer({ url, filename, onComplete, firedRef }: {
       ioRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numPages, loading, error, containerWidth, renderPage])
-
-  // ⚡ Initial render: render page 1 + page 2 once container width is known
-  useEffect(() => {
-    if (!containerWidth || loading || error || !numPages) return
-    renderPage(1)
-    if (numPages > 1) renderPage(2)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerWidth, loading, error, numPages])
+  }, [numPages, loading, error, containerWidth])
 
   // ⚡ Track scroll position to show/hide "scroll to top" button
   const handleScroll = useCallback(() => {
