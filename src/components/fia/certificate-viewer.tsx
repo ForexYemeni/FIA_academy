@@ -527,12 +527,22 @@ export function CertificateViewer({
         </div>
       </div>
 
-      {/* === CERTIFICATE PREVIEW (scrollable horizontally on small screens) === */}
+      {/* === CERTIFICATE PREVIEW ===
+          IMPORTANT: NO `overflow-x-auto` here. The previous version used
+          `overflow-x-auto` which caused the cert (then 1000px wide) to
+          become horizontally scrollable inside narrower containers
+          (dashboard dialog ~942px). When html-to-image serialized the
+          cert element, it captured only the visible scroll viewport,
+          cutting off the right half of the certificate in the exported
+          PNG/PDF. The cert is now responsive (width: 100%) so it fits
+          any parent — no overflow, no clipping. */}
       <div
-        className="relative overflow-x-auto bg-gradient-to-b from-amber-50/40 to-white py-6 rounded-2xl"
+        className="relative bg-gradient-to-b from-amber-50/40 to-white py-6 rounded-2xl"
         data-cert-skip="true"
       >
-        {/* The CertificateCard itself — certRef points here */}
+        {/* The CertificateCard itself — certRef points here.
+            The cert now uses width:100% + aspect-ratio:10/7, so it
+            scales to fit this container perfectly. */}
         <CertificateCard certificate={certificate} ref={certRef} />
       </div>
 
