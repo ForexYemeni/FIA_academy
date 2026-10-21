@@ -77,7 +77,7 @@ class NotificationPollService : Service() {
     companion object {
         private const val TAG = "FIA-PollService"
         private const val CHANNEL_SERVICE = "fia-service"
-        private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v5"  // 🔥 v2.6.1: aligned with FIAFirebaseMessagingService
+        private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v7"  // 🔥 v2.7.1: aligned with FIAFirebaseMessagingService
         private const val NOTIF_SERVICE_ID = 1
         private const val POLL_INTERVAL_MS = 10_000L  // 10 seconds (was 30s — faster delivery)
         private const val WAKELOCK_TIMEOUT_MS = 5 * 60 * 1000L  // 5 minutes, then re-acquire

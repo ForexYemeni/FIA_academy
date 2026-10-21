@@ -188,15 +188,13 @@ class FIAApp : Application(), Configuration.Provider {
             notifManager.createNotificationChannel(serviceChannel)
 
             // Channel 2 — actual notifications (popup + sound + vibrate)
-            // This is the channel used by BOTH:
-            //   - FIAFirebaseMessagingService (FCM pushes)
-            //   - NotificationPollService (polling fallback)
-            // 🔥 v2.6.1: switched to channel ID "fia-notifications-v5" because
-            // Android locks channel settings after first creation — the previous
-            // channel "fia-notifications-v4" had IMPORTANCE_LOW locked in from
-            // an earlier APK version, and couldn't be upgraded.
+            // 🔥 v2.7.1: switched to channel ID "fia-notifications-v7" because
+            // Android locks channel settings after first creation. The previous
+            // channels (v3, v4, v5, v6) may have had LOW importance locked in
+            // from earlier APK versions. The new channel ID forces Android to
+            // create it fresh with IMPORTANCE_HIGH.
             val notifChannel = NotificationChannel(
-                "fia-notifications-v5",  // 🔥 NEW channel ID — fresh state, fresh IMPORTANCE_HIGH
+                "fia-notifications-v7",  // 🔥 v2.7.1 BRAND NEW channel ID
                 "إشعارات أكاديمية المستقبل الدولية",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
