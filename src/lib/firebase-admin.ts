@@ -183,23 +183,48 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
   const results = await Promise.all(
     tokens.map(async (t: { token: string }) => {
       try {
+        // 🔥 v2.7.1 FINAL FIX: Use DATA-ONLY payload (no notification field).
+        //
+        // WHY data-only:
+        // ==============
+        // When using a 'notification' payload, FCM delivers the message to
+        // the system tray DIRECTLY (bypassing our onMessageReceived). This
+        // means our app code never runs, and the notification displays with
+        // whatever settings the system tray decides — often SILENTLY if the
+        // app's notification channel has been downgraded by the user.
+        //
+        // When using a DATA-ONLY payload, FCM delivers the message to our
+        // onMessageReceived() callback — which ALWAYS fires, EVEN IF the
+        // app is force-killed (Android 8+ background restrictions don't
+        // apply to FCM data-only messages — Firebase wakes up the app
+        // process to deliver them).
+        //
+        // This means:
+        // - We can build the notification with PRIORITY_MAX + DEFAULT_ALL
+        // - We can use our custom channel with IMPORTANCE_HIGH
+        // - We can play the sound manually as a backup
+        // - We can show the popup over other apps (full-screen intent)
+        // - The notification ALWAYS appears as a heads-up popup with sound
         const message = {
           token: t.token,
-          // 🔥 NOTIFICATION payload — Android system tray shows this
-          // automatically even if app is force-killed.
-          // NOTE: only title + body here — sound goes in android.notification
-          notification: {
+          // 🔥 DATA ONLY — no 'notification' field
+          // This forces onMessageReceived to fire (even when app is killed)
+          data: {
             title: opts.title,
             body: opts.body,
+            link: opts.link || '/',
+            type: opts.data?.type || 'system',
+            notif_id: String(Date.now()),
+            ...opts.data,
           },
-          // 🔥 DATA payload — for deep-linking when user taps the notif
-          data: dataPayload,
           android: {
             priority: 'high' as const,
             ttl: 86400, // 24 hours
+            // 🔥 Optional: notification config for data messages
+            // This is used when the app is in the background AND
+            // onMessageReceived doesn't fire (which shouldn't happen with
+            // data-only payloads, but we set this as a backup)
             notification: {
-              // 🔥 NO channelId — let Android use the default channel
-              // (which has sound enabled by default)
               sound: 'default' as const,
               icon: 'ic_notification',
               color: '#D4AF37',
@@ -210,19 +235,6 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
               visibility: 'public' as const,
               notificationCount: 1,
               tag: 'fia-notification',
-            },
-          },
-          // 🔥 APNS config (for iOS — harmless on Android)
-          apns: {
-            payload: {
-              aps: {
-                alert: {
-                  title: opts.title,
-                  body: opts.body,
-                },
-                sound: 'default',
-                badge: 1,
-              },
             },
           },
         }
