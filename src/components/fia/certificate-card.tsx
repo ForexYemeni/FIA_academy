@@ -295,14 +295,11 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
         style={{
           // === LANDSCAPE ASPECT RATIO ===
           // Slightly taller than A4 (1.4142) to ensure ALL content
-          // (including bottom icons: QR, cert number, date, status,
-          // issuer, signature, slogan) fits WITHIN the frame on mobile.
-          // On 340px mobile width: 340/1.15 = 296px height (was 240px
-          // with 1.4142 ratio — content overflowed by 65px).
-          // On 942px desktop width: 942/1.15 = 819px height (still
-          // landscape, looks great).
+          // (including bottom icons + slogan) fits WITHIN the frame.
+          // On 340px mobile: 340/1.1 = 309px height — fits all content.
+          // On 942px desktop: 942/1.1 = 856px height (still landscape).
           width: '100%',
-          aspectRatio: '1.15 / 1',
+          aspectRatio: '1.1 / 1',
           margin: 0,
           position: 'relative',
           background: COLOR.IVORY,
