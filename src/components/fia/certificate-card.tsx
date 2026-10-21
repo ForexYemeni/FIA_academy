@@ -297,12 +297,12 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
           // Slightly taller than A4 (1.4142) to ensure ALL content
           // (including bottom icons: QR, cert number, date, status,
           // issuer, signature, slogan) fits WITHIN the frame on mobile.
-          // On 340px mobile width: 340/1.25 = 272px height (was 240px
+          // On 340px mobile width: 340/1.15 = 296px height (was 240px
           // with 1.4142 ratio — content overflowed by 65px).
-          // On 942px desktop width: 942/1.25 = 754px height (still
+          // On 942px desktop width: 942/1.15 = 819px height (still
           // landscape, looks great).
           width: '100%',
-          aspectRatio: '1.25 / 1',
+          aspectRatio: '1.15 / 1',
           margin: 0,
           position: 'relative',
           background: COLOR.IVORY,
