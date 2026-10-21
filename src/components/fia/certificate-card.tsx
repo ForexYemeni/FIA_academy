@@ -293,11 +293,16 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
         ref={ref}
         dir="rtl"
         style={{
-          // === LANDSCAPE A4 ASPECT RATIO ===
-          // √2 ≈ 1.4142 (ISO A4 ratio). This locks the cert to a
-          // landscape orientation regardless of parent width.
+          // === LANDSCAPE ASPECT RATIO ===
+          // Slightly taller than A4 (1.4142) to ensure ALL content
+          // (including bottom icons: QR, cert number, date, status,
+          // issuer, signature, slogan) fits WITHIN the frame on mobile.
+          // On 340px mobile width: 340/1.25 = 272px height (was 240px
+          // with 1.4142 ratio — content overflowed by 65px).
+          // On 942px desktop width: 942/1.25 = 754px height (still
+          // landscape, looks great).
           width: '100%',
-          aspectRatio: '1.4142 / 1',
+          aspectRatio: '1.25 / 1',
           margin: 0,
           position: 'relative',
           background: COLOR.IVORY,
@@ -306,9 +311,9 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
           // Enable container queries so inner cqw units resolve correctly
           containerType: 'inline-size',
           // === OUTER GOLD FRAME ===
-          padding: '1.2cqw',
+          padding: '1cqw',
           backgroundImage: `linear-gradient(135deg, ${COLOR.GOLD} 0%, ${COLOR.GOLD_BRIGHT} 25%, ${COLOR.GOLD_LIGHT} 50%, ${COLOR.GOLD_BRIGHT} 75%, ${COLOR.GOLD} 100%)`,
-          borderRadius: '0.8cqw',
+          borderRadius: '0.7cqw',
           boxShadow: `0 0.6cqw 2cqw ${COLOR.SHADOW_NAVY}, 0 0 0 0.1cqw ${COLOR.GOLD_DARK}40`,
           overflow: 'hidden',
         }}
@@ -375,7 +380,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 position: 'relative',
                 width: '100%',
                 height: '100%',
-                padding: '2.8cqw 4.5cqw 2.4cqw 4.5cqw',
+                padding: '2cqw 4cqw 1.8cqw 4cqw',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
