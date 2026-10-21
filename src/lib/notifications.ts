@@ -152,6 +152,41 @@ export async function notifyCourseCompleted(userId: string, courseId: string) {
     `المتدرب "${userName}" أنهى دورة "${courseTitle}".`, '/')
 }
 
+// === EXAM EVENTS ===
+
+/** Student submitted a course exam attempt (auto-graded). Notify student + trainer + admins. */
+export async function notifyExamGraded(userId: string, courseId: string, score: number, passed: boolean) {
+  const courseTitle = await getCourseTitle(courseId)
+  const userName = await getUserName(userId)
+  if (passed) {
+    await send(userId, 'exam', '🎉 نجحت في اختبار الدورة!',
+      `مبروك! حصلت على ${score}% في اختبار دورة "${courseTitle}" — يمكنك الآن طلب شهادة الدورة.`, '/#exams')
+  } else {
+    await send(userId, 'exam', 'نتيجة اختبار الدورة',
+      `حصلت على ${score}% في اختبار دورة "${courseTitle}" — لم تحقق درجة النجاح هذه المرة، يمكنك إعادة الاختبار من "اختباراتي".`, '/#exams')
+  }
+  const trainerId = await getTrainerOfCourse(courseId)
+  if (trainerId) {
+    await send(trainerId, 'exam', 'نتيجة اختبار جديدة لمتدرب',
+      `المتدرب "${userName}" حصل على ${score}% في اختبار دورتك "${courseTitle}" (${passed ? 'ناجح' : 'راسب'}). راجع النتيجة من "نتائج المتدربين".`, '/#results')
+  }
+  const admins = await getAdminIds()
+  await sendToMany(admins, 'exam', 'نتيجة اختبار جديدة',
+    `المتدرب "${userName}" حصل على ${score}% في اختبار دورة "${courseTitle}" (${passed ? 'ناجح' : 'راسب'}).`, '/#exams')
+}
+
+/** Trainer corrected/overrode a trainee's exam result. Notify the student. */
+export async function notifyTrainerGradedExam(userId: string, courseId: string, score: number, passed: boolean, note?: string) {
+  const courseTitle = await getCourseTitle(courseId)
+  if (passed) {
+    await send(userId, 'exam', '📝 تمت مراجعة نتيجتك من المدرب',
+      `راجع المدرب نتيجتك في اختبار دورة "${courseTitle}" — النتيجة النهائية: ${score}% (ناجح).${note ? ' ملاحظة المدرب: ' + note : ''}`, '/#results')
+  } else {
+    await send(userId, 'exam', '📝 تمت مراجعة نتيجتك من المدرب',
+      `راجع المدرب نتيجتك في اختبار دورة "${courseTitle}" — النتيجة النهائية: ${score}% (راسب).${note ? ' ملاحظة المدرب: ' + note : ''}`, '/#results')
+  }
+}
+
 // === CERTIFICATE REQUEST EVENTS ===
 
 /** Student requested a certificate. Notify student + admins + trainer. */

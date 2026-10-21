@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, Users, FileText, User, Bell, Settings,
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
-  GraduationCap, Crown, Calendar, Clock,
+  GraduationCap, Crown, Calendar, Clock, TrendingUp,
   Phone, Briefcase, Sparkles, Award, KeyRound, Save,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
@@ -26,6 +26,8 @@ import { SharedBlog, SharedFAQ } from './shared-community'
 import { SharedForumRoyal } from './shared-forum-royal'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
+import { TrainerQuestionBank } from './trainer-questions'
+import { TrainerResultsCenter } from './trainer-results'
 import { supabasePublic } from '@/lib/supabase'
 
 const NAV: NavItem[] = [
@@ -33,6 +35,8 @@ const NAV: NavItem[] = [
   { id: 'courses', label: 'دوراتي التدريبية', icon: BookOpen },
   { id: 'students', label: 'متدربوّ', icon: Users },
   { id: 'exams', label: 'الاختبارات', icon: FileText },
+  { id: 'question-bank', label: 'بنك الأسئلة', icon: HelpCircle },
+  { id: 'results', label: 'نتائج المتدربين', icon: TrendingUp },
   { id: 'forum', label: 'المنتدى', icon: MessageSquare },
   { id: 'blog', label: 'المدونة', icon: Newspaper },
   { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
@@ -223,6 +227,8 @@ export function TrainerDashboard() {
       )}
       {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
       {active === 'exams' && <TrainerExams courses={courses} />}
+      {active === 'question-bank' && <TrainerQuestionBank courses={courses} />}
+      {active === 'results' && <TrainerResultsCenter user={user} courses={courses} />}
       {active === 'forum' && <SharedForumRoyal user={user} />}
       {active === 'blog' && <SharedBlog />}
       {active === 'faqs' && <SharedFAQ />}

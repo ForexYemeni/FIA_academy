@@ -21,7 +21,8 @@ import {
   LuxField, LuxDialog, LuxSaveBar, luxInput,
 } from './luxury'
 
-const TYPE_META: Record<string, { label: string; icon: any; tone: string; grad: string }> = {
+// Shared type metadata — reused by the trainer question bank (trainer-questions.tsx)
+export const TYPE_META: Record<string, { label: string; icon: any; tone: string; grad: string }> = {
   mcq: { label: 'اختيار من متعدد', icon: ListOrdered, tone: 'purple', grad: 'from-purple-500 to-fuchsia-600' },
   truefalse: { label: 'صح / خطأ', icon: CircleDot, tone: 'emerald', grad: 'from-emerald-500 to-teal-600' },
   short_answer: { label: 'إجابة قصيرة', icon: Type, tone: 'amber', grad: 'from-amber-500 to-orange-600' },
@@ -262,9 +263,9 @@ export function AdminExamQuestionsRoyal() {
 }
 
 // ============================================================================
-// EXAM QUESTION DIALOG — royal editor
+// EXAM QUESTION DIALOG — royal editor (shared: admin + trainer question banks)
 // ============================================================================
-function ExamQuestionDialogRoyal({ open, onOpenChange, initial, courseId, courseTitle, onSaved }: any) {
+export function ExamQuestionDialogRoyal({ open, onOpenChange, initial, courseId, courseTitle, onSaved }: any) {
   const [form, setForm] = useState<any>(initial || {
     course_id: courseId, question_type: 'mcq', prompt: '',
     options: ['', '', '', ''], correct_answer: 0, explanation: '', difficulty: 'متوسط', points: 1,

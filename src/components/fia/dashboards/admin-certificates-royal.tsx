@@ -39,6 +39,7 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
   const [students, setStudents] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
   const [trainers, setTrainers] = useState<any[]>([])
+  const [examAttempts, setExamAttempts] = useState<any[]>([])
   const [editing, setEditing] = useState<any | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [issueOpen, setIssueOpen] = useState(false)
@@ -64,6 +65,8 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setStudents(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
     fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : []))
+    // Exam attempts — to display the trainee's test result on request cards
+    fetch('/api/exam-attempts?all=1').then((r) => r.json()).then((d) => setExamAttempts(Array.isArray(d) ? d : []))
   }
   useEffect(() => { load() }, [])
 
@@ -166,6 +169,13 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
 
   const isCourseCompleted = (userId: string, courseId: string) => {
     return enrollments.some((e) => e.user_id === userId && e.course_id === courseId && (e.status === 'completed' || e.status === 'مكتمل'))
+  }
+
+  // Best submitted exam attempt for a requester — shown on the request card
+  const bestAttemptFor = (userId: string, courseId: string) => {
+    const mine = examAttempts.filter((a) => a.user_id === userId && a.course_id === courseId && a.submitted_at)
+    if (mine.length === 0) return null
+    return mine.reduce((best, a) => ((a.score || 0) > (best?.score ?? -1) ? a : best), null as any)
   }
 
   const requestStatusBadge = (status: string) => {
@@ -363,6 +373,7 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
             requests.map((r) => {
               const badge = requestStatusBadge(r.status)
               const completed = isCourseCompleted(r.user_id, r.course_id)
+              const best = bestAttemptFor(r.user_id, r.course_id)
               return (
                 <Card key={r.id} className="fia-card-hover p-4 border border-gold/25 hover:border-gold/45 relative overflow-hidden">
                   <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-300 to-gold opacity-70" />
@@ -370,6 +381,19 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
                     <LuxBadge tone={badge.tone}>{badge.label}</LuxBadge>
                     {completed && <LuxBadge tone="green"><CheckCircle2 className="w-3 h-3" /> الدورة مكتملة</LuxBadge>}
                     {!completed && r.status === 'pending' && <LuxBadge tone="red"><Clock className="w-3 h-3" /> الدورة غير مكتملة</LuxBadge>}
+                    {/* EXAM RESULT — approval is based on it */}
+                    {best ? (
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold rounded-lg px-2.5 py-1 border ${
+                        best.passed ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-700' : 'bg-rose-500/10 border-rose-500/35 text-rose-700'
+                      }`}>
+                        {best.passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        نتيجة الاختبار: {best.score}%
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold rounded-lg px-2.5 py-1 border bg-amber-500/10 border-amber-500/35 text-amber-700">
+                        <Clock className="w-3 h-3" /> لم يجتز اختبار الدورة بعد
+                      </span>
+                    )}
                   </div>
                   <div className="font-extrabold text-navy text-sm mb-1">{r.student_name}</div>
                   <div className="text-xs text-muted-foreground mb-1">{r.course_title || '-'}</div>
@@ -386,7 +410,14 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
                   <div className="flex gap-2 mt-3 pt-2.5 border-t border-gold/15 flex-wrap">
                     {r.status === 'pending' && (
                       <>
-                        <Button size="sm" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs rounded-lg shadow-md active:scale-[0.97] transition-all" disabled={!completed} onClick={() => handleRequestAction(r.id, 'trainer_approve', 'تم التأكد من إكمال الدورة')}>
+                        <Button size="sm" className={`text-white text-xs rounded-lg shadow-md active:scale-[0.97] transition-all ${
+                          completed && (!best || best.passed)
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
+                            : 'bg-muted text-muted-foreground shadow-none cursor-not-allowed hover:bg-muted'
+                        }`}
+                          disabled={!completed || (!!best && !best.passed)}
+                          title={best && !best.passed ? 'لا يمكن الموافقة قبل اجتياز المتدرب لاختبار الدورة' : 'الموافقة كمدرب'}
+                          onClick={() => handleRequestAction(r.id, 'trainer_approve', best?.passed ? `تم التأكد من إكمال الدورة واجتياز الاختبار (${best.score}%)` : 'تم التأكد من إكمال الدورة')}>
                           <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة المدرب
                         </Button>
                         <Button size="sm" variant="outline" className="border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs rounded-lg" onClick={() => handleRequestAction(r.id, 'reject', 'لم تكتمل الدورة')}>

@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, FileText, Award, CreditCard,
   User, Bell, Settings, TrendingUp, Clock, CheckCircle2,
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
-  Sparkles, Star, PlayCircle, Phone, Briefcase, XCircle,
+  Sparkles, Star, PlayCircle, Phone, Briefcase, XCircle, ShieldCheck,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -419,7 +420,7 @@ export function StudentDashboard() {
             setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
           }} />}
           {active === 'exams' && <Exams userId={user?.id} courses={courses} />}
-          {active === 'results' && <Results />}
+          {active === 'results' && <Results courses={courses} />}
           {active === 'certificates' && <StudentCertificates user={user} />}
           {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
           {active === 'forum' && <SharedForumRoyal user={user} />}
@@ -1787,72 +1788,110 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
 }
 
 function Exams({ userId, courses }: any) {
+  // ============================================================================
+  // اختباراتي — v4 royal: مرتبطة مباشرة ببنك الأسئلة
+  // لكل دورة مسجّل فيها المتدرب (والمؤكد دفعها) تظهر بطاقة اختبار واحدة تجمع
+  // أسئلة بنك الأسئلة الخاصة بالدورة. لا تظهر أي دورة غير مسجّل فيها.
+  // ============================================================================
+  const router = useRouter()
   const [exams, setExams] = useState<any[]>([])
+  const [attempts, setAttempts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [starting, setStarting] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      if (!userId) {
-        setLoading(false)
-        return
-      }
-      try {
-        // 1. Fetch the student's enrollments (only their own).
-        const enrRes = await fetch(`/api/enrollments?user_id=${userId}`)
-        const enrollments = await enrRes.json()
-        const validEnrollments: any[] = Array.isArray(enrollments) ? enrollments : []
+  const load = async () => {
+    if (!userId) { setLoading(false); return }
+    try {
+      // 1) The student's own enrollments — ONLY courses he is actually enrolled in
+      const enrRes = await fetch(`/api/enrollments?user_id=${userId}`)
+      const enrollments = await enrRes.json()
+      const validEnrollments: any[] = Array.isArray(enrollments) ? enrollments : []
+      const accessible = validEnrollments.filter((e: any) => e.payment_status !== 'pending')
 
-        // 2. For each enrolled course, fetch its lessons and filter exam-type lessons.
-        //    Only show exams for courses the student actually has access to
-        //    (i.e., payment_status is NOT 'pending').
-        const accessible = validEnrollments.filter(
-          (e: any) => e.payment_status !== 'pending'
-        )
+      // 2) All attempts of this student (for status + best score)
+      const attRes = await fetch(`/api/exam-attempts?user_id=${userId}`)
+      const attData = await attRes.json()
+      setAttempts(Array.isArray(attData) ? attData : [])
 
-        const results = await Promise.all(
-          accessible.map(async (e: any) => {
-            try {
-              const lessonsRes = await fetch(`/api/lessons?course_id=${e.course_id}`)
-              const lessons = await lessonsRes.json()
-              const allLessons: any[] = Array.isArray(lessons) ? lessons : []
-              const examLessons = allLessons.filter(
-                (l: any) => l.lesson_type === 'exam'
-              )
-              const courseTitle =
-                courses?.find((c: any) => c.id === e.course_id)?.title || null
-              return examLessons.map((l: any) => ({
-                id: l.id,
-                name: l.title || 'اختبار بدون اسم',
-                course_id: e.course_id,
-                course_title: courseTitle,
-                enrollment_id: e.id,
-                duration_minutes: l.duration_minutes || 0,
-              }))
-            } catch {
-              return []
+      // 3) For each enrolled course → the course's active question bank size
+      const results = await Promise.all(
+        accessible.map(async (e: any) => {
+          try {
+            const qRes = await fetch(`/api/exam-questions?course_id=${e.course_id}`)
+            const questions = await qRes.json()
+            const qs = Array.isArray(questions) ? questions : []
+            if (qs.length === 0) return null // course has no exam bank yet
+            const courseTitle = courses?.find((c: any) => c.id === e.course_id)?.title || null
+            const coursePass = courses?.find((c: any) => c.id === e.course_id)?.pass_score || 60
+            return {
+              course_id: e.course_id,
+              course_title: courseTitle,
+              pass_score: coursePass,
+              enrollment_id: e.id,
+              questions_count: qs.length,
+              total_points: qs.reduce((a: number, q: any) => a + (parseInt(q.points) || 0), 0),
             }
-          })
-        )
+          } catch { return null }
+        })
+      )
+      setExams(results.filter(Boolean))
+    } catch { setExams([]) } finally { setLoading(false) }
+  }
 
-        if (cancelled) return
-        setExams(results.flat())
-      } catch {
-        if (!cancelled) setExams([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
+  useEffect(() => { load() }, [userId, courses])
+
+  // ⚡ REAL-TIME: when an attempt is graded (server PUT), the student's cards
+  // update instantly without any refresh.
+  useEffect(() => {
+    if (!userId) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`exam-attempts-student:${userId}`)
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'exam_attempts', filter: `user_id=eq.${userId}` },
+          () => { load() }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, courses])
 
+  // Best submitted attempt per course
+  const bestFor = (courseId: string) => {
+    const mine = attempts.filter((a: any) => a.course_id === courseId && a.submitted_at)
+    if (mine.length === 0) return null
+    return mine.reduce((best: any, a: any) => ((a.score || 0) > (best?.score ?? -1) ? a : best), null)
+  }
+  // An open (unsubmitted) attempt — lets the student resume
+  const openFor = (courseId: string) =>
+    attempts.find((a: any) => a.course_id === courseId && !a.submitted_at)
+
+  const startExam = async (courseId: string) => {
+    if (!userId) return
+    setStarting(courseId)
+    try {
+      // Resume an open attempt if it exists — otherwise the server creates one
+      const open = openFor(courseId)
+      let attemptId = open?.id
+      if (!attemptId) {
+        const res = await fetch('/api/exam-attempts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, course_id: courseId }),
+        })
+        const data = await res.json()
+        if (!res.ok) { toast.error(data.error || 'تعذر بدء الاختبار'); return }
+        attemptId = data.id
+      }
+      router.push(`/exam/${attemptId}`)
+    } finally { setStarting(null) }
+  }
+
   return (
-    <SectionCard title="اختباراتي" description="جميع الاختبارات المتاحة لك في دوراتك المسجّلة">
+    <SectionCard title="اختباراتي" description="اختبارات بنك الأسئلة لدوراتك المسجّلة فقط — أكمل اختبار الدورة لتصبح مؤهلاً للشهادة">
       {loading ? (
-        /* ⚡ Magical loading state */
         <div className="text-center py-14">
           <div className="relative inline-block mb-3">
             <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
@@ -1861,7 +1900,6 @@ function Exams({ userId, courses }: any) {
           <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
         </div>
       ) : exams.length === 0 ? (
-        /* ⚡ Magical empty state */
         <div className="text-center py-14">
           <div className="relative inline-block mb-4">
             <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
@@ -1871,74 +1909,219 @@ function Exams({ userId, courses }: any) {
           </div>
           <h3 className="font-bold text-navy text-base mb-1.5">لا توجد اختبارات متاحة لك حالياً</h3>
           <p className="text-xs text-muted-foreground max-w-md mx-auto">
-            سجّل في دورة تحتوي على اختبارات لتظهر هنا، أو تأكّد من تأكيد دفعاتك من قبل الإدارة ✨
+            تظهر هنا اختبارات الدورات التي تسجّل فيها فقط، متى أضاف المدرب أو الإدارة بنك أسئلة الدورة ✨
           </p>
         </div>
       ) : (
-        /* ⚡ Magical exam cards — 2/3/4 grid */
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 fia-stagger">
-          {exams.map((exam: any, i: number) => (
-            <Card key={exam.id || i} className="fia-card-hover p-0 overflow-hidden cursor-default border border-gold/20 hover:border-gold/40">
-              {/* ⚡ Magical header — purple gradient */}
-              <div className="relative p-3 bg-gradient-to-br from-purple-600 via-purple-700 to-fuchsia-700 text-white overflow-hidden">
-                <div className="absolute inset-0 opacity-20" style={{
-                  backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
-                  backgroundSize: '12px 12px'
-                }} />
-                <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
-                      <FileText className="w-5 h-5 text-white" />
+          {exams.map((exam: any) => {
+            const best = bestFor(exam.course_id)
+            const open = openFor(exam.course_id)
+            const passed = best?.passed === true
+            const statusTone = passed ? 'from-emerald-500 to-teal-600' : best ? 'from-rose-500 to-red-600' : 'from-purple-600 via-purple-700 to-fuchsia-700'
+            const statusLabel = passed ? 'ناجح ✓' : best ? `راسب — ${best.score}%` : open ? 'محاولة مفتوحة' : 'لم تبدأ بعد'
+            return (
+              <Card key={exam.course_id} className="fia-card-hover p-0 overflow-hidden border border-gold/20 hover:border-gold/40">
+                {/* Header — state-aware gradient */}
+                <div className={`relative p-3 bg-gradient-to-br ${statusTone} text-white overflow-hidden`}>
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, white 1px, transparent 1px)',
+                    backgroundSize: '12px 12px'
+                  }} />
+                  <div className="absolute -top-4 -right-4 w-12 h-12 bg-white/15 rounded-full blur-xl" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
+                        {passed ? <CheckCircle2 className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
+                      </div>
+                      <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                        <HelpCircle className="w-2.5 h-2.5 ml-0.5" /> {exam.questions_count} سؤال
+                      </Badge>
                     </div>
-                    <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
-                      <Clock className="w-2.5 h-2.5 ml-0.5" /> {exam.duration_minutes ? `${exam.duration_minutes} د` : 'غير محدد'}
-                    </Badge>
+                    <h3 className="font-bold text-white text-xs line-clamp-2 leading-tight">{exam.course_title || 'اختبار الدورة'}</h3>
                   </div>
-                  <h3 className="font-bold text-white text-xs line-clamp-2 leading-tight">{exam.name}</h3>
                 </div>
-              </div>
 
-              {/* ⚡ Magical body */}
-              <div className="p-3 space-y-2">
-                {exam.course_title && (
-                  <div className="pt-1 border-t border-border/40">
-                    <div className="text-[9px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                      <BookOpen className="w-2.5 h-2.5 text-gold/60" /> الدورة
-                    </div>
-                    <div className="text-[10px] text-navy font-bold line-clamp-2 leading-tight">{exam.course_title}</div>
+                {/* Body */}
+                <div className="p-3 space-y-2">
+                  {/* Best result */}
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="text-[9px] text-muted-foreground">حالتك</div>
+                    <span className={`text-[10px] font-extrabold rounded-md px-2 py-0.5 ${
+                      passed ? 'bg-emerald-500/15 text-emerald-700' : best ? 'bg-rose-500/15 text-rose-600' : 'bg-muted text-muted-foreground'
+                    }`}>{statusLabel}</span>
                   </div>
-                )}
-                {/* Start button — magical gradient */}
-                <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all">
-                  <Sparkles className="w-3 h-3 ml-1" /> ابدأ الاختبار
-                </Button>
-              </div>
-            </Card>
-          ))}
+                  {best && (
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                      <div className="text-[9px] text-muted-foreground">أفضل نتيجة</div>
+                      <div className={`text-sm font-extrabold ${passed ? 'text-emerald-600' : 'text-rose-500'}`}>{best.score}%</div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                    <div className="text-[9px] text-muted-foreground">حد النجاح</div>
+                    <div className="text-[10px] font-bold text-navy">{exam.pass_score}%</div>
+                  </div>
+
+                  {/* Action */}
+                  {passed ? (
+                    <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md active:scale-[0.97] transition-all"
+                      onClick={() => router.push('/#certificates')}>
+                      <Award className="w-3 h-3 ml-1" /> اطلب شهادتك الآن
+                    </Button>
+                  ) : (
+                    <Button size="sm" disabled={starting === exam.course_id}
+                      className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all"
+                      onClick={() => startExam(exam.course_id)}>
+                      {starting === exam.course_id ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Sparkles className="w-3 h-3 ml-1" />}
+                      {open ? 'أكمل محاولتك' : best ? 'أعد الاختبار' : 'ابدأ الاختبار'}
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            )
+          })}
         </div>
       )}
     </SectionCard>
   )
 }
 
-function Results() {
+function Results({ courses }: any) {
+  // ============================================================================
+  // نتائجي — v4 royal: نتائج حقيقية من exam_attempts + تصحيحات المدرب
+  // ============================================================================
+  const router = useRouter()
+  const user = useAuth((s: any) => s.user)
+  const [attempts, setAttempts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = () => {
+    if (!user?.id) { setLoading(false); return }
+    fetch(`/api/exam-attempts?user_id=${user.id}&submitted=1`)
+      .then((r) => r.json())
+      .then((d) => setAttempts(Array.isArray(d) ? d : []))
+      .catch(() => setAttempts([]))
+      .finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [user?.id])
+
+  // ⚡ REAL-TIME: instant result updates (auto-grade or trainer correction)
+  useEffect(() => {
+    if (!user?.id) return
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`exam-results-student:${user.id}`)
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'exam_attempts', filter: `user_id=eq.${user.id}` },
+          () => { load() }
+        )
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  const reviewOf = (a: any) => { try { return a?.answers?.__review__ || null } catch { return null } }
+  const courseTitle = (id: string) => courses?.find((c: any) => c.id === id)?.title || 'دورة'
+  const coursePass = (id: string) => courses?.find((c: any) => c.id === id)?.pass_score || 60
+
+  // Best attempt per course (dedupe attempts of the same course)
+  const bestByCourse: any[] = []
+  for (const a of attempts) {
+    const existing = bestByCourse.find((b) => b.course_id === a.course_id)
+    if (!existing || (a.score || 0) > (existing.score || 0)) {
+      const idx = bestByCourse.findIndex((b) => b.course_id === a.course_id)
+      if (idx >= 0) bestByCourse[idx] = a; else bestByCourse.push(a)
+    }
+  }
+  const passedCount = bestByCourse.filter((a) => a.passed).length
+  const avg = bestByCourse.length > 0 ? Math.round(bestByCourse.reduce((acc, a) => acc + (a.score || 0), 0) / bestByCourse.length) : 0
+
   return (
-    <SectionCard title="نتائجي" description="سجل نتائج الاختبارات التي أتممتها">
-      {/* ⚡ Magical empty state */}
-      <div className="text-center py-14">
-        <div className="relative inline-block mb-4">
-          <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
-          <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
-            <TrendingUp className="w-10 h-10 text-gold" />
+    <SectionCard title="نتائجي" description="نتائج اختبارات بنك الأسئلة لدوراتك — مع تصحيحات المدرب النهائية">
+      {loading ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-3">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
           </div>
+          <p className="text-sm text-muted-foreground">جاري تحميل النتائج...</p>
         </div>
-        <h3 className="font-bold text-navy text-base mb-1.5">لا توجد نتائج بعد</h3>
-        <p className="text-xs text-muted-foreground max-w-md mx-auto">
-          عند إكمالك لأحد الاختبارات في دوراتك المسجّلة، ستظهر نتيجتك وتفاصيلها هنا مع
-          النسبة المئوية وحالة النجاح أو الرسوب ✨
-        </p>
-      </div>
+      ) : bestByCourse.length === 0 ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+              <TrendingUp className="w-10 h-10 text-gold" />
+            </div>
+          </div>
+          <h3 className="font-bold text-navy text-base mb-1.5">لا توجد نتائج بعد</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            أكمل اختبار إحدى دوراتك من قسم «اختباراتي» وستظهر نتيجتك هنا فوراً بعد التصحيح التلقائي ✨
+          </p>
+          <Button size="sm" className="mt-4 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white rounded-xl shadow-md"
+            onClick={() => router.push('/#exams')}>
+            <FileText className="w-3.5 h-3.5 ml-1" /> الذهاب إلى اختباراتي
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Summary strip */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="rounded-xl border border-gold/25 bg-gradient-to-b from-gold/[0.08] to-transparent p-3 text-center">
+              <div className="text-[10px] font-bold text-muted-foreground">دورات مجتازة</div>
+              <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">{passedCount}<span className="text-sm text-muted-foreground">/{bestByCourse.length}</span></div>
+            </div>
+            <div className="rounded-xl border border-gold/25 bg-gradient-to-b from-gold/[0.08] to-transparent p-3 text-center">
+              <div className="text-[10px] font-bold text-muted-foreground">معدل النتائج</div>
+              <div className="text-2xl font-extrabold text-navy tabular-nums">{avg}%</div>
+            </div>
+            <div className="rounded-xl border border-gold/25 bg-gradient-to-b from-gold/[0.08] to-transparent p-3 text-center">
+              <div className="text-[10px] font-bold text-muted-foreground">مؤهل للشهادة</div>
+              <div className={`text-2xl font-extrabold tabular-nums ${passedCount === bestByCourse.length ? 'text-gold' : 'text-muted-foreground'}`}>{passedCount === bestByCourse.length ? 'نعم ✓' : 'لا'}</div>
+            </div>
+          </div>
+
+          {/* Result cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 fia-stagger">
+            {bestByCourse.map((a) => {
+              const review = reviewOf(a)
+              return (
+                <Card key={a.id} className="fia-card-hover p-4 border border-gold/25 relative overflow-hidden">
+                  <div className={`absolute top-0 right-0 left-0 h-1 ${a.passed ? 'bg-gradient-to-l from-emerald-500 via-teal-400 to-emerald-500' : 'bg-gradient-to-l from-rose-500 via-red-400 to-rose-500'} opacity-80`} />
+                  <div className="flex items-start gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-md ${
+                      a.passed ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-rose-500 to-red-600'
+                    }`}>
+                      <span className="text-white font-extrabold text-lg leading-none tabular-nums">{a.score}%</span>
+                      <span className="text-[9px] text-white/85 font-bold mt-0.5">{a.passed ? 'ناجح' : 'راسب'}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-navy text-sm line-clamp-1 mb-0.5">{courseTitle(a.course_id)}</div>
+                      <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground">
+                        {a.submitted_at && <span dir="ltr">{new Date(a.submitted_at).toLocaleDateString('ar-EG')}</span>}
+                        <span>حد النجاح {coursePass(a.course_id)}%</span>
+                        {typeof a.duration_seconds === 'number' && a.duration_seconds > 0 && <span dir="ltr">⏱ {Math.floor(a.duration_seconds / 60)} د</span>}
+                      </div>
+                      {review && (
+                        <div className="mt-1.5 text-[10px] font-bold text-purple-700 bg-purple-500/10 border border-purple-500/25 rounded-lg px-2 py-1 inline-flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> النتيجة النهائية بعد مراجعة المدرب
+                          {review.note && <span className="font-medium"> — {review.note}</span>}
+                        </div>
+                      )}
+                    </div>
+                    <Button size="sm" variant="outline" className="flex-shrink-0 border-gold/30 hover:bg-gold/10 rounded-lg text-[10px]"
+                      onClick={() => router.push(a.passed ? '/#certificates' : '/#exams')}>
+                      {a.passed ? 'اطلب الشهادة' : 'أعد الاختبار'}
+                    </Button>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </>
+      )}
     </SectionCard>
   )
 }
