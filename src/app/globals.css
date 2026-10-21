@@ -721,3 +721,49 @@ body {
     max-width: 48rem;
   }
 }
+
+/* ============================================================
+ * v2.7 — Luxury landing/auth animations (navy & gold theme)
+ * GPU-friendly transforms/opacity only. Pure CSS — no libs.
+ * ============================================================ */
+@keyframes fia-lux-fadeup {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fia-lux-fadeup {
+  animation: fia-lux-fadeup 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fia-lux-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+.fia-lux-glow { animation: fia-lux-glow 2.6s ease-in-out infinite; }
+
+/* Gold shine sweep for premium buttons */
+.fia-lux-shine { position: relative; overflow: hidden; }
+.fia-lux-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: fia-lux-shine 2.8s ease-in-out infinite;
+}
+@keyframes fia-lux-shine {
+  0%   { transform: translateX(-160%) skewX(-18deg); }
+  100% { transform: translateX(260%) skewX(-18deg); }
+}
+
+/* Loader bar inside the SSR splash */
+.fia-lux-loader { animation: fia-lux-loader 1.2s ease-in-out infinite; }
+@keyframes fia-lux-loader {
+  0%   { transform: translateX(120%); }
+  100% { transform: translateX(-220%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fia-lux-fadeup, .fia-lux-glow, .fia-lux-loader { animation: none; }
+  .fia-lux-shine::after { animation: none; opacity: 0; }
+}
