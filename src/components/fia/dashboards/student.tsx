@@ -8,6 +8,7 @@ import {
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
   Sparkles, Star, PlayCircle, Phone, Briefcase, XCircle, ShieldCheck,
+  RefreshCw, Hourglass, Timer,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -32,6 +33,7 @@ import { SharedForumRoyal } from './shared-forum-royal'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CertificateRequest } from '@/components/fia/certificate-request'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
+import { ExamRetakeDialog } from '@/components/fia/exam-retake-dialog'
 import { downloadCertificateFile } from '@/lib/certificate-download'
 
 const NAV: NavItem[] = [
@@ -1796,8 +1798,10 @@ function Exams({ userId, courses }: any) {
   const router = useRouter()
   const [exams, setExams] = useState<any[]>([])
   const [attempts, setAttempts] = useState<any[]>([])
+  const [retakes, setRetakes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState<string | null>(null)
+  const [retakeDialogCourse, setRetakeDialogCourse] = useState<any>(null)
 
   const load = async () => {
     if (!userId) { setLoading(false); return }
@@ -1812,6 +1816,11 @@ function Exams({ userId, courses }: any) {
       const attRes = await fetch(`/api/exam-attempts?user_id=${userId}`)
       const attData = await attRes.json()
       setAttempts(Array.isArray(attData) ? attData : [])
+
+      // 2.5) Paid-retake requests (status: pending review / approved)
+      fetch(`/api/exam-retake?user_id=${userId}`).then((r) => r.json()).then((d) => {
+        setRetakes(Array.isArray(d) ? d : [])
+      }).catch(() => setRetakes([]))
 
       // 3) For each enrolled course → the course's active question bank size
       const results = await Promise.all(
@@ -1868,6 +1877,12 @@ function Exams({ userId, courses }: any) {
   const openFor = (courseId: string) =>
     attempts.find((a: any) => a.course_id === courseId && !a.submitted_at)
 
+  // Paid-retake status helpers (server enforces authoritatively — this is UX only)
+  const pendingRetakeFor = (courseId: string) =>
+    retakes.find((r: any) => r.course_id === courseId && r.status === 'قيد الانتظار')
+  const approvedRetakeFor = (courseId: string) =>
+    retakes.find((r: any) => r.course_id === courseId && r.status === 'مكتمل' && !(r.reference || '').includes('__USED__'))
+
   const startExam = async (courseId: string) => {
     if (!userId) return
     setStarting(courseId)
@@ -1918,6 +1933,11 @@ function Exams({ userId, courses }: any) {
             const best = bestFor(exam.course_id)
             const open = openFor(exam.course_id)
             const passed = best?.passed === true
+            const courseObj = courses?.find((c: any) => c.id === exam.course_id)
+            const retakeFee = Number(courseObj?.retake_fee) || 0
+            const examDuration = Number(courseObj?.exam_duration_minutes) || 0
+            const pendingRetake = pendingRetakeFor(exam.course_id)
+            const approvedRetake = approvedRetakeFor(exam.course_id)
             const statusTone = passed ? 'from-emerald-500 to-teal-600' : best ? 'from-rose-500 to-red-600' : 'from-purple-600 via-purple-700 to-fuchsia-700'
             const statusLabel = passed ? 'ناجح ✓' : best ? `راسب — ${best.score}%` : open ? 'محاولة مفتوحة' : 'لم تبدأ بعد'
             return (
@@ -1934,9 +1954,16 @@ function Exams({ userId, courses }: any) {
                       <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-md">
                         {passed ? <CheckCircle2 className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
                       </div>
-                      <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
-                        <HelpCircle className="w-2.5 h-2.5 ml-0.5" /> {exam.questions_count} سؤال
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        {examDuration > 0 && (
+                          <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                            <Timer className="w-2.5 h-2.5 ml-0.5" /> {examDuration} د
+                          </Badge>
+                        )}
+                        <Badge className="bg-white/15 text-white border border-white/30 backdrop-blur-sm text-[10px]">
+                          <HelpCircle className="w-2.5 h-2.5 ml-0.5" /> {exam.questions_count} سؤال
+                        </Badge>
+                      </div>
                     </div>
                     <h3 className="font-bold text-white text-xs line-clamp-2 leading-tight">{exam.course_title || 'اختبار الدورة'}</h3>
                   </div>
@@ -1962,18 +1989,49 @@ function Exams({ userId, courses }: any) {
                     <div className="text-[10px] font-bold text-navy">{exam.pass_score}%</div>
                   </div>
 
-                  {/* Action */}
+                  {/* Action — paid-retake aware (no free retakes) */}
                   {passed ? (
                     <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md active:scale-[0.97] transition-all"
                       onClick={() => router.push('/#certificates')}>
                       <Award className="w-3 h-3 ml-1" /> اطلب شهادتك الآن
                     </Button>
+                  ) : open ? (
+                    <Button size="sm" disabled={starting === exam.course_id}
+                      className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all"
+                      onClick={() => startExam(exam.course_id)}>
+                      {starting === exam.course_id ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Sparkles className="w-3 h-3 ml-1" />}
+                      أكمل محاولتك
+                    </Button>
+                  ) : best ? (
+                    approvedRetake ? (
+                      <Button size="sm" disabled={starting === exam.course_id}
+                        className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md active:scale-[0.97] transition-all"
+                        onClick={() => startExam(exam.course_id)}>
+                        {starting === exam.course_id ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Sparkles className="w-3 h-3 ml-1" />}
+                        ابدأ محاولتك الجديدة ✓
+                      </Button>
+                    ) : pendingRetake ? (
+                      <Button size="sm" disabled className="w-full h-8 text-[10px] rounded-lg bg-amber-500/15 text-amber-700 border border-amber-500/30 cursor-not-allowed">
+                        <Hourglass className="w-3 h-3 ml-1 animate-pulse" /> طلب الإعادة قيد المراجعة
+                      </Button>
+                    ) : retakeFee > 0 ? (
+                      <Button size="sm"
+                        className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all"
+                        onClick={() => setRetakeDialogCourse(courseObj)}>
+                        <RefreshCw className="w-3 h-3 ml-1" />
+                        إعادة الاختبار — رسوم {retakeFee.toLocaleString()} {courseObj?.currency || 'ر.ي'}
+                      </Button>
+                    ) : (
+                      <Button size="sm" disabled className="w-full h-8 text-[10px] rounded-lg bg-muted text-muted-foreground cursor-not-allowed">
+                        <Lock className="w-3 h-3 ml-1" /> إعادة غير متاحة
+                      </Button>
+                    )
                   ) : (
                     <Button size="sm" disabled={starting === exam.course_id}
                       className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all"
                       onClick={() => startExam(exam.course_id)}>
                       {starting === exam.course_id ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Sparkles className="w-3 h-3 ml-1" />}
-                      {open ? 'أكمل محاولتك' : best ? 'أعد الاختبار' : 'ابدأ الاختبار'}
+                      ابدأ الاختبار
                     </Button>
                   )}
                 </div>
@@ -1982,6 +2040,18 @@ function Exams({ userId, courses }: any) {
           })}
         </div>
       )}
+
+      {/* ⚡ Paid retake dialog — fee + payment methods + proof upload */}
+      <ExamRetakeDialog
+        open={!!retakeDialogCourse}
+        onOpenChange={(o: boolean) => { if (!o) setRetakeDialogCourse(null) }}
+        course={retakeDialogCourse}
+        userId={userId}
+        onRequested={() => {
+          setRetakeDialogCourse(null)
+          load()
+        }}
+      />
     </SectionCard>
   )
 }

@@ -1679,12 +1679,16 @@ const AdminPayments = React.memo(function AdminPayments() {
     return match ? match[1].toUpperCase() : null
   }
 
-  // Strip PROOF: and COUPON: markers from reference for clean display
+  // Strip PROOF: and COUPON: markers from reference for clean display.
+  // Also strip the RETAKE:<course-uuid> prefix (exam retake fee rows) —
+  // the retake state is shown as a dedicated badge instead.
   const cleanReference = (ref: string | null | undefined) => {
     if (!ref) return null
     return ref
       .replace(/\s*\|\s*PROOF:.*$/i, '')
       .replace(/\s*\|\s*COUPON:.*$/i, '')
+      .replace(/^RETAKE:[a-zA-Z0-9-]+\s*\|?\s*/i, '')
+      .replace(/\s*\|\s*__USED__:.*$/i, '')
       .trim() || null
   }
 
@@ -1763,6 +1767,8 @@ const AdminPayments = React.memo(function AdminPayments() {
           const isPending = p.status === 'قيد الانتظار'
           const isCompleted = p.status === 'مكتمل'
           const couponCode = getCouponCode(p)
+          const isRetakeFee = (p.reference || '').startsWith('RETAKE')
+          const isRetakeUsed = isRetakeFee && (p.reference || '').includes('__USED__')
           const ref = cleanReference(p.reference)
           const currency = getCurrency(p)
           const hasCoupon = !!couponCode
@@ -1783,6 +1789,14 @@ const AdminPayments = React.memo(function AdminPayments() {
             >
               {/* Top state-aware gradient strip */}
               <div className={`h-1.5 bg-gradient-to-r ${stateGradient}`} />
+              {/* Retake-fee corner badge */}
+              {isRetakeFee && (
+                <div className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                  isRetakeUsed ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' : 'bg-purple-500/10 border-purple-500/40 text-purple-600'
+                }`}>
+                  🔁 رسوم إعادة اختبار{isRetakeUsed ? ' — مستخدمة ✓' : ''}
+                </div>
+              )}
               {/* Coupon corner ribbon */}
               {hasCoupon && (
                 <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/40 text-rose-600 text-[10px] font-mono font-bold" dir="ltr">

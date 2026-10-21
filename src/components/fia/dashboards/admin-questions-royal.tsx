@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import {
   HelpCircle, Plus, Edit, Trash2, CheckCircle2, X, BookOpen, Award, Hash,
   FileText, Sparkles, Loader2, Search, Layers, CircleDot, ListOrdered,
-  Type, XCircle,
+  Type, XCircle, Settings, Timer, Coins, Copy, Database, AlertTriangle, Infinity as InfinityIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ export function AdminExamQuestionsRoyal() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => {
@@ -73,6 +74,8 @@ export function AdminExamQuestionsRoyal() {
   }
 
   const selectedCourseObj = courses.find((c) => c.id === selectedCourse)
+  const examDuration = Number(selectedCourseObj?.exam_duration_minutes) || 0
+  const retakeFee = Number(selectedCourseObj?.retake_fee) || 0
   const filtered = items.filter((q) => {
     if (typeFilter && q.question_type !== typeFilter) return false
     if (!search.trim()) return true
@@ -99,21 +102,32 @@ export function AdminExamQuestionsRoyal() {
             items={[
               { icon: Layers, label: 'إجمالي الأسئلة', value: items.length, grad: 'from-purple-600 to-fuchsia-700' },
               { icon: ListOrdered, label: 'اختيار متعدد', value: mcqCount, grad: 'from-indigo-500 to-purple-600' },
-              { icon: CircleDot, label: 'صح / خطأ', value: tfCount, grad: 'from-emerald-500 to-teal-600' },
-              { icon: Hash, label: 'مجموع النقاط', value: totalPoints, grad: 'from-amber-500 to-orange-600' },
+              { icon: Timer, label: 'مدة الاختبار', value: examDuration > 0 ? `${examDuration} د` : 'بلا حد', grad: 'from-sky-500 to-indigo-600' },
+              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'غير متاحة', grad: 'from-amber-500 to-orange-600' },
             ]}
           />
         ) : undefined
       }
       actions={
-        <Button
-          className="relative bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-lg active:scale-[0.97] transition-all font-extrabold overflow-hidden"
-          disabled={!selectedCourse}
-          onClick={() => { setEditing(null); setOpen(true) }}
-        >
-          <span className="absolute inset-0 lux-shimmer" />
-          <Plus className="w-4 h-4 ml-1 relative" /> سؤال جديد
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="border-gold/40 hover:bg-gold/10 hover:border-gold text-navy rounded-xl shadow-sm font-extrabold"
+            disabled={!selectedCourse}
+            onClick={() => setSettingsOpen(true)}
+            title="مدة الاختبار ورسوم الإعادة"
+          >
+            <Settings className="w-4 h-4 ml-1" /> إعدادات الاختبار
+          </Button>
+          <Button
+            className="relative bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-lg active:scale-[0.97] transition-all font-extrabold overflow-hidden"
+            disabled={!selectedCourse}
+            onClick={() => { setEditing(null); setOpen(true) }}
+          >
+            <span className="absolute inset-0 lux-shimmer" />
+            <Plus className="w-4 h-4 ml-1 relative" /> سؤال جديد
+          </Button>
+        </div>
       }
       toolbar={
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -245,6 +259,21 @@ export function AdminExamQuestionsRoyal() {
         />
       )}
 
+      {settingsOpen && selectedCourseObj && (
+        <ExamSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          course={selectedCourseObj}
+          onSaved={(updated: any) => {
+            // Refresh the courses list so the new stats reflect instantly
+            fetch('/api/courses').then((r) => r.json()).then((d) => {
+              const arr = Array.isArray(d) ? d : []
+              setCourses(arr)
+            }).catch(() => {})
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
@@ -259,6 +288,170 @@ export function AdminExamQuestionsRoyal() {
         loading={deleting}
       />
     </LuxSection>
+  )
+}
+
+// ============================================================================
+// EXAM SETTINGS DIALOG — royal per-course exam configuration (admin + trainer)
+// - exam_duration_minutes: countdown shown to the student during the exam
+//   (empty/0 = unlimited). Anchored server-side — tamper-resistant.
+// - retake_fee: the paid-retake fee. 0 = retakes NOT possible at all.
+//   When > 0, students pay it (with proof) and the admin approves from the
+//   payments inbox to unlock exactly ONE more attempt.
+// ============================================================================
+export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any) {
+  const [duration, setDuration] = useState<string>('')
+  const [fee, setFee] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+  const [needsMigration, setNeedsMigration] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setNeedsMigration(false)
+    const d = Number(course?.exam_duration_minutes)
+    const f = Number(course?.retake_fee)
+    setDuration(course && course.exam_duration_minutes != null && d > 0 ? String(d) : '')
+    setFee(course && course.retake_fee != null && f > 0 ? String(f) : '')
+  }, [open, course?.id])
+
+  const copySql = () => {
+    const sql = `ALTER TABLE courses ADD COLUMN IF NOT EXISTS exam_duration_minutes INT DEFAULT NULL;\nALTER TABLE courses ADD COLUMN IF NOT EXISTS retake_fee NUMERIC DEFAULT 0;\nNOTIFY pgrst, 'reload schema';`
+    navigator.clipboard?.writeText(sql)
+    toast.success('تم نسخ أمر SQL — نفّذه في Supabase SQL Editor')
+  }
+
+  const save = async () => {
+    if (!course?.id) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: course.id,
+          exam_duration_minutes: duration.trim() === '' ? null : Math.max(0, parseInt(duration) || 0),
+          retake_fee: fee.trim() === '' ? 0 : Math.max(0, parseFloat(fee) || 0),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل الحفظ'); return }
+      // Graceful-degradation check: if the API fell back (columns missing),
+      // the returned row won't carry the new fields.
+      if (!('exam_duration_minutes' in (data || {}))) {
+        setNeedsMigration(true)
+        toast.error('تحتاج قاعدة البيانات ترقية أولاً — انسخ أمر SQL بالأعلى ونفّذه في Supabase SQL Editor ثم أعد الحفظ')
+        return
+      }
+      toast.success('تم حفظ إعدادات الاختبار بنجاح')
+      onSaved?.(data)
+      onOpenChange(false)
+    } finally { setSaving(false) }
+  }
+
+  const currency = course?.currency || 'ر.ي'
+
+  return (
+    <LuxDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="إعدادات الاختبار"
+      subtitle={course?.title ? `دورة: ${course.title}` : 'تحكم وقت الاختبار ورسوم إعادة الاختبار'}
+      icon={Settings}
+      gradient="from-[#1b1035] via-purple-900 to-fuchsia-900"
+      maxWidth="sm:max-w-lg"
+      footer={
+        <LuxSaveBar
+          onCancel={() => onOpenChange(false)}
+          onSave={save}
+          saving={saving}
+          saveLabel="حفظ الإعدادات"
+          icon={CheckCircle2}
+          gradient="from-gold to-amber-500"
+          text="text-navy"
+        />
+      }
+    >
+      <div className="space-y-4">
+        {/* Migration warning — graceful degradation before the SQL upgrade */}
+        {needsMigration && (
+          <div className="rounded-xl border-2 border-amber-500/40 bg-amber-50/70 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
+                قاعدة البيانات تحتاج ترقية (عمودان جديدان) — انسخ الأمر التالي ونفّذه في Supabase Dashboard → SQL Editor ثم أعد الحفظ:
+              </p>
+            </div>
+            <button type="button" onClick={copySql}
+              className="w-full flex items-center justify-between gap-2 rounded-lg bg-white/80 border border-amber-300/60 px-3 py-2 hover:bg-amber-100/60 transition-colors">
+              <code className="text-[10px] font-mono text-navy text-right leading-relaxed" dir="ltr">ALTER TABLE courses ADD COLUMN IF NOT EXISTS exam_duration_minutes INT DEFAULT NULL; ...</code>
+              <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-700 flex-shrink-0"><Copy className="w-3 h-3" /> نسخ SQL</span>
+            </button>
+          </div>
+        )}
+
+        {/* Duration */}
+        <LuxField label="مدة الاختبار (بالدقائق)" icon={Timer} hint="فارغ = بلا حد زمني">
+          <div className="flex items-center gap-2">
+            <Input type="number" min={0} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="بلا حد" className={`${luxInput} text-center font-bold`} dir="ltr" />
+            <span className="text-xs font-bold text-muted-foreground flex-shrink-0">دقيقة</span>
+            {duration !== '' && (
+              <button type="button" onClick={() => setDuration('')} title="إلغاء الحد الزمني"
+                className="w-9 h-11 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 flex items-center justify-center flex-shrink-0">
+                <InfinityIcon className="w-4 h-4 text-navy" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {[15, 30, 45, 60, 90, 120].map((v) => (
+              <button key={v} type="button" onClick={() => setDuration(String(v))}
+                className={`px-3 py-1.5 rounded-lg border text-[10px] font-extrabold transition-all ${
+                  duration === String(v) ? 'border-transparent bg-gradient-to-br from-purple-600 to-fuchsia-700 text-white shadow-md' : 'border-gold/25 bg-white text-muted-foreground hover:border-gold/50'
+                }`}>{v} دقيقة</button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed flex items-start gap-1">
+            <Timer className="w-3 h-3 flex-shrink-0 mt-0.5 text-purple-500" />
+            يرى المتدرب عدّاداً تنازلياً فاخراً أثناء الاختبار، وعند انتهاء الوقت يُسلَّم الاختبار تلقائياً ويُصحَّح فوراً. الوقت محسوب من السيرفر فلا يمكن التلاعب به.
+          </p>
+        </LuxField>
+
+        {/* Retake fee */}
+        <LuxField label="رسوم إعادة الاختبار" icon={Coins} hint="0 = الإعادة غير متاحة نهائياً">
+          <div className="flex items-center gap-2">
+            <Input type="number" min={0} value={fee} onChange={(e) => setFee(e.target.value)} placeholder="0 — إعادة غير متاحة" className={`${luxInput} text-center font-bold`} dir="ltr" />
+            <span className="text-xs font-bold text-muted-foreground flex-shrink-0">{currency}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {[1000, 2000, 5000, 10000].map((v) => (
+              <button key={v} type="button" onClick={() => setFee(String(v))}
+                className={`px-3 py-1.5 rounded-lg border text-[10px] font-extrabold transition-all ${
+                  fee === String(v) ? 'border-transparent bg-gradient-to-br from-gold to-amber-500 text-navy shadow-md' : 'border-gold/25 bg-white text-muted-foreground hover:border-gold/50'
+                }`} dir="ltr">{v.toLocaleString()} {currency}</button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed flex items-start gap-1">
+            <Coins className="w-3 h-3 flex-shrink-0 mt-0.5 text-amber-500" />
+            المحاولة الأولى مجانية دائماً. بعد إكمالها لا يستطيع المتدرب إعادة الاختبار أبداً، إلا إذا دفع هذه الرسوم (طرق الدفع + رفع إثبات الدفع) واعتمدت الإدارة الطلب من صندوق المدفوعات — فيُفتح له محاولة واحدة جديدة فقط.
+          </p>
+        </LuxField>
+
+        {/* Current values summary */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-gold/[0.07] to-transparent p-2.5 text-center">
+            <p className="text-[9px] font-bold text-muted-foreground">المدة الحالية</p>
+            <p className={`text-sm font-extrabold ${duration ? 'text-purple-700' : 'text-muted-foreground'}`}>
+              {duration ? `${duration} دقيقة` : 'بلا حد زمني'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-gold/[0.07] to-transparent p-2.5 text-center">
+            <p className="text-[9px] font-bold text-muted-foreground">رسوم الإعادة الحالية</p>
+            <p className={`text-sm font-extrabold ${fee ? 'text-amber-600' : 'text-muted-foreground'}`} dir="ltr">
+              {fee ? `${Number(fee).toLocaleString()} ${currency}` : 'إعادة غير متاحة'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </LuxDialog>
   )
 }
 

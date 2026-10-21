@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import {
   Clock, AlertTriangle, Send, CheckCircle2, XCircle, Loader2, Eye,
-  Sparkles, Award, BookOpen, HelpCircle,
+  Sparkles, Award, BookOpen, HelpCircle, RefreshCw, TimerReset, Infinity as InfinityIcon,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { ExamRetakeDialog } from '@/components/fia/exam-retake-dialog'
 
 interface Props {
   attempt: any
@@ -17,16 +18,23 @@ interface Props {
   course?: any
   studentName?: string
   mode: 'exam' | 'results'
+  serverNow?: number
 }
 
-export default function ExamRunnerClient({ attempt, questions, course, studentName, mode }: Props) {
+export default function ExamRunnerClient({ attempt, questions, course, studentName, mode, serverNow }: Props) {
   const router = useRouter()
   const [answers, setAnswers] = useState<Record<string, any>>(attempt.answers || {})
+
+  // ⚡ SERVER-DRIVEN COUNTDOWN — the admin/trainer sets exam_duration_minutes
+  // on the course (question bank → إعدادات الاختبار). 0/null = unlimited.
+  // The deadline is anchored to the SERVER-side started_at + a server-vs-client
+  // clock-skew correction, so the countdown is tamper-resistant and accurate.
+  const EXAM_MINUTES = Number(course?.exam_duration_minutes) || 0
+  const skewRef = useRef<number>(serverNow ? serverNow - Date.now() : 0)
   const [timeLeft, setTimeLeft] = useState<number>(() => {
-    const DURATION = (questions.length || 10) * 60 * 1.5
-    const startedAt = new Date(attempt.started_at).getTime()
-    const elapsed = Math.floor((Date.now() - startedAt) / 1000)
-    return Math.max(0, Math.floor(DURATION) - elapsed)
+    if (!EXAM_MINUTES || EXAM_MINUTES <= 0) return -1 // -1 = unlimited time
+    const deadline = new Date(attempt.started_at).getTime() + EXAM_MINUTES * 60 * 1000
+    return Math.max(0, Math.floor((deadline - (Date.now() + skewRef.current)) / 1000))
   })
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<any>(mode === 'results' ? attempt : null)
@@ -36,7 +44,22 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
   // Certificate-request chain state (student → trainer → admin → issue)
   const [certReq, setCertReq] = useState<any>(null)
   const [requesting, setRequesting] = useState(false)
-  const [retrying, setRetrying] = useState(false)
+  const [retakeOpen, setRetakeOpen] = useState(false)
+
+  // One-time time warnings (5 min / 1 min)
+  const warned5Ref = useRef(false)
+  const warned1Ref = useRef(false)
+  useEffect(() => {
+    if (mode !== 'exam' || timeLeft === -1) return
+    if (timeLeft <= 300 && !warned5Ref.current) {
+      warned5Ref.current = true
+      toast.warning('⏱ بقي 5 دقائق على انتهاء وقت الاختبار')
+    }
+    if (timeLeft <= 60 && !warned1Ref.current) {
+      warned1Ref.current = true
+      toast.error('⚠️ دقيقة واحدة متبقية — سيتم التسليم تلقائياً عند انتهاء الوقت')
+    }
+  }, [timeLeft, mode])
 
   useEffect(() => {
     if (mode === 'results') return
@@ -70,6 +93,7 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
 
   useEffect(() => {
     if (mode === 'results') return
+    if (timeLeft === -1) return // unlimited — no countdown
     if (timeLeft <= 0) { submit(true); return }
     const interval = setInterval(() => setTimeLeft((t) => Math.max(0, t - 1)), 1000)
     return () => clearInterval(interval)
@@ -135,20 +159,10 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
       } finally { setRequesting(false) }
     }
 
-    // Failed → start a fresh attempt immediately
-    const retryExam = async () => {
-      setRetrying(true)
-      try {
-        const res = await fetch('/api/exam-attempts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: attempt.user_id, course_id: attempt.course_id }),
-        })
-        const data = await res.json()
-        if (!res.ok) { toast.error(data.error || 'تعذر بدء محاولة جديدة'); return }
-        router.push(`/exam/${data.id}`)
-      } finally { setRetrying(false) }
-    }
+    // Failed → the ONLY way back is the paid retake flow (fee dialog →
+    // admin approval → one new attempt). No free retakes, ever.
+    const RETAKE_FEE = Number(course?.retake_fee) || 0
+    const RETAKE_CURRENCY = course?.currency || 'ر.ي'
 
     // Certificate request chain label
     const chainStep = certReq ? ['pending', 'trainer_approved', 'admin_approved', 'issued'].indexOf(certReq.status) : -1
@@ -258,19 +272,33 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
                 </div>
               )}
 
-              {/* Failed → retry card */}
+              {/* Failed → PAID retake card (no free retakes) */}
               {!passed && (
-                <div className="relative mt-6 p-5 bg-gradient-to-br from-purple-500/10 to-fuchsia-50/50 border-2 border-purple-500/30 rounded-xl">
-                  <p className="text-sm font-bold text-navy mb-1">💪 لا تستسلم — أعد المحاولة فوراً</p>
-                  <p className="text-xs text-muted-foreground mb-3">راجع إجاباتك أدناه ثم ابدأ محاولة جديدة. التصحيح تلقائي فور التسليم.</p>
-                  <button
-                    onClick={retryExam}
-                    disabled={retrying}
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all disabled:opacity-50"
-                  >
-                    {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
-                    {retrying ? 'جاري التحضير...' : '🔁 إعادة الاختبار الآن'}
-                  </button>
+                <div className="relative mt-6 p-5 bg-gradient-to-br from-purple-500/10 to-fuchsia-50/50 border-2 border-purple-500/30 rounded-xl overflow-hidden">
+                  <div className="absolute -top-6 -left-6 w-20 h-20 bg-purple-500/15 rounded-full blur-2xl" />
+                  <div className="relative text-center">
+                    <p className="text-sm font-bold text-navy mb-1">🔁 إعادة الاختبار</p>
+                    {RETAKE_FEE > 0 ? (
+                      <>
+                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                          المحاولة الأولى كانت مجانية — لبدء محاولة جديدة يلزم سداد رسوم الإعادة
+                          <span className="font-extrabold text-purple-700"> ({RETAKE_FEE.toLocaleString()} {RETAKE_CURRENCY})</span>
+                          {' '}مع موافقة الإدارة
+                        </p>
+                        <button
+                          onClick={() => setRetakeOpen(true)}
+                          className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          إعادة الاختبار — رسوم {RETAKE_FEE.toLocaleString()} {RETAKE_CURRENCY}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        إعادة الاختبار غير متاحة لهذه الدورة حالياً — تواصل مع الإدارة لمعرفة الخيارات المتاحة
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -321,6 +349,17 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
             </div>
           </Card>
         </div>
+
+        {/* ⚡ Paid retake dialog — fee + payment methods + proof upload */}
+        <ExamRetakeDialog
+          open={retakeOpen}
+          onOpenChange={setRetakeOpen}
+          course={course}
+          userId={attempt.user_id}
+          onRequested={() => {
+            setTimeout(() => { router.push('/#exams') }, 1800)
+          }}
+        />
       </div>
     )
   }
@@ -330,31 +369,68 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
   const answeredCount = Object.keys(answers).filter((k) => answers[k] !== undefined && answers[k] !== null && answers[k] !== '').length
   const allAnswered = answeredCount === totalQuestions
 
-  const minutes = Math.floor(timeLeft / 60)
-  const seconds = timeLeft % 60
-  const timeDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  const isUrgent = timeLeft < 60
+  // ⏱ Luxury countdown display — HH:MM:SS when hours exist, urgency tiers
+  const unlimited = timeLeft === -1
+  const h = Math.floor(Math.max(0, timeLeft) / 3600)
+  const m = Math.floor((Math.max(0, timeLeft) % 3600) / 60)
+  const s = Math.max(0, timeLeft) % 60
+  const timeDisplay = unlimited ? '∞' : h > 0
+    ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const isCritical = !unlimited && timeLeft <= 120
+  const isWarn = !unlimited && !isCritical && timeLeft <= 600
+  const timeProgress = unlimited ? 100 : EXAM_MINUTES > 0 ? Math.max(0, Math.min(100, (timeLeft / (EXAM_MINUTES * 60)) * 100)) : 0
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-navy/5 to-white py-8 px-4" dir="rtl">
       <div className="max-w-3xl mx-auto">
-        {/* ⚡ Sticky header — magical gradient timer */}
-        <div className="sticky top-0 z-10 relative overflow-hidden bg-white border-2 border-gold/30 rounded-2xl shadow-xl p-4 mb-6 flex items-center justify-between">
+        {/* ⚡ Sticky header — magical gradient timer (server-driven countdown) */}
+        <div className={`sticky top-0 z-10 relative overflow-hidden bg-white border-2 rounded-2xl shadow-xl p-4 mb-4 ${isCritical ? 'border-red-500/50' : isWarn ? 'border-amber-500/50' : 'border-gold/30'}`}>
           <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
             backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
             backgroundSize: '14px 14px'
           }} />
-          <div className="relative">
-            <h1 className="text-lg font-bold text-navy flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-gold" />
-              {course?.title || 'اختبار'}
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">{answeredCount} من {totalQuestions} مجاب عنها</p>
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-navy flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-gold flex-shrink-0" />
+                <span className="truncate">{course?.title || 'اختبار'}</span>
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5">{answeredCount} من {totalQuestions} مجاب عنها</p>
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              {unlimited ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md">
+                  <InfinityIcon className="w-5 h-5" />
+                  <span className="font-bold text-sm">بلا حد زمني</span>
+                </div>
+              ) : (
+                <div className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-lg font-bold shadow-md transition-colors ${
+                  isCritical ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white animate-pulse'
+                  : isWarn ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
+                  : 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold'
+                }`}>
+                  <Clock className="w-5 h-5" />
+                  <span dir="ltr">{timeDisplay}</span>
+                </div>
+              )}
+              {!unlimited && (
+                <span className={`text-[9px] font-extrabold ${isCritical ? 'text-red-500' : isWarn ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                  الوقت المتبقي {isCritical ? '— أسرع!' : ''}
+                </span>
+              )}
+            </div>
           </div>
-          <div className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-lg font-bold ${isUrgent ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white animate-pulse shadow-md' : 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-md'}`}>
-            <Clock className="w-5 h-5" />
-            <span dir="ltr">{timeDisplay}</span>
-          </div>
+          {/* Time progress bar — drains as the exam clock runs */}
+          {!unlimited && (
+            <div className="relative mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-1000 ${
+                isCritical ? 'bg-gradient-to-l from-red-500 to-rose-600'
+                : isWarn ? 'bg-gradient-to-l from-amber-500 to-orange-600'
+                : 'bg-gradient-to-l from-gold via-amber-400 to-gold'
+              }`} style={{ width: `${timeProgress}%` }} />
+            </div>
+          )}
         </div>
 
         {/* ⚡ Anti-cheat warning banner — magical amber card */}
