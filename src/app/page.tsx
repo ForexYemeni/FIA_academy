@@ -66,16 +66,51 @@ export default function Home() {
     }
   }
 
-  // === Skeleton screen during initial mount ===
-  // Before the React hydration completes, we show a simple navy
-  // background so the user doesn't see a "blank white flash". This
-  // matches the APK's loading screen color → seamless experience.
+  // === Luxury splash during initial mount (v2.7) ===
+  // Before React hydration completes, we render a premium navy/gold
+  // splash (SSR HTML → paints instantly, no white flash). It matches
+  // the APK's native splash exactly → seamless hand-off, and replaces
+  // the old blank navy rectangle that felt like "slow loading".
   if (!mounted) {
     return (
       <div
-        className="min-h-screen bg-navy"
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#0A1F44] via-[#0B2250] to-[#051429]"
         style={{ paddingTop: 'var(--safe-area-top)' }}
-      />
+      >
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[#C9A961]/15 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-[#1B3A6B]/40 blur-3xl" />
+          <div
+            className="absolute inset-0 opacity-[0.12]"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 20% 30%, #C9A961 1px, transparent 1px), radial-gradient(circle at 80% 70%, #ffffff 1px, transparent 1px)',
+              backgroundSize: '40px 40px, 28px 28px',
+            }}
+          />
+        </div>
+        <div className="relative">
+          <div className="absolute -inset-4 rounded-full bg-[#C9A961]/25 blur-2xl" />
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#C9A961] via-[#E5C77E] to-[#C9A961] p-[2px] shadow-2xl">
+            <img
+              src="/fia/logo-fia.png"
+              alt="FIA"
+              width={72}
+              height={72}
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-[22px] object-cover"
+            />
+          </div>
+        </div>
+        <h1 className="relative mt-4 text-lg font-extrabold text-white">
+          أكاديمية المستقبل الدولية
+        </h1>
+        <p className="relative mt-1 text-[10px] font-bold tracking-[0.3em] text-[#C9A961]">
+          FIA ACADEMY
+        </p>
+        <div className="relative mt-6 h-1 w-28 overflow-hidden rounded-full bg-white/10">
+          <div className="fia-lux-loader h-full w-1/2 rounded-full bg-gradient-to-r from-[#C9A961] to-[#E5C77E]" />
+        </div>
+      </div>
     )
   }
 

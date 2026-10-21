@@ -6,9 +6,10 @@
  * ============================================================================
  *
  * Displays a certificate and provides three actions:
- *   1. تنزيل الصورة (PNG) — uses html-to-image.toPng()
+ *   1. تنزيل الصورة (PNG) — v2.7: من خادم الموقع (@napi-rs/canvas + خط Cairo مدمج)
+ *      مع html-to-image كمسار احتياطي فقط
  *   2. نسخ الرقم — uses navigator.clipboard.writeText() with execCommand fallback
- *   3. تنزيل PDF — uses html-to-image + pdf-lib to embed the cert as a high-quality JPEG inside an A4 landscape PDF
+ *   3. تنزيل PDF — v2.7: من خادم الموقع (pdfkit + Cairo) مع التوليد المحلي كاحتياط
  *
  * ROOT CAUSE OF PREVIOUS FAILURE
  * =================================
@@ -130,6 +131,82 @@ export function CertificateViewer({
   }
 
   /**
+   * v2.7 — جلب الشهادة من خادم الموقع (المسار الأساسي للحفظ).
+   *
+   * لماذا؟ محرك html-to-image يعتمد على SVG <foreignObject> داخل WebView
+   * أندرويد، وعلى أغلب الأجهزة يفشل في دمج الخطوط أو يرسم العربية
+   * متداخلة/مزاحة حتى لو ظهرت سليمة على الشاشة — وهذا هو سبب «الشهادة
+   * غير المرتبة» في المعرض. خادم الموقع يرسم نفس الشهادة الفاخرة عبر
+   * @napi-rs/canvas بخط Cairo الحقيقي المسجّل من ملفات TTF → نتيجة
+   * حرفية متطابقة كل مرة وبجودة أصلية ثابتة على كل الأجهزة.
+   *
+   * يعيد base64 خام أو null لو فشل (عندها نرجع للمسار المحلي الاحتياطي).
+   */
+  const fetchServerCertBase64 = async (
+    format: 'png' | 'pdf'
+  ): Promise<string | null> => {
+    try {
+      const number = certificate?.certificate_number
+      if (!number || typeof window === 'undefined') return null
+      const url = `${window.location.origin}/api/certificate-pdf?number=${encodeURIComponent(number)}&format=${format}`
+      const res = await fetch(url, { credentials: 'omit' })
+      if (!res.ok) return null
+      const blob = await res.blob()
+      if (format === 'png' && !blob.type.startsWith('image/')) return null
+      if (
+        format === 'pdf' &&
+        !(
+          blob.type === 'application/pdf' ||
+          blob.type === 'application/octet-stream' ||
+          blob.type === ''
+        )
+      )
+        return null
+      if (blob.size < 5000) return null
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string
+          const idx = result.indexOf(',')
+          resolve(idx >= 0 ? result.substring(idx + 1) : result)
+        }
+        reader.onerror = () => reject(new Error('FileReader failed'))
+        reader.readAsDataURL(blob)
+      })
+      return base64
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * تنزيل base64 كملف في المتصفحات العادية (blob + anchor بالاسم الرسمي).
+   */
+  const downloadBase64AsFile = async (
+    base64: string,
+    mime: string,
+    filename: string
+  ) => {
+    const blob = await (await fetch(`data:${mime};base64,${base64}`)).blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    a.rel = 'noopener noreferrer'
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(blobUrl)
+      } catch {}
+      try {
+        document.body.removeChild(a)
+      } catch {}
+    }, 2000)
+  }
+
+  /**
    * Convert the on-screen JSX cert element to a high-quality PNG via
    * html-to-image. Returns a base64 data URL.
    *
@@ -234,12 +311,15 @@ export function CertificateViewer({
   }
 
   /**
-   * PNG download button handler.
-   * Path:
-   *   1. Render cert to PNG data URL via html-to-image
-   *   2. Strip "data:image/png;base64," prefix → raw base64
-   *   3. If in FIA APK WebView → pass base64 to native bridge
-   *   4. Else → blob + anchor download (regular browser)
+   * PNG download button handler (v2.7).
+   *
+   * PATH 1 (الأساسي — يلغي مشكلة «الشهادة غير مرتبة» نهائياً):
+   *   يجلب الشهادة مرسومة من خادم الموقع (/api/certificate-pdf) بخط
+   *   Cairo الحقيقي — نصوص عربية سليمة 100% بلا تداخل ولا انكسار.
+   *   - داخل التطبيق: base64 → FIANativeBridge (Chunked) → ألبوم المعرض فوراً
+   *   - في المتصفح: تنزيل blob مباشر بالاسم الرسمي
+   *
+   * PATH 2 (احتياطي فقط لو فشل الخادم): html-to-image من العنصر المعروض.
    */
   const downloadAsImage = async () => {
     if (!certRef.current) {
@@ -251,6 +331,42 @@ export function CertificateViewer({
     const filename = `FIA-Certificate-${certificate.certificate_number}.png`
     const toastId = toast.loading('جارٍ تجهيز الصورة بأعلى جودة...')
     try {
+      // === PATH 1 — ملف الشهادة الرسمي من الخادم ===
+      const serverBase64 = await fetchServerCertBase64('png')
+      if (serverBase64) {
+        if (isAndroidWebView()) {
+          const saved = await saveImageToGalleryChunked(
+            serverBase64,
+            'image/png',
+            filename
+          )
+          if (saved) {
+            const bridge = (window as any).FIANativeBridge
+            try {
+              bridge.showToast('تم حفظ الشهادة في المعرض ✓', 'long')
+            } catch {}
+            try {
+              bridge.vibrate('[50]')
+            } catch {}
+            toast.success('تم تنزيل الشهادة إلى المعرض ✓', { id: toastId })
+            return
+          }
+          toast.error('فشل الحفظ المباشر — جاري التنزيل عبر نظام التطبيق', {
+            id: toastId,
+          })
+          // DownloadListener في التطبيق يلتقط روابط attachment → مجلد Fia academy
+          try {
+            const attachmentUrl = `${window.location.origin}/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=png&download=1`
+            window.open(attachmentUrl, '_blank')
+          } catch {}
+          return
+        }
+        await downloadBase64AsFile(serverBase64, 'image/png', filename)
+        toast.success('تم تنزيل صورة الشهادة ✓', { id: toastId })
+        return
+      }
+
+      // === PATH 2 — احتياطي: التقاط العنصر المعروض محلياً ===
       const dataUrl = await renderCertToPng()
       const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1)
 
@@ -279,23 +395,7 @@ export function CertificateViewer({
       }
 
       // Regular browser path — or APK fallback
-      const blob = await (await fetch(dataUrl)).blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = filename
-      a.rel = 'noopener noreferrer'
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => {
-        try {
-          URL.revokeObjectURL(blobUrl)
-        } catch {}
-        try {
-          document.body.removeChild(a)
-        } catch {}
-      }, 2000)
+      await downloadBase64AsFile(base64Data, 'image/png', filename)
       toast.success('تم تنزيل صورة الشهادة ✓', { id: toastId })
     } catch (e: any) {
       console.error('[FIA] cert PNG failed:', e)
@@ -308,16 +408,13 @@ export function CertificateViewer({
   }
 
   /**
-   * PDF download handler (v2.6).
+   * PDF download handler (v2.7).
    *
    * Pipeline:
-   *   1. Render cert to PNG via html-to-image (fonts embedded, 3x)
-   *   2. Embed the PNG DIRECTLY into pdf-lib (embedPng) — لا ضغط JPEG
-   *      (ضغط JPEG على نصوص يترك هالات ضبابية؛ PNG يحفظ النص حاداً تماماً)
-   *   3. A4 landscape page matching the cert's aspect ratio exactly
-   *   4. Save PDF bytes
-   *   5. If in APK → pass base64 to FIANativeBridge.savePdfToDownloads(Chunked)
-   *   6. Else → blob + anchor download
+   *   PATH 1 (الأساسي): ملف PDF الرسمي من خادم الموقع — pdfkit يرسم
+   *   الشهادة متجهياً بخطوط Cairo الحقيقية → نص حاد 100% بلا أي معالجة صور.
+   *   PATH 2 (احتياطي لو فشل الخادم): التقاط العنصر محلياً (html-to-image
+   *   3x + embedPng بلا JPEG) كما في v2.6.
    */
   const downloadPdf = async () => {
     if (!certRef.current) {
@@ -329,6 +426,73 @@ export function CertificateViewer({
     const filename = `FIA-Certificate-${certificate.certificate_number}.pdf`
     const toastId = toast.loading('جارٍ تجهيز ملف الشهادة...')
     try {
+      // === PATH 1 — PDF الرسمي من الخادم (نص متجهي بخط Cairo) ===
+      const serverBase64 = await fetchServerCertBase64('pdf')
+      if (serverBase64) {
+        if (isAndroidWebView()) {
+          const bridge = (window as any).FIANativeBridge
+          if (bridge) {
+            if (typeof bridge.savePdfToDownloadsChunked === 'function') {
+              try {
+                const chunks: string[] = []
+                const CHUNK_SIZE = 500_000
+                for (let i = 0; i < serverBase64.length; i += CHUNK_SIZE) {
+                  chunks.push(serverBase64.substring(i, i + CHUNK_SIZE))
+                }
+                const saved = bridge.savePdfToDownloadsChunked(
+                  JSON.stringify(chunks),
+                  filename
+                )
+                if (saved) {
+                  try {
+                    bridge.showToast(
+                      'تم حفظ الشهادة PDF في مجلد التنزيلات ✓',
+                      'long'
+                    )
+                  } catch {}
+                  try {
+                    bridge.vibrate('[50]')
+                  } catch {}
+                  toast.success('تم تنزيل الشهادة PDF ✓', { id: toastId })
+                  return
+                }
+              } catch (e) {
+                console.warn('[FIA] chunked PDF save failed:', e)
+              }
+            }
+            if (typeof bridge.savePdfToDownloads === 'function') {
+              try {
+                const saved = bridge.savePdfToDownloads(serverBase64, filename)
+                if (saved) {
+                  try {
+                    bridge.showToast(
+                      'تم حفظ الشهادة PDF في مجلد التنزيلات ✓',
+                      'long'
+                    )
+                  } catch {}
+                  toast.success('تم تنزيل الشهادة PDF ✓', { id: toastId })
+                  return
+                }
+              } catch (e) {
+                console.warn('[FIA] single PDF save failed:', e)
+              }
+            }
+          }
+          toast.error('فشل الحفظ المباشر — جاري التنزيل عبر نظام التطبيق', {
+            id: toastId,
+          })
+          try {
+            const attachmentUrl = `${window.location.origin}/api/certificate-pdf?number=${encodeURIComponent(certificate.certificate_number)}&format=pdf&download=1`
+            window.open(attachmentUrl, '_blank')
+          } catch {}
+          return
+        }
+        await downloadBase64AsFile(serverBase64, 'application/pdf', filename)
+        toast.success('تم تنزيل ملف الشهادة PDF ✓', { id: toastId })
+        return
+      }
+
+      // === PATH 2 — احتياطي: توليد PDF محلياً من العنصر المعروض ===
       const pngDataUrl = await renderCertToPng()
       const pngBytes = new Uint8Array(
         await (await fetch(pngDataUrl)).arrayBuffer()
@@ -616,8 +780,8 @@ export function CertificateViewer({
       {/* APK hint */}
       {isAndroidWebView() && (
         <p className="text-[10px] text-muted-foreground text-center mt-1">
-          💡 تُحفظ الشهادة باسم ملفها الرسمي: الصورة في ألبوم «Fia academy» داخل المعرض،
-          وملف PDF في مجلد «Fia academy» داخل التنزيلات. الجودة 3x بنفس التصميم المعروض تماماً.
+          💡 تُحفظ الشهادة بجودة الخادم الأصلية (خط Cairo مدمج): الصورة في ألبوم «Fia academy»
+          داخل المعرض، وملف PDF في مجلد «Fia academy» داخل التنزيلات — بنفس التصميم الفاخر تماماً.
         </p>
       )}
     </div>

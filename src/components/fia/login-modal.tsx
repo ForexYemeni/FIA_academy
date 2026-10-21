@@ -57,7 +57,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl" showCloseButton={false}>
         <div className="overflow-hidden rounded-lg">
           {/* ⚡ Magical navy gradient header with gold dot pattern */}
           <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-6 overflow-hidden text-center">
@@ -76,11 +76,11 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
               <X className="w-4 h-4 text-gold" />
             </button>
             <DialogHeader className="border-0 bg-transparent p-0 text-center items-center">
-              {/* Magical gold-glow Sparkles icon */}
+              {/* v2.7: شعار الأكاديمية بإطار ذهبي متدرج + هالة نابضة */}
               <div className="relative inline-block mb-3">
-                <div className="absolute inset-0 bg-gold/20 rounded-full blur-xl animate-pulse" />
-                <div className="relative w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md border border-white/30">
-                  <Sparkles className="w-7 h-7 text-navy" strokeWidth={2.2} />
+                <div className="absolute -inset-2 bg-gold/25 rounded-full blur-xl animate-pulse" />
+                <div className="relative rounded-2xl bg-gradient-to-br from-gold via-[#E5C77E] to-gold p-[2px] shadow-xl">
+                  <img src="/fia/logo-fia.png" alt="FIA" width={56} height={56} className="h-14 w-14 rounded-[14px] object-cover" />
                 </div>
               </div>
               <DialogTitle className="text-white text-2xl font-bold mb-1 flex items-center justify-center gap-2">
@@ -146,7 +146,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                 <Button
                   onClick={submit}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20 h-11"
+                  className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
                 >
                   {loading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
                   {loading ? 'جاري المعالجة...' : 'دخول'}
@@ -214,7 +214,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                 <Button
                   onClick={submit}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/20 h-11"
+                  className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
                 >
                   {loading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
                   {loading ? 'جاري المعالجة...' : 'إنشاء الحساب'}
