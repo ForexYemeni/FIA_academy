@@ -532,3 +532,48 @@ Stage Summary:
 - Restored: simple, clean, professional landscape certificate
 - Files changed: src/components/fia/certificate-card.tsx (694 insertions, 809 deletions)
 - Production deployment: dpl_57TQggxnVgqH2iSDeoSefKwtKuhw (READY, sha e875824)
+
+---
+Task ID: cert-aspect-ratio-adjust-for-bottom-content
+Agent: main (Z.ai)
+Task: User said "المتبقي القليل حتى يظهر بقية الايقونات السفلية للشهادة و اطارها" — the bottom icons and frame are almost showing but slightly cut off.
+
+Work Log:
+- Inspected DOM text positions on mobile (412×915 viewport).
+- Found that with aspectRatio 1.4142:1, the cert was 340×240px, but content needed 305px:
+  - 'امسح للتحقق' (QR label): y=267-280 — 40px OUTSIDE frame
+  - 'FIA-2026-77842': y=255-276 — 36px OUTSIDE
+  - 'تاريخ الإصدار' value: y=252-279 — 39px OUTSIDE
+  - 'صالحة' status: y=251-281 — 41px OUTSIDE
+  - 'صادر عن': y=229-242 — outside
+  - 'التوقيع': y=267-280 — 40px OUTSIDE
+  - '✦ نحو مستقبل أفضل معاً ✦': y=288-305 — 65px OUTSIDE
+
+- Iteratively adjusted aspect ratio:
+  1. 1.4142 → 1.25 (340×272): labels fit but values still 1-6px outside, slogan 30px outside
+  2. 1.25 → 1.15 (340×296): all text inside except slogan (6px outside)
+  3. 1.15 → 1.1 (340×309): ALL 18 text elements inside frame! ✅
+
+- Also reduced inner padding from '2.8cqw 4.5cqw 2.4cqw 4.5cqw' to '2cqw 4cqw 1.8cqw 4cqw'
+- Reduced outer gold frame padding from 1.2cqw to 1cqw
+
+TESTS (production):
+- Mobile (412×915):
+  * cert: 340×309, ratio 1.100
+  * All 18 text elements INSIDE frame (insideCount: 18, outsideCount: 0)
+  * PNG: 680×618 (ratio 1.100)
+  * Content fills: Y 0 to 615 of 618 (0.5% bottom empty)
+  * Gold frame visible at bottom rows (y=613-617 all gold)
+  * 6678 navy + 6242 gold pixels
+  * PDF: 110KB, 482×438 (ratio 1.100)
+- Desktop (1280×900):
+  * PNG: 1884×1712 (ratio 1.100)
+  * Content fills: Y 0 to 1710 of 1712 (0.1% bottom empty)
+  * Gold frame visible at bottom (y=1709-1711 all gold)
+  * 6437 navy + 11933 gold pixels
+
+Stage Summary:
+- ROOT CAUSE: aspect ratio 1.4142:1 was too wide/short for all content to fit on mobile
+- FIX: changed aspect ratio to 1.1:1 (slightly taller) + reduced padding
+- All content (logo, name, badge, student name, course, QR, cert number, date, status, issuer, signature, slogan) now fits WITHIN the cert frame
+- Both PNG and PDF exports show the complete cert with bottom icons and frame visible
