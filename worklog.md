@@ -1117,3 +1117,80 @@ USER ACTION REQUIRED:
    - Play sound
    - Vibrate the device
    - Appear on lock screen
+
+---
+Task ID: silent-notifications-server-side-fix
+Agent: main (Z.ai)
+Task: User reported notifications still silent after v2.6.1 APK — appearing only in-app, no external popup, no sound.
+
+ROOT CAUSE (server-side this time):
+===================================
+Even with the v2.6.1 APK fixes (new channel v5, PRIORITY_MAX, setFullScreenIntent, USE_FULL_SCREEN_INTENT permission), notifications were still silent. The actual root cause was on the SERVER SIDE:
+
+The server was using ONLY a 'data' payload in the FCM message.
+- Data payloads require onMessageReceived() to fire in the app to display the notification
+- BUT onMessageReceived does NOT fire when:
+  * The app is force-killed (Android 8+ "background restricted")
+  * The app process is dead AND the device is in Doze mode
+  * Some manufacturer ROMs (Xiaomi/Huawei) kill background processes
+- Result: the FCM push arrived at the device, but Android's system tray had nothing to display
+
+THE FIX:
+========
+Added a NOTIFICATION payload alongside the data payload in src/lib/firebase-admin.ts:
+
+```typescript
+const message = {
+  token: t.token,
+  notification: {  // 🔥 NEW — Android system tray shows this automatically
+    title: opts.title,
+    body: opts.body,
+  },
+  data: dataPayload,  // kept for deep-linking
+  android: {
+    priority: 'high',
+    ttl: 86400,
+    notification: {
+      channelId: 'fia-notifications-v5',
+      sound: 'default',
+      icon: 'ic_notification',
+      color: '#D4AF37',
+      priority: 'high',
+      defaultSound: true,
+      defaultVibrateTimings: true,
+      defaultLightSettings: true,
+      visibility: 'public',
+      notificationCount: 1,
+    },
+  },
+}
+```
+
+When Android receives a notification payload:
+- It AUTOMATICALLY displays the notification in the system tray
+- Plays the default sound
+- Vibrates the device
+- Shows heads-up popup
+- Works EVEN IF the app is force-killed
+- This is the SAME mechanism WhatsApp/Telegram use
+
+The data payload is STILL included so when the user taps the notification,
+the app can read the deep-link and navigate to the relevant page.
+
+TESTS:
+======
+- Local build: SUCCESS
+- Production deployment: dpl_CvibHTdm2iKdggmbuFdDyE9nQmdD READY
+- Test push sent: success=true, sent=1, failed=0
+- The notification now uses Android's native system tray delivery
+- No new APK needed — server-side fix only
+
+USER ACTION:
+============
+No new APK needed! The fix is on the server side and is already live.
+Just test notifications again — they should now:
+- Pop up as heads-up notifications (slide down from top)
+- Play the default notification sound
+- Vibrate the device
+- Appear on the lock screen
+- Work even if the app is force-killed
