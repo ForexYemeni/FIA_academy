@@ -1385,3 +1385,76 @@ USER ACTION:
 - The app will load the website ONCE on startup
 - Website updates appear automatically (no rebuild needed)
 - Deep-links from notifications navigate without reloading home
+
+---
+Task ID: v2.7.1-final-notification-fix
+Agent: main (Z.ai)
+Task: User extremely frustrated — "أقسم بالله العظيم اني مللت من هذا المشااكل الاشعارات لاتصل خارج التطبيق أبداً"
+
+ROOT CAUSE (FINAL DIAGNOSIS):
+=============================
+1. The channel 'fia-notifications-v5' had its importance locked by Android
+   (either by user manually downgrading via Settings, or by Android's
+   adaptive rules that downgrade channels with low engagement).
+   Android LOCKS channel settings after first creation.
+
+2. The server was sending a 'notification' payload alongside the data payload.
+   When FCM receives a notification payload, it delivers to the system tray
+   DIRECTLY (bypassing onMessageReceived) — using whatever channel settings
+   the system decides, often SILENT.
+
+THE FINAL FIX (v2.7.1):
+========================
+
+ANDROID SIDE:
+- Brand new channel ID: 'fia-notifications-v7' — Android has never seen this,
+  so it's created fresh with IMPORTANCE_HIGH (sound + popup + vibrate)
+- Deletes ALL old channels (v3, v4, v5, v6, original) to clean up
+- If the new channel exists but with LOW importance, deletes + recreates it
+- onMessageReceived now logs EVERYTHING (verbose mode) for debugging
+- ALWAYS posts notification with:
+  * PRIORITY_MAX (forces heads-up popup)
+  * DEFAULT_ALL (sound + lights + vibrate)
+  * setSound(explicit notification sound)
+  * setCategory(CATEGORY_MESSAGE)
+  * setVisibility(VISIBILITY_PUBLIC)
+  * setFullScreenIntent (shows over other apps)
+  * setTicker (status bar ticker text)
+- Plays notification sound MANUALLY as a backup (in case channel sound disabled)
+- Checks if notifications are enabled + logs channel importance
+
+SERVER SIDE:
+- Switched to DATA-ONLY payload (removed 'notification' field entirely)
+- This forces onMessageReceived to ALWAYS fire
+- Even when app is force-killed (Android 8+ restrictions don't apply to
+  FCM data-only messages — Firebase wakes up the app process)
+- Gives our code full control over notification display
+
+TESTS:
+======
+- Next.js build: SUCCESS
+- APK build: SUCCESS (9.1MB, signed v2)
+- APK verified: package=com.fiaacademy, versionCode=31, versionName=2.7.1
+- APK contains: fia-notifications-v7, PRIORITY_MAX, DEFAULT_ALL, setFullScreenIntent
+- Test push to user 592394ae-...: success=true, sent=1, failed=0
+- Released to GitHub: https://github.com/ForexYemeni/FIA_academy/releases/tag/v2.7.1
+- Direct download: https://github.com/ForexYemeni/FIA_academy/releases/download/v2.7.1/FIA-Academy-v2.7.1.apk
+
+USER ACTION REQUIRED:
+====================
+1. Install FIA-Academy-v2.7.1.apk (over v2.7.0 — same package name)
+2. On first launch, GRANT these permissions:
+   - Battery optimization exemption
+   - Full-screen intent permission (Android 14+)
+   - Notifications permission
+3. Open Android Settings → App → FIA Academy → Notifications
+   - Verify the channel "إشعارات أكاديمية المستقبل الدولية" exists
+   - Make sure it's set to "High priority" or "Show notifications"
+4. Login and test notifications — should now:
+   - Pop up as heads-up notifications (slide down from top)
+   - Play sound (default notification sound)
+   - Vibrate the device
+   - Work even when app is closed
+
+If notifications STILL don't show, check Android notification settings:
+Settings → App → FIA Academy → Notifications → make sure ALL toggles are ON.
