@@ -7,7 +7,8 @@ import {
   Loader2, CheckCircle2, X, Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import * as htmlToImage from 'html-to-image'
+import html2canvas from 'html2canvas'
+import { PDFDocument } from 'pdf-lib'
 import { isAndroidWebView } from '@/lib/certificate-download'
 
 export function CertificateViewer({ certificate, onClose }: { certificate: any; onClose?: () => void }) {
@@ -57,22 +58,15 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
    */
   const renderCertToCleanCanvas = async (): Promise<HTMLCanvasElement> => {
     if (!certRef.current) throw new Error('لا يمكن العثور على عنصر الشهادة')
-    // ⚡ Use html2canvas — it uses the browser's native canvas API
-    // which correctly handles Arabic text shaping, ligatures, and
-    // RTL direction. This is the KEY difference from html-to-image
-    // (which uses SVG+foreignObject and substitutes wrong Arabic
-    // glyphs).
+    // ⚡ Use html2canvas (statically imported) — it uses the
+    // browser's native canvas API which correctly handles Arabic
+    // text shaping, ligatures, and RTL direction.
     // scale=4 → 4x resolution (2880x2032 for a 720x508 cert).
-    const html2canvasModule = await import('html2canvas')
-    const html2canvas = html2canvasModule.default
     const sourceCanvas = await html2canvas(certRef.current, {
       scale: 4,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
-      // Don't set width/height — let html2canvas measure the
-      // element's natural size (720x508). This ensures the full cert
-      // is captured, not just the visible viewport portion.
     } as any)
     // ⚡ Re-draw onto a clean canvas with explicit white background.
     // This:
@@ -241,8 +235,7 @@ export function CertificateViewer({ certificate, onClose }: { certificate: any; 
         )
       })
       const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
-      // Use pdf-lib to create the PDF
-      const { PDFDocument } = await import('pdf-lib')
+      // Use pdf-lib (statically imported) to create the PDF
       const pdfDoc = await PDFDocument.create()
       const embeddedImage = await pdfDoc.embedJpg(jpegBytes)
       // Page size matches the cert's aspect ratio (no margins/borders)
