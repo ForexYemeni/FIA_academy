@@ -825,3 +825,35 @@ Stage Summary:
 - User needs to: install APK, run SQL migration, add 3 Firebase env vars on Vercel
 - Commit on main: 6b8f783
 - Production deployment: dpl_HUFXiErAT4BYzuHkok6xWxK4B8bo READY
+
+---
+Task ID: env-vars-and-table-setup
+Agent: main (Z.ai)
+Task: User provided Firebase credentials + Supabase DB URL + Vercel token. Asked to add the Firebase env vars and create the fcm_tokens table without touching anything else.
+
+Work Log:
+1. Verified existing Vercel env vars (24 total) — made sure NOT to touch any of them
+2. Added 3 new Firebase env vars to Vercel (all 3 targets: production, preview, development):
+   - FIREBASE_PROJECT_ID=fia-academy (id: 3Gps4oB6EJLpdcto)
+   - FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@fia-academy.iam.gserviceaccount.com (id: AGH7s5CwowcAMtYp)
+   - FIREBASE_PRIVATE_KEY=[encrypted by Vercel, 1678 chars with \n escapes] (id: 82S1iGTQZcXU8XbU)
+3. Total env vars after: 27 (was 24, added 3)
+4. Connected to Supabase via psycopg2 (no need to install psql)
+5. Created the fcm_tokens table with idempotent SQL (uses IF NOT EXISTS everywhere — safe to re-run)
+   - 6 columns: id, user_id, token, device_info, created_at, updated_at
+   - 4 indexes: pkey (auto), fcm_tokens_user_id_token_key (unique), fcm_tokens_user_id_idx, fcm_tokens_token_idx
+   - RLS enabled (no policies = deny by default, service_role bypasses)
+6. Triggered a new Vercel deployment (dpl_JsVb127Lyq9Ugboh8EocoBka3SoB) to pick up the new env vars
+7. Verified everything works via /api/fcm/test-push endpoint:
+   - FIREBASE_PROJECT_ID_set: true (value: fia-academy)
+   - FIREBASE_CLIENT_EMAIL_set: true
+   - FIREBASE_PRIVATE_KEY_set: true
+   - fcm_tokens table query succeeds (returns 0 tokens for the test user — expected because user has not installed the new APK yet)
+
+Stage Summary:
+- 3 Firebase env vars added to Vercel without touching any existing vars
+- fcm_tokens table created in Supabase without affecting any existing tables
+- New Vercel deployment picked up the env vars successfully
+- /api/fcm/test-push endpoint now reports all env vars are set
+- The ONLY remaining step is for the user to install FIA-Academy-v2.6.0.apk and log in — the APK will register the FCM token automatically
+- NO existing data, env vars, or tables were modified or deleted
