@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react'
 import {
   HelpCircle, Plus, Edit, Trash2, CheckCircle2, BookOpen, Hash,
   Sparkles, Loader2, Search, Layers, CircleDot, ListOrdered,
-  GraduationCap, Settings, Timer, Coins,
+  GraduationCap, Settings, Timer, Coins, RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -65,6 +65,8 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
   const selectedCourseObj = courses.find((c) => c.id === selectedCourse)
   const examDuration = Number(selectedCourseObj?.exam_duration_minutes) || 0
   const retakeFee = Number(selectedCourseObj?.retake_fee) || 0
+  const maxRetakesRaw = Number(selectedCourseObj?.max_retakes)
+  const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
   const filtered = items.filter((q) => {
     if (typeFilter && q.question_type !== typeFilter) return false
     if (!search.trim()) return true
@@ -89,9 +91,9 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
           <LuxStats
             items={[
               { icon: Layers, label: 'إجمالي الأسئلة', value: items.length, grad: 'from-purple-600 to-fuchsia-700' },
-              { icon: ListOrdered, label: 'اختيار متعدد', value: mcqCount, grad: 'from-indigo-500 to-purple-600' },
               { icon: Timer, label: 'مدة الاختبار', value: examDuration > 0 ? `${examDuration} د` : 'بلا حد', grad: 'from-sky-500 to-indigo-600' },
-              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'غير متاحة', grad: 'from-amber-500 to-orange-600' },
+              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'عند المراجعة', grad: 'from-amber-500 to-orange-600' },
+              { icon: RefreshCw, label: 'الإعادات المسموحة', value: `${maxRetakes} (${1 + maxRetakes} محاولات)`, grad: 'from-emerald-500 to-teal-600' },
             ]}
           />
         ) : undefined

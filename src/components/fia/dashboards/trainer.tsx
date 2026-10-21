@@ -6,7 +6,7 @@ import {
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
   GraduationCap, Crown, Calendar, Clock, TrendingUp,
-  Phone, Briefcase, Sparkles, Award, KeyRound, Save,
+  Phone, Briefcase, Sparkles, Award, KeyRound, Save, HeartHandshake,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -269,6 +269,31 @@ function TrainerOverview({ user, courses, students }: any) {
       ? (ratedCourses.reduce((acc, c) => acc + c.rating, 0) / ratedCourses.length).toFixed(1)
       : 'لا توجد تقييمات بعد'
 
+  // ⚡ ROYAL v4.2 — magical FOLLOWERS hub: count + live follower list.
+  const [followers, setFollowers] = useState<any[]>([])
+  const [followersLoading, setFollowersLoading] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      if (!user?.id) { setFollowersLoading(false); return }
+      fetch(`/api/trainer-follows?trainer_id=${user.id}`)
+        .then((r) => r.json())
+        .then((d) => { if (!cancelled) setFollowers(Array.isArray(d?.followers) ? d.followers : []) })
+        .catch(() => { if (!cancelled) setFollowers([]) })
+        .finally(() => { if (!cancelled) setFollowersLoading(false) })
+    }
+    load()
+    // ⚡ REAL-TIME: a new follower appears instantly (magic toast)
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel(`trainer-followers:${user?.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_follows' }, () => { load() })
+        .subscribe()
+    } catch {}
+    return () => { cancelled = true; try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [user?.id])
+
   // Real "active exams" count: lessons with lesson_type === 'exam' across
   // the trainer's own courses (same data source as TrainerExams).
   const [examsCount, setExamsCount] = useState<number>(0)
@@ -332,9 +357,10 @@ function TrainerOverview({ user, courses, students }: any) {
       </div>
 
       {/* ⚡ Magical StatCards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 fia-stagger">
         <StatCard icon={BookOpen} label="الدورات التدريبية" value={courses.length} color="navy" />
         <StatCard icon={Users} label="إجمالي المتدربين" value={String(students.length)} color="gold" />
+        <StatCard icon={HeartHandshake} label="متابعوك المخلصون" value={followersLoading ? '—' : String(followers.length)} color="green" />
         <StatCard icon={Star} label="متوسط التقييم" value={avgRating} color="green" />
         <StatCard
           icon={FileText}
@@ -343,6 +369,45 @@ function TrainerOverview({ user, courses, students }: any) {
           color="blue"
         />
       </div>
+
+      {/* ⚡ ROYAL v4.2 — followers hall */}
+      <SectionCard title="متابعوك" description="الأساتذة والمتدربون الذين يتابعونك — يتلقون إشعاراً فورياً بكل دورة أو درس جديد تنشره">
+        {followersLoading ? (
+          <div className="text-center py-8"><Loader2 className="w-6 h-6 mx-auto animate-spin text-gold" /></div>
+        ) : followers.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <HeartHandshake className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-bold text-navy mb-1">لا يوجد متابعون بعد</p>
+            <p className="text-xs">عندما يتابعك متدرب سيظهر هنا فوراً مع إشعار مباشر لك ✨</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div className="rounded-xl bg-gradient-to-l from-gold/[0.1] to-transparent border border-gold/25 px-4 py-2 flex items-center gap-2">
+                <HeartHandshake className="w-5 h-5 text-gold" />
+                <span className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{followers.length}</span>
+                <span className="text-[10px] font-bold text-muted-foreground">متابع إجمالاً</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {followers.map((f: any) => (
+                <div key={f.id} className="flex items-center gap-2 rounded-xl border border-gold/20 bg-white px-2.5 py-1.5 shadow-sm">
+                  <Avatar className="w-7 h-7 rounded-lg border border-gold/30">
+                    <AvatarImage src={f.follower?.avatar || ''} />
+                    <AvatarFallback className="text-[10px] font-extrabold bg-gradient-to-br from-navy to-navy-light text-gold rounded-lg">
+                      {f.follower?.name?.charAt(0) || '؟'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-navy truncate max-w-[120px]">{f.follower?.name || 'متدرب'}</div>
+                    <div className="text-[8px] text-muted-foreground">{new Date(f.created_at).toLocaleDateString('ar-EG')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </SectionCard>
 
       {/* ⚡ Magical section — أحدث الدورات */}
       <SectionCard title="أحدث الدورات" description="الدورات التي تدرّسها">

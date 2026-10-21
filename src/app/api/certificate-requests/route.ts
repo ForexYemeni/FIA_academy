@@ -113,6 +113,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })
     }
 
+    // === ROYAL v4.2 PERMANENT-FAILURE GATE ===
+    // A student who exhausted the retake budget (1 + max_retakes attempts)
+    // without EVER passing can never receive a certificate for this course.
+    const { data: atts } = await supabaseAdmin
+      .from('exam_attempts')
+      .select('id, passed')
+      .eq('user_id', user_id)
+      .eq('course_id', course_id)
+      .not('submitted_at', 'is', null)
+    if ((atts || []).length > 0) {
+      const everPassed = (atts || []).some((a: any) => a.passed === true)
+      if (!everPassed) {
+        const { data: cRow } = await supabaseAdmin
+          .from('courses')
+          .select('max_retakes')
+          .eq('id', course_id)
+          .maybeSingle()
+        const maxRetakesRaw = Number(cRow?.max_retakes)
+        const budget = 1 + (Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2)
+        if ((atts || []).length >= budget) {
+          return NextResponse.json(
+            { error: 'لم تتوفّق في هذه الدورة — انتهت جميع محاولاتك المسموحة، ولا يمكن إصدار شهادة لهذه الدورة' },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
     // Check if request already exists
     const { data: existing } = await supabaseAdmin
       .from('payments')
