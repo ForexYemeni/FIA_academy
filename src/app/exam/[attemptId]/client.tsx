@@ -15,10 +15,11 @@ interface Props {
   attempt: any
   questions: any[]
   course?: any
+  studentName?: string
   mode: 'exam' | 'results'
 }
 
-export default function ExamRunnerClient({ attempt, questions, course, mode }: Props) {
+export default function ExamRunnerClient({ attempt, questions, course, studentName, mode }: Props) {
   const router = useRouter()
   const [answers, setAnswers] = useState<Record<string, any>>(attempt.answers || {})
   const [timeLeft, setTimeLeft] = useState<number>(() => {
@@ -32,8 +33,10 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
   const [tabSwitches, setTabSwitches] = useState<number>(attempt.tab_switches || 0)
   const [warnings, setWarnings] = useState<string[]>([])
   const recordedRef = useRef(false)
-  const [issuing, setIssuing] = useState(false)
-  const [certNumber, setCertNumber] = useState<string | null>(null)
+  // Certificate-request chain state (student → trainer → admin → issue)
+  const [certReq, setCertReq] = useState<any>(null)
+  const [requesting, setRequesting] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     if (mode === 'results') return
@@ -72,6 +75,19 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
     return () => clearInterval(interval)
   }, [timeLeft, mode])
 
+  // ⚡ Load the certificate-request chain status for this user + course
+  // (top-level hook — must NOT live inside the conditional results block)
+  useEffect(() => {
+    if (!result || !attempt.user_id || !attempt.course_id) return
+    fetch(`/api/certificate-requests?user_id=${attempt.user_id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const arr = Array.isArray(d) ? d : []
+        setCertReq(arr.find((r: any) => r.course_id === attempt.course_id) || null)
+      })
+      .catch(() => {})
+  }, [result, attempt.user_id, attempt.course_id])
+
   const submit = async (autoSubmitted = false) => {
     if (submitting) return
     setSubmitting(true)
@@ -94,23 +110,48 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
   if (result) {
     const passed = result.passed
     const score = result.score
-    const passScore = course?.pass_score || 60
+    const passScore = course?.pass_score || result.pass_score || 60
+    const review = (() => { try { return result?.answers?.__review__ || null } catch { return null } })()
 
-    const issueCertificate = async () => {
-      setIssuing(true)
+    // Request the certificate through the trusted chain (NOT direct issue):
+    // student request → trainer approval → admin approval → issued
+    const requestCertificate = async () => {
+      setRequesting(true)
       try {
-        const res = await fetch('/api/certificates/issue', {
+        const res = await fetch('/api/certificate-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: attempt.user_id,
+            course_id: attempt.course_id,
+            student_name: studentName || '',
+            course_title: course?.title || '',
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) { toast.error(data.error || 'فشل إرسال الطلب'); return }
+        toast.success('تم إرسال طلب الشهادة — ينتظر موافقة المدرب ثم الإدارة')
+        setCertReq(data)
+      } finally { setRequesting(false) }
+    }
+
+    // Failed → start a fresh attempt immediately
+    const retryExam = async () => {
+      setRetrying(true)
+      try {
+        const res = await fetch('/api/exam-attempts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: attempt.user_id, course_id: attempt.course_id }),
         })
         const data = await res.json()
-        if (!res.ok) { toast.error(data.error || 'فشل إصدار الشهادة'); return }
-        if (data.already) toast.info('لديك شهادة صادرة بالفعل')
-        else toast.success('🎉 تم إصدار شهادتك!')
-        setCertNumber(data.certificate?.certificate_number || null)
-      } finally { setIssuing(false) }
+        if (!res.ok) { toast.error(data.error || 'تعذر بدء محاولة جديدة'); return }
+        router.push(`/exam/${data.id}`)
+      } finally { setRetrying(false) }
     }
+
+    // Certificate request chain label
+    const chainStep = certReq ? ['pending', 'trainer_approved', 'admin_approved', 'issued'].indexOf(certReq.status) : -1
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-navy/5 to-white py-12 px-4" dir="rtl">
@@ -123,7 +164,6 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
               backgroundSize: '24px 24px, 18px 18px'
             }} />
             <div className={`absolute -top-12 -right-12 w-40 h-40 ${passed ? 'bg-emerald-500/15' : 'bg-red-500/15'} rounded-full blur-3xl`} />
-            <div className="absolute -bottom-12 -left-12 w-32 h-32 ${passed ? 'bg-emerald-500/10' : 'bg-red-500/10'} rounded-full blur-2xl" />
 
             <div className="relative">
               <div className={`relative inline-block mb-4`}>
@@ -132,21 +172,31 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
                   {passed ? <CheckCircle2 className="w-14 h-14 text-white" /> : <XCircle className="w-14 h-14 text-white" />}
                 </div>
               </div>
-              <h1 className={`text-3xl font-extrabold mb-2 ${passed ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {passed ? '🎉 نجحت!' : 'لم تنجح هذه المرة'}
+              {/* GRAND COURSE-COMPLETION STATE */}
+              <h1 className={`text-3xl font-extrabold mb-1 ${passed ? 'text-emerald-600' : 'text-rose-500'}`}>
+                {passed ? '🎉 أكملت الدورة ناجحاً!' : 'لم تجتز اختبار الدورة بعد'}
               </h1>
-              <p className="text-muted-foreground mb-4">حصلت على</p>
+              <p className={`text-sm font-bold mb-3 ${passed ? 'text-emerald-600/80' : 'text-rose-500/80'}`}>
+                {passed ? 'أنت الآن مؤهل لطلب شهادة إكمال الدورة' : 'أعد المحاولة حتى تحقق درجة النجاح لتصبح مؤهلاً للشهادة'}
+              </p>
+              <p className="text-muted-foreground mb-1">حصلت على</p>
               <div className={`text-6xl font-extrabold mb-2 ${passed ? 'bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent' : 'bg-gradient-to-r from-rose-500 to-red-600 bg-clip-text text-transparent'}`}>{score}%</div>
               <p className="text-sm text-muted-foreground mb-4">
                 {result.correct_count || 0} من {result.total_questions || 0} إجابة صحيحة · حد النجاح {passScore}%
               </p>
+              {review && (
+                <div className="mx-auto max-w-sm mb-4 text-xs font-bold text-purple-700 bg-purple-500/10 border border-purple-500/25 rounded-xl px-3 py-2">
+                  📝 النتيجة النهائية بعد مراجعة المدرب{review.by_name ? ` (${review.by_name})` : ''}
+                  {review.note ? ` — ${review.note}` : ''}
+                </div>
+              )}
               {tabSwitches > 0 && (
                 <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30 mb-4">
                   <AlertTriangle className="w-3 h-3 ml-1" /> {tabSwitches} تحذيرات أمنية مسجّلة
                 </Badge>
               )}
 
-              {/* Issue certificate — magical gold card */}
+              {/* ============ CERTIFICATE CHAIN CARD ============ */}
               {passed && (
                 <div className="relative mt-6 p-5 bg-gradient-to-br from-gold/10 to-amber-50/50 border-2 border-gold/40 rounded-xl overflow-hidden">
                   <div className="absolute inset-0 opacity-20" style={{
@@ -155,25 +205,52 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
                   }} />
                   <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/20 rounded-full blur-2xl" />
                   <div className="relative">
-                    {certNumber ? (
+                    {certReq?.status === 'issued' && certReq.cert_number ? (
                       <div>
                         <p className="text-sm font-bold text-navy mb-2 flex items-center gap-1.5"><Award className="w-4 h-4 text-gold" /> شهادتك الصادرة</p>
-                        <p className="font-mono text-lg text-gold mb-3" dir="ltr">{certNumber}</p>
-                        <a href={`/verify/${certNumber}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-5 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all">
+                        <p className="font-mono text-lg text-gold mb-3" dir="ltr">{certReq.cert_number}</p>
+                        <a href={`/verify/${certReq.cert_number}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-5 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all">
                           <CheckCircle2 className="w-4 h-4" /> عرض الشهادة
                         </a>
                       </div>
+                    ) : certReq && ['pending', 'trainer_approved', 'admin_approved'].includes(certReq.status) ? (
+                      <div>
+                        <p className="text-sm font-bold text-navy mb-3 flex items-center justify-center gap-1.5"><Sparkles className="w-4 h-4 text-gold" /> طلب شهادتك في سلسلة الموافقات</p>
+                        <div className="flex items-center justify-center gap-1 mb-3 text-[10px] font-extrabold">
+                          {[
+                            { k: 'pending', label: 'المدرب' },
+                            { k: 'trainer_approved', label: 'الإدارة' },
+                            { k: 'admin_approved', label: 'الإصدار' },
+                          ].map((s, i) => {
+                            const done = chainStep > i
+                            const current = chainStep === i
+                            return (
+                              <span key={s.k} className="flex items-center gap-1">
+                                {i > 0 && <span className="w-3 h-px bg-gold/40" />}
+                                <span className={`rounded-full px-2.5 py-1 border ${
+                                  done ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700'
+                                  : current ? 'bg-gold/20 border-gold/60 text-navy animate-pulse'
+                                  : 'bg-white/50 border-border text-muted-foreground'
+                                }`}>{s.label}</span>
+                              </span>
+                            )
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {certReq.status === 'pending' ? 'انتظر موافقة المدرب على طلبك' : certReq.status === 'trainer_approved' ? 'وافق المدرب — ينتظر الآن اعتماد الإدارة' : 'اعتمدت الإدارة — سيصدر رقم شهادتك خلال لحظات'}
+                        </p>
+                      </div>
                     ) : (
                       <div>
-                        <p className="text-sm font-bold text-navy mb-1 flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-gold" /> 🎉 يمكنك الآن إصدار شهادتك!</p>
-                        <p className="text-xs text-muted-foreground mb-3">احصل على شهادة إكمال معتمدة قابلة للتحقق منها عبر QR code</p>
+                        <p className="text-sm font-bold text-navy mb-1 flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-gold" /> 🎉 أنت مؤهل لطلب الشهادة!</p>
+                        <p className="text-xs text-muted-foreground mb-3">يمر طلبك بسلسلة موافقات موثوقة: المدرب ← الإدارة ← الإصدار برقم قابل للتحقق</p>
                         <button
-                          onClick={issueCertificate}
-                          disabled={issuing}
+                          onClick={requestCertificate}
+                          disabled={requesting || !studentName}
                           className="inline-flex items-center gap-2 bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all disabled:opacity-50"
                         >
-                          {issuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
-                          {issuing ? 'جاري الإصدار...' : '📜 إصدار الشهادة'}
+                          {requesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                          {requesting ? 'جاري إرسال الطلب...' : '📜 اطلب شهادتك الآن'}
                         </button>
                       </div>
                     )}
@@ -181,9 +258,28 @@ export default function ExamRunnerClient({ attempt, questions, course, mode }: P
                 </div>
               )}
 
+              {/* Failed → retry card */}
+              {!passed && (
+                <div className="relative mt-6 p-5 bg-gradient-to-br from-purple-500/10 to-fuchsia-50/50 border-2 border-purple-500/30 rounded-xl">
+                  <p className="text-sm font-bold text-navy mb-1">💪 لا تستسلم — أعد المحاولة فوراً</p>
+                  <p className="text-xs text-muted-foreground mb-3">راجع إجاباتك أدناه ثم ابدأ محاولة جديدة. التصحيح تلقائي فور التسليم.</p>
+                  <button
+                    onClick={retryExam}
+                    disabled={retrying}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all disabled:opacity-50"
+                  >
+                    {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+                    {retrying ? 'جاري التحضير...' : '🔁 إعادة الاختبار الآن'}
+                  </button>
+                </div>
+              )}
+
               <div className="flex flex-wrap justify-center gap-3 mt-6">
-                <Button onClick={() => router.push('/')} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all">
-                  العودة للوحة التحكم
+                <Button onClick={() => router.push('/#exams')} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all">
+                  اختباراتي
+                </Button>
+                <Button onClick={() => router.push('/#results')} variant="outline" className="rounded-xl border-gold/30 hover:border-gold hover:bg-gold/5">
+                  نتائجي
                 </Button>
                 <Button onClick={() => router.push(`/courses/${course?.slug || ''}`)} variant="outline" className="rounded-xl border-gold/30 hover:border-gold hover:bg-gold/5">
                   مراجعة الدورة

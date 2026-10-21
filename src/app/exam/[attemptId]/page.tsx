@@ -29,9 +29,28 @@ export default async function Page({ params }: Props) {
 
   // Already submitted → show results page instead
   if (attempt.submitted_at) {
-    return <ExamRunnerClient attempt={attempt} questions={[]} mode="results" />
+    // Resolve the student's name so the results view can create a proper
+    // certificate request through the approval chain.
+    const { data: studentUser } = await supabaseAdmin
+      .from('users')
+      .select('name')
+      .eq('id', attempt.user_id)
+      .maybeSingle()
+    const { data: attemptCourse } = await supabaseAdmin
+      .from('courses')
+      .select('id, title, slug, pass_score')
+      .eq('id', attempt.course_id)
+      .maybeSingle()
+    return (
+      <ExamRunnerClient
+        attempt={attempt}
+        questions={[]}
+        course={attemptCourse || undefined}
+        studentName={studentUser?.name || ''}
+        mode="results"
+      />
+    )
   }
-
   // Fetch the actual questions — strip correct_answer to prevent client-side cheating
   const questionIds: string[] = Array.isArray(attempt.question_ids) ? attempt.question_ids : []
   const { data: questionRows } = await supabaseAdmin
@@ -40,18 +59,19 @@ export default async function Page({ params }: Props) {
     .in('id', questionIds)
     .eq('status', 'نشط')
 
-  // Also fetch course info (for the page title + pass score)
-  const { data: course } = await supabaseAdmin
-    .from('courses')
-    .select('id, title, pass_score')
-    .eq('id', attempt.course_id)
-    .maybeSingle()
+  // Also fetch course info (for the page title + pass score) + the student's
+  // name (needed to create a proper certificate request after passing).
+  const [{ data: course }, { data: studentUser }] = await Promise.all([
+    supabaseAdmin.from('courses').select('id, title, slug, pass_score').eq('id', attempt.course_id).maybeSingle(),
+    supabaseAdmin.from('users').select('name').eq('id', attempt.user_id).maybeSingle(),
+  ])
 
   return (
     <ExamRunnerClient
       attempt={attempt}
       questions={questionRows || []}
       course={course}
+      studentName={studentUser?.name || ''}
       mode="exam"
     />
   )
