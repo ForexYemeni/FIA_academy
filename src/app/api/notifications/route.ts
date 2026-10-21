@@ -44,6 +44,23 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
 
+    // 🔥 Send FCM push notification (the primary notification mechanism)
+    // This works even when the app is fully closed/force-killed.
+    // Uses the same code path as /api/fcm/test-push.
+    try {
+      const { sendFcmPush } = await import('@/lib/firebase-admin')
+      await sendFcmPush({
+        userId: user_id,
+        title,
+        body: body || '',
+        data: { type, link: link || '/' },
+        link: link || '/',
+      })
+    } catch (e) {
+      // Non-fatal — DB insert succeeded, polling fallback still works
+      console.warn('[FIA-Notifications] FCM push failed (non-fatal):', e)
+    }
+
     // Email notification (if SMTP env vars are configured)
     try {
       await sendEmailNotification(user_id, type, title, body)
