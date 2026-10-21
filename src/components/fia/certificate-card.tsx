@@ -304,7 +304,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
           position: 'relative',
           background: COLOR.IVORY,
           fontFamily:
-            "'Cairo', 'Noto Sans Arabic', 'Segoe UI', sans-serif",
+            "var(--font-cairo), 'Cairo', 'Noto Sans Arabic', 'Segoe UI', sans-serif",
           // Enable container queries so inner cqw units resolve correctly
           containerType: 'inline-size',
           // === OUTER GOLD FRAME ===

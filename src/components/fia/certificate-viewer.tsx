@@ -109,11 +109,35 @@ export function CertificateViewer({
   }
 
   /**
+   * v2.6: انتظر اكتمال تحميل خط Cairo (next/font) — كانت الخطوط غير جاهزة
+   * أو غير مدمجة لحظة التصدير فيرتّم المحتوى بخط النظام الاحتياطي العريض
+   * فتتداخل النصوص وتنكسر الشارة والتاريخ في الصورة المحفوظة بالمعرض.
+   */
+  const waitForFontsReady = async (): Promise<void> => {
+    try {
+      const fonts = (document as any).fonts
+      if (!fonts) return
+      await fonts.ready
+      // حمّل الأوزان المستخدمة في الشهادة صراحةً إن لم تكن جاهزة بعد
+      await Promise.all(
+        ['400', '700', '800'].map((w) =>
+          fonts.load(`${w} 16px 'Cairo'`).catch(() => undefined)
+        )
+      )
+    } catch {
+      // لا شيء — fonts API غير مدعوم، نكمل بلا انتظار
+    }
+  }
+
+  /**
    * Convert the on-screen JSX cert element to a high-quality PNG via
    * html-to-image. Returns a base64 data URL.
    *
-   * Quality settings:
-   *   - pixelRatio: 2 → 1000×700 cert becomes 2000×1400 PNG (print quality)
+   * Quality settings (v2.6 — إصلاح تفكك التصميم في الصورة المصدّرة):
+   *   - pixelRatio: 3 → صورة أضعف الجودة للطباعة والعرض (2400×2100 لشهادة 800px)
+   *   - waitForFontsReady + fontEmbedCSS مُحسب مسبقاً → نفس خط Cairo المعروض
+   *     يُدمج فعلياً في الصورة → نفس المقاسات بلا تداخل نصوص
+   *   - width/height صريحة من getBoundingClientRect → لا اختلاف أبعاد مع العرض الحي
    *   - cacheBust: true → forces fresh fetch of images (no stale cache)
    *   - backgroundColor: '#FFFEFA' → fallback if cert's own bg is transparent
    */
@@ -122,21 +146,46 @@ export function CertificateViewer({
       throw new Error('لا يمكن العثور على عنصر الشهادة')
     }
     await waitForImagesToLoad(certRef.current)
-    const dataUrl = await htmlToImage.toPng(certRef.current, {
+    await waitForFontsReady()
+
+    const rect = certRef.current.getBoundingClientRect()
+
+    // حُسب مسبقاً: CSS كامل لخطوط @font-face مدمجة data-URI — تفشل غالباً
+    // داخل WebView لو تُركت لآلية الالتقاط الافتراضية
+    let fontEmbedCSS = ''
+    try {
+      fontEmbedCSS = await htmlToImage.getFontEmbedCSS(certRef.current)
+    } catch {
+      fontEmbedCSS = ''
+    }
+
+    const options: any = {
       quality: 1.0,
-      pixelRatio: 2,
+      pixelRatio: 3,
       cacheBust: true,
       backgroundColor: '#FFFEFA',
+      width: Math.ceil(rect.width),
+      height: Math.ceil(rect.height),
+      style: { margin: '0' },
       // Skip elements that explicitly opt out (e.g. buttons, page chrome)
-      filter: (node) => {
+      filter: (node: any) => {
         if (!node) return false
-        // Skip elements marked with data-cert-skip
         if (node instanceof HTMLElement && node.dataset?.certSkip === 'true') {
           return false
         }
         return true
       },
-    })
+    }
+    if (fontEmbedCSS) options.fontEmbedCSS = fontEmbedCSS
+
+    let dataUrl = await htmlToImage.toPng(certRef.current, options)
+
+    // شبكة أمان: إن خرجت صورة مفرغة/شبه فارغة أعد المحاولة بلا خطوط مدمجة يدوياً
+    if (!dataUrl || dataUrl.length < 1000) {
+      const fallback: any = { ...options }
+      delete fallback.fontEmbedCSS
+      dataUrl = await htmlToImage.toPng(certRef.current, fallback)
+    }
     if (!dataUrl || dataUrl.length < 1000) {
       throw new Error('فشل توليد صورة الشهادة — حاول مرة أخرى')
     }
@@ -259,17 +308,15 @@ export function CertificateViewer({
   }
 
   /**
-   * PDF download button handler.
+   * PDF download handler (v2.6).
    *
    * Pipeline:
-   *   1. Render cert to PNG via html-to-image (high-quality)
-   *   2. Convert PNG → JPEG (canvas) — JPEG is always RGB, no LAB ICC
-   *      issues, smaller file size
-   *   3. Embed JPEG into pdf-lib as a single A4 landscape page that
-   *      matches the cert's aspect ratio exactly (no margins, no
-   *      white borders)
+   *   1. Render cert to PNG via html-to-image (fonts embedded, 3x)
+   *   2. Embed the PNG DIRECTLY into pdf-lib (embedPng) — لا ضغط JPEG
+   *      (ضغط JPEG على نصوص يترك هالات ضبابية؛ PNG يحفظ النص حاداً تماماً)
+   *   3. A4 landscape page matching the cert's aspect ratio exactly
    *   4. Save PDF bytes
-   *   5. If in APK → pass base64 to FIANativeBridge.savePdfToDownloads
+   *   5. If in APK → pass base64 to FIANativeBridge.savePdfToDownloads(Chunked)
    *   6. Else → blob + anchor download
    */
   const downloadPdf = async () => {
@@ -283,39 +330,14 @@ export function CertificateViewer({
     const toastId = toast.loading('جارٍ تجهيز ملف الشهادة...')
     try {
       const pngDataUrl = await renderCertToPng()
+      const pngBytes = new Uint8Array(
+        await (await fetch(pngDataUrl)).arrayBuffer()
+      )
 
-      // Convert PNG → JPEG via canvas (always RGB, smaller file)
-      const imgEl = new Image()
-      imgEl.crossOrigin = 'anonymous'
-      await new Promise<void>((resolve, reject) => {
-        imgEl.onload = () => resolve()
-        imgEl.onerror = () => reject(new Error('فشل تحميل صورة الشهادة'))
-        imgEl.src = pngDataUrl
-      })
-      const canvas = document.createElement('canvas')
-      canvas.width = imgEl.naturalWidth
-      canvas.height = imgEl.naturalHeight
-      const ctx = canvas.getContext('2d')!
-      // White background to flatten any alpha
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(imgEl, 0, 0)
-      const jpegBlob: Blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob)
-            else reject(new Error('فشل تحويل الصورة إلى JPEG'))
-          },
-          'image/jpeg',
-          0.95
-        )
-      })
-      const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer())
-
-      // Build PDF with pdf-lib — embed JPEG, size page to match aspect ratio
+      // Build PDF with pdf-lib — embed PNG directly, size page to match aspect ratio
       const { PDFDocument } = await import('pdf-lib')
       const pdfDoc = await PDFDocument.create()
-      const embeddedImage = await pdfDoc.embedJpg(jpegBytes)
+      const embeddedImage = await pdfDoc.embedPng(pngBytes)
       const imgWidth = embeddedImage.width
       const imgHeight = embeddedImage.height
       const imgRatio = imgWidth / imgHeight
@@ -594,8 +616,8 @@ export function CertificateViewer({
       {/* APK hint */}
       {isAndroidWebView() && (
         <p className="text-[10px] text-muted-foreground text-center mt-1">
-          💡 سيتم حفظ الشهادة في مجلد «FIA» داخل المعرض. الصورة عالية الجودة (2x)
-          بنفس التصميم المعروض.
+          💡 تُحفظ الشهادة باسم ملفها الرسمي: الصورة في ألبوم «Fia academy» داخل المعرض،
+          وملف PDF في مجلد «Fia academy» داخل التنزيلات. الجودة 3x بنفس التصميم المعروض تماماً.
         </p>
       )}
     </div>
