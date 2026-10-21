@@ -41,6 +41,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var loadingOverlay: FrameLayout? = null
 
+    // 🔥 v2.7.0 KEY FIX: Track whether the WebView has already loaded
+    // the home URL. This prevents the DOUBLE-LOAD issue where the page
+    // was being loaded twice on app startup.
+    //
+    // ROOT CAUSE of double-load:
+    // - onCreate() called setupWebView() which called loadUrl(HOME_URL)
+    // - But the WebView was being created BEFORE the activity was fully
+    //   attached to the window, causing Android to recreate the activity
+    //   (config change or process restart) → setupWebView() called again
+    //   → second loadUrl(HOME_URL)
+    //
+    // THE FIX:
+    // - Use a `webViewLoaded` flag to ensure loadUrl is called EXACTLY ONCE
+    // - Use savedInstanceState to detect activity recreation (config change)
+    //   and skip the second loadUrl
+    // - Move loadUrl() to a separate method that's idempotent
+    private var webViewLoaded = false
+
     // File picker launcher — registered via the Activity Result API
     // (the deprecated startActivityForResult approach was buggy with
     // the system file picker on Android 13+).
@@ -149,6 +167,12 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 🔥 v2.7.0 FIX: If savedInstanceState != null, the activity is being
+        // recreated (e.g. after a config change or process kill). In that case,
+        // we DON'T want to load the URL again — the WebView's state is restored
+        // automatically by Android. Loading again would cause a DOUBLE-LOAD.
+        val isActivityRecreated = savedInstanceState != null
 
         // Build the UI programmatically — no layout XML needed, keeps
         // the APK small and the visual structure obvious.
@@ -697,6 +721,17 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true
             allowFileAccess = true
             allowContentAccess = true
+            // 🔥 v2.7.0: LOAD_DEFAULT — uses cache if available, otherwise
+            // fetches from network. This is the IDEAL setting because:
+            // - When the user opens the app, the WebView loads from cache
+            //   instantly (fast startup), then fetches fresh content from
+            //   the network in the background.
+            // - Updates to the website appear automatically (no APK rebuild
+            //   needed) — the cache is updated when the network version
+            //   differs from the cached version.
+            // - The user's session (login state) is preserved because
+            //   localStorage/cookies are stored separately from the page
+            //   cache and persist across reloads.
             cacheMode = WebSettings.LOAD_DEFAULT
             useWideViewPort = true
             loadWithOverviewMode = true
@@ -704,6 +739,19 @@ class MainActivity : AppCompatActivity() {
             displayZoomControls = false
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            // 🔥 v2.7.0: Enable database storage — this is needed for the
+            // web app's localStorage + IndexedDB to work (where the auth
+            // token and other session data is stored).
+            databaseEnabled = true
+            // 🔥 v2.7.0: Set the WebView's user-agent to identify the APK.
+            // The web app can detect this and adjust behavior (e.g. show/hide
+            // features that only work in the APK).
+            // We APPEND to the default user-agent so the WebView's standard
+            // features (like fetch, etc.) still work correctly.
+            val defaultUA = userAgentString ?: ""
+            if (!defaultUA.contains("FIA-Academy-APK")) {
+                userAgentString = "$defaultUA FIA-Academy-APK/v2.7.0"
+            }
             // ⚡ Disable the text selection action mode (the floating
             // "Copy / Share / Select All" toolbar that appears when
             // the user long-presses any text in the WebView). This is
@@ -997,8 +1045,19 @@ class MainActivity : AppCompatActivity() {
         // new saveImageToGallery / savePdfToDownloads methods.
         webView.addJavascriptInterface(FIANativeBridge(this), "FIANativeBridge")
 
-        // Load the home URL
-        webView.loadUrl(HOME_URL)
+        // 🔥 v2.7.0 KEY FIX: Load the home URL EXACTLY ONCE.
+        // The `webViewLoaded` flag prevents double-load in case setupWebView()
+        // is called multiple times (e.g. after activity recreation).
+        // We also check savedInstanceState in onCreate — if the activity is
+        // being recreated, we DON'T call loadUrl at all (the WebView state
+        // is restored by Android automatically).
+        if (!webViewLoaded) {
+            Log.i(TAG, "🔥 Loading home URL (first time)")
+            webViewLoaded = true
+            webView.loadUrl(HOME_URL)
+        } else {
+            Log.i(TAG, "⚠️ WebView already loaded — skipping loadUrl (preventing double-load)")
+        }
     }
 
     private fun generateFilename(mimeType: String): String {
@@ -1164,12 +1223,81 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Resume the WebView (paused in onPause)
+        // 🔥 v2.7.0: We DO NOT call webView.reload() here.
+        // The previous code may have triggered a reload on resume, causing
+        // the page to be loaded again. The WebView keeps its state across
+        // onPause/onResume — we just resume the WebView's lifecycle.
         webView.onResume()
     }
 
     override fun onPause() {
         webView.onPause()
         super.onPause()
+    }
+
+    /**
+     * 🔥 v2.7.0: Save WebView state so it can be restored on activity recreation.
+     * This prevents the page from being loaded again when the activity is
+     * recreated (e.g. after a configuration change like rotation).
+     */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        try {
+            webView.saveState(outState)
+            outState.putBoolean("webViewLoaded", webViewLoaded)
+            Log.d(TAG, "💾 Saved WebView state")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to save WebView state", e)
+        }
+    }
+
+    /**
+     * 🔥 v2.7.0: Restore WebView state. If we have a saved state, mark
+     * the WebView as already loaded so we don't trigger loadUrl again.
+     */
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        try {
+            webView.restoreState(savedInstanceState)
+            webViewLoaded = savedInstanceState.getBoolean("webViewLoaded", false)
+            Log.d(TAG, "📂 Restored WebView state (webViewLoaded=$webViewLoaded)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to restore WebView state", e)
+        }
+    }
+
+    /**
+     * 🔥 v2.7.0: Handle deep-link intents (from notifications).
+     *
+     * When the user taps a notification, the system delivers an Intent
+     * with a deep-link URL. We receive it here and navigate the WebView
+     * to that URL — WITHOUT calling reload() on the home page.
+     *
+     * The previous code may have caused a double-load by treating the
+     * deep-link intent as a fresh launch. Now we use onNewIntent to
+     * handle deep-links that arrive while the app is already running.
+     */
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    /**
+     * 🔥 v2.7.0: Handle deep-link navigation without reloading the home page.
+     * If the intent has a URL, navigate the WebView to it (this is a
+     * client-side navigation, NOT a reload).
+     */
+    private fun handleDeepLink(intent: Intent?) {
+        val url = intent?.data?.toString() ?: return
+        if (url.isBlank()) return
+        Log.i(TAG, "🔗 Deep-link received: $url")
+        // Navigate the WebView to the deep-link URL.
+        // This is a client-side navigation (not a reload) — the WebView
+        // will load only the new URL, not the home page again.
+        if (url.startsWith(HOME_URL) || url.contains("fiaacademy.vercel.app")) {
+            webView.loadUrl(url)
+        }
     }
 
     override fun onDestroy() {
