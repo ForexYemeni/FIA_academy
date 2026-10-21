@@ -135,3 +135,77 @@ Stage Summary:
 Files committed:
 - 29fcbdf on https://github.com/ForexYemeni/FIA_academy main branch
 - Verified via Vercel API: deployment dpl_6JE6jeLJVwfE7w4GhcvKmrMc7jQQ ready, target=production, readyState=READY
+
+---
+Task ID: cert-clipping-fix
+Agent: main (Z.ai)
+Task: Fix the certificate clipping in PNG/PDF export — user reported the on-screen cert looks great but the downloaded PNG/PDF is cut off and looks bad.
+
+Work Log:
+- User uploaded two images: (1) screenshot of verify page showing the cert on a phone — looks great; (2) the downloaded PNG — clearly clipped, only the left half of the cert visible, right side is blank/empty.
+- Analyzed the downloaded PNG file (/home/z/my-project/upload/FIA-Certificate-FIA-2026-89944 (1).png):
+  - Size: 2000×1400 (pixelRatio 2 × 1000×700 cert)
+  - Pixel samples confirmed: left half (x=0 to ~1000) had cert content (gold/navy/cream pixels), but right half (x=1000 to 1999) was all transparent (alpha=0).
+  - This means html-to-image exported a canvas sized 2000×1400, but only painted the LEFT half — the right half was empty.
+- Loaded production verify page (https://fiaacademy.vercel.app/verify/FIA-2026-89944) in headless browser via agent-browser.
+- Inspected the cert element's actual rendered geometry:
+  - cert element width=1000 (matches the fixed 1000px style)
+  - cert element bounding rect: x=111, y=343
+  - cert parent width = 942px (NARROWER than the 1000px cert!)
+  - parent overflow-x = "auto" — the parent was set to scroll horizontally
+  - parent scrollWidth = 1000 (the cert overflowed the parent)
+- ROOT CAUSE OF CLIPPING:
+  - CertificateCard had a FIXED width: 1000px in inline style.
+  - The cert's parent container (dashboard dialog or verify page wrapper) was narrower (942px in this case).
+  - The parent had `overflow-x: auto` — so the cert became horizontally scrollable.
+  - When html-to-image serialized the cert, it measured the cert at its scroll viewport (942px visible) but expanded the canvas to the cert's actual width (1000px) — then painted only the visible portion (the left 942px out of 1000px), leaving the right 58px+ of the cert unpainted, plus the rest of the 2000px-wide canvas entirely empty.
+  - Net effect: PNG/PDF showed only the left half of the cert.
+
+THE FIX:
+- Rewrote CertificateCard (src/components/fia/certificate-card.tsx):
+  - Root div now uses width: 100% (NOT fixed 1000px) — adapts to parent width.
+  - Aspect ratio locked via `aspectRatio: '10 / 7'` (close to A4 landscape √2 ≈ 1.414).
+  - All inner sizes converted from fixed px to percentages (%) or clamp():
+    * Logo: 8.8% width + aspect-ratio 1/1
+    * Inner padding: 1.4% (was 14px)
+    * Corner ornaments: positioned at 2.8% from edges (was 14px)
+    * Font sizes: clamp(min, vw-based, max) — e.g. academy name = clamp(14px, 2.8vw, 32px)
+    * Icon container sizes: width 3.6% + minWidth 28px (so they don't shrink too small)
+    * QR container: width 12% (was 120px)
+    * Signature column: width 14% (was 140px)
+  - Removed `margin: '0 auto'` from root (was causing offset within parent — root now fills parent edge-to-edge).
+  - Added `overflow: 'hidden'` to root to clip any decorative elements that extend past the edges.
+  - All inline HEX colors retained (no oklch/lab regression).
+
+- Updated CertificateViewer (src/components/fia/certificate-viewer.tsx):
+  - Removed `overflow-x-auto` from the cert preview container — the cert now fits naturally inside any parent width without scrolling.
+  - Added explanatory comment documenting WHY overflow must be avoided for proper export.
+
+TESTS:
+- Local Next.js build succeeded (all 58 routes generated).
+- Pushed to main → Vercel auto-deployed as production deployment dpl_5q6dvKu5C8wQCooVgZSmFJCMRxhb (READY in ~30s).
+- Browser-tested on production (verify page):
+  - Desktop viewport (1280×800):
+    * cert element rendered: 942×659 (matches parent width, 10:7 ratio preserved)
+    * cert element x=169 (no offset within parent)
+    * parent no longer has overflow-x: auto
+    * Downloaded PNG: 1884×1318 (942×659 × pixelRatio 2)
+    * Pixel samples: corners gold/cream, center cream — CONTENT FILLS THE WHOLE IMAGE
+  - Mobile viewport (412×915):
+    * cert element rendered: 340×238 (responsive!)
+    * Downloaded PNG: 680×476 (340×238 × pixelRatio 2)
+    * Pixel samples: all edges gold (the gold frame), center cream — NO CLIPPING
+  - PDF download:
+    * PDF page size: 297×207.774 pts (A4 landscape, matches cert's 10:7 ratio)
+    * 1 page, 328KB, PDF 1.7
+    * Pixel samples on rendered PDF page: all corners gold (211,175,56), center cream (250,246,234) — content fills the entire PDF page
+
+Stage Summary:
+- ROOT CAUSE: Fixed-width 1000px cert inside a narrower (942px) parent with overflow-x: auto → cert was scrollable → html-to-image captured only the visible viewport, not the full cert.
+- FIX: Made cert responsive (width: 100% + aspect-ratio: 10/7) — now fits any parent naturally without scrolling. All inner sizes converted to percentages/clamp so the cert scales proportionally.
+- Files changed:
+  - src/components/fia/certificate-card.tsx (responsive rewrite)
+  - src/components/fia/certificate-viewer.tsx (removed overflow-x-auto)
+- Production deployment: dpl_5q6dvKu5C8wQCooVgZSmFJCMRxhb (READY)
+- Commit on main: e9a7c78
+- Verified on production: PNG (1884×1318 desktop, 680×476 mobile) and PDF (A4 landscape) all show the COMPLETE certificate with no clipping.
