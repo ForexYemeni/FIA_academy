@@ -11,7 +11,7 @@ import React, { useEffect, useState } from 'react'
 import {
   Award, FileText, Eye, Edit, Trash2, RefreshCw, XCircle, CheckCircle2,
   X, Search, Download, Loader2, Plus, Calendar, User, BookOpen, Landmark,
-  BadgeCheck, ShieldCheck, Sparkles, Clock, Ban, RotateCcw,
+  BadgeCheck, ShieldCheck, Sparkles, Clock, Ban, RotateCcw, GraduationCap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
   const [courses, setCourses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
+  const [trainers, setTrainers] = useState<any[]>([])
   const [editing, setEditing] = useState<any | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [issueOpen, setIssueOpen] = useState(false)
@@ -62,6 +63,7 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setStudents(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+    fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : []))
   }
   useEffect(() => { load() }, [])
 
@@ -425,6 +427,7 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
           students={students}
           courses={courses}
           enrollments={enrollments}
+          trainers={trainers}
           onSaved={load}
         />
       )}
@@ -551,31 +554,40 @@ const AdminCertificatesRoyal = React.memo(function AdminCertificatesRoyal() {
 // ============================================================================
 // ISSUE CERTIFICATE DIALOG — royal wizard-style manual issuance
 // ============================================================================
-function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollments, onSaved }: {
+function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollments, trainers, onSaved }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   students: any[]
   courses: any[]
   enrollments: any[]
+  trainers: any[]
   onSaved: () => void
 }) {
   const [studentId, setStudentId] = useState('')
   const [courseId, setCourseId] = useState('')
+  const [trainerId, setTrainerId] = useState('')
+  const [customTrainer, setCustomTrainer] = useState('')
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [issuedBy, setIssuedBy] = useState('أكاديمية المستقبل الدولية')
   const [hasAccreditation, setHasAccreditation] = useState(false)
   const [accreditationBody, setAccreditationBody] = useState('')
+  const [bypassCompletion, setBypassCompletion] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const student = students.find((s) => s.id === studentId)
   const course = courses.find((c) => c.id === courseId)
+  const trainer = trainers.find((t) => t.id === trainerId)
+  const trainerName = trainer ? trainer.name : customTrainer.trim() || ''
   const isEnrolled = studentId && courseId && enrollments.some((e) => e.user_id === studentId && e.course_id === courseId)
   const enrollmentCompleted = studentId && courseId && enrollments.some((e) => e.user_id === studentId && e.course_id === courseId && (e.status === 'completed' || e.status === 'مكتمل'))
+  // إصدار استثنائي: مسجل لكن غير مكتمل — الإدارة فقط تملك مفتاح التجاوز
+  const needsBypass = !!isEnrolled && !enrollmentCompleted
 
   const save = async () => {
     if (!student) { toast.error('اختر المتدرب أولاً'); return }
     if (!course) { toast.error('اختر الدورة أولاً'); return }
     if (!issueDate) { toast.error('حدد تاريخ الإصدار'); return }
+    if (needsBypass && !bypassCompletion) { toast.error('الدورة غير مكتملة — فعّل الإصدار الاستثنائي للمتابعة'); return }
     setSaving(true)
     try {
       const res = await fetch('/api/certificates', {
@@ -586,6 +598,7 @@ function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollm
           student_id: student.id,
           course_title: course.title,
           course_id: course.id,
+          trainer_name: trainerName || null,
           issued_by: issuedBy || 'أكاديمية المستقبل الدولية',
           status: 'صالحة',
           issued_at: new Date(issueDate + 'T12:00:00').toISOString(),
@@ -599,7 +612,8 @@ function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollm
         onSaved()
         onOpenChange(false)
         // Reset
-        setStudentId(''); setCourseId(''); setHasAccreditation(false); setAccreditationBody('')
+        setStudentId(''); setCourseId(''); setTrainerId(''); setCustomTrainer('')
+        setHasAccreditation(false); setAccreditationBody(''); setBypassCompletion(false)
         setIssueDate(new Date().toISOString().slice(0, 10))
         // Offer PDF preview
         window.open(`/api/certificate-pdf?number=${encodeURIComponent(data.certificate_number)}&format=pdf`, '_blank')
@@ -627,10 +641,10 @@ function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollm
           onCancel={() => onOpenChange(false)}
           onSave={save}
           saving={saving}
-          saveLabel="إصدار الشهادة"
+          saveLabel={needsBypass && !bypassCompletion ? 'الدورة غير مكتملة — فعّل الإصدار الاستثنائي' : 'إصدار الشهادة'}
           icon={BadgeCheck}
-          gradient="from-gold to-amber-500"
-          text="text-navy"
+          gradient={needsBypass && !bypassCompletion ? 'from-slate-400 to-slate-500' : 'from-gold to-amber-500'}
+          text={needsBypass && !bypassCompletion ? 'text-white' : 'text-navy'}
         />
       }
     >
@@ -674,25 +688,76 @@ function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollm
         }))}
       />
 
-      {/* Enrollment status hint */}
+      {/* Enrollment status hint + admin bypass */}
       {studentId && courseId && (
-        <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 border text-xs font-bold ${
-          enrollmentCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
-          : isEnrolled ? 'bg-blue-500/10 border-blue-500/30 text-blue-700'
-          : 'bg-amber-500/10 border-amber-500/30 text-amber-700'
-        }`}>
-          {enrollmentCompleted ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            : isEnrolled ? <Clock className="w-4 h-4 flex-shrink-0" />
-            : <ShieldCheck className="w-4 h-4 flex-shrink-0" />}
-          {enrollmentCompleted ? 'المتدرب مكتمل هذه الدورة — جاهز للإصدار'
-            : isEnrolled ? 'المتدرب مسجل في الدورة لكنها غير مكتملة بعد'
-            : 'المتدرب غير مسجل في هذه الدورة — يمكن الإصدار كشهادة خارجية'}
-        </div>
+        enrollmentCompleted ? (
+          <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 border text-xs font-bold bg-emerald-500/10 border-emerald-500/30 text-emerald-700">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            المتدرب مكتمل هذه الدورة — جاهز للإصدار
+          </div>
+        ) : isEnrolled ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] overflow-hidden">
+            <div className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-amber-700">
+              <Clock className="w-4 h-4 flex-shrink-0" />
+              المتدرب مسجل في الدورة لكنها غير مكتملة بعد
+            </div>
+            {/* ⚡ مفتاح الإصدار الاستثنائي — حصري لحساب الإدارة */}
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 border-t border-amber-500/20 bg-white/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-sm">
+                  <ShieldCheck className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-navy">إصدار استثنائي</div>
+                  <div className="text-[10px] text-muted-foreground">تجاوز شرط إكمال الدورة لهذا المتدرب — صلاحية الإدارة فقط</div>
+                </div>
+              </div>
+              <Switch checked={bypassCompletion} onCheckedChange={setBypassCompletion} />
+            </div>
+            {bypassCompletion && (
+              <div className="px-3.5 py-2 border-t border-amber-500/20 bg-amber-500/10 text-[11px] font-bold text-amber-700 flex items-center gap-1.5 lux-pop">
+                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                سيتم الإصدار كاستثناء إداري موثّق باسم الإدارة
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 border text-xs font-bold bg-blue-500/10 border-blue-500/30 text-blue-700">
+            <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+            المتدرب غير مسجل في هذه الدورة — سيتم الإصدار كشهادة خارجية
+          </div>
+        )
       )}
 
-      {/* ── Step 3: تفاصيل الإصدار ────────────────────────────────── */}
+      {/* ── Step 3: المدرب ──────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-2 mt-1">
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-[11px] font-extrabold text-navy shadow-sm">3</div>
+        <span className="text-xs font-extrabold text-navy">اسم مدرب الدورة</span>
+        <div className="flex-1 h-px bg-gradient-to-l from-gold/30 to-transparent" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <LuxField label="اختر من قائمة المدربين" icon={GraduationCap} hint="اختياري">
+          <LuxCombo
+            value={trainerId}
+            onChange={(v: string) => { setTrainerId(v); if (v) setCustomTrainer('') }}
+            placeholder="— اختر المدرب —"
+            searchPlaceholder="ابحث باسم المدرب أو تخصصه..."
+            options={trainers.map((t) => ({
+              value: t.id,
+              label: t.name || 'بدون اسم',
+              hint: t.specialization || t.title,
+              emoji: (t.name || '؟').charAt(0),
+            }))}
+          />
+        </LuxField>
+        <LuxField label="أو اكتب الاسم يدوياً" icon={User} hint="للشهادات الخارجية">
+          <Input value={customTrainer} onChange={(e) => { setCustomTrainer(e.target.value); if (e.target.value) setTrainerId('') }} className={luxInput} placeholder="اسم المدرب إن لم يكن في القائمة" />
+        </LuxField>
+      </div>
+
+      {/* ── Step 4: تفاصيل الإصدار ────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-2 mt-1">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-[11px] font-extrabold text-navy shadow-sm">4</div>
         <span className="text-xs font-extrabold text-navy">تفاصيل الإصدار</span>
         <div className="flex-1 h-px bg-gradient-to-l from-gold/30 to-transparent" />
       </div>
@@ -754,6 +819,10 @@ function IssueCertificateDialog({ open, onOpenChange, students, courses, enrollm
           <div>
             <div className="text-[9px] text-muted-foreground mb-0.5">الدورة</div>
             <div className="font-bold text-navy truncate">{course?.title || '—'}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-muted-foreground mb-0.5">مدرب الدورة</div>
+            <div className="font-bold text-navy truncate">{trainerName || '—'}</div>
           </div>
           <div>
             <div className="text-[9px] text-muted-foreground mb-0.5">تاريخ الإصدار</div>

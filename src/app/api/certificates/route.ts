@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// ⚡ Adaptive insert helper — resilience against live-schema drift.
+// Inserts into `table`; when PostgREST reports a missing column
+// ("Could not find the 'x' column of 'table' in the schema cache"),
+// that column is stripped from the payload and the insert is retried.
+// Guarantees issuance succeeds with whichever columns actually exist.
+const MISSING_COL_RE = /Could not find the '([^']+)' column of '[^']+'/
+async function adaptiveInsert(table: string, payload: Record<string, any>, maxRetries = 8) {
+  let row = { ...payload }
+  let lastError: any = null
+  for (let i = 0; i < maxRetries; i++) {
+    const { data, error } = await supabaseAdmin.from(table).insert(row).select().single()
+    if (!error) return { data, error: null }
+    const m = MISSING_COL_RE.exec(error.message || '')
+    if (m && row[m[1]] !== undefined) {
+      lastError = error
+      const { [m[1]]: _omit, ...rest } = row
+      row = rest
+      continue
+    }
+    return { data: null, error }
+  }
+  return { data: null, error: lastError }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const num = req.nextUrl.searchParams.get('number')
@@ -78,11 +102,12 @@ export async function POST(req: NextRequest) {
     if (!body.certificate_number) {
       body.certificate_number = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
     }
-    const { data, error } = await supabaseAdmin
-      .from('certificates')
-      .insert(body)
-      .select()
-      .single()
+
+    // ⚡ Adaptive insert: try with ALL provided fields; if the live table lacks a
+    // column (e.g. course_id/student_id/trainer_name before migration 005),
+    // strip exactly the reported missing column(s) and retry — so issuance
+    // NEVER fails with "Could not find the ... column in the schema cache".
+    const { data, error } = await adaptiveInsert('certificates', body)
     if (error) throw error
     return NextResponse.json(data)
   } catch (e: any) {

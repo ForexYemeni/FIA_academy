@@ -85,6 +85,7 @@ export interface CertificateData {
   certificate_number: string
   student_name: string
   course_title?: string
+  trainer_name?: string | null
   issued_at?: string | null
   issued_by?: string | null
   status: string
@@ -137,6 +138,24 @@ function IconCalendar({ size, color, strokeWidth = 2 }: IconProps) {
     >
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  )
+}
+
+function IconGraduation({ size, color, strokeWidth = 2 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 10 12 5 2 10l10 5 10-5z" />
+      <path d="M6 12.5V17c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" />
     </svg>
   )
 }
@@ -609,6 +628,33 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 >
                   {certificate.course_title || 'دورة معتمدة'}
                 </h3>
+
+                {/* Trainer name — elegant attribution line (only if present) */}
+                {certificate.trainer_name && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4cqw',
+                      padding: '0.25cqw 1cqw',
+                      borderRadius: 12,
+                      background: `${COLOR.NAVY}06`,
+                      border: `1px solid ${COLOR.GOLD}40`,
+                      marginTop: '0.4cqw',
+                    }}
+                  >
+                    <IconGraduation size={11} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
+                    <span
+                      style={{
+                        fontSize: 'clamp(7px, 0.95cqw, 12px)',
+                        color: COLOR.NAVY,
+                        fontWeight: 700,
+                      }}
+                    >
+                      بتأهيل وإشراف المدرب: {certificate.trainer_name}
+                    </span>
+                  </div>
+                )}
 
                 {/* External accreditation badge — only if present */}
                 {certificate.has_external_accreditation &&

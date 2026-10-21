@@ -310,6 +310,129 @@ export function LuxCombo({ value, onChange, options, placeholder = '— اختر
 }
 
 // ---------------------------------------------------------------------------
+// LuxPicker — magical full-screen dropdown card (same UX as the courses
+// dialog picker): trigger mini-card + bottom-sheet/centered modal with a
+// royal gradient header, numbered option cards and staggered animations.
+// RTL-safe, mobile-first (bottom sheet), desktop centered.
+// ---------------------------------------------------------------------------
+export function LuxPicker({ label, value, onChange, options, icon: Icon, placeholder = '— اختر —', accent = 'gold', disabled }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string; hint?: string; emoji?: string }[]
+  icon?: any
+  placeholder?: string
+  accent?: 'gold' | 'navy' | 'emerald' | 'amber' | 'blue'
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find((o) => o.value === value)
+  const selectedLabel = selected ? (selected.emoji ? `${selected.emoji} ` : '') + selected.label : value || placeholder
+
+  const accents: Record<string, { gradient: string; bg: string; text: string; border: string; iconBg: string }> = {
+    gold:    { gradient: 'from-[#061024] via-navy to-[#3a2f10]',  bg: 'from-gold/10 to-amber-500/5',   text: 'text-navy',        border: 'border-gold/35',    iconBg: 'from-gold to-amber-500' },
+    navy:    { gradient: 'from-[#061024] via-navy to-navy-light', bg: 'from-navy/8 to-navy/3',         text: 'text-navy',        border: 'border-navy/20',    iconBg: 'from-navy to-navy-light' },
+    emerald: { gradient: 'from-emerald-600 to-teal-700',          bg: 'from-emerald-50 to-teal-50',    text: 'text-emerald-700', border: 'border-emerald-200', iconBg: 'from-emerald-500 to-teal-600' },
+    amber:   { gradient: 'from-amber-500 to-orange-600',          bg: 'from-amber-50 to-orange-50',    text: 'text-amber-700',   border: 'border-amber-200',   iconBg: 'from-amber-500 to-orange-600' },
+    blue:    { gradient: 'from-blue-600 to-indigo-700',           bg: 'from-blue-50 to-indigo-50',     text: 'text-blue-700',    border: 'border-blue-200',    iconBg: 'from-blue-500 to-indigo-600' },
+  }
+  const a = accents[accent] || accents.gold
+
+  return (
+    <>
+      {/* Trigger — mini card like the courses dialog */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        className={cn(
+          'w-full h-11 px-3 text-sm bg-gradient-to-br border rounded-xl focus:outline-none focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:shadow-md flex items-center justify-between gap-2 group',
+          a.bg, a.border,
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        <span className={cn('font-medium truncate flex items-center gap-1.5', value ? a.text : 'text-muted-foreground/60 font-normal')}>
+          {selectedLabel}
+        </span>
+        <div className={cn('w-6 h-6 rounded-lg bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform', a.iconBg)}>
+          <ChevronDown className="w-3.5 h-3.5 text-white" />
+        </div>
+      </button>
+
+      {/* Modal card */}
+      {open && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center" style={{ animation: 'fadeIn 0.2s ease' }}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+            {/* Royal gradient header */}
+            <div className={cn('relative bg-gradient-to-br p-4 pb-3 overflow-hidden', a.gradient)}>
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-x-8 -translate-y-8" />
+              <div className="absolute inset-0 lux-shimmer pointer-events-none" />
+              <div className="relative flex items-center gap-2.5">
+                {Icon && (
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-sm border border-white/25">
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-white tracking-tight">{label}</h3>
+                  <p className="text-white/70 text-[10px] flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> اختر خياراً من القائمة</p>
+                </div>
+                <button type="button" onClick={() => setOpen(false)}
+                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Option cards */}
+            <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto fia-scroll" style={{ background: 'linear-gradient(to bottom, rgba(248,250,252,0.5), white)' }}>
+              {options.length === 0 && (
+                <div className="text-center py-6 text-xs text-muted-foreground">لا توجد خيارات متاحة</div>
+              )}
+              {options.map((o, i) => {
+                const isSelected = o.value === value
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { onChange(o.value); setOpen(false) }}
+                    style={{ animation: `slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.03}s both` }}
+                    className={cn(
+                      'w-full p-3 rounded-2xl text-right text-sm font-medium flex items-center justify-between gap-2 transition-all',
+                      isSelected
+                        ? `bg-gradient-to-l ${a.bg} ${a.text} border-2 ${a.border} shadow-sm`
+                        : 'text-gray-600 bg-white border-2 border-transparent hover:bg-gray-50 hover:text-navy hover:border-gray-200/60'
+                    )}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      {isSelected ? (
+                        <div className={cn('w-6 h-6 rounded-full bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm', a.iconBg)}>
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] text-gray-400 font-bold">{o.emoji || i + 1}</span>
+                        </div>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate">{o.label}</span>
+                        {o.hint && <span className="block text-[10px] text-gray-400 truncate">{o.hint}</span>}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // LuxEmpty — magical empty state
 // ---------------------------------------------------------------------------
 export function LuxEmpty({ icon: Icon, title, hint, action, themeKey = 'gold' }: {
