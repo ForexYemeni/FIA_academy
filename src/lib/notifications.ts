@@ -1,10 +1,14 @@
 // Shared notification helper used by all API routes.
-// Each function sends a notification to a user via the `notifications`
-// table (in-app) AND via OneSignal push (instant external OS-level
-// popup, even when the app is closed/force-killed).
+// Each function sends a notification to a user via:
+// 1) the notifications table (in-app bell + polling fallback)
+// 2) Firebase Cloud Messaging push (instant external OS-level popup,
+//    works even when the app is closed/force-killed)
+// 3) OneSignal push (legacy backup — kept for users with old APKs
+//    that still use OneSignal; will be removed in a future version)
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendPushNotification } from '@/lib/onesignal'
+import { sendFcmPush } from '@/lib/firebase-admin'
+import { sendPushNotification as sendOneSignalPush } from '@/lib/onesignal'
 
 // =========================================================================
 // Internal helpers
@@ -12,7 +16,7 @@ import { sendPushNotification } from '@/lib/onesignal'
 
 async function send(userId: string, type: string, title: string, body?: string, link?: string) {
   if (!userId || !type || !title) return
-  // 1) Insert into the notifications table (in-app bell)
+  // 1) Insert into the notifications table (in-app bell + polling fallback)
   try {
     await supabaseAdmin.from('notifications').insert({
       user_id: userId,
@@ -25,12 +29,26 @@ async function send(userId: string, type: string, title: string, body?: string, 
     // Non-fatal — don't fail the parent operation because the
     // notification couldn't be inserted.
   }
-  // 2) Send OneSignal push notification (instant external OS-level
-  //    popup, works even when the app is closed/force-killed)
+  // 2) Send Firebase Cloud Messaging push (the NEW primary push mechanism)
+  //    This works even when the app is fully closed/force-killed.
   try {
-    await sendPushNotification(userId, title, body || '', { type, link: link || '/' })
+    await sendFcmPush({
+      userId,
+      title,
+      body: body || '',
+      data: { type, link: link || '/' },
+      link: link || '/',
+    })
   } catch {
     // Non-fatal — in-app notification still works even if push fails
+  }
+  // 3) Send OneSignal push (legacy backup for old APKs)
+  //    Will be removed in a future version once all users have updated
+  //    to APK v2.6.0+ (which uses Firebase directly).
+  try {
+    await sendOneSignalPush(userId, title, body || '', { type, link: link || '/' })
+  } catch {
+    // Non-fatal — FCM push already sent above
   }
 }
 
@@ -77,10 +95,8 @@ async function getUserName(userId: string): Promise<string> {
 export async function notifyFreeEnrollment(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   const userName = await getUserName(userId)
-  // Notify student
   await send(userId, 'enrollment', 'تم التسجيل في الدورة بنجاح',
     `أنت الآن مسجّل في دورة "${courseTitle}". ابدأ التعلم الآن!`, '/')
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'enrollment', 'تسجيل جديد في دورة',
     `متدرب جديد "${userName}" سجّل في دورة "${courseTitle}".`, '/')
@@ -91,10 +107,8 @@ export async function notifyFreeEnrollment(userId: string, courseId: string) {
 export async function notifyPaymentRequest(userId: string, courseId: string, amount: number, currency: string) {
   const courseTitle = await getCourseTitle(courseId)
   const userName = await getUserName(userId)
-  // Notify student
   await send(userId, 'payment', 'تم استلام إثبات الدفع',
     `تم استلام طلب اشتراك في دورة "${courseTitle}" بمبلغ ${amount.toLocaleString()} ${currency}. سيتم تفعيل الدورة بعد مراجعة الإدارة وتأكيد الدفع.`, '/#payments')
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'payment', 'طلب تأكيد دفع جديد',
     `طلب جديد من "${userName}" للاشتراك في دورة "${courseTitle}" — المبلغ ${amount.toLocaleString()} ${currency}. ينتظر المراجعة والموافقة.`, '/#payments')
@@ -105,7 +119,6 @@ export async function notifyPaymentApproved(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   await send(userId, 'payment', 'تم تأكيد الدفع ✓',
     `تم تأكيد دفعك لدورة "${courseTitle}". يمكنك الآن الوصول إلى محتوى الدورة. ابدأ التعلم!`, '/#courses')
-  // Notify the course trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
     const userName = await getUserName(userId)
@@ -127,16 +140,13 @@ export async function notifyPaymentRejected(userId: string, courseId: string) {
 export async function notifyCourseCompleted(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   const userName = await getUserName(userId)
-  // Notify student
   await send(userId, 'completion', '🎉 أكملت الدورة بنجاح!',
     `أحسنت! لقد أكملت دورة "${courseTitle}" بنجاح. يمكنك الآن طلب الشهادة من صفحة دوراتك.`, '/#profile')
-  // Notify trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
     await send(trainerId, 'completion', 'متدرب أنهى دورتك',
       `المتدرب "${userName}" أنهى دورتك "${courseTitle}" بنجاح.`, '/')
   }
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'completion', 'إكمال دورة',
     `المتدرب "${userName}" أنهى دورة "${courseTitle}".`, '/')
@@ -148,14 +158,11 @@ export async function notifyCourseCompleted(userId: string, courseId: string) {
 export async function notifyCertificateRequested(userId: string, courseId: string) {
   const courseTitle = await getCourseTitle(courseId)
   const userName = await getUserName(userId)
-  // Notify student
   await send(userId, 'certificate', 'تم استلام طلب الشهادة',
     `تم استلام طلبك للحصول على شهادة دورة "${courseTitle}". سيتم مراجعته من قبل المدرب والإدارة.`, '/')
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'certificate', 'طلب شهادة جديد',
     `طلب شهادة جديد من "${userName}" لدورة "${courseTitle}". ينتظر المراجعة.`, '/')
-  // Notify trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
     await send(trainerId, 'certificate', 'طلب شهادة جديد في دورتك',
@@ -191,10 +198,8 @@ export async function notifyCertificateRejected(userId: string, courseId: string
 
 /** New user registered. Notify the user + all admins. */
 export async function notifyUserRegistered(userId: string, name: string, role: string) {
-  // Notify user
   await send(userId, 'welcome', 'مرحباً بك في أكاديمية المستقبل الدولية! 🎓',
     `أهلاً ${name}! تم إنشاء حسابك بنجاح بصفتك ${role === 'admin' ? 'مشرف/إدارة' : role === 'trainer' ? 'مدرب' : 'متدرب'}. ابدأ رحلتك التعليمية الآن!`, '/')
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'registration', 'تسجيل مستخدم جديد',
     `سجّل مستخدم جديد: "${name}" (${role}).`, '/')
@@ -207,13 +212,11 @@ export async function notifyReviewSubmitted(userId: string, courseId: string, ra
   const courseTitle = await getCourseTitle(courseId)
   const userName = await getUserName(userId)
   const stars = `${'⭐'.repeat(Math.max(1, Math.min(5, rating || 5)))}`
-  // Notify trainer
   const trainerId = await getTrainerOfCourse(courseId)
   if (trainerId) {
     await send(trainerId, 'review', `تقييم جديد في دورتك ${stars}`,
       `قيّم المتدرب "${userName}" دورتك "${courseTitle}" بـ ${rating || 5} من 5.`, '/#courses')
   }
-  // Notify admins
   const admins = await getAdminIds()
   await sendToMany(admins, 'review', 'تقييم جديد لدورة',
     `قيّم المتدرب "${userName}" دورة "${courseTitle}" بـ ${rating || 5} من 5.`, '/#courses')
@@ -267,8 +270,6 @@ export async function notifyAffiliateRegistered(name: string, email: string) {
 
 /** Admin published a new blog post. Notify all users (newsletter). */
 export async function notifyBlogPublished(postTitle: string, slug: string) {
-  // Notify all users (broadcast) — could be expensive for large user
-  // counts, but the notifications table can handle it.
   try {
     const { data: users } = await supabaseAdmin.from('users').select('id')
     const ids = (users || []).map((u: any) => u.id)

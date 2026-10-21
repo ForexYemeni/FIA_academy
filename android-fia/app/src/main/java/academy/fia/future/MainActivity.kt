@@ -571,6 +571,77 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 🔥 FCM Token Registration — POSTs the (user_id, fcm_token) pair
+     * to the server so the server can later target pushes to this
+     * specific device via Firebase Admin SDK.
+     *
+     * Called by FIANativeBridge.setUserId after the user logs in, AND
+     * by FIAApp.onCreate when the FCM token is first generated (if
+     * the user is already logged in).
+     *
+     * The server stores the token in the fcm_tokens table. Multiple
+     * tokens per user are supported (the user can be logged in on
+     * multiple devices).
+     */
+    fun sendFcmTokenToServer(userId: String, fcmToken: String) {
+        Thread {
+            try {
+                val url = java.net.URL("https://fiaacademy.vercel.app/api/fcm/register")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    setRequestProperty("Content-Type", "application/json")
+                    doOutput = true
+                }
+                val jsonBody = """{"user_id":"$userId","token":"$fcmToken"}"""
+                conn.outputStream.use { it.write(jsonBody.toByteArray()) }
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    android.util.Log.i("FIA-Bridge", "✅ FCM token registered with server")
+                } else {
+                    android.util.Log.w("FIA-Bridge", "Failed to register FCM token: HTTP $code")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("FIA-Bridge", "sendFcmTokenToServer error", e)
+            }
+        }.start()
+    }
+
+    /**
+     * 🔥 FCM Token Unregistration — called by FIANativeBridge.clearUserId
+     * when the user logs out. Removes the FCM token from the server so
+     * this device no longer receives notifications for the previous
+     * user.
+     */
+    fun unregisterFcmTokenFromServer(userId: String, fcmToken: String) {
+        Thread {
+            try {
+                val url = java.net.URL("https://fiaacademy.vercel.app/api/fcm/unregister")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    setRequestProperty("Content-Type", "application/json")
+                    doOutput = true
+                }
+                val jsonBody = """{"user_id":"$userId","token":"$fcmToken"}"""
+                conn.outputStream.use { it.write(jsonBody.toByteArray()) }
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    android.util.Log.i("FIA-Bridge", "✅ FCM token unregistered from server")
+                } else {
+                    android.util.Log.w("FIA-Bridge", "Failed to unregister FCM token: HTTP $code")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("FIA-Bridge", "unregisterFcmTokenFromServer error", e)
+            }
+        }.start()
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView.settings.apply {
@@ -1231,25 +1302,45 @@ class FIANativeBridge(private val activity: MainActivity) {
         try {
             // 1. Write to SharedPreferences so the polling service
             //    (NotificationPollService) can read it on the next
-            //    poll cycle (within 5 seconds).
+            //    poll cycle (within 10 seconds).
             val prefs = activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putString("user_id", userId).apply()
 
-            // 2. Login to OneSignal with the user's external_id.
-            //    This is the CRITICAL step that links this device's
-            //    OneSignal subscription to the user_id on the server.
-            //    Without this, the server-side call to
-            //    OneSignal's API with `external_user_id: userId`
-            //    never reaches this device — the push has no
-            //    subscription to deliver to.
+            // 2. Send the FCM token to the server so it can later
+            //    target pushes to this device. The token was generated
+            //    by Firebase on app install (see FIAApp.onCreate) and
+            //    saved to SharedPreferences.
             //
-            // OneSignal 5.x SDK: OneSignal.login(externalId) is
-            // the recommended way. It creates a OneSignal user
-            // (if not exists) and links this device's subscription
-            // to that user. Subsequent pushes with external_user_id
-            // will reach this device even if the app is force-killed.
-            com.onesignal.OneSignal.login(userId)
-            android.util.Log.i("FIA-Bridge", "OneSignal login successful for user: $userId")
+            // This is the FIREBASE replacement for OneSignal.login().
+            // The server stores the (user_id, fcm_token) pair in the
+            // fcm_tokens table. When the server wants to notify this
+            // user, it calls Firebase Admin SDK's messaging().send()
+            // with this token.
+            val fcmToken = prefs.getString("fcm_token", null)
+            if (!fcmToken.isNullOrBlank()) {
+                activity.sendFcmTokenToServer(userId, fcmToken)
+            } else {
+                android.util.Log.w("FIA-Bridge", "No FCM token yet — will register after Firebase generates it")
+                // The token might be generated after this call.
+                // FIAApp.onCreate() will retry sending when the token arrives.
+            }
+
+            // 3. Start the polling service as a BACKUP to FCM.
+            //    This ensures notifications arrive even if FCM fails
+            //    (which can happen on devices without Google Play Services).
+            try {
+                val serviceIntent = Intent(activity, NotificationPollService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    activity.startForegroundService(serviceIntent)
+                } else {
+                    activity.startService(serviceIntent)
+                }
+                android.util.Log.i("FIA-Bridge", "Polling service started for user: $userId")
+            } catch (e: Exception) {
+                android.util.Log.w("FIA-Bridge", "Failed to start polling service", e)
+            }
+
+            android.util.Log.i("FIA-Bridge", "✅ setUserId successful for user: $userId")
         } catch (e: Exception) {
             android.util.Log.w("FIA-Bridge", "setUserId failed", e)
         }
@@ -1257,20 +1348,22 @@ class FIANativeBridge(private val activity: MainActivity) {
 
     /**
      * Called from JS when the user logs out. Clears the user_id
-     * from SharedPreferences and logs out of OneSignal so the
-     * device stops receiving notifications for the previous user.
+     * from SharedPreferences and unregisters the FCM token from the
+     * server so this device stops receiving notifications for the
+     * previous user.
      */
     @JavascriptInterface
     fun clearUserId() {
         try {
             val prefs = activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            val oldUserId = prefs.getString("user_id", null)
+            val fcmToken = prefs.getString("fcm_token", null)
             prefs.edit().remove("user_id").apply()
-            // OneSignal 5.x: logout() removes the external_id
-            // association. The device keeps its subscription but
-            // no longer receives pushes targeted to the previous
-            // external_id.
-            com.onesignal.OneSignal.logout()
-            android.util.Log.i("FIA-Bridge", "OneSignal logout successful")
+            // Unregister the FCM token from the server
+            if (!oldUserId.isNullOrBlank() && !fcmToken.isNullOrBlank()) {
+                activity.unregisterFcmTokenFromServer(oldUserId, fcmToken)
+            }
+            android.util.Log.i("FIA-Bridge", "Logout successful — FCM token unregistered")
         } catch (e: Exception) {
             android.util.Log.w("FIA-Bridge", "clearUserId failed", e)
         }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1072001269529",
+    "project_id": "fia-academy-1aa89",
+    "storage_bucket": "fia-academy-1aa89.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1072001269529:android:cb8c89732eaad884aa4f88",
+        "android_client_info": {
+          "package_name": "com.fiaacademy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXTxhEath4FSfKf_yezg9lY45SxZX8lrM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

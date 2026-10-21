@@ -1,18 +1,40 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
 }
 
 android {
+    // namespace MUST match the Kotlin package declaration (academy.fia.future)
+    // because Android uses it to generate the R class.
+    //
+    // applicationId (below in defaultConfig) is what users see in the Google
+    // Play Store and what Firebase uses to register the device. We changed
+    // applicationId to "com.fiaacademy" to match the google-services.json
+    // package_name.
+    //
+    // So:
+    //   - namespace = "academy.fia.future" (matches the Kotlin package)
+    //   - applicationId = "com.fiaacademy" (matches the Firebase config)
     namespace = "academy.fia.future"
+    // ⚠️ IMPORTANT: applicationId MUST match the package_name in
+    // google-services.json, otherwise Firebase won't register the
+    // device for FCM. We changed this from "academy.fia.future" to
+    // "com.fiaacademy" to match the Firebase project configuration
+    // provided by the user.
+    //
+    // IMPACT: Users who have the old APK installed will need to
+    // UNINSTALL it before installing this new APK — Android won't
+    // allow installing an app with a different package name as an
+    // update to the existing one.
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "academy.fia.future"
+        applicationId = "com.fiaacademy"
         minSdk = 24
         targetSdk = 34
-        versionCode = 27
-        versionName = "2.5.1"
+        versionCode = 28
+        versionName = "2.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -57,18 +79,15 @@ dependencies {
     // gets killed by the OS or manufacturer's battery optimizer.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // OneSignal SDK — instant external OS-level push notifications even
-    // when the app is force-killed. Version 5.10.2 is the latest stable
-    // available on Maven Central (5.8.6 wasn't published there — it
-    // required the OneSignal gradle plugin).
-    implementation("com.onesignal:OneSignal:5.10.2")
-
-    // Firebase messaging — required by OneSignal for FCM delivery on
-    // Android.
+    // 🔥 Firebase — direct FCM push notifications (NO OneSignal).
+    // We use the Firebase SDK directly to register the device for FCM
+    // and receive push notifications. The server uses Firebase Admin
+    // SDK to send pushes directly to the user's FCM token.
     implementation(platform("com.google.firebase:firebase-bom:33.4.0"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-analytics")
 
-    // Coroutines — used by NotificationPollService for the 5s polling
+    // Coroutines — used by NotificationPollService for the polling
     // loop. Keeps the network call off the main thread.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

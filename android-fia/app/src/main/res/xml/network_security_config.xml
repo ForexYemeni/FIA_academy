@@ -5,6 +5,10 @@
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">fiaacademy.vercel.app</domain>
         <domain includeSubdomains="true">api.telegram.org</domain>
+        <domain includeSubdomains="true">firebaseinstallations.googleapis.com</domain>
+        <domain includeSubdomains="true">fcm.googleapis.com</domain>
+        <domain includeSubdomains="true">firebaseremoteconfig.googleapis.com</domain>
+        <domain includeSubdomains="true">firebasecloudmessaging.googleapis.com</domain>
         <domain includeSubdomains="true">onesignal.com</domain>
     </domain-config>
 </network-security-config>

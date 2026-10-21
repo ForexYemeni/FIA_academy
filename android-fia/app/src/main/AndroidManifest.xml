@@ -51,6 +51,26 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="34">
 
+        <!-- 🔥 Remove androidx.startup InitializationProvider so that
+             WorkManager uses our FIAApp's Configuration.Provider instead
+             of the default auto-init. Without this, WorkManager crashes
+             at app startup with:
+             "If an android.app.Application implements androidx.work.Configuration.Provider,
+              the default androidx.startup.InitializationProvider needs to be removed
+              from the AndroidManifest.xml file." -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- Disable WorkManager auto-init — we'll init it via
+                 Configuration.Provider in FIAApp -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <!-- Single entry point. Splash theme shows the FIA logo + navy
              background while MainActivity inflates its content (which
              is just a WebView with a loading overlay). -->
@@ -82,8 +102,10 @@
         </activity>
 
         <!-- ============================================================
-             Foreground service — polls /api/notifications every 30s
-             and fires native OS notifications for new items.
+             Foreground service — polls /api/notifications every 10s
+             as a BACKUP to FCM. The primary notification mechanism is
+             FIAFirebaseMessagingService (which receives FCM pushes
+             from the server via Firebase Admin SDK).
 
              CRITICAL ATTRIBUTES for reliable background operation:
              - foregroundServiceType="dataSync" — required for
@@ -100,6 +122,27 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- ============================================================
+             🔥 FIREBASE CLOUD MESSAGING SERVICE — the PRIMARY push
+             notification mechanism. Receives pushes from Firebase even
+             when the app is fully closed/force-killed.
+
+             This is the SAME mechanism used by WhatsApp, Telegram,
+             Instagram, etc. It's the industry standard for instant
+             notifications on Android.
+
+             - exported="false" — only Firebase can deliver to this service
+             - We use DATA payloads (not notification payloads) so
+               onMessageReceived is ALWAYS called, even in background
+             ============================================================ -->
+        <service
+            android:name=".FIAFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- Boot receiver — restart poller after reboot or app update -->
         <receiver
