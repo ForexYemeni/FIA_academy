@@ -746,3 +746,82 @@ Stage Summary:
 - Files changed: NotificationPollService.kt (POLL_INTERVAL_MS 30s→10s), build.gradle.kts (v2.5.1), new /api/notifications/test-push endpoint
 - New APK: /home/z/my-project/download/FIA-Academy-v2.5.1.apk (8.7MB)
 - Production deployment: live with new test endpoint
+
+---
+Task ID: firebase-cloud-messaging-integration-v2.6.0
+Agent: main (Z.ai)
+Task: User asked to make the APK work with Firebase directly (replacing OneSignal which was misconfigured).
+
+USER FEEDBACK:
+============
+"كان التطبيق سابقا يعمل وبشكل طبيعي جداً كانت المشكله ظهور تنبيهات متكررة. و كان يوجد تنبيهات منبثقة داخل التطبيق فطلبت منك ازالتها فانت قمت بازاله الكل. قم بجعل تطبيق apk يعمل فقط على firbas"
+
+User also provided Firebase project configuration:
+- project_id: fia-academy-1aa89
+- mobilesdk_app_id: 1:1072001269529:android:cb8c89732eaad884aa4f88
+- package_name: com.fiaacademy (different from old APK!)
+- api_key: AIzaSyCXTxhEath4FSfKf_yezg9lY45SxZX8lrM
+
+WHAT WAS DONE:
+=============
+Complete rewrite of the notification system to use Firebase Cloud Messaging (FCM) directly — NO OneSignal middleman.
+
+ANDROID (v2.6.0, versionCode 28):
+- New: FIAFirebaseMessagingService.kt — receives FCM pushes via onMessageReceived
+- New: google-services.json — Firebase SDK config
+- Updated FIAApp.kt — removed OneSignal, added Firebase init + token fetch
+- Updated MainActivity.kt — FIANativeBridge now sends FCM token to server (not OneSignal.login)
+- Updated AndroidManifest.xml — registered FIAFirebaseMessagingService
+- Updated build.gradle.kts — applicationId="com.fiaacademy" (matches Firebase config), removed OneSignal, added Firebase
+- Updated network_security_config.xml — allowed Firebase domains
+- Package name: com.fiaacademy (CHANGED — users MUST uninstall old APK first!)
+
+SERVER (Next.js):
+- New: src/lib/firebase-admin.ts — Firebase Admin SDK init + sendFcmPush function
+- New: POST /api/fcm/register — store FCM token for user
+- New: POST /api/fcm/unregister — remove FCM token
+- New: POST /api/fcm/test-push — diagnose FCM delivery (used for testing)
+- Updated src/lib/notifications.ts — now sends via FCM (primary) + OneSignal (backup)
+- New: scripts/fcm-tokens-schema.sql — SQL migration for fcm_tokens table
+
+TEST RESULTS:
+============
+- APK build: SUCCESS (9.1MB, signed with v2 scheme)
+- APK verified: package=com.fiaacademy, version=2.6.0, FIAFirebaseMessagingService present, Firebase SDK present
+- Next.js build: SUCCESS
+- Vercel deployment: dpl_HUFXiErAT4BYzuHkok6xWxK4B8bo READY
+- /api/fcm/test-push endpoint returns clear diagnostic info:
+  * "DB error: table fcm_tokens does not exist" (user needs to run SQL migration)
+  * "FIREBASE_PROJECT_ID_set: false" (user needs to add Firebase env vars on Vercel)
+
+REQUIRED USER ACTIONS (for the user to complete the setup):
+==========================================================
+1. Install FIA-Academy-v2.6.0.apk (UNINSTALL old APK first — different package name!)
+2. Run scripts/fcm-tokens-schema.sql in Supabase Dashboard → SQL Editor
+3. Get Firebase service account JSON from Firebase Console → Project Settings → Service Accounts → Generate New Private Key
+4. Add 3 env vars on Vercel Dashboard → Settings → Environment Variables:
+   - FIREBASE_PROJECT_ID=fia-academy-1aa89
+   - FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@fia-academy-1aa89.iam.gserviceaccount.com
+   - FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
+5. Login from the new APK — the FCM token will be registered automatically
+6. Test via: curl -X POST https://fiaacademy.vercel.app/api/fcm/test-push -H 'Content-Type: application/json' -d '{"user_id":"..."}'
+
+PUSH NOTIFICATION FLOW (after setup):
+====================================
+1. APK generates FCM token on install
+2. User logs in → bridge sends token to /api/fcm/register
+3. Server stores token in fcm_tokens table
+4. Server wants to notify user → sendFcmPush(userId, title, body)
+5. Firebase Admin SDK delivers push to the device (even if app is killed)
+6. FIAFirebaseMessagingService.onMessageReceived fires
+7. Native OS notification shown with custom premium layout
+
+Stage Summary:
+- Completely removed OneSignal dependency from APK
+- Added Firebase Cloud Messaging (the industry standard for push notifications)
+- New APK: FIA-Academy-v2.6.0.apk (9.1MB, package=com.fiaacademy)
+- New server endpoints: /api/fcm/register, /api/fcm/unregister, /api/fcm/test-push
+- New SQL migration: scripts/fcm-tokens-schema.sql
+- User needs to: install APK, run SQL migration, add 3 Firebase env vars on Vercel
+- Commit on main: 6b8f783
+- Production deployment: dpl_HUFXiErAT4BYzuHkok6xWxK4B8bo READY
