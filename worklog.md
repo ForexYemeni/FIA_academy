@@ -286,3 +286,74 @@ Stage Summary:
 - Files changed: src/components/fia/certificate-card.tsx (rewrote with inline IconXxx components + larger fonts)
 - Production deployment: dpl_7Gs1Ajx3j7uMyG94crLcCvTURrGB (READY, sha a7525a97)
 - Verified: cert number, issue date, status, QR code, issuer, signature all now appear in BOTH PNG and PDF exports on mobile AND desktop
+
+---
+Task ID: cert-content-overflow-fix-FINAL
+Agent: main (Z.ai)
+Task: Fix the STILL-missing bottom content in cert PNG/PDF export — user reported that despite previous fixes, the cert was still missing data in downloads.
+
+Work Log:
+- User uploaded new screenshot showing cert FIA-2026-77842 — same issue: bottom content missing in the downloaded cert.
+- Loaded production site in headless browser at mobile viewport (412×915) with the new cert number.
+- Inspected DOM text positions and cert element bounding rect:
+  - cert element bounding rect: y=286, bottomY=524, height=238
+  - BUT text content extended from y=329 to y=674 (well past the cert frame!)
+  - 'نحو مستقبل أفضل معاً' slogan at y=654 — 130px BELOW the cert frame
+  - cert number/date/status icons at y=570-650 — also below the frame
+  - 'صادر عن' at y=572, 'التوقيع' at y=630 — all OUTSIDE the cert
+
+- ROOT CAUSE: The cert root div used `aspectRatio: '10 / 7'`, which locked the cert to a FIXED height (238px on a 340px-wide mobile). But the actual content (logo + academy name + badge + intro + student name + ornaments + course title + dividers + QR + metadata grid + signature + slogan) needed ~390px of vertical space.
+  
+  Result: content OVERFLOWED the cert frame — the bottom section was pushed OUTSIDE the cert frame, below it. When html-to-image exported the cert element, it captured only the cert frame area (340×238) — the overflowing bottom content was NOT included in the export.
+
+THE FIX:
+- Removed `aspectRatio: '10 / 7'` from cert root div
+- Root div now uses:
+  - width: 100% (responsive to parent)
+  - minHeight: 480px (ensures reasonable minimum on tiny screens)
+  - height: auto (grows vertically to fit ALL content)
+- Inner content wrapper:
+  - Removed `justifyContent: space-between` (was stretching content to fill the locked aspect ratio)
+  - Now uses `flex-direction: column` with natural `gap: 14px` — content flows top-to-bottom with consistent spacing
+- Switched all inner sizes from % to fixed px:
+  - Logo: 80×80px (was 8.8% which gave ~30px on mobile)
+  - Padding: 28px 40px (was 4.2% 5.6%)
+  - Corner ornaments: positioned at 8px from edges (was 2.8%)
+  - Icon containers: 32×32px with minWidth/minHeight (was 3.6%)
+  - QR container: 100px with minWidth (was 12%)
+  - Signature column: 120px with minWidth (was 14%)
+- Each section uses gap-based flex layout — content never stretches to fill unused space
+
+TESTS:
+- Local build: SUCCESS
+- Pushed to main → Vercel auto-deployed as dpl_4182bEPL9bzLxuGYi6genmQmeL72 (READY)
+- Mobile viewport (412×915) production test:
+  * cert element now: width=340, height=668 (was 238!)
+  * ALL text content is now WITHIN the cert frame:
+    - academy name: y=419-449 ✅
+    - badge: y=477-497 ✅
+    - student name: y=555-597 ✅
+    - course title: y=648-696 ✅
+    - QR/number/date/status: y=804-854 ✅ (was OUTSIDE before)
+    - issuer/signature: y=780-854 ✅ (was OUTSIDE before)
+    - slogan: y=888-908 ✅ (was at y=654, 130px below frame)
+  * Downloaded PNG: 680×1336 (was 680×476)
+    - Content Y range: 0 to 1330 (image fully filled)
+    - 34249 navy pixels in bottom 30% (icons visible)
+    - 4929 dark pixels in QR area (QR visible)
+  * Downloaded PDF: 178KB, 1 page
+    - PDF page rendered: 179×350 (matches cert's 10:7-ish portrait now)
+    - 1692 navy pixels in bottom 30%
+    - Content fills entire page
+- Desktop viewport (1280×900) production test:
+  * Downloaded PNG: 1884×1466 (natural aspect ratio 1.285, not forced)
+  * Content Y range: 0 to 1465 (full image)
+  * 64446 navy pixels in bottom 30%
+  * All elements visible
+
+Stage Summary:
+- ROOT CAUSE FOUND: `aspectRatio: '10 / 7'` constraint forced cert to a fixed height that was too small for all the content. Content overflowed the cert frame and was therefore excluded from html-to-image exports.
+- FIX: Removed aspect-ratio constraint, switched to auto height with natural flex-column gap-based layout, used fixed px sizes for inner elements.
+- Files changed: src/components/fia/certificate-card.tsx (174 insertions, 137 deletions)
+- Production deployment: dpl_4182bEPL9bzLxuGYi6genmQmeL72 (READY, sha e1970da)
+- Verified on production: PNG (mobile + desktop), PDF — ALL content visible, no clipping, no overflow
