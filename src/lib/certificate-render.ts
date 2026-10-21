@@ -936,7 +936,7 @@ export async function renderCertificatePNG(
         const sigBuf = Buffer.from(await res.arrayBuffer())
         const sigImg = await loadImage(sigBuf)
         const boxW = 56 * U
-        const boxH = 16 * U
+        const boxH = 13 * U
         const ratio = sigImg.width / sigImg.height
         let dw = boxW
         let dh = boxW / ratio
@@ -947,7 +947,7 @@ export async function renderCertificatePNG(
         ctx.drawImage(
           sigImg,
           sigCX - dw / 2,
-          rowTop + 21 * U + (boxH - dh) / 2,
+          rowTop + 19.5 * U + (boxH - dh) / 2,
           dw,
           dh
         )
@@ -961,13 +961,13 @@ export async function renderCertificatePNG(
     const snSize = fitFont(ctx, signatoryName, 7, 5.5, 'bold', sigW / U, U)
     setFont(ctx, snSize, 'bold', U)
     ctx.fillStyle = NAVY
-    ctx.fillText(signatoryName, sigCX, rowTop + 41 * U)
+    ctx.fillText(signatoryName, sigCX, rowTop + 38.5 * U)
   }
   if (sigDrawn && signatoryPosition) {
     const spSize = fitFont(ctx, signatoryPosition, 6.5, 5, 'bold', sigW / U, U)
     setFont(ctx, spSize, 'bold', U)
     ctx.fillStyle = 'rgba(10, 31, 68, 0.7)'
-    ctx.fillText(signatoryPosition, sigCX, rowTop + 49 * U)
+    ctx.fillText(signatoryPosition, sigCX, rowTop + 45.5 * U)
   }
   ctx.globalAlpha = 0.4
   ctx.fillStyle = NAVY
