@@ -152,8 +152,24 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
     }
   }
 
-  // Build the FCM message — DATA payload (not notification) so
-  // onMessageReceived is ALWAYS called, even in background.
+  // Build the FCM message using BOTH notification + data payloads.
+  //
+  // 🔥 KEY FIX in v2.6.2: Previously we used ONLY data payload, which
+  // required onMessageReceived() to fire to show a notification. But
+  // onMessageReceived does NOT fire when:
+  //   - The app is force-killed (Android 8+ "background restricted")
+  //   - The app process is dead AND the device is in Doze mode
+  //   - Some manufacturer ROMs (Xiaomi/Huawei) aggressively kill
+  //     background processes
+  //
+  // By using a NOTIFICATION payload, Android's system tray AUTOMATICALLY
+  // displays the notification — even if our app process is dead. This
+  // is the SAME mechanism used by WhatsApp/Telegram when the user has
+  // the app closed.
+  //
+  // We ALSO include the data payload so when the user TAPS the
+  // notification, our app can read the deep-link and navigate to the
+  // relevant page.
   const dataPayload: Record<string, string> = {
     title: opts.title,
     body: opts.body,
@@ -169,10 +185,31 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
       try {
         const message = {
           token: t.token,
+          // 🔥 NOTIFICATION payload — Android system tray shows this
+          // automatically even if app is force-killed
+          notification: {
+            title: opts.title,
+            body: opts.body,
+          },
+          // 🔥 DATA payload — for deep-linking when user taps the notif
           data: dataPayload,
           android: {
             priority: 'high' as const,
             ttl: 86400, // 24 hours
+            // 🔥 Android-specific notification config
+            notification: {
+              channelId: 'fia-notifications-v5',
+              sound: 'default',
+              icon: 'ic_notification',
+              color: '#D4AF37',
+              clickAction: 'OPEN_NOTIFICATION',
+              priority: 'high' as const,
+              defaultSound: true,
+              defaultVibrateTimings: true,
+              defaultLightSettings: true,
+              visibility: 'public' as const,
+              notificationCount: 1,
+            },
           },
         }
         await m.send(message)
