@@ -186,19 +186,30 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
         const message = {
           token: t.token,
           // 🔥 NOTIFICATION payload — Android system tray shows this
-          // automatically even if app is force-killed
+          // automatically even if app is force-killed.
+          //
+          // 🔥 KEY FIX v2.6.3: REMOVED channelId from the android.notification
+          // config. Previously we specified channelId: 'fia-notifications-v5'
+          // but that channel only exists if the user has APK v2.6.1 installed.
+          // If the channel doesn't exist, Android falls back to a SILENT
+          // channel (no sound, no popup). By NOT specifying a channelId,
+          // Android uses the app's default notification channel which has
+          // sound + default importance.
           notification: {
             title: opts.title,
             body: opts.body,
+            // 🔥 Explicitly set sound at the notification level
+            // (works even without a specific channelId)
+            sound: 'default',
           },
           // 🔥 DATA payload — for deep-linking when user taps the notif
           data: dataPayload,
           android: {
             priority: 'high' as const,
             ttl: 86400, // 24 hours
-            // 🔥 Android-specific notification config
             notification: {
-              channelId: 'fia-notifications-v5',
+              // 🔥 NO channelId — let Android use the default channel
+              // (which has sound enabled by default)
               sound: 'default',
               icon: 'ic_notification',
               color: '#D4AF37',
@@ -209,17 +220,29 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
               defaultLightSettings: true,
               visibility: 'public' as const,
               notificationCount: 1,
+              // 🔥 tag for grouping — replaces previous notifications
+              // of the same tag instead of stacking them
+              tag: 'fia-notification',
+            },
+          },
+          // 🔥 APNS config (for iOS — harmless on Android, ensures
+          // cross-platform delivery if the user ever gets an iOS build)
+          apns: {
+            payload: {
+              aps: {
+                alert: {
+                  title: opts.title,
+                  body: opts.body,
+                },
+                sound: 'default',
+                badge: 1,
+              },
             },
           },
         }
         await m.send(message)
         return { token: t.token, success: true }
       } catch (e: any) {
-        // Common errors:
-        //   - "Requested entity was not found" = token is stale (app uninstalled)
-        //   - "registration-token-not-registered" = token was rotated
-        //   - "invalid-registration-token" = malformed token
-        // We should remove the token from the DB in any of these cases.
         if (
           e?.errorInfo?.code?.includes('not-found') ||
           e?.errorInfo?.code?.includes('not-registered') ||
