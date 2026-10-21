@@ -577,3 +577,93 @@ Stage Summary:
 - FIX: changed aspect ratio to 1.1:1 (slightly taller) + reduced padding
 - All content (logo, name, badge, student name, course, QR, cert number, date, status, issuer, signature, slogan) now fits WITHIN the cert frame
 - Both PNG and PDF exports show the complete cert with bottom icons and frame visible
+
+---
+Task ID: android-reliable-background-notifications
+Agent: main (Z.ai)
+Task: Fix background notifications that don't work when the FIA Academy APK is fully closed.
+
+Work Log:
+- User explicitly stated: "لنبدا الان بحل اشعارات منبثقة خارج التطبيق في الخلفية تعمل حتى لو كان التطبيق مغلق تماما لم اتمكن من تشغيلها في التطبيق apk الرجاء العمل عليها بشكل احترافي جداً رجاء غاية الرجاء"
+- Translation: "Let's start now with solving popup notifications outside the app in the background that work even if the app is completely closed. I couldn't get them to work in the APK. Please work on it very professionally, please I beg you."
+
+ANALYSIS OF EXISTING SYSTEM:
+- The Android app already has:
+  * OneSignal SDK initialized in FIAApp.kt (appId: 957cba56-ba48-479e-9e43-1e506d30dc10)
+  * NotificationPollService (foreground service, polls /api/notifications every 30s)
+  * BootReceiver (restarts service after device reboot)
+  * MainActivity.FIANativeBridge.setUserId(userId) — calls OneSignal.login(userId)
+- Server side: src/lib/onesignal.ts sends pushes via include_external_user_ids
+- Vercel env vars ONESIGNAL_APP_ID + ONESIGNAL_API_KEY confirmed set (decrypted to 1088 + 1328 chars)
+
+ROOT CAUSES OF FAILURE:
+1. Foreground service killed when user swipes app away from recents
+   (no onTaskRemoved handler — service dies with the task)
+2. Battery optimization kills service on manufacturer-modified Android
+   (Xiaomi/Huawei/Samsung/Oppo) — no exemption requested
+3. No fallback mechanism if service gets killed by OS memory pressure
+4. Service doesn't auto-start on app launch (only on login)
+
+THE FIX — 4 layers of reliability:
+
+1. onTaskRemoved + AlarmManager restart (NotificationPollService.kt)
+   - New onTaskRemoved() override schedules an AlarmManager exact alarm
+     1 second later to restart the service
+   - Catches the most common case: user swipes app away
+
+2. WorkManager fallback (NEW: NotificationFallbackWorker.kt)
+   - Periodic worker (every 15 min, Android minimum)
+   - Checks if NotificationPollService is running, restarts if not
+   - WorkManager survives app kills, device reboots, Doze mode
+
+3. Battery optimization exemption (MainActivity.kt)
+   - New permission: REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+   - requestBatteryOptimizationExemption() on first launch
+   - Shows system dialog asking user to whitelist the app
+   - Tracked in SharedPreferences so we only ask once
+
+4. Auto-start service on app launch (FIAApp.kt)
+   - FIAApp.onCreate() now:
+     * Implements Configuration.Provider for WorkManager
+     * Schedules NotificationFallbackWorker
+     * Creates notification channels early
+     * Auto-starts NotificationPollService if user_id is in prefs
+
+NEW PERMISSIONS ADDED:
+- WAKE_LOCK (background polling when screen off)
+- SCHEDULE_EXACT_ALARM + USE_EXACT_ALARM (for restart alarms)
+- REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (whitelist from battery opt)
+
+ANDROIDMANIFEST CHANGES:
+- stopWithTask="false" on NotificationPollService
+- BootReceiver intent-filter now catches QUICKBOOT_POWERON (HTC)
+- All new permissions declared
+
+BUILD:
+- Installed Android SDK cmdline-tools, platform-tools, build-tools 34
+- Built app-release.apk successfully (8.7MB)
+- APK signed with v2 scheme
+- Verified classes.dex contains: NotificationFallbackWorker, FIAApp (Configuration.Provider), NotificationPollService (onTaskRemoved)
+- Verified manifest has all new permissions + stopWithTask=false
+
+OUTPUT:
+- /home/z/my-project/download/FIA-Academy-v2.5.0.apk (8.7MB, versionCode 26, versionName 2.5.0)
+- User needs to:
+  1. Uninstall previous FIA Academy APK
+  2. Install FIA-Academy-v2.5.0.apk
+  3. On first launch, accept the battery optimization prompt
+  4. Login — service auto-starts
+  5. Test notifications from admin dashboard
+
+Stage Summary:
+- 4-layer reliability: onTaskRemoved restart + WorkManager fallback + battery opt exemption + auto-start
+- New APK built: FIA-Academy-v2.5.0.apk (8.7MB)
+- Files changed:
+  - NotificationPollService.kt (added onTaskRemoved + AlarmManager)
+  - NotificationFallbackWorker.kt (NEW)
+  - FIAApp.kt (Configuration.Provider, schedules worker, auto-starts service)
+  - MainActivity.kt (requestBatteryOptimizationExemption)
+  - AndroidManifest.xml (new permissions, stopWithTask=false)
+  - build.gradle.kts (WorkManager dependency, v2.5.0)
+- Pushed to GitHub main branch (commit decd113)
+- APK saved to /home/z/my-project/download/FIA-Academy-v2.5.0.apk
