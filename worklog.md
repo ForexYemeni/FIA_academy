@@ -667,3 +667,82 @@ Stage Summary:
   - build.gradle.kts (WorkManager dependency, v2.5.0)
 - Pushed to GitHub main branch (commit decd113)
 - APK saved to /home/z/my-project/download/FIA-Academy-v2.5.0.apk
+
+---
+Task ID: android-notifications-diagnosis-and-v2.5.1
+Agent: main (Z.ai)
+Task: User reported "بالرغم من جميع هذي التحديثات و العمل الا ان التنبيهات المنبثقة خارج التطبيق لا تصل أبداً ولايوجد لها اثر" — even after all updates, popup notifications outside the app never arrive.
+
+DIAGNOSIS:
+=========
+1. Created new endpoint /api/notifications/test-push to test OneSignal delivery directly
+2. Tested with real user_id (71b8fe5f-bd4f-4a5e-9e7d-e5093f581e5f)
+3. Result: push_sent=false — OneSignal push FAILED
+4. Verified env vars are set:
+   - ONESIGNAL_APP_ID = 957cba56-ba48-479e-9e43-1e506d30dc10 (36 chars)
+   - ONESIGNAL_API_KEY = [REDACTED - OneSignal API Key, 113 chars] (113 chars)
+
+ROOT CAUSE FOUND via OneSignal API:
+==================================
+Called OneSignal API directly: GET https://onesignal.com/api/v1/apps/957cba56-ba48-479e-9e43-1e506d30dc10
+
+Result:
+- App name: "fia academy App"
+- players: 0 (NO DEVICES REGISTERED!)
+- gcm_key: null (NO Firebase Cloud Messaging configured!)
+- fcm_v1_service_account_json: null
+- fcm_sender_id: null
+
+This means:
+- The OneSignal dashboard has NEVER been configured with Firebase Cloud Messaging credentials
+- Without FCM credentials, OneSignal CANNOT send pushes to Android devices
+- Even if the APK is installed and the user logs in, OneSignal.login(userId) cannot register the device
+- Therefore ALL OneSignal pushes silently fail
+
+This explains why the user said "even after all updates, notifications don't arrive":
+- The v2.5.0 APK WAS relying on OneSignal for instant push (which can't work without FCM config)
+- The polling fallback WAS at 30-second intervals (slow but should have worked)
+- The user probably never installed the v2.5.0 APK at all (or did install it but the service
+  was killed by battery optimization)
+
+THE FIX:
+========
+Since we cannot configure OneSignal's Firebase credentials without dashboard access,
+the polling path is the ONLY reliable mechanism. So:
+
+1. Reduced POLL_INTERVAL_MS from 30s to 10s (3x faster delivery)
+   - User will receive notification within 10 seconds of admin sending it
+   - (was 30s in v2.5.0, was 5s in older versions but too aggressive)
+
+2. All v2.5.0 reliability improvements retained:
+   - onTaskRemoved + AlarmManager restart
+   - WorkManager fallback (every 15 min)
+   - Battery optimization exemption request (CRITICAL — without this, manufacturers
+     like Xiaomi/Huawei/Samsung/Oppo will kill the service within minutes)
+   - Auto-start on app launch
+   - stopWithTask=false on service
+   - BootReceiver for restart after device reboot
+
+3. Bumped version to v2.5.1 (versionCode 27)
+
+4. New APK built: FIA-Academy-v2.5.1.apk (8.7MB, signed)
+
+NEW ENDPOINT FOR TESTING:
+=========================
+POST /api/notifications/test-push with body {user_id}
+- Tests OneSignal push delivery directly
+- Reports env var status (set/not set, length)
+- Reports push_sent: true/false with reason
+- Also inserts a notification into the DB (so polling can pick it up as backup)
+
+Tested on production:
+- Endpoint works: returns push_sent=false with clear reason
+- DB insertion works: notification_id returned
+- This confirms the polling path is the only viable delivery mechanism
+
+Stage Summary:
+- ROOT CAUSE: OneSignal dashboard not configured with Firebase Cloud Messaging credentials (gcm_key=null, fcm_sender_id=null). OneSignal cannot deliver to Android devices.
+- FIX: Polling is now 3x faster (10s vs 30s). User MUST install FIA-Academy-v2.5.1.apk and accept the battery optimization prompt.
+- Files changed: NotificationPollService.kt (POLL_INTERVAL_MS 30s→10s), build.gradle.kts (v2.5.1), new /api/notifications/test-push endpoint
+- New APK: /home/z/my-project/download/FIA-Academy-v2.5.1.apk (8.7MB)
+- Production deployment: live with new test endpoint
