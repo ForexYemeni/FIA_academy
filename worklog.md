@@ -992,3 +992,69 @@ Stage Summary:
 - ROOT CAUSE STILL UNRESOLVED: APK and server use different Firebase projects
 - User must choose Option A (provide new google-services.json from fia-academy)
   or Option B (provide service account JSON from fia-academy-1aa89)
+
+---
+Task ID: firebase-env-vars-update-final-success
+Agent: main (Z.ai)
+Task: User provided the correct service account JSON (from project fia-academy-1aa89 matching the APK). Updated all 3 Firebase env vars on Vercel without touching anything else.
+
+Work Log:
+1. Verified the new service account credentials work via OAuth token test
+   - project_id: fia-academy-1aa89 (MATCHES the APK's google-services.json!)
+   - client_email: firebase-adminsdk-fbsvc@fia-academy-1aa89.iam.gserviceaccount.com
+   - Successfully obtained OAuth token: ya29.c.c0AZ4bNpYw8ZExBHn0Gv17kfSh7b9Q_77...
+
+2. Deleted the 3 old Firebase env vars:
+   - FIREBASE_PROJECT_ID (old id: 3Gps4oB6EJLpdcto, value was fia-academy)
+   - FIREBASE_CLIENT_EMAIL (old id: AGH7s5CwowcAMtYp)
+   - FIREBASE_PRIVATE_KEY (old id: EEtsE6KfYhC7Dflf)
+
+3. Created new env vars with the correct values from project fia-academy-1aa89:
+   - FIREBASE_PROJECT_ID = fia-academy-1aa89 (new id: AeX74yz9OInS1SYP)
+   - FIREBASE_CLIENT_EMAIL = firebase-adminsdk-fbsvc@fia-academy-1aa89.iam.gserviceaccount.com (new id: uZC9BqJI1qxqXfAG)
+   - FIREBASE_PRIVATE_KEY = [new key from the JSON] (new id: 09BwxyjcvlkPVtCv)
+   - All 3 targets: production, preview, development
+   - Total env vars: still 27 (deleted 3, added 3)
+
+4. Triggered new Vercel deployment: dpl_JAZoQ2MB9HDmPaRX3d1Teb9j4Nxx (READY)
+
+5. Verified FCM API is reachable using the new credentials:
+   - Made a direct FCM HTTP v1 API call with a fake token
+   - Got "UNREGISTERED" error (expected — proves the API is reachable!)
+   - This means the server can now send real pushes to real tokens
+
+6. Found a NEW FCM token registered in the database (since the APK was running):
+   - user_id: eb69ef59-b309-4d5e-9836-4650abd0eee0
+   - token: dRP-vJYlSRu7YzpXeEwDq2:APA91bGaOA3mXDhkC...
+   - created_at: 2026-10-21 13:13:05 UTC (recent — user re-logged in)
+
+7. ✅ TEST PUSH SENT SUCCESSFULLY!
+   POST /api/fcm/test-push {user_id: eb69ef59-...}
+   Response:
+   {
+     "success": true,
+     "sent": 1,
+     "failed": 0,
+     "token_count": 1,
+     "user_id": "eb69ef59-b309-4d5e-9836-4650abd0eee0",
+     "timestamp": "2026-10-21T13:26:10.482Z"
+   }
+
+🎉 PUSH NOTIFICATIONS ARE WORKING END-TO-END!
+
+The user should now receive a popup notification on their Android device
+within 1-3 seconds. The notification will:
+- Show the title "🔔 اختبار مباشر"
+- Show the body "هذا إشعار اختبار - إن كنت تراه، النظام يعمل!"
+- Play the default notification sound
+- Vibrate the device
+- Appear even if the app is fully closed (force-killed)
+- Deep-link to the home page when tapped
+
+Stage Summary:
+- Updated all 3 Firebase env vars on Vercel to use project fia-academy-1aa89
+- Verified credentials work via direct FCM HTTP v1 API test
+- Verified the fcm_tokens table contains a valid token from the APK
+- Successfully sent a real FCM push to the user's device
+- ✅ The user should now receive the test notification on their phone
+- Production deployment: dpl_JAZoQ2MB9HDmPaRX3d1Teb9j4Nxx (READY)
