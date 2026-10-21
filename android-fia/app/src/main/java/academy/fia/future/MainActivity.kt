@@ -509,6 +509,54 @@ class MainActivity : AppCompatActivity() {
         // Xiaomi/Huawei/Samsung/Oppo will kill the foreground service
         // after a few minutes when the screen is off.
         requestBatteryOptimizationExemption()
+
+        // 🔥 v2.6.1: Request USE_FULL_SCREEN_INTENT permission on Android 14+
+        // Without this, notifications appear silently in the shade instead of
+        // as pop-up heads-up notifications. This is the key fix for the
+        // "silent notifications" issue.
+        requestFullScreenIntentPermission()
+    }
+
+    /**
+     * 🔥 v2.6.1 KEY FIX: Requests USE_FULL_SCREEN_INTENT permission.
+     *
+     * On Android 14 (API 34)+, apps must request this permission to show
+     * notifications as pop-up heads-up notifications (instead of silent
+     * shade entries). The user must explicitly grant it.
+     *
+     * Without this permission:
+     *   - Notifications arrive but are SILENT
+     *   - No heads-up popup
+     *   - No sound played by the system
+     *
+     * With this permission:
+     *   - Notifications pop up over other apps
+     *   - Default notification sound plays
+     *   - Vibration pattern fires
+     *   - Visible on lock screen
+     */
+    private fun requestFullScreenIntentPermission() {
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // On Android 13 and below, USE_FULL_SCREEN_INTENT is granted
+                // automatically — no runtime request needed.
+                return
+            }
+            val pm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (pm.canUseFullScreenIntent()) {
+                Log.d(TAG, "✅ Full-screen intent permission already granted")
+                return
+            }
+            // Open the system settings page so the user can grant the permission
+            val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                data = android.net.Uri.parse("package:$packageName")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            Log.i(TAG, "🔔 Requested USE_FULL_SCREEN_INTENT permission")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to request full-screen intent permission", e)
+        }
     }
 
     /**

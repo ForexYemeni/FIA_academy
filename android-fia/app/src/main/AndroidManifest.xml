@@ -39,6 +39,12 @@
          Samsung will kill the service after a few minutes. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- 🔥 v2.6.1: Required for setFullScreenIntent() — makes the notification
+         appear as a popup OVER other apps (not just a silent shade entry).
+         On Android 14+ (API 34), this permission is requested at runtime
+         the first time we try to use full-screen intent. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <application
         android:name=".FIAApp"
         android:allowBackup="true"

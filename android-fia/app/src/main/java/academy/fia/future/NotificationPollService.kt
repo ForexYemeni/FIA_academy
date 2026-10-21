@@ -77,7 +77,7 @@ class NotificationPollService : Service() {
     companion object {
         private const val TAG = "FIA-PollService"
         private const val CHANNEL_SERVICE = "fia-service"
-        private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v3"
+        private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v5"  // 🔥 v2.6.1: aligned with FIAFirebaseMessagingService
         private const val NOTIF_SERVICE_ID = 1
         private const val POLL_INTERVAL_MS = 10_000L  // 10 seconds (was 30s — faster delivery)
         private const val WAKELOCK_TIMEOUT_MS = 5 * 60 * 1000L  // 5 minutes, then re-acquire
@@ -320,15 +320,20 @@ class NotificationPollService : Service() {
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            // 🔥 PRIORITY_MAX for heads-up popup
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setSound(sound)
-            .setVibrate(longArrayOf(0, 250, 100, 250))
+            .setVibrate(longArrayOf(0, 500, 200, 500))
+            // 🔥 DEFAULT_ALL = sound + lights + vibrate
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setColor(0xFFD4AF37.toInt())
             .setColorized(true)
             .setContentIntent(pendingIntent)
+            // 🔥 Full-screen intent forces popup above other apps
+            .setFullScreenIntent(pendingIntent, true)
 
         if (customLayout != null) {
             try {

@@ -191,8 +191,12 @@ class FIAApp : Application(), Configuration.Provider {
             // This is the channel used by BOTH:
             //   - FIAFirebaseMessagingService (FCM pushes)
             //   - NotificationPollService (polling fallback)
+            // 🔥 v2.6.1: switched to channel ID "fia-notifications-v5" because
+            // Android locks channel settings after first creation — the previous
+            // channel "fia-notifications-v4" had IMPORTANCE_LOW locked in from
+            // an earlier APK version, and couldn't be upgraded.
             val notifChannel = NotificationChannel(
-                "fia-notifications-v4",  // NEW channel ID — clean state, fresh IMPORTANCE_HIGH
+                "fia-notifications-v5",  // 🔥 NEW channel ID — fresh state, fresh IMPORTANCE_HIGH
                 "إشعارات أكاديمية المستقبل الدولية",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
@@ -200,8 +204,17 @@ class FIAApp : Application(), Configuration.Provider {
                 enableLights(true)
                 lightColor = 0xFFD4AF37.toInt()
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 200, 500)
                 setShowBadge(true)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setBypassDnd(true)
+                // Set the default notification sound
+                val soundUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                val audioAttributes = android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                    .build()
+                setSound(soundUri, audioAttributes)
             }
             notifManager.createNotificationChannel(notifChannel)
         } catch (e: Exception) {
