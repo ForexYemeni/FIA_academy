@@ -66,16 +66,32 @@ export const viewport: Viewport = {
 const SW_REGISTER = `
 (function() {
   if (typeof window === 'undefined') return
-  if ('serviceWorker' in navigator) {
+  var ua = navigator.userAgent || ''
+  // WebView الأكاديمية: علامة wv الخاصة بـ WebView أو بصمة تطبيقنا FIAAcademyApp
+  var isFiaWebView = /Android/i.test(ua) && (/;\\s*wv\\)/i.test(ua) || /FIAAcademyApp/i.test(ua))
+  if (isFiaWebView) {
+    // v2.6: داخل تطبيق الأكاديمية لا نستخدم Service Worker إطلاقاً:
+    // كان يخدم نسخة مخزنة قديمة من الصفحة الرئيسية (دون أيقونات الشعار)
+    // ثم يعيد تحميل الصفحة عند controllerchange — فتظهر الرئيسية «كأنها
+    // تتحمل مرتين». الإشعارات في التطبيق تديرها الخدمة الأصلية، والحذف
+    // هنا آمن ومتكرر بلا كلفة.
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+        navigator.serviceWorker.getRegistrations().then(function(rs) {
+          rs.forEach(function(r) { try { r.unregister() } catch (e) {} })
+        }).catch(function() {})
+      }
+      if (window.caches && caches.keys) {
+        caches.keys().then(function(ks) {
+          ks.forEach(function(k) { try { caches.delete(k) } catch (e) {} })
+        }).catch(function() {})
+      }
+    } catch (e) {}
+  } else if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then(function (reg) {
-          // Force the new SW to take over immediately (so push events
-          // work on first session without requiring a page reload).
           if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING')
-          // ⚡ Check for updates every 5 minutes. This ensures users get
-          // the latest SW version (which may contain critical fixes for
-          // Realtime notifications, payment updates, etc.).
           setInterval(function() {
             reg.update().catch(function() {})
           }, 5 * 60 * 1000)
@@ -84,14 +100,9 @@ const SW_REGISTER = `
           console.warn('SW registration failed:', err)
         })
     })
-    // When a new SW takes over, reload the page once so the user
-    // gets the latest version.
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (!window.__fiaReloaded) {
-        window.__fiaReloaded = true
-        window.location.reload()
-      }
-    })
+    // v2.6: أُزيل reload عند controllerchange — كان يعيد تحميل الصفحة
+    // فجأة أثناء الاستخدام وبعد أي نشر جديد للموقع. تحديث الأصول يعمل
+    // تلقائياً مع أول تنقل جديد بلا أي مقاطعة للمستخدم.
   }
   // Affiliate tracking — capture ?ref= on first visit and stash in localStorage
   try {
@@ -99,16 +110,15 @@ const SW_REGISTER = `
     var ref = params.get('ref')
     if (ref) {
       fetch('/api/affiliates?code=' + encodeURIComponent(ref))
-        .then(function (r) { return r.json() })
-        .then(function (d) {
+        .then(function(r) { return r.json() })
+        .then(function(d) {
           if (d && d.valid && d.affiliate) {
             localStorage.setItem('fia_ref_code', ref)
             localStorage.setItem('fia_ref_id', d.affiliate.id)
-            // Fire-and-forget — record the click (server stores by IP + UA)
-            fetch('/api/affiliate-track?code=' + encodeURIComponent(ref), { method: 'POST' }).catch(function () {})
+            fetch('/api/affiliate-track?code=' + encodeURIComponent(ref), { method: 'POST' }).catch(function() {})
           }
         })
-        .catch(function () {})
+        .catch(function() {})
     }
   } catch (e) {}
 })()

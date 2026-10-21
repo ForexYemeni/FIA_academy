@@ -7,8 +7,8 @@
 // data from /api/* endpoints for Realtime updates + payment status +
 // enrollment lists. Caching these would cause stale UI.
 
-const APP_SHELL_CACHE = 'fia-shell-v4'
-const DYNAMIC_CACHE = 'fia-dynamic-v4'
+const APP_SHELL_CACHE = 'fia-shell-v5'
+const DYNAMIC_CACHE = 'fia-dynamic-v5'
 
 const APP_SHELL = [
   '/',
