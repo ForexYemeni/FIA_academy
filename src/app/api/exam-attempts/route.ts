@@ -50,20 +50,71 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'user_id و course_id مطلوبان' }, { status: 400 })
     }
 
-    // 1) ENROLLMENT GATE — the student must be enrolled with a confirmed/completed/free payment
-    const { data: enrollmentRows } = await supabaseAdmin
-      .from('enrollments')
-      .select('id, payment_status')
+    // 1) ENROLLMENT GATE — canonical enrollment rows live in the `payments`
+    //    table (see /api/enrollments: free → amount=0 + status 'مكتمل',
+    //    paid → 'قيد الانتظار' until the admin approves it to 'مكتمل',
+    //    rejected → 'ملغي'). The legacy `enrollments` table is only filled by
+    //    the online-payment webhook, so we check `payments` FIRST and fall
+    //    back to `enrollments` — a real enrollment in either table grants access.
+    const isApprovedStatus = (s: string) =>
+      ['مكتمل', 'completed', 'paid', 'confirmed'].includes((s || '').trim().toLowerCase()) ||
+      (s || '').trim() === 'مكتمل'
+    const isRejectedStatus = (s: string) =>
+      ['ملغي', 'cancelled', 'failed', 'rejected'].includes((s || '').trim().toLowerCase())
+    const isPendingStatus = (s: string) =>
+      ['قيد الانتظار', 'بانتظار', 'pending'].includes((s || '').trim().toLowerCase())
+
+    const { data: paymentRows } = await supabaseAdmin
+      .from('payments')
+      .select('id, amount, status')
       .eq('user_id', user_id)
       .eq('course_id', course_id)
-      .order('enrolled_at', { ascending: false })
-      .limit(1)
-    const enrollment = (enrollmentRows || [])[0] || null
+      .order('date', { ascending: false })
 
-    if (!enrollment) {
+    // Pick the most "advanced" payment row (same priority as /api/enrollments GET)
+    const statusPriority: Record<string, number> = {
+      'مكتمل': 3, 'completed': 3, 'paid': 3, 'confirmed': 3,
+      'active': 2, 'قيد الانتظار': 1, 'بانتظار': 1, 'pending': 1,
+    }
+    const bestPayment = (paymentRows || []).reduce(
+      (acc: any, r: any) => ((statusPriority[(r.status || '').trim()] || 0) > (statusPriority[(acc?.status || '').trim()] || 0) ? r : acc),
+      null as any
+    )
+
+    let enrolled = false
+    let paymentPending = false
+
+    if (bestPayment) {
+      const s = (bestPayment.status || '').trim()
+      const isFree = !bestPayment.amount || bestPayment.amount === 0
+      if (isApprovedStatus(s) || (isFree && !isRejectedStatus(s) && !isPendingStatus(s))) {
+        enrolled = true
+      } else if (isPendingStatus(s) || (!isApprovedStatus(s) && !isFree)) {
+        // paid enrollment waiting for admin approval
+        paymentPending = true
+      }
+    }
+
+    // Fallback: the online-payment webhook flow writes to `enrollments`
+    if (!enrolled && !paymentPending) {
+      const { data: legacyRows } = await supabaseAdmin
+        .from('enrollments')
+        .select('id, payment_status, status')
+        .eq('user_id', user_id)
+        .eq('course_id', course_id)
+        .limit(1)
+      const legacy = (legacyRows || [])[0]
+      if (legacy) {
+        const ps = (legacy.payment_status || legacy.status || '').toString().trim().toLowerCase()
+        if (ps === 'pending') paymentPending = true
+        else if (ps && ps !== 'cancelled' && ps !== 'failed') enrolled = true
+      }
+    }
+
+    if (!enrolled && !paymentPending) {
       return NextResponse.json({ error: 'أنت غير مسجل في هذه الدورة' }, { status: 403 })
     }
-    if (enrollment.payment_status === 'pending') {
+    if (paymentPending) {
       return NextResponse.json({ error: 'اشتراكك في الدورة بانتظار تأكيد الدفع' }, { status: 403 })
     }
 
