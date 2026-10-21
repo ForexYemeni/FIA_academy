@@ -79,7 +79,7 @@ class NotificationPollService : Service() {
         private const val CHANNEL_SERVICE = "fia-service"
         private const val CHANNEL_NOTIFICATIONS = "fia-notifications-v3"
         private const val NOTIF_SERVICE_ID = 1
-        private const val POLL_INTERVAL_MS = 30_000L  // 30 seconds
+        private const val POLL_INTERVAL_MS = 10_000L  // 10 seconds (was 30s — faster delivery)
         private const val WAKELOCK_TIMEOUT_MS = 5 * 60 * 1000L  // 5 minutes, then re-acquire
         private const val PREFS_NAME = "fia-prefs"
         private const val PREF_USER_ID = "user_id"
