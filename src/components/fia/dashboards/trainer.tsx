@@ -22,7 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
-import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
+import { SharedBlog, SharedFAQ } from './shared-community'
+import { SharedForumRoyal } from './shared-forum-royal'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 import { supabasePublic } from '@/lib/supabase'
@@ -222,7 +223,7 @@ export function TrainerDashboard() {
       )}
       {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
       {active === 'exams' && <TrainerExams courses={courses} />}
-      {active === 'forum' && <SharedForum user={user} />}
+      {active === 'forum' && <SharedForumRoyal user={user} />}
       {active === 'blog' && <SharedBlog />}
       {active === 'faqs' && <SharedFAQ />}
       {active === 'affiliate' && (

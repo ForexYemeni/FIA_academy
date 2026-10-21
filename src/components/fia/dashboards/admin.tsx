@@ -34,6 +34,16 @@ import {
   AdminForum, AdminBlog, AdminContact, AdminFaqs,
 } from './admin-extended'
 import { AdminForumBans } from './shared-community'
+import { AdminTrainersRoyal } from './admin-trainers-royal'
+import { AdminStudentsRoyal } from './admin-students-royal'
+import { AdminCertificatesRoyal } from './admin-certificates-royal'
+import { AdminExamQuestionsRoyal } from './admin-questions-royal'
+import { AdminAffiliatesRoyal } from './admin-affiliates-royal'
+import { AdminForumRoyal } from './admin-forum-royal'
+import {
+  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxCombo, LuxEmpty,
+  LuxBadge, LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput, luxTheme,
+} from './luxury'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 import { supabasePublic } from '@/lib/supabase'
@@ -119,21 +129,21 @@ export function AdminDashboard() {
         />
       )}
       {active === 'exams' && <AdminExams />}
-      {active === 'exam-questions' && <AdminExamQuestions />}
-      {active === 'students' && <AdminStudents />}
+      {active === 'exam-questions' && <AdminExamQuestionsRoyal />}
+      {active === 'students' && <AdminStudentsRoyal />}
       {active === 'payments' && <AdminPayments />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
       {active === 'coupons' && <AdminCoupons />}
-      {active === 'affiliates' && <AdminAffiliates />}
+      {active === 'affiliates' && <AdminAffiliatesRoyal />}
       {/* Certificate management — re-enabled */}
-      {active === 'certificates' && <AdminCertificates />}
-      {active === 'trainers' && <AdminTrainers />}
+      {active === 'certificates' && <AdminCertificatesRoyal />}
+      {active === 'trainers' && <AdminTrainersRoyal />}
       {active === 'reviews' && <AdminReviews />}
       {active === 'partners' && <AdminPartners />}
       {active === 'licenses' && <AdminLicenses />}
       {active === 'founder' && <AdminFounder user={user} />}
       {active === 'blog' && <AdminBlog />}
-      {active === 'forum' && <AdminForum />}
+      {active === 'forum' && <AdminForumRoyal />}
       {active === 'forum-bans' && <AdminForumBans />}
       {active === 'faqs' && <AdminFaqs />}
       {active === 'contact' && <AdminContact />}
