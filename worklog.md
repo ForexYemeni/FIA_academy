@@ -209,3 +209,80 @@ Stage Summary:
 - Production deployment: dpl_5q6dvKu5C8wQCooVgZSmFJCMRxhb (READY)
 - Commit on main: e9a7c78
 - Verified on production: PNG (1884×1318 desktop, 680×476 mobile) and PDF (A4 landscape) all show the COMPLETE certificate with no clipping.
+
+---
+Task ID: cert-missing-bottom-content-fix
+Agent: main (Z.ai)
+Task: Fix missing bottom content (cert number, date, status, QR, issuer, signature) in downloaded PNG/PDF — user reported that despite the cert looking good on screen, the downloaded image was missing the bottom section.
+
+Work Log:
+- User uploaded screenshot showing the downloaded cert on mobile — the bottom section (cert number, date, status, QR, signature) was visibly missing or empty.
+- Loaded production site in headless browser at mobile viewport (412×915).
+- Inspected DOM: all expected text WAS present in the DOM ('رقم الشهادة', 'FIA-2026-89944', 'تاريخ الإصدار', 'الحالة', 'صادر عن', 'التوقيع' all confirmed present with valid bounding rects).
+- Inspected computed font sizes — found the root cause:
+  * 'رقم الشهادة' label: 6px (way too small!)
+  * 'تاريخ الإصدار' label: 6px
+  * 'الحالة' label: 6px
+  * 'التوقيع' label: 6px
+  * 'امسح للتحقق' label: 7px
+  * cert number value: 8px
+  * status value: 8px
+  * issuer name: 8px
+- At pixelRatio 2 these became 12-16px in the exported PNG — too small to be legible after html-to-image's SVG foreignObject re-rendering.
+- Also discovered: lucide-react icons (Award, Calendar, FileText, Shield, Sparkles) appeared on screen but were MISSING from exported PNGs. Root cause: lucide-react uses stroke="currentColor" + fill="none", and html-to-image's SVG foreignObject serialization doesn't reliably cascade the parent's `color` CSS property into the cloned SVG's `currentColor` references.
+- Verified the bug: counted navy pixels in bottom 30% of exported PNG — only ~8 (just the border frame, no icon squares inside). The 3 navy icon containers were rendering as EMPTY boxes.
+
+THE FIX:
+- Rewrote CertificateCard (src/components/fia/certificate-card.tsx):
+  1. Replaced ALL lucide-react icons with INLINE SVG components:
+     - IconAward, IconCalendar, IconFileText, IconShield, IconSparkles
+     - Each SVG uses EXPLICIT stroke={COLOR.X} and fill={COLOR.Y}
+     - NO currentColor — guarantees html-to-image serialization works
+  2. Bumped minimum font sizes via clamp():
+     - Academy name: 14px → 18px min
+     - English subtitle: 7px → 9px min
+     - Badge text: 8px → 11px min
+     - 'تشهد...' intro: 10px → 12px min
+     - Student name: 20px → 24px min
+     - Course title: 13px → 16px min
+     - Cert number label: 6px → 9px min
+     - Cert number value: 8px → 10px min
+     - Date label: 6px → 9px min
+     - Date value: 7px → 10px min
+     - Status label: 6px → 9px min
+     - Status value: 8px → 11px min
+     - QR label: 7px → 9px min
+     - Issuer label: 7px → 9px min
+     - Issuer value: 8px → 10px min
+     - Signature label: 6px → 9px min
+     - Slogan: 8px → 11px min
+  3. Bumped icon sizes:
+     - Award icons in badge: 14px → 18px
+     - Sparkles ornaments: 16px → 20px
+     - Metadata icons (FileText/Calendar/Shield): 16px → 18px
+  4. Made icon containers FIXED size (32px × 32px with min-width/min-height) so they don't shrink on narrow screens
+  5. Made QR container use minWidth: 56px + inner img minWidth: 48px so QR is always scannable
+  6. Made signature column use minWidth: 80px so 'صادر عن' text isn't cramped
+
+TESTS:
+- Local build: SUCCESS, all 58 routes generated
+- Pushed to main → Vercel auto-deployed as dpl_7Gs1Ajx3j7uMyG94crLcCvTURrGB (READY)
+- Mobile viewport (412×915) production test:
+  * All text now 9px+ (was 6px)
+  * Downloaded PNG: 680×476, 19225 navy pixels in bottom (was ~8 before)
+  * 6 distinct navy clusters found — confirms 3 icon squares are now populated
+  * 3242 dark pixels in QR area — QR code is visible
+- Desktop viewport (1280×900) production test:
+  * Downloaded PNG: 1884×1318, 68053 navy pixels in bottom 30%
+  * All icons clearly visible
+- PDF download test (mobile):
+  * PDF page extracted at 150 DPI: 619×434
+  * 7248 navy pixels in bottom 35% — icons present
+  * File size: 86KB, 1 page, A4 landscape
+
+Stage Summary:
+- ROOT CAUSE: (1) lucide-react SVG icons with stroke="currentColor" don't serialize correctly in html-to-image exports; (2) font sizes too small on mobile (6px) became unreadable in 2x exports
+- FIX: Replaced lucide icons with inline SVG (explicit stroke colors), bumped all min font sizes via clamp()
+- Files changed: src/components/fia/certificate-card.tsx (rewrote with inline IconXxx components + larger fonts)
+- Production deployment: dpl_7Gs1Ajx3j7uMyG94crLcCvTURrGB (READY, sha a7525a97)
+- Verified: cert number, issue date, status, QR code, issuer, signature all now appear in BOTH PNG and PDF exports on mobile AND desktop
