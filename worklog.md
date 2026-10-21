@@ -487,3 +487,48 @@ Stage Summary:
 - Files changed: src/components/fia/certificate-card.tsx (809 insertions, 694 deletions)
 - Production deployment: dpl_7LKfJ4yRJBKfa6PSXwQ7SjXJURsL (READY, sha 71d091c)
 - Verified: cert now has rich luxury feel with proper A4 landscape dimensions, all content visible, all magical elements render correctly in both PNG and PDF exports
+
+---
+Task ID: cert-revert-magical-additions
+Agent: main (Z.ai)
+Task: User rejected the magical additions (crown, seal stamp, watermark, etc.) — restore the clean professional landscape design from commit a6893dd.
+
+Work Log:
+- User explicitly stated: "لم اطلب منك اضافة اي ختم أبداً كل ماهو مطلوب منك ان تظهر الصفحة السفلية للشهادة كما كانت مصممة بشكل احترافي جداً ولا تضف شي انظر الان لا زالت سيئة جداً"
+- Translation: "I didn't ask you to add any seal. All that's required is to show the bottom section of the cert as it was professionally designed. Don't add anything. Look, it's still very bad."
+- The magical additions (crown, seal stamp, watermark, guilloché pattern, calligraphic signature, ribbon banner, diamond ornaments) were UNSOLICITED and made the cert look cluttered and unprofessional.
+
+THE FIX:
+- Reverted src/components/fi/certificate-card.tsx to the clean landscape A4 version from commit a6893dd (BEFORE the magical luxury additions).
+- This is the version the user previously confirmed was "قريب من التصميم الحقيقي الاحترافي" (close to the real professional design).
+- Restored the simple, clean elements:
+  * Simple CornerOrnament (single curve + 4 dots + central diamond)
+  * Simple gold-pale badge «شهادة إكمال معتمدة» (not draped ribbon)
+  * Single 5-stop gold gradient frame (not 7-stop)
+  * Simple navy inner frame (not double border)
+  * Cream content background (no guilloché pattern)
+  * No watermark, no seal stamp, no crown, no signature script
+  * All content fits within the A4 landscape frame
+
+TESTS:
+- Local build: SUCCESS
+- Pushed to main → Vercel auto-deployed as dpl_57TQggxnVgqH2iSDeoSefKwtKuhw (READY)
+- Mobile viewport (412×915) production test:
+  * cert dimensions: 340×240 (ratio 1.414 = A4 landscape)
+  * Downloaded PNG: 680×480 (ratio 1.417 ≈ A4)
+  * Content fills entire image (Y: 0 to 477 of 480)
+  * 4991 navy pixels (frame + icons only, no seal stamp)
+  * 6682 gold pixels (frame + ornaments only, no crown)
+  * PDF: 81KB, A4 landscape
+- Desktop viewport (1280×900) production test:
+  * Downloaded PNG: 1884×1332 (exact A4 landscape, ratio 1.414)
+  * Content fills entire image (Y: 0 to 1330 of 1332)
+  * 11853 navy pixels
+  * 21635 gold pixels
+
+Stage Summary:
+- Reverted to clean landscape A4 design (commit a6893dd state)
+- Removed: crown, seal stamp, watermark, guilloché, calligraphic signature, ribbon banner, diamond ornaments, multi-stop gradient, double border
+- Restored: simple, clean, professional landscape certificate
+- Files changed: src/components/fia/certificate-card.tsx (694 insertions, 809 deletions)
+- Production deployment: dpl_57TQggxnVgqH2iSDeoSefKwtKuhw (READY, sha e875824)
