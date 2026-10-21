@@ -38,7 +38,7 @@ export default async function Page({ params }: Props) {
       .maybeSingle()
     const { data: attemptCourse } = await supabaseAdmin
       .from('courses')
-      .select('id, title, slug, pass_score')
+      .select('id, title, slug, pass_score, currency, retake_fee, exam_duration_minutes')
       .eq('id', attempt.course_id)
       .maybeSingle()
     return (
@@ -62,7 +62,7 @@ export default async function Page({ params }: Props) {
   // Also fetch course info (for the page title + pass score) + the student's
   // name (needed to create a proper certificate request after passing).
   const [{ data: course }, { data: studentUser }] = await Promise.all([
-    supabaseAdmin.from('courses').select('id, title, slug, pass_score').eq('id', attempt.course_id).maybeSingle(),
+    supabaseAdmin.from('courses').select('id, title, slug, pass_score, currency, retake_fee, exam_duration_minutes').eq('id', attempt.course_id).maybeSingle(),
     supabaseAdmin.from('users').select('name').eq('id', attempt.user_id).maybeSingle(),
   ])
 
@@ -73,6 +73,7 @@ export default async function Page({ params }: Props) {
       course={course}
       studentName={studentUser?.name || ''}
       mode="exam"
+      serverNow={Date.now()}
     />
   )
 }

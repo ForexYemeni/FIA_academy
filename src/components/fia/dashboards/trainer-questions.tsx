@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react'
 import {
   HelpCircle, Plus, Edit, Trash2, CheckCircle2, BookOpen, Hash,
   Sparkles, Loader2, Search, Layers, CircleDot, ListOrdered,
-  GraduationCap,
+  GraduationCap, Settings, Timer, Coins,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge,
 } from './luxury'
-import { ExamQuestionDialogRoyal, TYPE_META } from './admin-questions-royal'
+import { ExamQuestionDialogRoyal, ExamSettingsDialog, TYPE_META } from './admin-questions-royal'
 
 export function TrainerQuestionBank({ courses }: { courses: any[] }) {
   const [selectedCourse, setSelectedCourse] = useState<string>('')
@@ -31,6 +31,7 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Auto-select the trainer's first course
   useEffect(() => {
@@ -62,6 +63,8 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
   }
 
   const selectedCourseObj = courses.find((c) => c.id === selectedCourse)
+  const examDuration = Number(selectedCourseObj?.exam_duration_minutes) || 0
+  const retakeFee = Number(selectedCourseObj?.retake_fee) || 0
   const filtered = items.filter((q) => {
     if (typeFilter && q.question_type !== typeFilter) return false
     if (!search.trim()) return true
@@ -87,21 +90,32 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
             items={[
               { icon: Layers, label: 'إجمالي الأسئلة', value: items.length, grad: 'from-purple-600 to-fuchsia-700' },
               { icon: ListOrdered, label: 'اختيار متعدد', value: mcqCount, grad: 'from-indigo-500 to-purple-600' },
-              { icon: CircleDot, label: 'صح / خطأ', value: tfCount, grad: 'from-emerald-500 to-teal-600' },
-              { icon: Hash, label: 'مجموع النقاط', value: totalPoints, grad: 'from-amber-500 to-orange-600' },
+              { icon: Timer, label: 'مدة الاختبار', value: examDuration > 0 ? `${examDuration} د` : 'بلا حد', grad: 'from-sky-500 to-indigo-600' },
+              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'غير متاحة', grad: 'from-amber-500 to-orange-600' },
             ]}
           />
         ) : undefined
       }
       actions={
-        <Button
-          className="relative bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-lg active:scale-[0.97] transition-all font-extrabold overflow-hidden"
-          disabled={!selectedCourse}
-          onClick={() => { setEditing(null); setOpen(true) }}
-        >
-          <span className="absolute inset-0 lux-shimmer" />
-          <Plus className="w-4 h-4 ml-1 relative" /> سؤال جديد
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="border-gold/40 hover:bg-gold/10 hover:border-gold text-navy rounded-xl shadow-sm font-extrabold"
+            disabled={!selectedCourse}
+            onClick={() => setSettingsOpen(true)}
+            title="مدة الاختبار ورسوم الإعادة"
+          >
+            <Settings className="w-4 h-4 ml-1" /> إعدادات الاختبار
+          </Button>
+          <Button
+            className="relative bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy rounded-xl shadow-lg active:scale-[0.97] transition-all font-extrabold overflow-hidden"
+            disabled={!selectedCourse}
+            onClick={() => { setEditing(null); setOpen(true) }}
+          >
+            <span className="absolute inset-0 lux-shimmer" />
+            <Plus className="w-4 h-4 ml-1 relative" /> سؤال جديد
+          </Button>
+        </div>
       }
       toolbar={
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -227,6 +241,14 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
           courseId={selectedCourse}
           courseTitle={selectedCourseObj?.title}
           onSaved={() => { setOpen(false); if (selectedCourse) loadQuestions(selectedCourse) }}
+        />
+      )}
+
+      {settingsOpen && selectedCourseObj && (
+        <ExamSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          course={selectedCourseObj}
         />
       )}
 

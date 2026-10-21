@@ -153,6 +153,70 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated || openAttempt)
     }
 
+    // 3.5) RETAKE GATE — the student takes the exam ONCE for free.
+    // Any further attempt REQUIRES a paid retake: a payments row with
+    // reference 'RETAKE:<course_id>' approved (status 'مكتمل') by the
+    // admin and not yet consumed (no __USED__ marker). One approved
+    // retake payment = exactly ONE new attempt (consumed on use).
+    const { data: submittedRows } = await supabaseAdmin
+      .from('exam_attempts')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('course_id', course_id)
+      .not('submitted_at', 'is', null)
+      .limit(1)
+
+    if ((submittedRows || []).length > 0) {
+      const { data: retakePayments } = await supabaseAdmin
+        .from('payments')
+        .select('id, amount, currency, reference, status')
+        .eq('user_id', user_id)
+        .eq('course_id', course_id)
+        .eq('status', 'مكتمل')
+        .ilike('reference', 'RETAKE%')
+        .order('date', { ascending: false })
+      const usable = (retakePayments || []).find((p: any) => !(p.reference || '').includes('__USED__'))
+
+      if (!usable) {
+        // Distinguish "pending review" from "no retake paid yet"
+        const { data: pendingRetake } = await supabaseAdmin
+          .from('payments')
+          .select('id')
+          .eq('user_id', user_id)
+          .eq('course_id', course_id)
+          .eq('status', 'قيد الانتظار')
+          .ilike('reference', 'RETAKE%')
+          .limit(1)
+        if ((pendingRetake || []).length > 0) {
+          return NextResponse.json(
+            { error: 'طلب إعادة الاختبار قيد المراجعة — بانتظار موافقة الإدارة', code: 'RETAKE_PENDING' },
+            { status: 403 }
+          )
+        }
+        // Include the fee so the client can open the payment dialog directly
+        const { data: courseRow } = await supabaseAdmin
+          .from('courses')
+          .select('retake_fee, currency')
+          .eq('id', course_id)
+          .maybeSingle()
+        return NextResponse.json(
+          {
+            error: 'لقد أنهيت اختبار هذه الدورة — إعادة الاختبار تتطلب سداد رسوم الإعادة أولاً',
+            code: 'RETAKE_PAYMENT_REQUIRED',
+            retake_fee: Number(courseRow?.retake_fee) || 0,
+            currency: courseRow?.currency || 'ر.ي',
+          },
+          { status: 403 }
+        )
+      }
+
+      // Consume the retake payment — one payment unlocks exactly one attempt
+      await supabaseAdmin
+        .from('payments')
+        .update({ reference: `${usable.reference} | __USED__:${new Date().toISOString()}` })
+        .eq('id', usable.id)
+    }
+
     // 4) Create the attempt
     const { data, error } = await supabaseAdmin
       .from('exam_attempts')

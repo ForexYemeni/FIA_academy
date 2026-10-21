@@ -207,6 +207,7 @@ export async function PUT(req: NextRequest) {
       'original_price', 'auto_coupon_code',
       'offer_type', 'offer_duration_value', 'offer_duration_unit',
       'offer_price', 'offer_headline',
+      'exam_duration_minutes', 'retake_fee',
     ]
     const hasNewColumns = NEW_COLUMNS.some((c) => c in updates)
     let data: any = null

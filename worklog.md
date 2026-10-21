@@ -1479,3 +1479,37 @@ Settings → App → FIA Academy → Notifications → make sure ALL toggles are
 **اختبارات محلية:** عرض عادي (محمد شاعع / تدريب PDF / صالحة) ✓ — إجهاد (اسم طويل جداً + دورة طويلة + اعتماد خارجي + ملغاة بالأحمر) ✓ — PDF ✓ — tsc سليم بعد توحيد الوحدات في fitFont.
 
 **ملاحظة نشر:** لا تغيير على الروابط السريعة في الرئيسية إطلاقاً. لا تغيير مطلوب في APK (v2.7/vc17) — الجسر FIANativeBridge Chunked يستقبل الملف الجديد كما هو.
+
+---
+Task ID: bugfix-exam-enrollment-gate
+Agent: main
+Task: Fix "أنت غير مسجل في هذه الدورة" error in student اختباراتي section despite actual enrollment
+
+Work Log:
+- Root cause: POST /api/exam-attempts enrollment gate queried the legacy `enrollments` table, but the canonical enrollment store is the `payments` table (via /api/enrollments POST: free → amount=0 + status 'مكتمل'; paid → 'قيد الانتظار' until admin approves → 'مكتمل'; rejected → 'ملغي'). The student's My Tests list is built from /api/enrollments (payments), so the exam card appears, but starting it hit 403.
+- DB verification (scripts against live Supabase): 8/8 payment-based enrollments for courses with active question banks were ABSENT from `enrollments` table → all got 403. `enrollments` table holds 50 legacy rows (payment_status='paid', status='active') not present in payments.
+- Fix in src/app/api/exam-attempts/route.ts POST: enrollment gate now reads `payments` (user_id+course_id, most-advanced status via same priority map as /api/enrollments GET), treats approved statuses ('مكتمل'/'completed'/'paid'/'confirmed') OR free (amount=0, not rejected/pending) as enrolled; paid pending → 403 'اشتراكك في الدورة بانتظار تأكيد الدفع'; falls back to legacy `enrollments` table (webhook flow) when payments has no valid row.
+- Verified with tsc --noEmit (clean), committed and pushed to Vercel.
+
+Stage Summary:
+- Exam start now passes for ALL students enrolled via the app's real enrollment flow (payments table) and for legacy webhook enrollments.
+- Server-side only change → APK v2.7 (WebView) needs NO update.
+
+---
+Task ID: royal-exam-retake-and-timer
+Agent: main
+Task: Paid retake system + exam countdown timer (بشكل فاخر) — 3 requirements
+
+Work Log:
+- Requirement 1 (no free retakes ever): exam-attempts POST now has a RETAKE GATE — after any submitted attempt, a new attempt is created ONLY with an approved unconsumed retake payment (payments row reference 'RETAKE:<course_id>', status 'مكتمل', no __USED__ marker). Each approved payment unlocks exactly ONE attempt and is consumed server-side. Pending retake → RETAKE_PENDING 403; no payment → RETAKE_PAYMENT_REQUIRED 403 with fee+currency.
+- Requirement 2 (retake fee + payment): NEW /api/exam-retake route (GET list per user, POST create request with validations: fee>0, enrolled, has submitted attempt, no duplicate pending). Creates payments row 'قيد الانتظار' → flows into the EXISTING admin payments inbox (amount>0 filter already passes it). NEW shared luxury ExamRetakeDialog (fee card, payment methods w/ crypto support, copy buttons, payment reference, compressed proof upload via /api/upload/image) used in: student اختباراتي cards + exam results page. Admin payments cards now show a 🔁 رسوم إعادة اختبار badge (purple = awaiting/active, green = used) + reference display cleaned.
+- Requirement 3 (exam countdown controlled from admin/trainer): courses get exam_duration_minutes (NULL/0 = unlimited). NEW shared ExamSettingsDialog (luxury: duration presets 15–120 min, unlimited toggle, retake fee presets, live summary, copy-SQL graceful degradation) added to admin + trainer question banks (⚙️ إعدادات الاختبار button + 2 new stats). Exam page passes course fields (currency, retake_fee, exam_duration_minutes) + serverNow; client timer is server-anchored (started_at + skew correction), HH:MM:SS when hours, gold→amber(≤10min)→red-pulse(≤2min) tiers, draining progress bar, one-time 5min/1min toasts, auto-submit at 0 (existing), ∞ بلا حد زمني chip when unlimited.
+- Student cards: duration badge, and retake-aware actions (ابدأ محاولتك الجديدة ✓ / طلب الإعادة قيد المراجعة ⏳ / إعادة الاختبار — رسوم X / إعادة غير متاحة).
+- courses PUT: added exam_duration_minutes + retake_fee to the defensive NEW_COLUMNS retry list.
+- DB migration 015 (supabase/migrations/015_exam_duration_and_retake_fee.sql) could NOT be applied from here: db.<ref>.supabase.co is IPv6-only (no A record) and the sandbox has no IPv6 route; session pooler tenants don't exist for this project (aws-0/1-* all reject the tenant); no exec_sql RPC. Migration must be run by the user in Supabase SQL Editor (same procedure as migrations 001–014 per project docs). Code degrades gracefully until then (PUT fallback + copy-SQL prompt in the settings dialog).
+
+Stage Summary:
+- Files: api/exam-attempts, api/exam-retake (new), api/courses, exam/[attemptId]/page+client, components/fia/exam-retake-dialog (new), dashboards/admin-questions-royal, trainer-questions, student, admin.
+- tsc: zero errors in all modified files (pre-existing errors elsewhere untouched; next.config ignores TS build errors).
+- Local next build blocked only by sandbox Google-Fonts fetch (network) — not code. Vercel build unaffected.
+- PENDING USER ACTION: run migration 015 SQL in Supabase SQL Editor to activate duration/fee storage.
