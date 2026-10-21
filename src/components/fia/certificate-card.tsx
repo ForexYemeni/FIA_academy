@@ -1,62 +1,52 @@
 /**
  * ============================================================================
- * FIA ACADEMY — LUXURY CERTIFICATE COMPONENT (RESPONSIVE + EXPORT-SAFE)
+ * FIA ACADEMY — LUXURY CERTIFICATE COMPONENT (LANDSCAPE A4 + EXPORT-SAFE)
  * ============================================================================
  *
  * A unified, reusable certificate component for أكاديمية المستقبل الدولية
  * (Future International Academy). Renders the on-screen certificate preview
  * AND is the source element for high-quality PNG/PDF export.
  *
- * DESIGN IDENTITY (per brand spec):
- *   - Outer frame: luxury gold gradient
- *   - Inner frame: royal navy
- *   - Background: cream / ivory
- *   - Logo: official FIA logo (from /fia/logo-certificate.png)
- *   - Arabic name: «أكاديمية المستقبل الدولية»
- *   - English name: "FUTURE INTERNATIONAL ACADEMY"
- *   - Gold badge: «شهادة إكمال معتمدة»
- *   - Gold ornaments and dividers
- *   - Footer slogan: «نحو مستقبل أفضل معاً»
+ * DESIGN: LANDSCAPE A4 (matching the official reference cert)
+ * ==========================================================
+ * Aspect ratio: 1.4142 (√2, ISO A4 ratio)
+ * Reference dimensions: 1492×1054 (or any width × width/1.4142)
  *
- * TECHNICAL — RESPONSIVE + EXPORT-SAFE:
- * =====================================
+ * LAYOUT (top-to-bottom, all content fits within the frame):
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │                       [GOLD FRAME + NAVY FRAME]                  │
+ * │  ┌────────────────────────────────────────────────────────────┐  │
+ * │  │  [LOGO]                                                    │  │
+ * │  │  أكاديمية المستقبل الدولية                                  │  │
+ * │  │  FUTURE INTERNATIONAL ACADEMY                              │  │
+ * │  │  [شهادة إكمال معتمدة badge]                                │  │
+ * │  │  ───────── gold separator ─────────                        │  │
+ * │  │  تشهد أكاديمية المستقبل الدولية بأن                        │  │
+ * │  │  محمد علي عبده شائع (large)                                │  │
+ * │  │  ✦ ─── ornaments ─── ✦                                    │  │
+ * │  │  قد أتمّ بنجاح جميع متطلبات دورة                            │  │
+ * │  │  الإسعافات الأولية للكوادر الصحية (gold)                    │  │
+ * │  │  ───── dotted gold divider ─────                           │  │
+ * │  │  [QR]  |  رقم | تاريخ | حالة  |  صادر عن                   │  │
+ * │  │  امسح   |  FIA-2026-XXXXX | ٢١ أكتوبر | صالحة |  التوقيع   │  │
+ * │  │  ────────────────────────────────────────────              │  │
+ * │  │  ✦ نحو مستقبل أفضل معاً ✦                                  │  │
+ * │  └────────────────────────────────────────────────────────────┘  │
+ * └──────────────────────────────────────────────────────────────────┘
  *
- * CRITICAL — HEIGHT HANDLING (THE KEY FIX):
- * =========================================
- * The previous version used `aspectRatio: '10 / 7'` to lock the cert to a
- * fixed 10:7 aspect ratio. This caused a CRITICAL bug:
- *
- *   - On mobile (e.g. 340px wide cert), aspect-ratio forced height=238px
- *   - But the actual content (logo + name + course + QR + metadata +
- *     signature + slogan) needed ~390px of vertical space
- *   - Result: content OVERFLOWED the cert frame — the bottom section
- *     (QR, cert number, date, status, issuer, signature, slogan) was
- *     pushed OUTSIDE the cert frame, below it
- *   - When html-to-image exported the cert element, it captured only
- *     the cert frame area (340×238) — the overflowing bottom content
- *     was NOT included in the export
- *
- * THE FIX:
- *   - Removed `aspectRatio: '10 / 7'`
- *   - Root div uses `width: 100%` + `height: auto` — the cert grows
- *     vertically to fit ALL content
- *   - Added `minHeight` to ensure a reasonable minimum size on very
- *     small screens
- *   - Inner content uses `flex` layout with natural spacing instead
- *     of forced `justifyContent: space-between` (which stretched
- *     content to fill the locked aspect ratio)
- *
- * EXPORT SAFETY:
- *   - All colors are INLINE HEX values (NOT Tailwind classes), so
- *     html-to-image can serialize them without hitting the oklch()/lab()
- *     parsing bug that broke html2canvas v1.4.1 under Tailwind 4.
- *   - All icons are INLINE SVG with EXPLICIT stroke={COLOR.X} (NOT
- *     lucide-react's stroke="currentColor") — this guarantees the
- *     icons appear in the exported PNG/PDF (lucide-react's currentColor
- *     doesn't cascade properly in html-to-image's SVG foreignObject
- *     serialization).
- *   - All font sizes use clamp() with reasonable minimums so text is
- *     legible at pixelRatio 2 export even on small mobile screens.
+ * EXPORT SAFETY (THE KEY FIXES):
+ * ===============================
+ * 1. ALL content fits within a FIXED landscape A4 aspect ratio
+ *    (no overflow like the previous vertical layout caused).
+ * 2. All sizes use vw-based units so they SCALE PROPORTIONALLY with
+ *    the cert's width — content is always proportional, no clipping.
+ * 3. All colors are INLINE HEX (no oklch/lab parsing issues).
+ * 4. All icons are INLINE SVG with EXPLICIT stroke colors (no
+ *    lucide-react currentColor issues in html-to-image exports).
+ * 5. Font sizes use clamp() with reasonable minimums so text is
+ *    legible at pixelRatio 2 export even on small mobile screens.
+ * 6. The cert root has NO `margin: 0 auto` and NO `overflow-x: auto`
+ *    parent — so html-to-image captures the full cert correctly.
  *
  * USAGE:
  *   <CertificateCard certificate={cert} ref={certRef} />
@@ -82,8 +72,6 @@ const COLOR = {
   CREAM_DEEP: '#F5EFE0',    // Deeper cream
   IVORY: '#FFFEFA',         // Brightest ivory
   WHITE: '#FFFFFF',
-  GRAY_DARK: '#2C2C2C',
-  GRAY: '#6B6B6B',
   GREEN: '#16A34A',
   RED: '#DC2626',
   SHADOW_GOLD: 'rgba(212, 175, 55, 0.25)',
@@ -211,10 +199,10 @@ function IconSparkles({ size, color, strokeWidth = 2 }: IconProps) {
 // ============================================================================
 function CornerOrnament({
   position,
-  size = 48,
+  size,
 }: {
   position: 'tl' | 'tr' | 'bl' | 'br'
-  size?: number
+  size: number
 }) {
   const transforms: Record<string, string> = {
     tl: `translate(0, 0)`,
@@ -229,15 +217,14 @@ function CornerOrnament({
       viewBox="0 0 60 60"
       style={{
         position: 'absolute',
-        [position === 'tl' || position === 'tr' ? 'top' : 'bottom']: 8,
-        [position === 'tl' || position === 'bl' ? 'left' : 'right']: 8,
+        [position === 'tl' || position === 'tr' ? 'top' : 'bottom']: size * 0.18,
+        [position === 'tl' || position === 'bl' ? 'left' : 'right']: size * 0.18,
         opacity: 0.85,
         pointerEvents: 'none',
         transform: transforms[position],
         transformOrigin: '0 0',
       } as React.CSSProperties}
     >
-      {/* Outer filigree curve */}
       <path
         d="M 0 48 C 0 16, 16 0, 48 0"
         stroke={COLOR.GOLD}
@@ -245,7 +232,6 @@ function CornerOrnament({
         fill="none"
         strokeLinecap="round"
       />
-      {/* Inner curve */}
       <path
         d="M 8 40 C 8 22, 22 8, 40 8"
         stroke={COLOR.GOLD_BRIGHT}
@@ -253,26 +239,13 @@ function CornerOrnament({
         fill="none"
         strokeLinecap="round"
       />
-      {/* Decorative dots */}
       <circle cx="6" cy="42" r="1.5" fill={COLOR.GOLD} />
       <circle cx="14" cy="32" r="1.5" fill={COLOR.GOLD} />
       <circle cx="26" cy="20" r="1.5" fill={COLOR.GOLD} />
       <circle cx="36" cy="10" r="1.5" fill={COLOR.GOLD} />
-      {/* Central diamond */}
       <path d="M 0 0 L 5 -5 L 10 0 L 5 5 Z" fill={COLOR.GOLD} />
-      {/* Outer small accent line */}
-      <path
-        d="M 0 54 L 12 54"
-        stroke={COLOR.GOLD}
-        strokeWidth="1"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 54 0 L 54 12"
-        stroke={COLOR.GOLD}
-        strokeWidth="1"
-        strokeLinecap="round"
-      />
+      <path d="M 0 54 L 12 54" stroke={COLOR.GOLD} strokeWidth="1" strokeLinecap="round" />
+      <path d="M 54 0 L 54 12" stroke={COLOR.GOLD} strokeWidth="1" strokeLinecap="round" />
     </svg>
   )
 }
@@ -280,31 +253,21 @@ function CornerOrnament({
 // ============================================================================
 // MAIN CERTIFICATE COMPONENT
 //
-// CRITICAL IMPLEMENTATION NOTES:
+// CRITICAL DESIGN:
+// ================
+// 1. Landscape A4 aspect ratio (1.4142 = √2 = ISO A4)
+// 2. Width 100% of parent, height = width / 1.4142
+// 3. Content uses vw-based sizing so it scales PROPORTIONALLY with width
+// 4. Layout is vertical (top→bottom) but the FRAME is horizontal
+// 5. All content fits inside the frame (no overflow)
 //
-// 1. The root div uses `width: 100%` (NOT fixed 1000px) — adapts to parent.
+// Sizes use `cqw` (container query width units) — they're proportional
+// to the cert's width. This means:
+//   - On a 1000px cert: font sizes look right
+//   - On a 500px cert (mobile): font sizes scale to 50% — still proportional
+//   - The cert always looks the SAME visually, just smaller on small screens
 //
-// 2. **HEIGHT: auto** (NOT aspect-ratio). The previous version used
-//    `aspectRatio: '10 / 7'` which forced the cert to a fixed height
-//    regardless of content. On mobile this caused content to OVERFLOW
-//    the cert frame — the bottom section (QR, number, date, status,
-//    issuer, signature, slogan) was pushed OUTSIDE the cert, and was
-//    therefore missing from the exported PNG/PDF. Now the cert grows
-//    vertically to fit ALL content naturally.
-//
-// 3. Inner content uses `display: flex; flex-direction: column` with
-//    natural spacing (gap) instead of `justifyContent: space-between`
-//    which previously stretched content to fill the locked aspect ratio.
-//
-// 4. All inner sizes use px with min-width/min-height — NOT percentages
-//    of the cert dimensions (which were unreliable when height was
-//    locked by aspect-ratio). Using fixed px sizes ensures icons,
-//    text, and containers always render at the intended size.
-//
-// 5. All colors are INLINE HEX — no oklch/lab regression.
-//
-// 6. All icons are INLINE SVG with explicit stroke colors — no
-//    lucide-react currentColor issues in exports.
+// We use `cqw` by setting `containerType: 'inline-size'` on the root.
 // ============================================================================
 export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
   function CertificateCard({ certificate }, ref) {
@@ -330,22 +293,23 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
         ref={ref}
         dir="rtl"
         style={{
-          // === RESPONSIVE WIDTH ===
+          // === LANDSCAPE A4 ASPECT RATIO ===
+          // √2 ≈ 1.4142 (ISO A4 ratio). This locks the cert to a
+          // landscape orientation regardless of parent width.
           width: '100%',
-          // === AUTO HEIGHT — grows to fit content ===
-          // (Previously used aspectRatio: '10 / 7' which caused overflow
-          // on mobile. Now removed — cert grows vertically as needed.)
-          minHeight: 480,
+          aspectRatio: '1.4142 / 1',
           margin: 0,
           position: 'relative',
           background: COLOR.IVORY,
           fontFamily:
             "'Cairo', 'Noto Sans Arabic', 'Segoe UI', sans-serif",
+          // Enable container queries so inner cqw units resolve correctly
+          containerType: 'inline-size',
           // === OUTER GOLD FRAME ===
-          padding: 14,
+          padding: '1.2cqw',
           backgroundImage: `linear-gradient(135deg, ${COLOR.GOLD} 0%, ${COLOR.GOLD_BRIGHT} 25%, ${COLOR.GOLD_LIGHT} 50%, ${COLOR.GOLD_BRIGHT} 75%, ${COLOR.GOLD} 100%)`,
-          borderRadius: 12,
-          boxShadow: `0 8px 32px ${COLOR.SHADOW_NAVY}, 0 0 0 1px ${COLOR.GOLD_DARK}40`,
+          borderRadius: '0.8cqw',
+          boxShadow: `0 0.6cqw 2cqw ${COLOR.SHADOW_NAVY}, 0 0 0 0.1cqw ${COLOR.GOLD_DARK}40`,
           overflow: 'hidden',
         }}
       >
@@ -354,10 +318,9 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
           style={{
             width: '100%',
             height: '100%',
-            minHeight: 'inherit',
-            padding: 8,
+            padding: '0.6cqw',
             background: `linear-gradient(135deg, ${COLOR.NAVY_DEEP} 0%, ${COLOR.NAVY} 50%, ${COLOR.NAVY_MID} 100%)`,
-            borderRadius: 8,
+            borderRadius: '0.5cqw',
             position: 'relative',
             overflow: 'hidden',
           }}
@@ -369,8 +332,8 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
               inset: 0,
               opacity: 0.08,
               pointerEvents: 'none',
-              backgroundImage: `radial-gradient(circle, ${COLOR.GOLD} 1px, transparent 1px)`,
-              backgroundSize: '14px 14px',
+              backgroundImage: `radial-gradient(circle, ${COLOR.GOLD} 0.1cqw, transparent 0.1cqw)`,
+              backgroundSize: '1.2cqw 1.2cqw',
             }}
           />
 
@@ -378,12 +341,12 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
           <div
             style={{
               width: '100%',
-              minHeight: 'inherit',
+              height: '100%',
               background: `linear-gradient(135deg, ${COLOR.IVORY} 0%, ${COLOR.CREAM} 50%, ${COLOR.IVORY} 100%)`,
-              borderRadius: 5,
+              borderRadius: '0.4cqw',
               position: 'relative',
               overflow: 'hidden',
-              boxShadow: `inset 0 0 0 1.5px ${COLOR.GOLD}40`,
+              boxShadow: `inset 0 0 0 0.15cqw ${COLOR.GOLD}40`,
             }}
           >
             {/* Inner radial gold accents (background luxury) */}
@@ -400,24 +363,21 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
               }}
             />
 
-            {/* Corner ornaments */}
-            <CornerOrnament position="tl" size={48} />
-            <CornerOrnament position="tr" size={48} />
-            <CornerOrnament position="bl" size={48} />
-            <CornerOrnament position="br" size={48} />
+            {/* Corner ornaments — sized via cqw so they scale */}
+            <CornerOrnament position="tl" size={4.5} />
+            <CornerOrnament position="tr" size={4.5} />
+            <CornerOrnament position="bl" size={4.5} />
+            <CornerOrnament position="br" size={4.5} />
 
             {/* ===== INNER CONTENT WRAPPER ===== */}
             <div
               style={{
                 position: 'relative',
                 width: '100%',
-                // Natural padding — fixed px (NOT %) so it doesn't
-                // depend on the parent dimensions
-                padding: '28px 40px 24px 40px',
+                height: '100%',
+                padding: '2.8cqw 4.5cqw 2.4cqw 4.5cqw',
                 display: 'flex',
                 flexDirection: 'column',
-                // Natural spacing — let content flow, no forced stretch
-                gap: 14,
                 alignItems: 'center',
                 textAlign: 'center',
                 color: COLOR.NAVY,
@@ -425,18 +385,20 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
               }}
             >
               {/* ===== TOP: LOGO + ACADEMY IDENTITY ===== */}
-              <div style={{ width: '100%' }}>
+              <div style={{ width: '100%', flexShrink: 0 }}>
                 <img
                   src={logoSrc}
                   alt="FIA Logo"
                   crossOrigin="anonymous"
                   style={{
-                    width: 80,
-                    height: 80,
+                    width: '6cqw',
+                    height: '6cqw',
+                    minWidth: 32,
+                    minHeight: 32,
                     objectFit: 'contain',
-                    margin: '0 auto 8px',
+                    margin: '0 auto 0.5cqw',
                     display: 'block',
-                    filter: `drop-shadow(0 4px 10px ${COLOR.SHADOW_NAVY})`,
+                    filter: `drop-shadow(0 0.3cqw 0.7cqw ${COLOR.SHADOW_NAVY})`,
                   }}
                 />
                 <div
@@ -444,16 +406,16 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 12,
-                    marginBottom: 4,
+                    gap: '1cqw',
+                    marginBottom: '0.2cqw',
                     flexWrap: 'nowrap',
                   }}
                 >
                   <div
                     style={{
-                      width: 36,
+                      width: '3.5cqw',
+                      minWidth: 20,
                       height: 2,
-                      minWidth: 36,
                       background: `linear-gradient(to right, transparent, ${COLOR.GOLD})`,
                       borderRadius: 1,
                       flexShrink: 0,
@@ -461,7 +423,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   />
                   <span
                     style={{
-                      fontSize: 'clamp(16px, 3vw, 28px)',
+                      fontSize: 'clamp(14px, 2.4cqw, 28px)',
                       fontWeight: 900,
                       color: COLOR.NAVY,
                       lineHeight: 1.2,
@@ -474,9 +436,9 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   </span>
                   <div
                     style={{
-                      width: 36,
+                      width: '3.5cqw',
+                      minWidth: 20,
                       height: 2,
-                      minWidth: 36,
                       background: `linear-gradient(to left, transparent, ${COLOR.GOLD})`,
                       borderRadius: 1,
                       flexShrink: 0,
@@ -485,7 +447,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 </div>
                 <p
                   style={{
-                    fontSize: 'clamp(8px, 1.2vw, 12px)',
+                    fontSize: 'clamp(7px, 1cqw, 12px)',
                     color: COLOR.GOLD_DARK,
                     fontWeight: 800,
                     letterSpacing: '0.4em',
@@ -501,19 +463,19 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 18px',
+                    gap: '0.6cqw',
+                    padding: '0.4cqw 1.6cqw',
                     borderRadius: 22,
                     background: `linear-gradient(135deg, ${COLOR.GOLD_PALE}, ${COLOR.CREAM})`,
                     border: `1.5px solid ${COLOR.GOLD}`,
-                    marginTop: 12,
-                    boxShadow: `0 2px 8px ${COLOR.SHADOW_GOLD}`,
+                    marginTop: '0.8cqw',
+                    boxShadow: `0 0.15cqw 0.6cqw ${COLOR.SHADOW_GOLD}`,
                   }}
                 >
-                  <IconAward size={18} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
+                  <IconAward size={16} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
                   <span
                     style={{
-                      fontSize: 'clamp(11px, 1.4vw, 15px)',
+                      fontSize: 'clamp(9px, 1.2cqw, 15px)',
                       fontWeight: 900,
                       color: COLOR.NAVY,
                       letterSpacing: '0.5px',
@@ -521,18 +483,19 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   >
                     شهادة إكمال معتمدة
                   </span>
-                  <IconAward size={18} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
+                  <IconAward size={16} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
                 </div>
               </div>
 
               {/* Gold separator */}
               <div
                 style={{
-                  width: '70%',
+                  width: '60%',
                   height: 2,
                   background: `linear-gradient(to right, transparent, ${COLOR.GOLD}, transparent)`,
                   borderRadius: 1,
-                  margin: '4px 0',
+                  margin: '0.8cqw 0',
+                  flexShrink: 0,
                 }}
               />
 
@@ -540,15 +503,17 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
               <div
                 style={{
                   width: '100%',
+                  flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 6,
+                  justifyContent: 'center',
+                  gap: '0.4cqw',
                 }}
               >
                 <p
                   style={{
-                    fontSize: 'clamp(11px, 1.6vw, 16px)',
+                    fontSize: 'clamp(10px, 1.4cqw, 17px)',
                     color: COLOR.NAVY,
                     opacity: 0.7,
                     margin: 0,
@@ -561,7 +526,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 {/* Student name — the most prominent element */}
                 <h2
                   style={{
-                    fontSize: 'clamp(22px, 4.8vw, 48px)',
+                    fontSize: 'clamp(20px, 4cqw, 48px)',
                     fontWeight: 900,
                     color: COLOR.NAVY,
                     margin: 0,
@@ -580,21 +545,21 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
-                    margin: '6px 0',
+                    gap: '0.6cqw',
+                    margin: '0.4cqw 0',
                     width: '100%',
                   }}
                 >
                   <div
                     style={{
-                      width: 64,
+                      width: '6cqw',
+                      minWidth: 40,
                       height: 1.5,
-                      minWidth: 64,
                       background: `linear-gradient(to right, transparent, ${COLOR.GOLD})`,
                       borderRadius: 1,
                     }}
                   />
-                  <IconSparkles size={18} color={COLOR.GOLD} strokeWidth={2} />
+                  <IconSparkles size={16} color={COLOR.GOLD} strokeWidth={2} />
                   <div
                     style={{
                       width: 6,
@@ -604,12 +569,12 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                       boxShadow: `0 0 6px ${COLOR.GOLD}`,
                     }}
                   />
-                  <IconSparkles size={18} color={COLOR.GOLD} strokeWidth={2} />
+                  <IconSparkles size={16} color={COLOR.GOLD} strokeWidth={2} />
                   <div
                     style={{
-                      width: 64,
+                      width: '6cqw',
+                      minWidth: 40,
                       height: 1.5,
-                      minWidth: 64,
                       background: `linear-gradient(to left, transparent, ${COLOR.GOLD})`,
                       borderRadius: 1,
                     }}
@@ -618,7 +583,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
 
                 <p
                   style={{
-                    fontSize: 'clamp(11px, 1.5vw, 15px)',
+                    fontSize: 'clamp(9px, 1.3cqw, 15px)',
                     color: COLOR.NAVY,
                     opacity: 0.7,
                     margin: 0,
@@ -631,7 +596,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 {/* Course title — second most prominent element */}
                 <h3
                   style={{
-                    fontSize: 'clamp(15px, 2.4vw, 24px)',
+                    fontSize: 'clamp(13px, 2cqw, 24px)',
                     fontWeight: 800,
                     color: COLOR.GOLD_DARK,
                     margin: 0,
@@ -650,18 +615,18 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 6,
-                        padding: '4px 12px',
+                        gap: '0.4cqw',
+                        padding: '0.3cqw 1cqw',
                         borderRadius: 14,
                         background: `${COLOR.NAVY}08`,
                         border: `1px solid ${COLOR.GOLD}50`,
-                        marginTop: 8,
+                        marginTop: '0.5cqw',
                       }}
                     >
-                      <IconShield size={14} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
+                      <IconShield size={12} color={COLOR.GOLD_DARK} strokeWidth={2.5} />
                       <span
                         style={{
-                          fontSize: 'clamp(10px, 1.2vw, 13px)',
+                          fontSize: 'clamp(8px, 1cqw, 13px)',
                           color: COLOR.NAVY,
                           fontWeight: 700,
                         }}
@@ -677,9 +642,10 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: '0.6cqw',
                   width: '85%',
-                  margin: '6px 0',
+                  margin: '0.5cqw 0',
+                  flexShrink: 0,
                 }}
               >
                 <div
@@ -692,16 +658,16 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 />
                 <div
                   style={{
-                    width: 5,
-                    height: 5,
+                    width: 4,
+                    height: 4,
                     borderRadius: '50%',
                     background: `${COLOR.GOLD}90`,
                   }}
                 />
                 <div
                   style={{
-                    width: 7,
-                    height: 7,
+                    width: 6,
+                    height: 6,
                     borderRadius: '50%',
                     background: COLOR.GOLD,
                     boxShadow: `0 0 4px ${COLOR.GOLD}`,
@@ -709,8 +675,8 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 />
                 <div
                   style={{
-                    width: 5,
-                    height: 5,
+                    width: 4,
+                    height: 4,
                     borderRadius: '50%',
                     background: `${COLOR.GOLD}90`,
                   }}
@@ -732,8 +698,9 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   display: 'flex',
                   alignItems: 'flex-end',
                   justifyContent: 'space-between',
-                  gap: 12,
-                  paddingTop: 8,
+                  gap: '1.5cqw',
+                  paddingTop: '0.5cqw',
+                  flexShrink: 0,
                 }}
               >
                 {/* QR code — left side */}
@@ -741,18 +708,18 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   style={{
                     textAlign: 'center',
                     flexShrink: 0,
-                    width: 100,
-                    minWidth: 100,
+                    width: '9cqw',
+                    minWidth: 60,
                   }}
                 >
                   <div
                     style={{
                       display: 'inline-block',
-                      padding: 5,
+                      padding: '0.3cqw',
                       background: COLOR.WHITE,
                       border: `1.5px solid ${COLOR.GOLD}`,
                       borderRadius: 6,
-                      boxShadow: `0 2px 6px ${COLOR.SHADOW_NAVY}`,
+                      boxShadow: `0 0.15cqw 0.4cqw ${COLOR.SHADOW_NAVY}`,
                     }}
                   >
                     <img
@@ -760,20 +727,20 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                       alt="QR Code"
                       crossOrigin="anonymous"
                       style={{
-                        width: 70,
-                        height: 70,
-                        minWidth: 70,
-                        minHeight: 70,
+                        width: '6cqw',
+                        height: '6cqw',
+                        minWidth: 44,
+                        minHeight: 44,
                         display: 'block',
                       }}
                     />
                   </div>
                   <div
                     style={{
-                      fontSize: 'clamp(9px, 1vw, 11px)',
+                      fontSize: 'clamp(7px, 0.8cqw, 11px)',
                       color: COLOR.NAVY,
                       opacity: 0.6,
-                      marginTop: 4,
+                      marginTop: '0.3cqw',
                       fontWeight: 700,
                       letterSpacing: '0.3px',
                     }}
@@ -786,7 +753,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 <div
                   style={{
                     display: 'flex',
-                    gap: 12,
+                    gap: '1.2cqw',
                     alignItems: 'center',
                     flex: 1,
                     justifyContent: 'center',
@@ -796,35 +763,35 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       textAlign: 'center',
-                      minWidth: 80,
+                      minWidth: '8cqw',
                     }}
                   >
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        minWidth: 32,
-                        minHeight: 32,
+                        width: '2.8cqw',
+                        height: '2.8cqw',
+                        minWidth: 24,
+                        minHeight: 24,
                         borderRadius: 8,
                         background: COLOR.NAVY,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        margin: '0 auto 6px',
-                        boxShadow: `0 2px 5px ${COLOR.SHADOW_NAVY}`,
+                        margin: '0 auto 0.4cqw',
+                        boxShadow: `0 0.15cqw 0.4cqw ${COLOR.SHADOW_NAVY}`,
                       }}
                     >
-                      <IconFileText size={18} color={COLOR.GOLD} strokeWidth={2.5} />
+                      <IconFileText size={16} color={COLOR.GOLD} strokeWidth={2.5} />
                     </div>
                     <div
                       style={{
-                        fontSize: 'clamp(9px, 0.9vw, 11px)',
+                        fontSize: 'clamp(7px, 0.8cqw, 11px)',
                         color: COLOR.NAVY,
                         opacity: 0.7,
                         textTransform: 'uppercase',
                         fontWeight: 800,
                         letterSpacing: '0.5px',
-                        marginBottom: 3,
+                        marginBottom: 2,
                       }}
                     >
                       رقم الشهادة
@@ -833,7 +800,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                       style={{
                         fontFamily: 'monospace',
                         fontWeight: 800,
-                        fontSize: 'clamp(10px, 1.2vw, 13px)',
+                        fontSize: 'clamp(8px, 1cqw, 13px)',
                         color: COLOR.NAVY,
                         wordBreak: 'break-all',
                       }}
@@ -847,8 +814,8 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       width: 1,
-                      height: 56,
-                      minHeight: 56,
+                      height: '4cqw',
+                      minHeight: 32,
                       background: `${COLOR.GOLD}40`,
                     }}
                   />
@@ -857,35 +824,35 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       textAlign: 'center',
-                      minWidth: 100,
+                      minWidth: '9cqw',
                     }}
                   >
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        minWidth: 32,
-                        minHeight: 32,
+                        width: '2.8cqw',
+                        height: '2.8cqw',
+                        minWidth: 24,
+                        minHeight: 24,
                         borderRadius: 8,
                         background: COLOR.NAVY,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        margin: '0 auto 6px',
-                        boxShadow: `0 2px 5px ${COLOR.SHADOW_NAVY}`,
+                        margin: '0 auto 0.4cqw',
+                        boxShadow: `0 0.15cqw 0.4cqw ${COLOR.SHADOW_NAVY}`,
                       }}
                     >
-                      <IconCalendar size={18} color={COLOR.GOLD} strokeWidth={2.5} />
+                      <IconCalendar size={16} color={COLOR.GOLD} strokeWidth={2.5} />
                     </div>
                     <div
                       style={{
-                        fontSize: 'clamp(9px, 0.9vw, 11px)',
+                        fontSize: 'clamp(7px, 0.8cqw, 11px)',
                         color: COLOR.NAVY,
                         opacity: 0.7,
                         textTransform: 'uppercase',
                         fontWeight: 800,
                         letterSpacing: '0.5px',
-                        marginBottom: 3,
+                        marginBottom: 2,
                       }}
                     >
                       تاريخ الإصدار
@@ -893,7 +860,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                     <div
                       style={{
                         fontWeight: 700,
-                        fontSize: 'clamp(10px, 1.1vw, 12px)',
+                        fontSize: 'clamp(8px, 0.9cqw, 12px)',
                         color: COLOR.NAVY,
                       }}
                     >
@@ -905,8 +872,8 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       width: 1,
-                      height: 56,
-                      minHeight: 56,
+                      height: '4cqw',
+                      minHeight: 32,
                       background: `${COLOR.GOLD}40`,
                     }}
                   />
@@ -915,35 +882,35 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       textAlign: 'center',
-                      minWidth: 70,
+                      minWidth: '6cqw',
                     }}
                   >
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        minWidth: 32,
-                        minHeight: 32,
+                        width: '2.8cqw',
+                        height: '2.8cqw',
+                        minWidth: 24,
+                        minHeight: 24,
                         borderRadius: 8,
                         background: COLOR.NAVY,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        margin: '0 auto 6px',
-                        boxShadow: `0 2px 5px ${COLOR.SHADOW_NAVY}`,
+                        margin: '0 auto 0.4cqw',
+                        boxShadow: `0 0.15cqw 0.4cqw ${COLOR.SHADOW_NAVY}`,
                       }}
                     >
-                      <IconShield size={18} color={COLOR.GOLD} strokeWidth={2.5} />
+                      <IconShield size={16} color={COLOR.GOLD} strokeWidth={2.5} />
                     </div>
                     <div
                       style={{
-                        fontSize: 'clamp(9px, 0.9vw, 11px)',
+                        fontSize: 'clamp(7px, 0.8cqw, 11px)',
                         color: COLOR.NAVY,
                         opacity: 0.7,
                         textTransform: 'uppercase',
                         fontWeight: 800,
                         letterSpacing: '0.5px',
-                        marginBottom: 3,
+                        marginBottom: 2,
                       }}
                     >
                       الحالة
@@ -951,7 +918,7 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                     <div
                       style={{
                         fontWeight: 800,
-                        fontSize: 'clamp(11px, 1.2vw, 14px)',
+                        fontSize: 'clamp(9px, 1cqw, 14px)',
                         color: isVerified ? COLOR.GREEN : COLOR.RED,
                       }}
                     >
@@ -965,18 +932,18 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   style={{
                     textAlign: 'center',
                     flexShrink: 0,
-                    width: 120,
-                    minWidth: 120,
+                    width: '11cqw',
+                    minWidth: 80,
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 'clamp(9px, 1vw, 11px)',
+                      fontSize: 'clamp(7px, 0.8cqw, 11px)',
                       color: COLOR.NAVY,
                       opacity: 0.7,
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      marginBottom: 4,
+                      marginBottom: '0.3cqw',
                       fontWeight: 800,
                     }}
                   >
@@ -985,9 +952,9 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   <div
                     style={{
                       fontWeight: 800,
-                      fontSize: 'clamp(10px, 1.1vw, 13px)',
+                      fontSize: 'clamp(8px, 0.95cqw, 13px)',
                       color: COLOR.NAVY,
-                      marginBottom: 6,
+                      marginBottom: '0.4cqw',
                       lineHeight: 1.4,
                     }}
                   >
@@ -996,8 +963,8 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   {/* Signature line */}
                   <div
                     style={{
-                      width: 90,
-                      minWidth: 90,
+                      width: '8cqw',
+                      minWidth: 60,
                       height: 1.5,
                       background: COLOR.NAVY,
                       opacity: 0.4,
@@ -1007,10 +974,10 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                   />
                   <div
                     style={{
-                      fontSize: 'clamp(9px, 0.9vw, 10px)',
+                      fontSize: 'clamp(7px, 0.8cqw, 10px)',
                       color: COLOR.NAVY,
                       opacity: 0.6,
-                      marginTop: 4,
+                      marginTop: '0.3cqw',
                       fontWeight: 700,
                     }}
                   >
@@ -1024,14 +991,15 @@ export const CertificateCard = forwardRef<HTMLDivElement, CertificateCardProps>(
                 style={{
                   width: '100%',
                   textAlign: 'center',
-                  paddingTop: 12,
-                  marginTop: 8,
+                  paddingTop: '0.8cqw',
+                  marginTop: '0.6cqw',
                   borderTop: `1px solid ${COLOR.GOLD}30`,
+                  flexShrink: 0,
                 }}
               >
                 <span
                   style={{
-                    fontSize: 'clamp(11px, 1.3vw, 14px)',
+                    fontSize: 'clamp(9px, 1.1cqw, 14px)',
                     color: COLOR.GOLD_DARK,
                     fontWeight: 800,
                     letterSpacing: '0.8px',
