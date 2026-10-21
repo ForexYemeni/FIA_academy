@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input'
 import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import { supabasePublic } from '@/lib/supabase'
 import {
-  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge,
+  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxPicker, LuxEmpty, LuxBadge,
   LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput,
 } from './luxury'
 
@@ -388,25 +388,27 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         </div>
       </div>
 
-      {/* ── Section 2: البيانات المهنية — القوائم المنسدلة الفاخرة ── */}
+      {/* ── Section 2: البيانات المهنية — القوائم المنسدلة السحرية (نمط قسم الدورات) ── */}
       <FormSectionTitle icon={Award} label="البيانات المهنية" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <LuxField label="المسمى المهني" icon={Award} hint="اختر من القائمة">
-          <LuxSelect
-            value={form.title || ''}
-            onChange={(v) => setForm({ ...form, title: v })}
-            placeholder="— اختر المسمى —"
-            options={TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))}
-          />
-        </LuxField>
-        <LuxField label="التخصص" icon={Briefcase} hint="اختر من القائمة">
-          <LuxSelect
-            value={form.specialization || ''}
-            onChange={(v) => setForm({ ...form, specialization: v })}
-            placeholder="— اختر التخصص —"
-            options={SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))}
-          />
-        </LuxField>
+        <LuxPicker
+          label="المسمى المهني"
+          icon={Award}
+          accent="gold"
+          value={form.title || ''}
+          onChange={(v) => setForm({ ...form, title: v })}
+          placeholder="— اختر المسمى —"
+          options={TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))}
+        />
+        <LuxPicker
+          label="التخصص"
+          icon={Briefcase}
+          accent="blue"
+          value={form.specialization || ''}
+          onChange={(v) => setForm({ ...form, specialization: v })}
+          placeholder="— اختر التخصص —"
+          options={SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))}
+        />
       </div>
 
       {/* ── Section 3: بيانات الحساب ──────────────────────────────── */}

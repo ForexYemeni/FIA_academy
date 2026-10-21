@@ -239,6 +239,38 @@ function iconCalendar(ctx: Ctx, cx: number, cy: number, o: IconOpts) {
   ctx.restore()
 }
 
+function iconGraduation(ctx: Ctx, cx: number, cy: number, o: IconOpts) {
+  const s = o.size / 24
+  ctx.save()
+  ctx.translate(cx - 12 * s, cy - 12 * s)
+  ctx.scale(s, s)
+  ctx.strokeStyle = o.color
+  ctx.lineWidth = (o.sw ?? 2) / s
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  // قبعة التخرج — المعين العلوي
+  ctx.beginPath()
+  ctx.moveTo(12, 4)
+  ctx.lineTo(22, 9)
+  ctx.lineTo(12, 14)
+  ctx.lineTo(2, 9)
+  ctx.closePath()
+  ctx.stroke()
+  // القاعدة + الشرابة
+  ctx.beginPath()
+  ctx.moveTo(6, 11.4)
+  ctx.lineTo(6, 16)
+  ctx.quadraticCurveTo(6, 19, 12, 19)
+  ctx.quadraticCurveTo(18, 19, 18, 16)
+  ctx.lineTo(18, 11.4)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(22, 9)
+  ctx.lineTo(22, 15)
+  ctx.stroke()
+  ctx.restore()
+}
+
 function iconShield(ctx: Ctx, cx: number, cy: number, o: IconOpts) {
   const s = o.size / 24
   ctx.save()
@@ -416,6 +448,7 @@ export interface CertRenderData {
   certificate_number: string
   student_name: string
   course_title?: string | null
+  trainer_name?: string | null
   issued_at?: string | null
   status: string
   has_external_accreditation?: boolean
@@ -764,7 +797,9 @@ export async function renderCertificatePNG(
     U
   )
 
-  const blockH = 14 + 26 + 16 + 12 + 17 + 4 * 1.22
+  // ارتفاع الكتلة — يشمل شارة المدرب إن وُجدت حتى يبقى التوسيط عمودياً دقيقاً
+  const hasTrainerBadge = !!(cert.trainer_name && cert.trainer_name.trim())
+  const blockH = 14 + 26 + 16 + 12 + 17 + 4 * 1.22 + (hasTrainerBadge ? 17 : 0)
   let my = midTop + (midH - blockH * U) / 2 + 3 * U
 
   ctx.direction = 'rtl'
@@ -835,6 +870,33 @@ export async function renderCertificatePNG(
   ctx.fillText(courseText, cx, my + 8.5 * U)
   ctx.restore()
   my += 17 * U
+
+  // شارة اسم المدرب (إن وُجد) — مطابقة لشارة البطاقة المعروضة
+  if (cert.trainer_name && cert.trainer_name.trim()) {
+    const trText = `بتأهيل وإشراف المدرب: ${cert.trainer_name.trim()}`
+    const trSize = fitFont(ctx, trText, 7.5, 5.5, 'bold', (creamW - 110 * U) / U, U)
+    setFont(ctx, trSize, 'bold', U)
+    const trW = ctx.measureText(trText).width + 30 * U
+    const trH = 13 * U
+    const trY = my + 2 * U
+    ctx.save()
+    ctx.globalAlpha = 0.025
+    fillRR(ctx, cx - trW / 2, trY, trW, trH, 6.5 * U, NAVY)
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = 0.25
+    strokeRR(ctx, cx - trW / 2, trY, trW, trH, 6.5 * U, GOLD, 1 * U)
+    ctx.restore()
+    iconGraduation(ctx, cx - trW / 2 + 12 * U, trY + trH / 2, {
+      size: 11 * U,
+      color: GOLD_DARK,
+      sw: 2.5,
+    })
+    ctx.direction = 'rtl'
+    ctx.fillStyle = NAVY
+    ctx.fillText(trText, cx + 5.5 * U, trY + trH / 2)
+    my += 17 * U
+  }
 
   // شارة الاعتماد الخارجي (إن وُجدت)
   if (cert.has_external_accreditation && cert.external_accreditation_body) {
