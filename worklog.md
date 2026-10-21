@@ -1273,3 +1273,58 @@ Stage Summary:
 - FIX: Added sendFcmPush() call with try/catch (non-fatal on failure)
 - All notifyX functions already work correctly (they call sendFcmPush)
 - Production deployment live: dpl_AAFLUHeoGfBGvaiEifz66PtVEWo9
+
+---
+Task ID: fcm-payload-format-fix-final
+Agent: main (Z.ai)
+Task: Notifications arriving silently — no sound, no popup outside app. Even after previous fixes.
+
+ROOT CAUSE FOUND (via direct FCM API test):
+==========================================
+The FCM message payload had INVALID fields that caused Firebase to
+reject the push:
+
+Error from FCM HTTP v1 API:
+  "Invalid JSON payload received. Unknown name 'sound' at
+   'message.notification': Cannot find field."
+  "Invalid JSON payload received. Unknown name 'priority' at
+   'message.android.notification': Cannot find field."
+
+The fields were in the wrong location:
+- `notification.sound` ← INVALID (sound goes in android.notification)
+- `android.notification.priority` ← INVALID (priority goes in android.priority)
+
+This caused EVERY FCM push to fail silently. The server reported
+"failed: 1" but the error was swallowed in the try/catch.
+
+THE FIX:
+========
+Corrected the FCM message structure:
+- Removed `sound` from `notification` level (moved to android.notification)
+- Removed `priority` from `android.notification` level (kept at android.priority)
+- Kept `sound: 'default'` inside `android.notification` (correct location)
+- Kept `priority: 'high'` at the `android` level (correct location)
+- Removed `channelId` entirely (let Android use default channel with sound)
+- Added APNS config for iOS cross-platform support
+
+ALSO FIXED:
+- POST /api/notifications endpoint was missing sendFcmPush() call entirely
+  (added in previous commit, now working with correct FCM format)
+
+TESTS AFTER FIX:
+===============
+1. /api/fcm/test-push: success=true, sent=1, failed=0 ✅
+2. POST /api/notifications: DB entry created + FCM push sent ✅
+
+The user should now receive:
+- ✅ Sound (default notification sound)
+- ✅ Vibration
+- ✅ System tray notification
+- ✅ Works even when app is in background
+- ✅ Both /api/fcm/test-push AND in-app test button now trigger FCM
+
+Stage Summary:
+- ROOT CAUSE: invalid FCM message format (fields in wrong location)
+- FIX: corrected field locations + removed channelId
+- Production deployment: dpl_BDKdf6GhzWwuNu6LpZB43N3FgkpS (READY)
+- Both test paths now send FCM successfully
