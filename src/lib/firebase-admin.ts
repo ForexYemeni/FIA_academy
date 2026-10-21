@@ -187,20 +187,10 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
           token: t.token,
           // 🔥 NOTIFICATION payload — Android system tray shows this
           // automatically even if app is force-killed.
-          //
-          // 🔥 KEY FIX v2.6.3: REMOVED channelId from the android.notification
-          // config. Previously we specified channelId: 'fia-notifications-v5'
-          // but that channel only exists if the user has APK v2.6.1 installed.
-          // If the channel doesn't exist, Android falls back to a SILENT
-          // channel (no sound, no popup). By NOT specifying a channelId,
-          // Android uses the app's default notification channel which has
-          // sound + default importance.
+          // NOTE: only title + body here — sound goes in android.notification
           notification: {
             title: opts.title,
             body: opts.body,
-            // 🔥 Explicitly set sound at the notification level
-            // (works even without a specific channelId)
-            sound: 'default',
           },
           // 🔥 DATA payload — for deep-linking when user taps the notif
           data: dataPayload,
@@ -210,23 +200,19 @@ export async function sendFcmPush(opts: FcmPushOptions): Promise<FcmPushResult> 
             notification: {
               // 🔥 NO channelId — let Android use the default channel
               // (which has sound enabled by default)
-              sound: 'default',
+              sound: 'default' as const,
               icon: 'ic_notification',
               color: '#D4AF37',
               clickAction: 'OPEN_NOTIFICATION',
-              priority: 'high' as const,
               defaultSound: true,
               defaultVibrateTimings: true,
               defaultLightSettings: true,
               visibility: 'public' as const,
               notificationCount: 1,
-              // 🔥 tag for grouping — replaces previous notifications
-              // of the same tag instead of stacking them
               tag: 'fia-notification',
             },
           },
-          // 🔥 APNS config (for iOS — harmless on Android, ensures
-          // cross-platform delivery if the user ever gets an iOS build)
+          // 🔥 APNS config (for iOS — harmless on Android)
           apns: {
             payload: {
               aps: {
