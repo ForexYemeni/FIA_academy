@@ -26,7 +26,8 @@ import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
 import { AvatarUploader } from '@/components/fia/avatar-uploader'
 import { StudentCourseViewer } from '@/components/fia/student-course-viewer'
-import { SharedForum, SharedBlog, SharedFAQ } from './shared-community'
+import { SharedBlog, SharedFAQ } from './shared-community'
+import { SharedForumRoyal } from './shared-forum-royal'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CertificateRequest } from '@/components/fia/certificate-request'
 import { CertificateViewer } from '@/components/fia/certificate-viewer'
@@ -421,7 +422,7 @@ export function StudentDashboard() {
           {active === 'results' && <Results />}
           {active === 'certificates' && <StudentCertificates user={user} />}
           {active === 'payments' && <Payments payments={payments} userId={user?.id} courses={courses} />}
-          {active === 'forum' && <SharedForum user={user} />}
+          {active === 'forum' && <SharedForumRoyal user={user} />}
           {active === 'blog' && <SharedBlog />}
           {active === 'faqs' && <SharedFAQ />}
           {active === 'affiliate' && (

@@ -1,0 +1,418 @@
+'use client'
+
+// ============================================================================
+// ADMIN STUDENTS — Royal v3 redesign (FIA Royal design language)
+// Data logic & APIs unchanged: /api/students, /api/courses, /api/enrollments
+// ============================================================================
+import React, { useEffect, useState } from 'react'
+import {
+  Users, BookOpen, CheckCircle2, Clock, Mail, Phone, Calendar, Eye, Trash2,
+  Search, X, GraduationCap, TrendingUp, Wallet, Award,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog, DialogContent, DialogTitle,
+} from '@/components/ui/dialog'
+import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
+import { supabasePublic } from '@/lib/supabase'
+import {
+  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge, LuxRow,
+} from './luxury'
+
+const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
+  const [items, setItems] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [search, setSearch] = useState('')
+  const [courseFilter, setCourseFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+  }, [])
+
+  // ⚡ REAL-TIME: students + enrollments — admin sees new students + enrollments INSTANTLY
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-students-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'users' },
+          (payload: any) => {
+            if (payload.new.role === 'student') {
+              setItems((prev) => [payload.new, ...prev])
+              toast.info('👤 طالب جديد سجل في المنصة')
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'users' },
+          (payload: any) => setItems((prev) => prev.map((s) => s.id === payload.new.id ? { ...s, ...payload.new } : s))
+        )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'users' },
+          (payload: any) => setItems((prev) => prev.filter((s) => s.id !== payload.old.id))
+        )
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'enrollments' },
+          (payload: any) => setEnrollments((prev) => [payload.new, ...prev]))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'enrollments' },
+          (payload: any) => setEnrollments((prev) => prev.map((e) => e.id === payload.new.id ? { ...e, ...payload.new } : e)))
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      toast.success('تم الحذف')
+      setItems(items.filter((s) => s.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      setSelectedStudent(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const getStudentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
+
+  // Status derivation per student
+  const studentStatus = (studentId: string) => {
+    const sEnrs = getStudentEnrollments(studentId)
+    if (sEnrs.length === 0) return 'new'
+    const allCompleted = sEnrs.every((e) => e.status === 'completed' || e.status === 'مكتمل')
+    if (allCompleted) return 'completed'
+    if (sEnrs.some((e) => e.payment_status === 'pending')) return 'pending'
+    return 'learning'
+  }
+
+  // Filters
+  const filtered = items.filter((s) => {
+    if (statusFilter) {
+      const st = studentStatus(s.id)
+      if (statusFilter === 'completed' && st !== 'completed') return false
+      if (statusFilter === 'learning' && !(st === 'learning' || st === 'completed')) return false
+      if (statusFilter === 'pending' && st !== 'pending') return false
+      if (statusFilter === 'new' && st !== 'new') return false
+    }
+    if (courseFilter && !getStudentEnrollments(s.id).some((e) => e.course_id === courseFilter)) return false
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q) || (s.phone || '').includes(q)
+  })
+
+  // Stats
+  const totalEnrollments = enrollments.length
+  const completedCount = enrollments.filter((e) => e.status === 'completed' || e.status === 'مكتمل').length
+  const pendingCount = enrollments.filter((e) => e.payment_status === 'pending').length
+
+  const STATUS_META: Record<string, { label: string; tone: string }> = {
+    new: { label: 'جديد', tone: 'gray' },
+    learning: { label: 'قيد التعلّم', tone: 'blue' },
+    completed: { label: 'مكتمل', tone: 'green' },
+    pending: { label: 'بانتظار الدفع', tone: 'amber' },
+  }
+
+  return (
+    <LuxSection
+      title="المتدربون"
+      subtitle="مجتمع المتعلمين المسجلين في الأكاديمية"
+      icon={Users}
+      themeKey="students"
+      count={filtered.length}
+      stats={
+        <LuxStats
+          items={[
+            { icon: Users, label: 'إجمالي المتدربين', value: items.length, grad: 'from-navy to-navy-light' },
+            { icon: BookOpen, label: 'إجمالي التسجيلات', value: totalEnrollments, grad: 'from-blue-500 to-indigo-600' },
+            { icon: Award, label: 'دورات مكتملة', value: completedCount, grad: 'from-emerald-500 to-teal-600' },
+            { icon: Wallet, label: 'بانتظار الدفع', value: pendingCount, grad: 'from-amber-500 to-orange-600' },
+          ]}
+        />
+      }
+      toolbar={
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <LuxSearch value={search} onChange={setSearch} placeholder="ابحث بالاسم أو البريد أو الهاتف..." className="lg:col-span-2" />
+          <LuxSelect value={statusFilter} onChange={setStatusFilter} placeholder="كل الحالات"
+            options={[
+              { value: 'learning', label: 'قيد التعلّم', emoji: '📖' },
+              { value: 'completed', label: 'مكتمل', emoji: '✅' },
+              { value: 'pending', label: 'بانتظار الدفع', emoji: '⏳' },
+              { value: 'new', label: 'بدون دورات', emoji: '✨' },
+            ]} />
+          <LuxSelect value={courseFilter} onChange={setCourseFilter} placeholder="كل الدورات"
+            options={courses.map((c) => ({ value: c.id, label: c.title, emoji: '📘' }))} />
+        </div>
+      }
+    >
+      {filtered.length === 0 ? (
+        <LuxEmpty
+          icon={Users}
+          themeKey="students"
+          title={search || statusFilter || courseFilter ? 'لا توجد نتائج مطابقة' : 'لا يوجد متدربون بعد'}
+          hint={search || statusFilter || courseFilter ? 'جرّب تعديل البحث أو الفلاتر' : 'سيتم تسجيل المتدربون تلقائياً عند إنشاء حساباتهم'}
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 fia-stagger">
+          {filtered.map((s) => {
+            const sEnrs = getStudentEnrollments(s.id)
+            const completedCountS = sEnrs.filter((e) => e.status === 'completed' || e.status === 'مكتمل').length
+            const pendingCountS = sEnrs.filter((e) => e.payment_status === 'pending').length
+            const status = studentStatus(s.id)
+            const meta = STATUS_META[status]
+            const progress = sEnrs.length > 0 ? Math.round((completedCountS / sEnrs.length) * 100) : 0
+            return (
+              <Card key={s.id} className="fia-card-hover p-0 overflow-hidden cursor-default border border-gold/25">
+                {/* Royal header */}
+                <div className="relative p-4 bg-gradient-to-br from-[#04102b] via-navy to-navy-light text-white overflow-hidden">
+                  <div className="absolute inset-0 opacity-[0.15]" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 25%, #D4AF37 1px, transparent 1px)',
+                    backgroundSize: '13px 13px',
+                  }} />
+                  <div className="absolute -top-5 -right-5 w-16 h-16 bg-blue-400/15 rounded-full blur-2xl" />
+                  <div className="absolute top-2.5 left-2.5 z-10">
+                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold rounded-full px-2 py-0.5 border backdrop-blur-sm ${
+                      status === 'completed' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+                      : status === 'pending' ? 'bg-amber-500/20 text-amber-200 border-amber-400/40'
+                      : status === 'learning' ? 'bg-blue-500/20 text-blue-200 border-blue-400/40'
+                      : 'bg-white/10 text-white/70 border-white/25'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${status === 'completed' ? 'bg-emerald-300' : status === 'pending' ? 'bg-amber-300 animate-pulse' : status === 'learning' ? 'bg-blue-300 animate-pulse' : 'bg-white/50'}`} />
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="relative flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      <div className="absolute inset-0 bg-gold/40 blur-sm rounded-2xl scale-90" />
+                      <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-gold/60 shadow-lg bg-navy-light">
+                        {s.avatar ? (
+                          <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-2xl bg-gradient-to-br from-gold/25 to-amber-600/25">
+                            {s.name?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-sm truncate text-white">{s.name}</div>
+                      <div className="text-[10px] text-white/65 truncate" dir="ltr">{s.email}</div>
+                      {s.phone && <div className="text-[10px] text-gold-light mt-0.5 font-medium" dir="ltr">{s.phone}</div>}
+                    </div>
+                  </div>
+                </div>
+                {/* Body */}
+                <div className="p-3.5 space-y-2.5">
+                  {/* Stats chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-700 rounded-lg px-2 py-1 border border-blue-500/25 text-[10px] font-bold">
+                      <BookOpen className="w-3 h-3" /> {sEnrs.length} دورة
+                    </span>
+                    {completedCountS > 0 && (
+                      <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-700 rounded-lg px-2 py-1 border border-emerald-500/25 text-[10px] font-bold">
+                        <CheckCircle2 className="w-3 h-3" /> {completedCountS} مكتملة
+                      </span>
+                    )}
+                    {pendingCountS > 0 && (
+                      <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 rounded-lg px-2 py-1 border border-amber-500/25 text-[10px] font-bold">
+                        <Clock className="w-3 h-3" /> {pendingCountS} معلّقة
+                      </span>
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  {sEnrs.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-1">
+                        <span className="font-bold">التقدم</span>
+                        <span className="font-extrabold text-navy tabular-nums">{progress}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-l from-gold via-amber-400 to-gold transition-all" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  {/* Course preview */}
+                  {sEnrs.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-gold/15">
+                      {sEnrs.slice(0, 2).map((e) => {
+                        const c = courses.find((co) => co.id === e.course_id)
+                        if (!c) return null
+                        const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+                        return (
+                          <div key={e.id} className="text-[10px] flex items-center justify-between gap-1 bg-muted/30 rounded-lg px-2 py-1">
+                            <span className="truncate text-navy font-medium">{c.title}</span>
+                            <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              isCompleted ? 'bg-emerald-500/15 text-emerald-700 border border-emerald-500/30'
+                              : e.payment_status === 'pending' ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30'
+                              : 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
+                            }`}>
+                              {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار' : 'يتعلّم'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {sEnrs.length > 2 && <div className="text-[10px] text-muted-foreground text-center">+{sEnrs.length - 2} دورة أخرى</div>}
+                    </div>
+                  )}
+                  {/* Join date */}
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <Calendar className="w-2.5 h-2.5 text-gold/70" />
+                    <span>انضم في {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-1.5 pt-1 border-t border-gold/15">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => setSelectedStudent(s)}>
+                      <Eye className="w-3 h-3 ml-1" /> الملف الكامل
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-9 p-0 hover:bg-rose-500/10" onClick={() => setDeleteTarget(s)}>
+                      <Trash2 className="w-3 h-3 text-rose-500" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Student detail — royal modal */}
+      {selectedStudent && (
+        <Dialog open={true} onOpenChange={(o) => { if (!o) setSelectedStudent(null) }}>
+          <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto lux-scrollbar p-0 border-0">
+            {/* Royal header */}
+            <div className="relative p-5 bg-gradient-to-br from-[#04102b] via-navy to-navy-light text-white overflow-hidden">
+              <div className="absolute inset-0 opacity-[0.18]" style={{
+                backgroundImage: 'radial-gradient(circle at 15% 30%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 85% 20%, white 1px, transparent 1px)',
+                backgroundSize: '22px 22px, 17px 17px',
+              }} />
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-gold/20 rounded-full blur-3xl" />
+              <div className="absolute inset-0 lux-shimmer pointer-events-none" />
+              <button onClick={() => setSelectedStudent(null)} className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center z-10 transition-colors">
+                <X className="w-4 h-4 text-white/90" />
+              </button>
+              <div className="relative flex items-center gap-3.5">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-gold/60 bg-navy-light shadow-xl flex-shrink-0">
+                  {selectedStudent.avatar ? (
+                    <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-2xl bg-gradient-to-br from-gold/25 to-amber-600/25">
+                      {selectedStudent.name?.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-lg font-extrabold text-white">{selectedStudent.name}</DialogTitle>
+                  <div className="text-xs text-white/70 mt-0.5" dir="ltr">{selectedStudent.email}</div>
+                  {selectedStudent.phone && <div className="text-xs text-gold-light mt-0.5" dir="ltr">{selectedStudent.phone}</div>}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4 bg-gradient-to-b from-gold/[0.04] to-white">
+              {/* Quick stats */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="fia-card-hover p-3 bg-gradient-to-br from-navy to-navy-light border border-gold/25 rounded-xl text-center">
+                  <div className="text-2xl font-extrabold text-gold tabular-nums">{getStudentEnrollments(selectedStudent.id).length}</div>
+                  <div className="text-[10px] text-white/70 mt-0.5">إجمالي الدورات</div>
+                </div>
+                <div className="fia-card-hover p-3 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-xl text-center">
+                  <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">
+                    {getStudentEnrollments(selectedStudent.id).filter((e) => e.status === 'completed' || e.status === 'مكتمل').length}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">مكتملة</div>
+                </div>
+                <div className="fia-card-hover p-3 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl text-center">
+                  <div className="text-2xl font-extrabold text-amber-600 tabular-nums">
+                    {getStudentEnrollments(selectedStudent.id).filter((e) => e.payment_status === 'pending').length}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">معلّقة</div>
+                </div>
+              </div>
+
+              {/* Contact info */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 bg-white rounded-xl border border-gold/25">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Phone className="w-3 h-3 text-gold" /> الهاتف</div>
+                  <div className="text-sm font-bold text-navy" dir="ltr">{selectedStudent.phone || '-'}</div>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-gold/25">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Calendar className="w-3 h-3 text-gold" /> تاريخ التسجيل</div>
+                  <div className="text-sm font-bold text-navy">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ar-EG') : '-'}</div>
+                </div>
+              </div>
+
+              {/* Enrollments */}
+              <div>
+                <h4 className="font-extrabold text-navy text-sm mb-2.5 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center">
+                    <BookOpen className="w-3.5 h-3.5 text-navy" />
+                  </div>
+                  الدورات المسجّلة ({getStudentEnrollments(selectedStudent.id).length})
+                </h4>
+                <div className="space-y-2">
+                  {getStudentEnrollments(selectedStudent.id).map((e) => {
+                    const c = courses.find((co) => co.id === e.course_id)
+                    if (!c) return null
+                    const isFree = c.price_type === 'مجانية' || c.price === 0
+                    const isCompleted = e.status === 'completed' || e.status === 'مكتمل'
+                    return (
+                      <div key={e.id} className="flex items-center justify-between gap-2 p-3 bg-white border border-gold/20 rounded-xl hover:border-gold/45 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-navy text-sm truncate">{c.title}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {isFree ? 'مجانية' : `${c.price?.toLocaleString()} ${c.currency || 'ر.ي'}`}
+                          </div>
+                        </div>
+                        <Badge className={`flex-shrink-0 ${
+                          isCompleted ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+                          : e.payment_status === 'pending' ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
+                          : 'bg-blue-500/15 text-blue-700 border-blue-500/30'
+                        }`}>
+                          {isCompleted ? 'مكتمل' : e.payment_status === 'pending' ? 'بانتظار الدفع' : 'قيد التعلّم'}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                  {getStudentEnrollments(selectedStudent.id).length === 0 && (
+                    <div className="text-center py-6 text-sm text-muted-foreground border border-dashed border-gold/25 rounded-xl bg-white/50">
+                      لم يسجّل في أي دورة بعد
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end p-4 bg-muted/20 border-t border-gold/15">
+              <Button variant="outline" onClick={() => setSelectedStudent(null)} className="rounded-xl border-gold/30 hover:bg-gold/5">إغلاق</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <PasswordConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null) }}
+        title="تأكيد حذف المتدرب"
+        message="سيتم حذف المتدرب نهائياً من النظام. أدخل كلمة مرورك للتأكيد."
+        itemLabel="سيتم حذف المتدرب التالي:"
+        itemName={deleteTarget?.name}
+        confirmLabel="حذف نهائي"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
+    </LuxSection>
+  )
+})
+
+export { AdminStudentsRoyal }
