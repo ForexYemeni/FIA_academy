@@ -1058,3 +1058,62 @@ Stage Summary:
 - Successfully sent a real FCM push to the user's device
 - ✅ The user should now receive the test notification on their phone
 - Production deployment: dpl_JAZoQ2MB9HDmPaRX3d1Teb9j4Nxx (READY)
+
+---
+Task ID: silent-notifications-fix-v2.6.1
+Agent: main (Z.ai)
+Task: User reported notifications arriving silently — no sound, no popup. "لا يوجد اي اشعارات صوتية ولايوجد اشعارات منبثقة خارج التطبيق ابدا ظهر هذا التنبية بشكل صامت تماماً"
+
+ROOT CAUSE:
+==========
+Android LOCKS notification channel settings once the channel is first
+created. The previous channels (v3, v4) had been created by an earlier
+APK with IMPORTANCE_LOW (silent). Even though later versions updated
+the channel code to IMPORTANCE_HIGH, Android ignored the change.
+
+Also:
+- The notification builder used PRIORITY_HIGH (not PRIORITY_MAX)
+- setFullScreenIntent() was not called
+- USE_FULL_SCREEN_INTENT permission was not requested (required on Android 14+)
+
+THE FIX (v2.6.1):
+=================
+1. New channel ID: 'fia-notifications-v5'
+   - Forces Android to create fresh channel with IMPORTANCE_HIGH
+   - Old channels (v3, v4) deleted on app launch
+   - setBypassDnd(true) — appears even in DND mode
+   - Explicit setSound() with default notification sound + AudioAttributes
+   - Vibration pattern (0, 500, 200, 500)
+
+2. Updated notification builders (both FCM and Polling services):
+   - PRIORITY_MAX (was PRIORITY_HIGH)
+   - setDefaults(DEFAULT_ALL) — sound + lights + vibrate
+   - setFullScreenIntent(pendingIntent, true) — forces popup over other apps
+
+3. New permission: USE_FULL_SCREEN_INTENT
+   - Added to AndroidManifest.xml
+   - MainActivity.requestFullScreenIntentPermission() opens Settings
+     on Android 14+ to grant the permission
+
+4. Bumped version to 2.6.1 (versionCode 29)
+
+TESTS:
+======
+- APK build: SUCCESS (9.1MB, signed v2)
+- APK verified: contains fia-notifications-v5, PRIORITY_MAX, setFullScreenIntent, USE_FULL_SCREEN_INTENT permission
+- Sent test push via /api/fcm/test-push: success=true, sent=1
+- APK released to GitHub: https://github.com/ForexYemeni/FIA_academy/releases/tag/v2.6.1
+- Direct download: https://github.com/ForexYemeni/FIA_academy/releases/download/v2.6.1/FIA-Academy-v2.6.1.apk
+
+USER ACTION REQUIRED:
+====================
+1. Install FIA-Academy-v2.6.1.apk (over v2.6.0 — same package name com.fiaacademy)
+2. On first launch, GRANT these permissions when prompted:
+   - Battery optimization exemption
+   - Full-screen intent permission (NEW — Android 14+)
+   - Notifications permission
+3. Login — notifications should now:
+   - Pop up as heads-up notifications
+   - Play sound
+   - Vibrate the device
+   - Appear on lock screen
