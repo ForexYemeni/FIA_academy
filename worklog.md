@@ -1194,3 +1194,82 @@ Just test notifications again — they should now:
 - Vibrate the device
 - Appear on the lock screen
 - Work even if the app is force-killed
+
+---
+Task ID: real-notifications-not-working-server-fix
+Agent: main (Z.ai)
+Task: User reported that my test pushes via /api/fcm/test-push WORK, but real notifications from the app's 'test notification' button and admin actions DON'T trigger external popup notifications.
+
+ROOT CAUSE FOUND:
+================
+The POST /api/notifications endpoint (used by the in-app 'test notification' button AND by various parts of the app to create notifications) was COMPLETELY MISSING the sendFcmPush() call!
+
+Before the fix:
+```typescript
+// POST /api/notifications
+const { data, error } = await supabaseAdmin.from('notifications').insert({...})
+// Email notification (if SMTP env vars configured)
+await sendEmailNotification(user_id, type, title, body)
+return NextResponse.json(data)
+// ← NO sendFcmPush() call!
+```
+
+This explains why:
+- My test pushes via /api/fcm/test-push WORKED (that endpoint calls sendFcmPush directly)
+- The in-app 'test notification' button did NOT trigger FCM (it calls POST /api/notifications)
+- Real admin actions also use POST /api/notifications OR the notifyX functions
+
+The notifyX functions in src/lib/notifications.ts DO call sendFcmPush correctly.
+But the POST /api/notifications endpoint did NOT — it only inserted into DB + sent email.
+
+THE FIX:
+========
+Added sendFcmPush() call to POST /api/notifications endpoint:
+
+```typescript
+// After DB insert:
+try {
+  const { sendFcmPush } = await import('@/lib/firebase-admin')
+  await sendFcmPush({
+    userId: user_id,
+    title,
+    body: body || '',
+    data: { type, link: link || '/' },
+    link: link || '/',
+  })
+} catch (e) {
+  console.warn('[FIA-Notifications] FCM push failed (non-fatal):', e)
+}
+```
+
+Now POST /api/notifications will:
+1. Insert into the notifications table (in-app bell + polling fallback)
+2. Send FCM push (primary — works even when app is force-killed) ← NEW
+3. Send email (if SMTP configured)
+
+This fix applies to:
+- In-app 'test notification' button (now sends FCM push)
+- Any code that calls POST /api/notifications
+- All notifyX functions (they already call sendFcmPush correctly)
+
+TESTS:
+======
+- Local build: SUCCESS
+- Production deployment: dpl_AAFLUHeoGfBGvaiEifz66PtVEWo9 READY
+- POST /api/notifications now creates DB entry AND sends FCM push
+- The user should now receive external popup notifications when they
+  press the in-app 'test notification' button
+
+USER ACTION:
+============
+No new APK needed — server-side fix only.
+The user can test immediately:
+1. Open the app
+2. Press the 'test notification' button
+3. Should now receive external popup with sound + vibration
+
+Stage Summary:
+- ROOT CAUSE: POST /api/notifications was missing sendFcmPush() call
+- FIX: Added sendFcmPush() call with try/catch (non-fatal on failure)
+- All notifyX functions already work correctly (they call sendFcmPush)
+- Production deployment live: dpl_AAFLUHeoGfBGvaiEifz66PtVEWo9
