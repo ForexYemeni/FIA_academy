@@ -112,6 +112,18 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
       .catch(() => {})
   }, [result, attempt.user_id, attempt.course_id])
 
+  // ⚡ ROYAL v4.2 — retake budget awareness on the results page: fetch ALL
+  // submitted attempts of this student for this course so we can detect the
+  // exhausted (permanent-failure) state.
+  const [allAttempts, setAllAttempts] = useState<any[]>([])
+  useEffect(() => {
+    if (!result || !attempt.user_id || !attempt.course_id) return
+    fetch(`/api/exam-attempts?user_id=${attempt.user_id}&course_id=${attempt.course_id}`)
+      .then((r) => r.json())
+      .then((d) => setAllAttempts(Array.isArray(d) ? d : []))
+      .catch(() => setAllAttempts([]))
+  }, [result, attempt.user_id, attempt.course_id])
+
   const submit = async (autoSubmitted = false) => {
     if (submitting) return
     setSubmitting(true)
@@ -272,35 +284,49 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
                 </div>
               )}
 
-              {/* Failed → PAID retake card (no free retakes) */}
-              {!passed && (
-                <div className="relative mt-6 p-5 bg-gradient-to-br from-purple-500/10 to-fuchsia-50/50 border-2 border-purple-500/30 rounded-xl overflow-hidden">
-                  <div className="absolute -top-6 -left-6 w-20 h-20 bg-purple-500/15 rounded-full blur-2xl" />
-                  <div className="relative text-center">
-                    <p className="text-sm font-bold text-navy mb-1">🔁 إعادة الاختبار</p>
-                    {RETAKE_FEE > 0 ? (
-                      <>
-                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                          المحاولة الأولى كانت مجانية — لبدء محاولة جديدة يلزم سداد رسوم الإعادة
-                          <span className="font-extrabold text-purple-700"> ({RETAKE_FEE.toLocaleString()} {RETAKE_CURRENCY})</span>
-                          {' '}مع موافقة الإدارة
-                        </p>
-                        <button
-                          onClick={() => setRetakeOpen(true)}
-                          className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          إعادة الاختبار — رسوم {RETAKE_FEE.toLocaleString()} {RETAKE_CURRENCY}
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        إعادة الاختبار غير متاحة لهذه الدورة حالياً — تواصل مع الإدارة لمعرفة الخيارات المتاحة
+              {/* Failed → PAID retake card + ROYAL v4.2 budget policy */}
+              {!passed && (() => {
+                const submitted = allAttempts.filter((a: any) => a.submitted_at)
+                const everPassed = submitted.some((a: any) => a.passed === true)
+                const maxRetakesRaw = Number(course?.max_retakes)
+                const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
+                const budget = 1 + maxRetakes
+                const exhausted = !everPassed && submitted.length >= budget
+                return exhausted ? (
+                  <div className="relative mt-6 p-5 bg-gradient-to-br from-slate-900 via-slate-800 to-black border-2 border-rose-500/40 rounded-xl overflow-hidden">
+                    <div className="absolute -top-6 -left-6 w-24 h-24 bg-rose-500/20 rounded-full blur-2xl" />
+                    <div className="relative text-center">
+                      <p className="text-sm font-extrabold text-rose-400 mb-1">⛔ لم تتوفّق في هذه الدورة أبداً</p>
+                      <p className="text-xs text-slate-300 mb-2 leading-relaxed">
+                        استهلكت جميع محاولاتك المسموحة في هذه الدورة ({submitted.length}/{budget}) دون تحقيق درجة النجاح — القرار نهائي ولا يمكن إعادة الاختبار مرة أخرى، ولن تصدر شهادة لهذه الدورة.
                       </p>
-                    )}
+                      <span className="inline-block text-[10px] font-bold text-slate-400 border border-slate-600 rounded-lg px-3 py-1">انتهت المحاولات — {submitted.length}/{budget}</span>
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="relative mt-6 p-5 bg-gradient-to-br from-purple-500/10 to-fuchsia-50/50 border-2 border-purple-500/30 rounded-xl overflow-hidden">
+                    <div className="absolute -top-6 -left-6 w-20 h-20 bg-purple-500/15 rounded-full blur-2xl" />
+                    <div className="relative text-center">
+                      <p className="text-sm font-bold text-navy mb-1">🔁 إعادة الاختبار</p>
+                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                        المحاولة الأولى كانت مجانية — لبدء محاولة جديدة يلزم سداد رسوم الإعادة
+                        {RETAKE_FEE > 0 && <span className="font-extrabold text-purple-700"> ({RETAKE_FEE.toLocaleString()} {RETAKE_CURRENCY})</span>}
+                        {' '}مع موافقة الإدارة
+                        <span className="block mt-1 text-[10px]">متبقٍ لك <span className="font-extrabold text-purple-700" dir="ltr">{Math.max(0, budget - submitted.length)}</span> من أصل {maxRetakes} إعادات مسموحة</span>
+                      </p>
+                      <button
+                        onClick={() => setRetakeOpen(true)}
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-[0.97] transition-all"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        {RETAKE_FEE > 0
+                          ? `إعادة الاختبار — رسوم ${RETAKE_FEE.toLocaleString()} ${RETAKE_CURRENCY}`
+                          : 'إعادة الاختبار — سداد الرسوم'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
 
               <div className="flex flex-wrap justify-center gap-3 mt-6">
                 <Button onClick={() => router.push('/#exams')} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all">

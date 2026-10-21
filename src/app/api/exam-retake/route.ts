@@ -11,7 +11,9 @@ import { notifyPaymentRequest } from '@/lib/notifications'
 //                       reference 'RETAKE:<course_id>', status 'قيد الانتظار').
 //                       The admin approves it from the payments inbox; after
 //                       approval the exam-attempts gate unlocks ONE new attempt.
-// A retake is only possible when the course has retake_fee > 0.
+// ROYAL v4.2: a request is allowed even when retake_fee = 0 (the admin
+// sets the fee at review time). When the retake budget is exhausted the
+// request is refused outright — the failure is permanent.
 // ============================================================================
 
 // GET — list retake payment rows
@@ -46,16 +48,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'user_id و course_id وإثبات الدفع مطلوبة' }, { status: 400 })
     }
 
-    // 1) Course + fee — retakes only exist when retake_fee > 0
+    // 1) Course + settings — retake budget enforcement (ROYAL v4.2)
     const { data: course } = await supabaseAdmin
       .from('courses')
-      .select('id, title, currency, retake_fee')
+      .select('id, title, currency, retake_fee, max_retakes')
       .eq('id', course_id)
       .maybeSingle()
     if (!course) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
     const fee = Number(course.retake_fee) || 0
-    if (fee <= 0) {
-      return NextResponse.json({ error: 'إعادة الاختبار غير متاحة لهذه الدورة' }, { status: 400 })
+    const maxRetakesRaw = Number(course.max_retakes)
+    const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
+    const attemptBudget = 1 + maxRetakes
+
+    // 1.5) PERMANENT FAILURE — the budget is exhausted without a pass:
+    // no more retake requests, ever.
+    const { data: submittedAll } = await supabaseAdmin
+      .from('exam_attempts')
+      .select('id, passed')
+      .eq('user_id', user_id)
+      .eq('course_id', course_id)
+      .not('submitted_at', 'is', null)
+    const submittedCount = (submittedAll || []).length
+    const everPassed = (submittedAll || []).some((a: any) => a.passed === true)
+    if (submittedCount > 0 && !everPassed && submittedCount >= attemptBudget) {
+      return NextResponse.json(
+        { error: `انتهت جميع محاولاتك في هذه الدورة (${submittedCount}/${attemptBudget}) — لم تتوفّق في هذه الدورة أبداً، ولا يمكن طلب إعادة`, code: 'ATTEMPTS_EXHAUSTED' },
+        { status: 403 }
+      )
     }
 
     // 2) The student must actually be enrolled (any non-retake payment row)

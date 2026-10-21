@@ -694,8 +694,127 @@ function NewTopicDialog({ open, onOpenChange, categoryId, userId, onCreated }: a
 }
 
 // ============================================================================
-// SHARED BLOG — readable by students/trainers/team
+// SHARED BLOG — readable by students/trainers/team — ROYAL v4.2:
+// luxurious author chips (مدرب معتمد / المؤسس / الإدارة / فريق الإدارة) +
+// trainers & admins can PUBLISH new topics with their name shining on them.
 // ============================================================================
+
+// Author identity for blog chips — role + team_role aware
+function blogAuthorIdentity(author?: any): { label: string; cls: string; dot: string } {
+  const role = author?.role || ''
+  if (role === 'admin' && author?.team_role === 'founder')
+    return { label: 'المؤسس', cls: 'bg-gold/15 text-[#8a6d1d] border-gold/45', dot: 'bg-gold' }
+  if (role === 'trainer')
+    return { label: 'مدرب معتمد', cls: 'bg-emerald-500/12 text-emerald-700 border-emerald-500/35', dot: 'bg-emerald-500' }
+  if (role === 'admin')
+    return { label: 'الإدارة', cls: 'bg-rose-500/12 text-rose-600 border-rose-500/35', dot: 'bg-rose-500' }
+  if (role === 'leader')
+    return { label: 'قائد فريق', cls: 'bg-purple-500/12 text-purple-700 border-purple-500/35', dot: 'bg-purple-500' }
+  if (role === 'team')
+    return { label: 'فريق الإدارة', cls: 'bg-slate-500/12 text-slate-600 border-slate-500/35', dot: 'bg-slate-500' }
+  return { label: 'عضو', cls: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground' }
+}
+
+// Luxurious author chip — used on cards + inside the article view
+function BlogAuthorChip({ author, compact }: { author?: any; compact?: boolean }) {
+  if (!author) return null
+  const rid = blogAuthorIdentity(author)
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="relative flex-shrink-0">
+        <Avatar className={compact ? 'w-7 h-7 rounded-lg border-2 border-gold/40' : 'w-9 h-9 rounded-xl border-2 border-gold/40'}>
+          <AvatarImage src={author.avatar || ''} />
+          <AvatarFallback className="text-[10px] font-extrabold bg-gradient-to-br from-navy to-navy-light text-gold rounded-xl">
+            {author.name?.charAt(0) || '؟'}
+          </AvatarFallback>
+        </Avatar>
+        <span className={`absolute -bottom-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border border-white ${rid.dot}`} />
+      </div>
+      <div className="min-w-0">
+        <div className={`font-extrabold text-navy truncate ${compact ? 'text-[10px]' : 'text-xs'}`}>{author.name || 'كاتب'}</div>
+        <span className={`inline-block text-[8px] font-extrabold rounded-full px-1.5 py-px border ${rid.cls}`}>{rid.label}</span>
+      </div>
+    </div>
+  )
+}
+
+// ROYAL new-post dialog — trainers/admins publish topics that carry their name
+function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
+  const [title, setTitle] = useState('')
+  const [excerpt, setExcerpt] = useState('')
+  const [body, setBody] = useState('')
+  const [tags, setTags] = useState('')
+  const [cover, setCover] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!title.trim() || !body.trim()) { toast.error('العنوان والمحتوى مطلوبان'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/blog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, excerpt, body, tags, cover: cover || null, author_id: user?.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل النشر'); return }
+      toast.success('📜 تم نشر موضوعك — اسمك يتألق الآن على المقال')
+      setTitle(''); setExcerpt(''); setBody(''); setTags(''); setCover('')
+      onCreated?.(data)
+      onOpenChange(false)
+    } finally { setSaving(false) }
+  }
+
+  const rid = blogAuthorIdentity(user)
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Newspaper className="w-5 h-5 text-gold" /> موضوع جديد في المدونة {rid.label === 'مدرب معتمد' ? '— باسمك كمدرب معتمد' : ''}
+          </DialogTitle>
+        </DialogHeader>
+        {/* Live author preview — the name shines */}
+        <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center justify-between gap-3">
+          <BlogAuthorChip author={user} />
+          <span className="text-[10px] text-muted-foreground font-bold">سيظهر اسمك بهذه الهيبة على الموضوع</span>
+        </div>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label>العنوان *</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" placeholder="عنوان فاخر يلخص موضوعك" />
+          </div>
+          <div>
+            <Label>مقتطف قصير</Label>
+            <Input value={excerpt} onChange={(e) => setExcerpt(e.target.value)} className="mt-1" placeholder="سطران يلخصان الفكرة — يظهران في البطاقة" />
+          </div>
+          <div>
+            <Label>المحتوى *</Label>
+            <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={9} className="mt-1" placeholder="اكتب موضوعك بالتفصيل..." />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>وسوم (فاصلة بينها)</Label>
+              <Input value={tags} onChange={(e) => setTags(e.target.value)} className="mt-1" placeholder="تدريب, طب" />
+            </div>
+            <div>
+              <Label>رابط صورة الغلاف</Label>
+              <Input value={cover} onChange={(e) => setCover(e.target.value)} className="mt-1" placeholder="https://..." dir="ltr" />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
+          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
+            {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Newspaper className="w-4 h-4 ml-1" />}
+            نشر الموضوع
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function SharedBlog() {
   // Read the current user from the global auth store so we can pass
   // user.id down to the reaction buttons + comment section. Previously
@@ -707,6 +826,10 @@ export function SharedBlog() {
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewingPost, setViewingPost] = useState<any | null>(null)
+  const [newPostOpen, setNewPostOpen] = useState(false)
+
+  // ROYAL v4.2 — who can publish blog topics: trainers, admins & team.
+  const canPublish = user && ['trainer', 'admin', 'team', 'leader', 'founder'].includes(user.role)
 
   useEffect(() => {
     fetch('/api/blog').then((r) => r.json()).then((d) => {
@@ -756,12 +879,21 @@ export function SharedBlog() {
   }, [viewingPost?.id])
 
   if (viewingPost) {
+    const authorRid = blogAuthorIdentity(viewingPost.author)
     return (
       <SectionCard
         title={viewingPost.title}
         description={viewingPost.published_at ? new Date(viewingPost.published_at).toLocaleDateString('ar-EG') : ''}
         action={<Button variant="outline" onClick={() => setViewingPost(null)}><ArrowRight className="w-4 h-4 ml-1" /> رجوع</Button>}
       >
+        {/* ROYAL author hero — the name shines */}
+        <div className="relative overflow-hidden rounded-xl border-2 border-gold/30 bg-gradient-to-l from-gold/[0.09] via-amber-50/40 to-transparent p-3.5 mb-5 flex items-center justify-between gap-3">
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 25% 40%, #D4AF37 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+          <div className="relative"><BlogAuthorChip author={viewingPost.author} /></div>
+          {viewingPost.author && (
+            <span className={`relative text-[9px] font-extrabold rounded-full px-2.5 py-1 border ${authorRid.cls}`}>✍ كاتب الموضوع</span>
+          )}
+        </div>
         {viewingPost.cover && (
           <div className="aspect-video rounded-xl overflow-hidden mb-6">
             <img src={viewingPost.cover} alt={viewingPost.title} className="w-full h-full object-cover" />
@@ -784,7 +916,16 @@ export function SharedBlog() {
   }
 
   return (
-    <SectionCard title="المدونة" description={`${posts.length} مقال`}>
+    <SectionCard
+      title="المدونة"
+      description={`${posts.length} مقال`}
+      action={canPublish ? (
+        <Button size="sm" onClick={() => setNewPostOpen(true)}
+          className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl shadow-md">
+          <Plus className="w-4 h-4 ml-1" /> موضوع جديد
+        </Button>
+      ) : undefined}
+    >
       {loading ? (
         <div className="text-center py-12"><Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" /></div>
       ) : posts.length === 0 ? (
@@ -806,6 +947,12 @@ export function SharedBlog() {
                   {p.tags && <Badge variant="outline" className="mb-2 text-[10px]">{p.tags.split(',')[0]}</Badge>}
                   <h4 className="font-bold text-navy text-sm mb-2 line-clamp-2">{p.title}</h4>
                   {p.excerpt && <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{p.excerpt}</p>}
+                  {/* ROYAL author chip — the name shines on every card */}
+                  {p.author && (
+                    <div className="mb-3 pt-2 border-t border-border/40">
+                      <BlogAuthorChip author={p.author} compact />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                     <span><Clock className="w-3 h-3 inline" /> {p.published_at ? new Date(p.published_at).toLocaleDateString('ar-EG') : ''}</span>
                     <span><Eye className="w-3 h-3 inline" /> {p.views || 0}</span>
@@ -816,6 +963,13 @@ export function SharedBlog() {
           ))}
         </div>
       )}
+
+      {/* ROYAL v4.2 — trainer/admin publish dialog */}
+      <NewBlogPostDialog open={newPostOpen} onOpenChange={setNewPostOpen} user={user}
+        onCreated={(post: any) => {
+          if (post && post.status === 'منشور') setPosts((prev) => [post, ...prev])
+        }}
+      />
     </SectionCard>
   )
 }

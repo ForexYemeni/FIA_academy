@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
       if (!data) return NextResponse.json({ error: 'المقال غير موجود' }, { status: 404 })
       // Increment views
       await supabaseAdmin.from('blog_posts').update({ views: (data.views || 0) + 1 }).eq('id', data.id)
-      return NextResponse.json({ ...data, views: (data.views || 0) + 1 })
+      const author = await resolveAuthor(data.author_id)
+      return NextResponse.json({ ...data, views: (data.views || 0) + 1, author })
     }
     const { data, error } = await supabaseAdmin
       .from('blog_posts')
@@ -43,10 +44,42 @@ export async function GET(req: NextRequest) {
       .eq('status', 'منشور')
       .order('published_at', { ascending: false })
     if (error) throw error
-    return NextResponse.json(data || [])
+    // ROYAL v4.2 — enrich every post with its author (name + role + avatar +
+    // title) so the UI can show luxurious author chips: مدرب معتمد / الإدارة /
+    // المؤسس / فريق الإدارة.
+    const posts = data || []
+    const authorIds = Array.from(new Set(posts.map((p: any) => p.author_id).filter(Boolean)))
+    const map: Record<string, any> = {}
+    if (authorIds.length > 0) {
+      const { data: authors } = await supabaseAdmin
+        .from('users')
+        .select('id, name, role, avatar, title, team_role')
+        .in('id', authorIds)
+      for (const a of authors || []) map[a.id] = a
+    }
+    return NextResponse.json(posts.map((p: any) => ({ ...p, author: map[p.author_id] || null })))
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
+}
+
+// Resolve one author (users first, then the public trainers table) — used by
+// the single-slug endpoint.
+async function resolveAuthor(authorId: string | null): Promise<any | null> {
+  if (!authorId) return null
+  const { data: userRow } = await supabaseAdmin
+    .from('users')
+    .select('id, name, role, avatar, title, team_role')
+    .eq('id', authorId)
+    .maybeSingle()
+  if (userRow) return userRow
+  const { data: trainerRow } = await supabaseAdmin
+    .from('trainers')
+    .select('id, name, avatar, title')
+    .eq('id', authorId)
+    .maybeSingle()
+  if (trainerRow) return { ...trainerRow, role: 'trainer' }
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -77,10 +110,18 @@ export async function POST(req: NextRequest) {
         author_id: author_id || null,
         tags: tags || null,
         status: 'منشور',
+        published_at: new Date().toISOString(),
       })
       .select()
       .single()
     if (error) throw error
+
+    // ROYAL v4.2 — newsletter notification (in-app + push) — non-fatal
+    try {
+      const { notifyBlogPublished } = await import('@/lib/notifications')
+      await notifyBlogPublished(title, slug)
+    } catch {}
+
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

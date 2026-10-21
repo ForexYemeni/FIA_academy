@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgLessonCreated } from '@/lib/telegram'
+import { notifyFollowersNewLesson, resolveTrainerProfileId } from '@/lib/notifications'
 
 // Lessons are stored inside modules (which are stored as JSON in the course's description field).
 // The /api/modules endpoint handles the full course content. This endpoint provides
@@ -136,6 +137,17 @@ export async function POST(req: NextRequest) {
     // Publish to Telegram — every new lesson is announced on the channel
     try {
       await tgLessonCreated(courseId, body.title, body.lesson_type || 'text')
+    } catch {}
+
+    // ROYAL v4.2 — notify ALL followers of the course's trainer:
+    // "درس جديد من المدرب فلان" (in-app + FCM push, non-fatal).
+    try {
+      const profileId = await resolveTrainerProfileId(course.trainer_id)
+      if (profileId) {
+        const { data: profile } = await supabaseAdmin
+          .from('trainers').select('name').eq('id', profileId).maybeSingle()
+        await notifyFollowersNewLesson(profileId, profile?.name || 'المدرب', course.title, body.title)
+      }
     } catch {}
 
     return NextResponse.json(newLesson)

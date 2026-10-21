@@ -312,3 +312,81 @@ export async function notifyBlogPublished(postTitle: string, slug: string) {
       `منشور جديد: "${postTitle}". اقرأه الآن في مدونة الأكاديمية.`, `/blog/${slug}`)
   } catch {}
 }
+
+// === ROYAL v4.2 — RETAKE BUDGET & TRAINER FOLLOW EVENTS ===
+
+/** A submit was VOIDED because the retake budget was already exhausted —
+ *  even though the raw score may have passed, the verdict is final: the
+ *  student never passed this course. */
+export async function notifyExamVoidedByExhaustion(userId: string, courseId: string, rawScore: number) {
+  const courseTitle = await getCourseTitle(courseId)
+  await send(userId, 'exam', '⛔ انتهت محاولاتك في هذه الدورة',
+    `حصلت على ${rawScore}% في اختبار دورة "${courseTitle}"، لكنك كنت قد استهلكت جميع محاولاتك المسموحة — لم تتوفّق في هذه الدورة أبداً، ولن يمكن إصدار شهادة لها.`, '/#exams')
+}
+
+/** A student followed a trainer. Notify the trainer. */
+export async function notifyTrainerGainedFollower(trainerUserId: string, followerName: string) {
+  await send(trainerUserId, 'follow', '👑 متدرب جديد يتابعك',
+    `"${followerName}" أصبح يتابعك الآن — سيتلقى إشعاراً فورياً بكل دورة أو درس جديد تنشره.`, '/#overview')
+}
+
+/** A followed trainer published a new course. Notify ALL his followers. */
+export async function notifyFollowersNewCourse(trainerProfileId: string, trainerName: string, courseTitle: string, courseSlug?: string) {
+  try {
+    const { data: follows } = await supabaseAdmin
+      .from('trainer_follows').select('follower_id').eq('trainer_id', trainerProfileId)
+    const ids = (follows || []).map((f: any) => f.follower_id)
+    if (ids.length === 0) return
+    await sendToMany(ids, 'follow', `🎓 المدرب ${trainerName} أضاف دورة جديدة`,
+      `دورة "${courseTitle}" متاحة الآن — كن أول من يسجّل فيها!`, courseSlug ? `/courses/${courseSlug}` : '/#browse')
+  } catch {}
+}
+
+/** A followed trainer published a new lesson. Notify ALL his followers. */
+export async function notifyFollowersNewLesson(trainerProfileId: string, trainerName: string, courseTitle: string, lessonTitle: string) {
+  try {
+    const { data: follows } = await supabaseAdmin
+      .from('trainer_follows').select('follower_id').eq('trainer_id', trainerProfileId)
+    const ids = (follows || []).map((f: any) => f.follower_id)
+    if (ids.length === 0) return
+    await sendToMany(ids, 'follow', `📚 درس جديد من ${trainerName}`,
+      `أضاف المدرب ${trainerName} درساً جديداً "${lessonTitle}" في دورة "${courseTitle}".`, '/#courses')
+  } catch {}
+}
+
+// === TRAINER IDENTITY RESOLVERS (profile table vs account table) ===
+// `courses.trainer_id` historically points EITHER at the public `trainers`
+// profile id OR at the `users` account id (role=trainer). These helpers
+// resolve one from the other so follows + notifications always land on the
+// right rows.
+
+/** Resolve the public trainer profile id (trainers.id) from either ref. */
+export async function resolveTrainerProfileId(trainerRef: string | null | undefined): Promise<string | null> {
+  if (!trainerRef) return null
+  try {
+    const { data: direct } = await supabaseAdmin.from('trainers').select('id, email').eq('id', trainerRef).maybeSingle()
+    if (direct) return direct.id
+    const { data: userRow } = await supabaseAdmin.from('users').select('id, email').eq('id', trainerRef).maybeSingle()
+    if (userRow?.email) {
+      const { data: profile } = await supabaseAdmin.from('trainers').select('id').eq('email', userRow.email).maybeSingle()
+      if (profile) return profile.id
+    }
+  } catch {}
+  return null
+}
+
+/** Resolve the trainer ACCOUNT id (users.id) from either ref — so
+ *  notifications reach the trainer's bell + FCM push. */
+export async function resolveTrainerUserId(trainerRef: string | null | undefined): Promise<string | null> {
+  if (!trainerRef) return null
+  try {
+    const { data: userRow } = await supabaseAdmin.from('users').select('id').eq('id', trainerRef).maybeSingle()
+    if (userRow) return userRow.id
+    const { data: profile } = await supabaseAdmin.from('trainers').select('email').eq('id', trainerRef).maybeSingle()
+    if (profile?.email) {
+      const { data: byEmail } = await supabaseAdmin.from('users').select('id').eq('email', profile.email).maybeSingle()
+      if (byEmail) return byEmail.id
+    }
+  } catch {}
+  return null
+}

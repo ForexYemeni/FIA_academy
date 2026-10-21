@@ -185,7 +185,11 @@ export function ExamRetakeDialog({ open, onOpenChange, course, userId, onRequest
                 </div>
               </div>
               <div className="text-left">
-                <p className="text-2xl font-extrabold text-gold" dir="ltr">{fee.toLocaleString()} <span className="text-xs">{currency}</span></p>
+                {fee > 0 ? (
+                  <p className="text-2xl font-extrabold text-gold" dir="ltr">{fee.toLocaleString()} <span className="text-xs">{currency}</span></p>
+                ) : (
+                  <p className="text-sm font-extrabold text-gold leading-tight">تحددها الإدارة<br /><span className="text-[10px] font-bold text-muted-foreground">عند مراجعة الطلب</span></p>
+                )}
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgCourseCreated, tgCourseUpdated, tgCourseDeleted } from '@/lib/telegram'
+import { notifyFollowersNewCourse, resolveTrainerProfileId } from '@/lib/notifications'
 
 // Modules and lessons are stored INLINE in the course's `description`
 // field, after a `===FIA_MODULES===` separator. This is a legacy format
@@ -126,6 +127,17 @@ export async function POST(req: NextRequest) {
       await tgCourseCreated(data.id)
     } catch {}
 
+    // ROYAL v4.2 — notify ALL followers of this course's trainer:
+    // "المدرب فلان أضاف دورة جديدة" (in-app + FCM push, non-fatal).
+    try {
+      const profileId = await resolveTrainerProfileId(data.trainer_id)
+      if (profileId) {
+        const { data: profile } = await supabaseAdmin
+          .from('trainers').select('name').eq('id', profileId).maybeSingle()
+        await notifyFollowersNewCourse(profileId, profile?.name || 'المدرب', data.title, data.slug)
+      }
+    } catch {}
+
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -207,7 +219,7 @@ export async function PUT(req: NextRequest) {
       'original_price', 'auto_coupon_code',
       'offer_type', 'offer_duration_value', 'offer_duration_unit',
       'offer_price', 'offer_headline',
-      'exam_duration_minutes', 'retake_fee',
+      'exam_duration_minutes', 'retake_fee', 'max_retakes',
     ]
     const hasNewColumns = NEW_COLUMNS.some((c) => c in updates)
     let data: any = null

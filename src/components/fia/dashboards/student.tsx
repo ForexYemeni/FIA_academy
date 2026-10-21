@@ -8,7 +8,8 @@ import {
   Compass, Lock, Plus, Download, Loader2, FileUp, X, Copy, Share2,
   Mail, Eye, EyeOff, MessageSquare, Newspaper, HelpCircle, Gift, ExternalLink,
   Sparkles, Star, PlayCircle, Phone, Briefcase, XCircle, ShieldCheck,
-  RefreshCw, Hourglass, Timer,
+  RefreshCw, Hourglass, Timer, Ban, GraduationCap, HeartHandshake,
+  Users2, Search, BadgeCheck, Crown,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
   { id: 'courses', label: 'دوراتي', icon: BookOpen },
   { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
+  { id: 'trainers', label: 'المدربون', icon: GraduationCap },
   { id: 'exams', label: 'اختباراتي', icon: FileText },
   { id: 'results', label: 'نتائجي', icon: TrendingUp },
   { id: 'certificates', label: 'شهاداتي', icon: Award },
@@ -417,6 +419,20 @@ export function StudentDashboard() {
             }
             if (enr.payment_status === 'pending') {
               toast.info('بانتظار تأكيد الإدارة للدفع — سيتم تفعيل الدورة قريباً')
+              return
+            }
+            setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
+          }} />}
+          {active === 'trainers' && <Trainers userId={user?.id} onViewCourse={(c: any) => {
+            // Same safety logic as the overview: enrollment/paid checks
+            const enr = enrollments.find((e:any)=>e.course_id===c.id)
+            if (!enr) {
+              setBrowseInitialCourse(c)
+              setActive('browse')
+              return
+            }
+            if (enr.payment_status === 'pending') {
+              toast.info('هذه الدورة مدفوعة وبانتظار تأكيد الإدارة للدفع. سيتم تفعيلها قريباً.')
               return
             }
             setViewingCourse(c); setViewingEnrollment(enr); setActive('course-view')
@@ -1789,6 +1805,264 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
   )
 }
 
+// ============================================================================
+// TRAINERS — ROYAL v4.2: magical trainers section with a follow system.
+// Students browse every trainer (avatar, title, specialization, bio, stats),
+// see his courses, FOLLOW him and receive instant notifications whenever he
+// publishes a new course or lesson. Filter tabs: all / followed.
+// ============================================================================
+function Trainers({ userId, onViewCourse }: any) {
+  const [trainers, setTrainers] = useState<any[]>([])
+  const [courses, setCourses] = useState<any[]>([])
+  const [follows, setFollows] = useState<any[]>([])
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'all' | 'following'>('all')
+  const [query, setQuery] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const load = async () => {
+    try {
+      const [trRes, coRes, countsRes] = await Promise.all([
+        fetch('/api/trainers').then((r) => r.json()).catch(() => []),
+        fetch('/api/courses').then((r) => r.json()).catch(() => []),
+        fetch('/api/trainer-follows').then((r) => r.json()).catch(() => ({})),
+      ])
+      setTrainers(Array.isArray(trRes) ? trRes : [])
+      setCourses(Array.isArray(coRes) ? coRes : [])
+      if (countsRes && !Array.isArray(countsRes)) setFollowerCounts(countsRes)
+      if (userId) {
+        const f = await fetch(`/api/trainer-follows?user_id=${userId}`).then((r) => r.json()).catch(() => [])
+        setFollows(Array.isArray(f) ? f : [])
+      }
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [userId])
+
+  // ⚡ REAL-TIME: follower counts update live (magic)
+  useEffect(() => {
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('trainer-follows-royal')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_follows' }, () => { load() })
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
+
+  const followingIds = new Set(follows.map((f: any) => f.trainer_id))
+  const isFollowing = (id: string) => followingIds.has(id)
+
+  const toggleFollow = async (t: any) => {
+    if (!userId || busy) return
+    setBusy(t.id)
+    try {
+      const wasFollowing = isFollowing(t.id)
+      if (wasFollowing) {
+        setFollows((prev) => prev.filter((f: any) => f.trainer_id !== t.id))
+        setFollowerCounts((c) => ({ ...c, [t.id]: Math.max(0, (c[t.id] || 1) - 1) }))
+        await fetch('/api/trainer-follows', {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ follower_id: userId, trainer_id: t.id }),
+        })
+        toast.success(`ألغيت متابعة ${t.name}`)
+      } else {
+        setFollows((prev) => [...prev, { trainer_id: t.id, trainer: t }])
+        setFollowerCounts((c) => ({ ...c, [t.id]: (c[t.id] || 0) + 1 }))
+        const res = await fetch('/api/trainer-follows', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ follower_id: userId, trainer_id: t.id }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) { toast.error(data.error || 'تعذر المتابعة'); setFollows((prev) => prev.filter((f: any) => f.trainer_id !== t.id)) }
+        else toast.success(`👑 أصبحت تتابع ${t.name} — ستصلك إشعارات دوراته ودروسه الجديدة`)
+      }
+    } finally { setBusy(null) }
+  }
+
+  const filtered = trainers
+    .filter((t) => (tab === 'following' ? followingIds.has(t.id) : true))
+    .filter((t) => !query.trim() || (t.name || '').includes(query.trim()) || (t.specialization || '').includes(query.trim()) || (t.title || '').includes(query.trim()))
+
+  const coursesOf = (t: any) => courses.filter((c: any) => c.trainer_id === t.id)
+  const totalFollowers = Object.values(followerCounts).reduce((a, b) => a + (b || 0), 0)
+
+  return (
+    <SectionCard title="المدربون" description="تابع نخبة المدربين الخبراء — وستصلك إشعارات فورية بكل دورة أو درس جديد ينشرونه">
+      {loading ? (
+        <div className="text-center py-14">
+          <div className="relative inline-block mb-3">
+            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+            <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
+          </div>
+          <p className="text-sm text-muted-foreground">جاري تحميل المدربين...</p>
+        </div>
+      ) : (
+        <>
+          {/* ⚡ Magical hero — follow stats */}
+          <div className="relative overflow-hidden rounded-2xl p-5 mb-5 bg-gradient-to-l from-navy via-navy-light to-navy text-white shadow-xl ring-1 ring-gold/30">
+            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 85% 50%, white 1px, transparent 1px)', backgroundSize: '22px 22px, 16px 16px' }} />
+            <div className="absolute -top-10 -left-10 w-36 h-36 bg-gold/15 rounded-full blur-3xl" />
+            <div className="relative flex items-center gap-4 flex-wrap">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30">
+                <GraduationCap className="w-6 h-6 text-navy" strokeWidth={2.2} />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <h3 className="text-lg font-extrabold mb-0.5">نخبة مدربي الأكاديمية</h3>
+                <p className="text-gold/80 text-xs">تابع مدربك المفضل وتابع إبداعاته لحظة بلحظة ✨</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 px-3.5 py-2 text-center">
+                  <div className="text-lg font-extrabold text-gold tabular-nums" dir="ltr">{trainers.length}</div>
+                  <div className="text-[9px] text-white/70 font-bold">مدرب خبير</div>
+                </div>
+                <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 px-3.5 py-2 text-center">
+                  <div className="text-lg font-extrabold text-gold tabular-nums" dir="ltr">{follows.length}</div>
+                  <div className="text-[9px] text-white/70 font-bold">أتابعهم</div>
+                </div>
+                <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 px-3.5 py-2 text-center">
+                  <div className="text-lg font-extrabold text-gold tabular-nums" dir="ltr">{totalFollowers}</div>
+                  <div className="text-[9px] text-white/70 font-bold">متابعة في الأكاديمية</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter tabs + search */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <div className="flex rounded-xl border border-gold/25 overflow-hidden bg-white">
+              <button onClick={() => setTab('all')} className={`px-4 py-2 text-[11px] font-extrabold transition-all ${tab === 'all' ? 'bg-gradient-to-br from-navy to-navy-light text-gold' : 'text-muted-foreground hover:bg-gold/5'}`}>
+                جميع المدربين
+              </button>
+              <button onClick={() => setTab('following')} className={`px-4 py-2 text-[11px] font-extrabold transition-all flex items-center gap-1 ${tab === 'following' ? 'bg-gradient-to-br from-gold to-amber-500 text-navy' : 'text-muted-foreground hover:bg-gold/5'}`}>
+                <HeartHandshake className="w-3.5 h-3.5" /> من أتابعهم ({follows.length})
+              </button>
+            </div>
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث بالاسم أو التخصص..." className="pr-9 h-9 rounded-xl border-gold/25 text-xs" />
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>{tab === 'following' ? 'لم تتابع أي مدرب بعد — تصفح القائمة واضغط «متابعة» ✨' : 'لا يوجد مدربون مطابقون لبحثك'}</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4 fia-stagger">
+              {filtered.map((t) => {
+                const tcourses = coursesOf(t)
+                const following = isFollowing(t.id)
+                const fCount = followerCounts[t.id] || 0
+                const isOpen = expanded === t.id
+                return (
+                  <Card key={t.id} className="fia-card-hover overflow-hidden p-0 border border-gold/25 hover:border-gold/50 relative">
+                    {/* Cover strip */}
+                    <div className="h-14 bg-gradient-to-l from-navy via-navy-light to-navy relative">
+                      <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #D4AF37 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+                      {following && (
+                        <span className="absolute top-2 left-2 text-[9px] font-extrabold text-navy bg-gradient-to-r from-gold to-amber-500 rounded-full px-2 py-0.5 shadow-md flex items-center gap-1">
+                          <BadgeCheck className="w-3 h-3" /> تتابعه
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-4 pt-0 relative">
+                      {/* Avatar overlapping the cover */}
+                      <div className="-mt-8 mb-2 flex items-end justify-between">
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold to-amber-500 p-[3px] shadow-lg">
+                            <div className="w-full h-full rounded-2xl bg-navy flex items-center justify-center overflow-hidden">
+                              {t.avatar ? (
+                                <img src={t.avatar} alt={t.name} className="w-full h-full object-cover rounded-2xl" />
+                              ) : (
+                                <span className="text-gold font-extrabold text-xl">{(t.name || '؟').charAt(0)}</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-gold to-amber-500 border-2 border-white flex items-center justify-center shadow-sm">
+                            <Crown className="w-3 h-3 text-navy" />
+                          </span>
+                        </div>
+                        {/* Follow button — royal magnetic */}
+                        <button onClick={() => toggleFollow(t)} disabled={busy === t.id || !userId}
+                          className={`h-9 px-4 rounded-xl text-[11px] font-extrabold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-60 ${
+                            following
+                              ? 'bg-white border-2 border-gold/50 text-navy hover:bg-gold/10'
+                              : 'bg-gradient-to-r from-gold to-amber-500 text-navy hover:from-amber-500 hover:to-gold hover:shadow-lg'
+                          }`}>
+                          {busy === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : following ? <CheckCircle2 className="w-3.5 h-3.5" /> : <HeartHandshake className="w-3.5 h-3.5" />}
+                          {following ? 'إلغاء المتابعة' : 'متابعة'}
+                        </button>
+                      </div>
+
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-navy text-sm truncate">{t.name}</h4>
+                          <p className="text-[10px] text-gold font-bold truncate">{t.title || 'مدرب معتمد'}</p>
+                        </div>
+                      </div>
+                      {t.specialization && (
+                        <span className="inline-block mt-1.5 text-[9px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2.5 py-0.5">{t.specialization}</span>
+                      )}
+                      {t.bio && <p className="text-[10px] text-muted-foreground leading-relaxed mt-2 line-clamp-2">{String(t.bio).replace(/\n+/g, ' · ')}</p>}
+
+                      {/* Stats row */}
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        <div className="rounded-lg bg-gold/[0.07] border border-gold/20 py-1.5 text-center">
+                          <div className="text-sm font-extrabold text-navy tabular-nums" dir="ltr">{tcourses.length}</div>
+                          <div className="text-[8px] text-muted-foreground font-bold">دورات</div>
+                        </div>
+                        <div className="rounded-lg bg-gold/[0.07] border border-gold/20 py-1.5 text-center">
+                          <div className="text-sm font-extrabold text-navy tabular-nums" dir="ltr">{fCount}</div>
+                          <div className="text-[8px] text-muted-foreground font-bold">متابع</div>
+                        </div>
+                        <div className="rounded-lg bg-gold/[0.07] border border-gold/20 py-1.5 text-center">
+                          <div className="text-sm font-extrabold text-navy tabular-nums" dir="ltr">{t.years_experience || 0}</div>
+                          <div className="text-[8px] text-muted-foreground font-bold">سنة خبرة</div>
+                        </div>
+                      </div>
+
+                      {/* Courses preview / expandable list */}
+                      {tcourses.length > 0 && (
+                        <button onClick={() => setExpanded(isOpen ? null : t.id)}
+                          className="w-full mt-3 flex items-center justify-between rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.06] to-transparent px-3 py-2 hover:bg-gold/10 transition-all">
+                          <span className="text-[10px] font-extrabold text-navy flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-gold" /> دورات المدرب ({tcourses.length})
+                          </span>
+                          <span className={`text-[10px] text-gold transition-transform ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+                        </button>
+                      )}
+                      {isOpen && (
+                        <div className="mt-2 space-y-1.5">
+                          {tcourses.map((c: any) => (
+                            <button key={c.id} onClick={() => onViewCourse?.(c)}
+                              className="w-full text-right rounded-lg border border-border/60 bg-white hover:border-gold/40 hover:bg-gold/[0.04] px-3 py-2 flex items-center justify-between gap-2 transition-all">
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-bold text-navy truncate">{c.title}</div>
+                                <div className="text-[9px] text-muted-foreground">{c.category || '—'} · {c.level || ''}</div>
+                              </div>
+                              <span className={`text-[9px] font-extrabold rounded-full px-2 py-0.5 flex-shrink-0 ${c.price_type === 'مجانية' || Number(c.price) === 0 ? 'bg-emerald-500/12 text-emerald-700' : 'bg-gold/15 text-amber-700'}`}>
+                                {c.price_type === 'مجانية' || Number(c.price) === 0 ? 'مجانية' : `${Number(c.price).toLocaleString()} ${c.currency || 'ر.ي'}`}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </SectionCard>
+  )
+}
+
 function Exams({ userId, courses }: any) {
   // ============================================================================
   // اختباراتي — v4 royal: مرتبطة مباشرة ببنك الأسئلة
@@ -1938,8 +2212,17 @@ function Exams({ userId, courses }: any) {
             const examDuration = Number(courseObj?.exam_duration_minutes) || 0
             const pendingRetake = pendingRetakeFor(exam.course_id)
             const approvedRetake = approvedRetakeFor(exam.course_id)
-            const statusTone = passed ? 'from-emerald-500 to-teal-600' : best ? 'from-rose-500 to-red-600' : 'from-purple-600 via-purple-700 to-fuchsia-700'
-            const statusLabel = passed ? 'ناجح ✓' : best ? `راسب — ${best.score}%` : open ? 'محاولة مفتوحة' : 'لم تبدأ بعد'
+            // ROYAL v4.2 — retake budget: 1 initial attempt + max_retakes.
+            // When the budget is exhausted without EVER passing → permanent
+            // failure ("لم تتوفّق في هذه الدورة أبداً").
+            const mySubmitted = attempts.filter((a: any) => a.course_id === exam.course_id && a.submitted_at)
+            const everPassed = mySubmitted.some((a: any) => a.passed === true)
+            const maxRetakesRaw = Number(courseObj?.max_retakes)
+            const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
+            const attemptBudget = 1 + maxRetakes
+            const exhausted = !everPassed && mySubmitted.length >= attemptBudget
+            const statusTone = passed ? 'from-emerald-500 to-teal-600' : exhausted ? 'from-slate-800 via-slate-900 to-black' : best ? 'from-rose-500 to-red-600' : 'from-purple-600 via-purple-700 to-fuchsia-700'
+            const statusLabel = passed ? 'ناجح ✓' : exhausted ? 'فشل نهائي' : best ? `راسب — ${best.score}%` : open ? 'محاولة مفتوحة' : 'لم تبدأ بعد'
             return (
               <Card key={exam.course_id} className="fia-card-hover p-0 overflow-hidden border border-gold/20 hover:border-gold/40">
                 {/* Header — state-aware gradient */}
@@ -1989,8 +2272,26 @@ function Exams({ userId, courses }: any) {
                     <div className="text-[10px] font-bold text-navy">{exam.pass_score}%</div>
                   </div>
 
-                  {/* Action — paid-retake aware (no free retakes) */}
-                  {passed ? (
+                  {/* ROYAL v4.2 — attempts progress chip */}
+                  {mySubmitted.length > 0 && (
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                      <div className="text-[9px] text-muted-foreground">المحاولات</div>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: attemptBudget }).map((_, i) => (
+                          <span key={i} className={`w-2 h-2 rounded-full ${i < mySubmitted.length ? 'bg-rose-500' : 'bg-emerald-500/60'}`} title={i < mySubmitted.length ? 'مستهلكة' : 'متاحة'} />
+                        ))}
+                        <span className="text-[9px] font-extrabold text-muted-foreground mr-1" dir="ltr">{mySubmitted.length}/{attemptBudget}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action — ROYAL v4.2: paid retakes + budget cap */}
+                  {exhausted ? (
+                    <div className="w-full h-9 rounded-lg bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-rose-500/40 flex flex-col items-center justify-center px-2">
+                      <span className="text-[10px] font-extrabold text-rose-400 flex items-center gap-1"><Ban className="w-3 h-3" /> لم تتوفّق في هذه الدورة أبداً</span>
+                      <span className="text-[8px] text-slate-400">انتهت جميع المحاولات — القرار نهائي</span>
+                    </div>
+                  ) : passed ? (
                     <Button size="sm" className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md active:scale-[0.97] transition-all"
                       onClick={() => router.push('/#certificates')}>
                       <Award className="w-3 h-3 ml-1" /> اطلب شهادتك الآن
@@ -2014,16 +2315,16 @@ function Exams({ userId, courses }: any) {
                       <Button size="sm" disabled className="w-full h-8 text-[10px] rounded-lg bg-amber-500/15 text-amber-700 border border-amber-500/30 cursor-not-allowed">
                         <Hourglass className="w-3 h-3 ml-1 animate-pulse" /> طلب الإعادة قيد المراجعة
                       </Button>
-                    ) : retakeFee > 0 ? (
+                    ) : (
+                      /* ALWAYS opens the royal retake dialog — even when the fee
+                         isn't configured yet (the admin sets it at review time) */
                       <Button size="sm"
                         className="w-full h-8 text-[10px] rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-700 hover:to-fuchsia-800 text-white shadow-md active:scale-[0.97] transition-all"
                         onClick={() => setRetakeDialogCourse(courseObj)}>
                         <RefreshCw className="w-3 h-3 ml-1" />
-                        إعادة الاختبار — رسوم {retakeFee.toLocaleString()} {courseObj?.currency || 'ر.ي'}
-                      </Button>
-                    ) : (
-                      <Button size="sm" disabled className="w-full h-8 text-[10px] rounded-lg bg-muted text-muted-foreground cursor-not-allowed">
-                        <Lock className="w-3 h-3 ml-1" /> إعادة غير متاحة
+                        {retakeFee > 0
+                          ? `إعادة الاختبار — رسوم ${retakeFee.toLocaleString()} ${courseObj?.currency || 'ر.ي'}`
+                          : 'إعادة الاختبار — سداد الرسوم'}
                       </Button>
                     )
                   ) : (
@@ -2095,6 +2396,14 @@ function Results({ courses }: any) {
   const reviewOf = (a: any) => { try { return a?.answers?.__review__ || null } catch { return null } }
   const courseTitle = (id: string) => courses?.find((c: any) => c.id === id)?.title || 'دورة'
   const coursePass = (id: string) => courses?.find((c: any) => c.id === id)?.pass_score || 60
+  // ROYAL v4.2 — permanent-failure detection per course (budget exhausted, never passed)
+  const exhaustedFor = (courseId: string) => {
+    const mine = attempts.filter((x: any) => x.course_id === courseId)
+    const courseObj = courses?.find((c: any) => c.id === courseId)
+    const m = Number(courseObj?.max_retakes)
+    const budget = 1 + (Number.isFinite(m) ? Math.max(0, m) : 2)
+    return mine.length >= budget && !mine.some((x: any) => x.passed === true)
+  }
 
   // Best attempt per course (dedupe attempts of the same course)
   const bestByCourse: any[] = []
@@ -2180,10 +2489,15 @@ function Results({ courses }: any) {
                           {review.note && <span className="font-medium"> — {review.note}</span>}
                         </div>
                       )}
+                      {!a.passed && exhaustedFor(a.course_id) && (
+                        <div className="mt-1.5 text-[10px] font-extrabold text-rose-400 bg-gradient-to-l from-slate-900 to-slate-800 border border-rose-500/40 rounded-lg px-2 py-1.5 inline-flex items-center gap-1">
+                          <Ban className="w-3 h-3" /> لم تتوفّق في هذه الدورة أبداً — انتهت جميع المحاولات
+                        </div>
+                      )}
                     </div>
                     <Button size="sm" variant="outline" className="flex-shrink-0 border-gold/30 hover:bg-gold/10 rounded-lg text-[10px]"
                       onClick={() => router.push(a.passed ? '/#certificates' : '/#exams')}>
-                      {a.passed ? 'اطلب الشهادة' : 'أعد الاختبار'}
+                      {a.passed ? 'اطلب الشهادة' : exhaustedFor(a.course_id) ? 'انتهت المحاولات' : 'أعد الاختبار'}
                     </Button>
                   </div>
                 </Card>

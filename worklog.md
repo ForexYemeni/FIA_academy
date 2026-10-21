@@ -1513,3 +1513,27 @@ Stage Summary:
 - tsc: zero errors in all modified files (pre-existing errors elsewhere untouched; next.config ignores TS build errors).
 - Local next build blocked only by sandbox Google-Fonts fetch (network) — not code. Vercel build unaffected.
 - PENDING USER ACTION: run migration 015 SQL in Supabase SQL Editor to activate duration/fee storage.
+
+---
+Task ID: royal-v42-retake-budget-followers-forum-blog
+Agent: main
+Task: v4.2 ROYAL — retake budget (max_retakes per course) + retake button fix + trainers section with follow system + followers count + public forum + trainer blog posting with author names
+
+Work Log:
+- DB MIGRATION APPLIED DIRECTLY (first time possible — user provided the pooler connection string): courses.max_retakes INT DEFAULT 2 + trainer_follows table (follower_id, trainer_id, UNIQUE pair, 2 indexes) + NOTIFY pgrst reload + verified all columns/tables live via pg.
+- RETAKE BUTTON FIX (root cause): student card + exam results page previously showed a LOCKED "إعادة غير متاحة" button whenever retake_fee=0 (6 of 7 courses!). Now the royal retake dialog ALWAYS opens (fee card shows "تحددها الإدارة عند مراجعة الطلب" when fee=0) and /api/exam-retake POST accepts fee=0 requests (admin sets the fee at review time).
+- RETAKE BUDGET POLICY (per course): budget = 1 initial + max_retakes. POST /api/exam-attempts: when submitted >= budget && never passed → 403 ATTEMPTS_EXHAUSTED "لم تتوفّق في هذه الدورة أبداً" (fires BEFORE the payment gate). PUT submit: any attempt graded after exhaustion is VOID (passed forced false + __exhausted__ marker + explicit notification) — "حتى لو توفق بالاختبار". certificate-requests POST refuses permanently-failed students. exam-retake POST refuses too.
+- ExamSettingsDialog (shared admin+trainer): new "عدد مرات الإعادة المسموحة" field (presets 0/1/2/3/5) + live budget explanation card + 3-column summary (duration/fee/total attempts). Question bank LuxStats now show retakes chip (both admin + trainer banks). courses PUT NEW_COLUMNS += max_retakes.
+- Student cards: attempts progress dots (X/Y), exhausted dark permanent-failure card, نتائجي exhausted banner.
+- TRAINER FOLLOWS: new /api/trainer-follows (GET user follows / GET trainer followers+count / POST follow+notify / DELETE unfollow) with graceful users.id↔trainers.id resolution (resolveTrainerProfileId/resolveTrainerUserId in lib/notifications).
+- STUDENT TRAINERS SECTION (nav "المدربون"): magical hero with 3 stats, filter tabs (الكل/من أتابعهم) + search, royal trainer cards (gold-ring avatar, crown, title, specialization, bio, 3-stat row, expandable courses list w/ prices, magnetic follow/unfollow button). Course click routes through the same enrollment-safety flow as browse.
+- NOTIFICATIONS: follow → "متدرب جديد يتابعك" to trainer's account (bell+FCM); courses POST → notifyFollowersNewCourse to ALL followers; lessons POST → notifyFollowersNewLesson. All non-fatal.
+- TRAINER DASHBOARD: 5th stat card "متابعوك المخلصون" + followers hall section (avatars+dates, realtime).
+- PUBLIC FORUM: new /forum page (SEO metadata) — full forum browseable by guests (categories chips, search, topic cards with author chips + pinned/views/replies, royal join CTA). Header nav now includes المنتدى + المدونة.
+- BLOG ROYAL: /api/blog GET enriches every post with author (users→trainers fallback incl. team_role); POST sets published_at + newsletter notification. SharedBlog: luxurious author chips on cards + article hero ("✍ كاتب الموضوع"), "موضوع جديد" gold button for trainer/admin/team (NewBlogPostDialog with live author preview). Public /blog page cards show author chips too (server-enriched).
+- Build: next build SUCCEEDED locally (all routes compiled incl. /forum). tsc: zero errors in all 17 touched files (remaining errors are pre-existing in untouched files). scripts cleaned.
+
+Stage Summary:
+- Files: api/exam-attempts, api/exam-retake, api/certificate-requests, api/courses, api/lessons, api/blog, api/trainer-follows (NEW), lib/notifications, dashboards/student, trainer, admin-questions-royal, trainer-questions, shared-community, exam-retake-dialog, app/exam/[attemptId]/client, app/forum (NEW page+client), app/blog/page+client, components/fia/header.
+- Server-side enforcement is authoritative (budget + void + certificate gate); UI is awareness only.
+- APK v2.7 needs NO update (WebView loads remote).

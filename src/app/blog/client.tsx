@@ -84,6 +84,26 @@ export default function BlogListClient({ posts }: { posts: any[] }) {
                   )}
                   <div className="relative p-5">
                     <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+                    {/* ROYAL author chip — the name shines */}
+                    {p.author && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="relative">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-navy to-navy-light border-2 border-gold/40 flex items-center justify-center overflow-hidden">
+                            {p.author.avatar ? (
+                              <img src={p.author.avatar} alt={p.author.name || ''} className="w-full h-full object-cover rounded-xl" />
+                            ) : (
+                              <span className="text-gold font-extrabold text-xs">{p.author.name?.charAt(0) || '؟'}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-extrabold text-navy truncate">{p.author.name || 'كاتب'}</div>
+                          <span className="inline-block text-[8px] font-extrabold text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-px">
+                            {p.author.role === 'trainer' ? 'مدرب معتمد' : p.author.team_role === 'founder' ? 'المؤسس' : p.author.role === 'admin' ? 'الإدارة' : 'فريق الأكاديمية'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <h3 className="font-bold text-navy text-lg mb-2 line-clamp-2">{p.title}</h3>
                     {p.excerpt && <p className="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">{p.excerpt}</p>}
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-border/40">

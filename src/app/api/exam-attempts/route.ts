@@ -153,20 +153,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated || openAttempt)
     }
 
-    // 3.5) RETAKE GATE — the student takes the exam ONCE for free.
-    // Any further attempt REQUIRES a paid retake: a payments row with
-    // reference 'RETAKE:<course_id>' approved (status 'مكتمل') by the
-    // admin and not yet consumed (no __USED__ marker). One approved
-    // retake payment = exactly ONE new attempt (consumed on use).
-    const { data: submittedRows } = await supabaseAdmin
+    // 3.5) RETAKE POLICY — ROYAL v4.2
+    // The student takes the exam ONCE for free. Further attempts are PAID
+    // retakes (approved 'RETAKE:<course_id>' payments, one attempt each)
+    // AND the total number of retakes is capped by the course setting
+    // `max_retakes` (budget = 1 initial attempt + max_retakes). When the
+    // budget is exhausted without EVER passing, the course enters a
+    // PERMANENT-FAILURE state: no more attempts, no certificate —
+    // "لم تتوفّق في هذه الدورة أبداً" (even future passes cannot revive it:
+    // the submit handler voids any attempt graded after exhaustion).
+    const { data: courseSettings } = await supabaseAdmin
+      .from('courses')
+      .select('retake_fee, currency, max_retakes')
+      .eq('id', course_id)
+      .maybeSingle()
+
+    const { data: submittedAll } = await supabaseAdmin
       .from('exam_attempts')
-      .select('id')
+      .select('id, passed, score')
       .eq('user_id', user_id)
       .eq('course_id', course_id)
       .not('submitted_at', 'is', null)
-      .limit(1)
 
-    if ((submittedRows || []).length > 0) {
+    const submittedCount = (submittedAll || []).length
+    const everPassed = (submittedAll || []).some((a: any) => a.passed === true)
+    const maxRetakesRaw = Number(courseSettings?.max_retakes)
+    const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
+    const attemptBudget = 1 + maxRetakes
+
+    if (submittedCount > 0) {
+      // PERMANENT FAILURE — budget exhausted, never passed. No more attempts
+      // even with a paid retake: the decision is final and royal.
+      if (!everPassed && submittedCount >= attemptBudget) {
+        return NextResponse.json(
+          {
+            error: `انتهت جميع محاولاتك في هذه الدورة (${submittedCount}/${attemptBudget}) — لم تتوفّق في هذه الدورة أبداً، ولا يمكن إعادة الاختبار مرة أخرى`,
+            code: 'ATTEMPTS_EXHAUSTED',
+            submitted: submittedCount,
+            budget: attemptBudget,
+            max_retakes: maxRetakes,
+          },
+          { status: 403 }
+        )
+      }
+
+      // PAID RETAKE GATE — each new attempt consumes one approved retake payment
       const { data: retakePayments } = await supabaseAdmin
         .from('payments')
         .select('id, amount, currency, reference, status')
@@ -194,17 +225,12 @@ export async function POST(req: NextRequest) {
           )
         }
         // Include the fee so the client can open the payment dialog directly
-        const { data: courseRow } = await supabaseAdmin
-          .from('courses')
-          .select('retake_fee, currency')
-          .eq('id', course_id)
-          .maybeSingle()
         return NextResponse.json(
           {
             error: 'لقد أنهيت اختبار هذه الدورة — إعادة الاختبار تتطلب سداد رسوم الإعادة أولاً',
             code: 'RETAKE_PAYMENT_REQUIRED',
-            retake_fee: Number(courseRow?.retake_fee) || 0,
-            currency: courseRow?.currency || 'ر.ي',
+            retake_fee: Number(courseSettings?.retake_fee) || 0,
+            currency: courseSettings?.currency || 'ر.ي',
           },
           { status: 403 }
         )
@@ -255,13 +281,16 @@ export async function PUT(req: NextRequest) {
       .single()
     if (fetchErr || !attempt) return NextResponse.json({ error: 'المحاولة غير موجودة' }, { status: 404 })
 
-    // Course pass score (fallback 60)
+    // Course pass score (fallback 60) + retake budget (1 + max_retakes)
     const { data: course } = await supabaseAdmin
       .from('courses')
-      .select('pass_score')
+      .select('pass_score, max_retakes')
       .eq('id', attempt.course_id)
       .maybeSingle()
     const passScore = typeof course?.pass_score === 'number' ? course.pass_score : 60
+    const maxRetakesRaw = Number(course?.max_retakes)
+    const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
+    const attemptBudget = 1 + maxRetakes
 
     // ============ TRAINER/ADMIN REVIEW-CORRECTION ============
     if (body.review) {
@@ -351,12 +380,47 @@ export async function PUT(req: NextRequest) {
       ? Math.round((new Date(submittedAt).getTime() - new Date(attempt.started_at).getTime()) / 1000)
       : 0
 
+    // ============ ROYAL v4.2 BUDGET OVERRIDE ============
+    // An attempt submitted AFTER the retake budget (1 + max_retakes) was
+    // already exhausted is VOID — even if the raw score passed. The student
+    // is told plainly: "لم تتوفّق في هذه الدورة أبداً".
+    const { data: priorAttempts } = await supabaseAdmin
+      .from('exam_attempts')
+      .select('id, passed')
+      .eq('user_id', attempt.user_id)
+      .eq('course_id', attempt.course_id)
+      .not('submitted_at', 'is', null)
+      .neq('id', id)
+    const priorCount = (priorAttempts || []).length
+    const priorEverPassed = (priorAttempts || []).some((a: any) => a.passed === true)
+
+    let finalPassed = passed
+    let voidedByExhaustion = false
+    let exhaustedInfo: any = null
+    if (priorCount >= attemptBudget && !priorEverPassed) {
+      finalPassed = false
+      voidedByExhaustion = true
+      exhaustedInfo = {
+        prior_submitted: priorCount,
+        budget: attemptBudget,
+        max_retakes: maxRetakes,
+        raw_score: score,
+        raw_passed: passed,
+        at: submittedAt,
+      }
+    }
+
+    const prevAnswers = (typeof attempt.answers === 'object' && attempt.answers !== null) ? attempt.answers : {}
+    const finalAnswers = voidedByExhaustion
+      ? { ...prevAnswers, ...answers, __exhausted__: exhaustedInfo }
+      : answers
+
     const { data, error } = await supabaseAdmin
       .from('exam_attempts')
       .update({
-        answers,
+        answers: finalAnswers,
         score,
-        passed,
+        passed: finalPassed,
         submitted_at: submittedAt,
         duration_seconds: durationSeconds,
         tab_switches: tab_switches || 0,
@@ -368,8 +432,15 @@ export async function PUT(req: NextRequest) {
 
     // Notify student + trainer + admins (non-fatal)
     try {
-      await notifyExamGraded(attempt.user_id, attempt.course_id, score, passed)
+      await notifyExamGraded(attempt.user_id, attempt.course_id, score, finalPassed)
     } catch {}
+    if (voidedByExhaustion) {
+      // Explicit royal notice — the pass is annulled by policy
+      try {
+        const { notifyExamVoidedByExhaustion } = await import('@/lib/notifications')
+        await notifyExamVoidedByExhaustion(attempt.user_id, attempt.course_id, score)
+      } catch {}
+    }
 
     return NextResponse.json({
       ...data,

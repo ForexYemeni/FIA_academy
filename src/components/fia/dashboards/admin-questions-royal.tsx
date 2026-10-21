@@ -9,6 +9,7 @@ import {
   HelpCircle, Plus, Edit, Trash2, CheckCircle2, X, BookOpen, Award, Hash,
   FileText, Sparkles, Loader2, Search, Layers, CircleDot, ListOrdered,
   Type, XCircle, Settings, Timer, Coins, Copy, Database, AlertTriangle, Infinity as InfinityIcon,
+  RefreshCw, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,8 @@ export function AdminExamQuestionsRoyal() {
   const selectedCourseObj = courses.find((c) => c.id === selectedCourse)
   const examDuration = Number(selectedCourseObj?.exam_duration_minutes) || 0
   const retakeFee = Number(selectedCourseObj?.retake_fee) || 0
+  const maxRetakesRaw = Number(selectedCourseObj?.max_retakes)
+  const maxRetakes = Number.isFinite(maxRetakesRaw) ? Math.max(0, maxRetakesRaw) : 2
   const filtered = items.filter((q) => {
     if (typeFilter && q.question_type !== typeFilter) return false
     if (!search.trim()) return true
@@ -101,9 +104,9 @@ export function AdminExamQuestionsRoyal() {
           <LuxStats
             items={[
               { icon: Layers, label: 'إجمالي الأسئلة', value: items.length, grad: 'from-purple-600 to-fuchsia-700' },
-              { icon: ListOrdered, label: 'اختيار متعدد', value: mcqCount, grad: 'from-indigo-500 to-purple-600' },
               { icon: Timer, label: 'مدة الاختبار', value: examDuration > 0 ? `${examDuration} د` : 'بلا حد', grad: 'from-sky-500 to-indigo-600' },
-              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'غير متاحة', grad: 'from-amber-500 to-orange-600' },
+              { icon: Coins, label: 'رسوم الإعادة', value: retakeFee > 0 ? `${retakeFee.toLocaleString()}` : 'عند المراجعة', grad: 'from-amber-500 to-orange-600' },
+              { icon: RefreshCw, label: 'الإعادات المسموحة', value: `${maxRetakes} (${1 + maxRetakes} محاولات)`, grad: 'from-emerald-500 to-teal-600' },
             ]}
           />
         ) : undefined
@@ -302,6 +305,7 @@ export function AdminExamQuestionsRoyal() {
 export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any) {
   const [duration, setDuration] = useState<string>('')
   const [fee, setFee] = useState<string>('')
+  const [maxRetakes, setMaxRetakes] = useState<string>('2')
   const [saving, setSaving] = useState(false)
   const [needsMigration, setNeedsMigration] = useState(false)
 
@@ -310,8 +314,10 @@ export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any)
     setNeedsMigration(false)
     const d = Number(course?.exam_duration_minutes)
     const f = Number(course?.retake_fee)
+    const m = Number(course?.max_retakes)
     setDuration(course && course.exam_duration_minutes != null && d > 0 ? String(d) : '')
     setFee(course && course.retake_fee != null && f > 0 ? String(f) : '')
+    setMaxRetakes(course && course.max_retakes != null && Number.isFinite(m) ? String(Math.max(0, m)) : '2')
   }, [open, course?.id])
 
   const copySql = () => {
@@ -331,6 +337,7 @@ export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any)
           id: course.id,
           exam_duration_minutes: duration.trim() === '' ? null : Math.max(0, parseInt(duration) || 0),
           retake_fee: fee.trim() === '' ? 0 : Math.max(0, parseFloat(fee) || 0),
+          max_retakes: Math.max(0, parseInt(maxRetakes) || 0),
         }),
       })
       const data = await res.json()
@@ -435,8 +442,30 @@ export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any)
           </p>
         </LuxField>
 
+        {/* Max retakes — ROYAL v4.2 */}
+        <LuxField label="عدد مرات الإعادة المسموحة" icon={RefreshCw} hint="لكل دورة على حدة">
+          <div className="flex items-center gap-2">
+            <Input type="number" min={0} max={10} value={maxRetakes} onChange={(e) => setMaxRetakes(e.target.value)} placeholder="2" className={`${luxInput} text-center font-bold`} dir="ltr" />
+            <span className="text-xs font-bold text-muted-foreground flex-shrink-0">إعادة</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {[0, 1, 2, 3, 5].map((v) => (
+              <button key={v} type="button" onClick={() => setMaxRetakes(String(v))}
+                className={`px-3 py-1.5 rounded-lg border text-[10px] font-extrabold transition-all ${
+                  maxRetakes === String(v) ? 'border-transparent bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md' : 'border-gold/25 bg-white text-muted-foreground hover:border-gold/50'
+                }`}>{v === 0 ? 'بلا إعادات' : `${v} ${v === 1 ? 'إعادة' : 'إعادات'}`}</button>
+            ))}
+          </div>
+          <div className="rounded-xl bg-gradient-to-l from-emerald-500/10 to-transparent border border-emerald-500/25 p-2.5 mt-2 flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              الميزانية الكلية للمتدرب = <span className="font-extrabold text-navy">1 محاولة أولى + {maxRetakes || 0} إعادات = {1 + (parseInt(maxRetakes) || 0)} محاولات</span>. عند استهلاكها كلها دون نجاح يُعلَن الفشل النهائي في هذه الدورة: <span className="font-extrabold text-rose-600">«لم تتوفّق في هذه الدورة أبداً»</span> — تُحجب الشهادة نهائياً حتى لو نجح في أي محاولة لاحقة.
+            </p>
+          </div>
+        </LuxField>
+
         {/* Current values summary */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-gold/[0.07] to-transparent p-2.5 text-center">
             <p className="text-[9px] font-bold text-muted-foreground">المدة الحالية</p>
             <p className={`text-sm font-extrabold ${duration ? 'text-purple-700' : 'text-muted-foreground'}`}>
@@ -444,9 +473,15 @@ export function ExamSettingsDialog({ open, onOpenChange, course, onSaved }: any)
             </p>
           </div>
           <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-gold/[0.07] to-transparent p-2.5 text-center">
-            <p className="text-[9px] font-bold text-muted-foreground">رسوم الإعادة الحالية</p>
+            <p className="text-[9px] font-bold text-muted-foreground">رسوم الإعادة</p>
             <p className={`text-sm font-extrabold ${fee ? 'text-amber-600' : 'text-muted-foreground'}`} dir="ltr">
-              {fee ? `${Number(fee).toLocaleString()} ${currency}` : 'إعادة غير متاحة'}
+              {fee ? `${Number(fee).toLocaleString()} ${currency}` : 'عند المراجعة'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-gold/[0.07] to-transparent p-2.5 text-center">
+            <p className="text-[9px] font-bold text-muted-foreground">إجمالي المحاولات</p>
+            <p className="text-sm font-extrabold text-emerald-600" dir="ltr">
+              1 + {parseInt(maxRetakes) || 0} = {1 + (parseInt(maxRetakes) || 0)}
             </p>
           </div>
         </div>
