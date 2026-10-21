@@ -17,15 +17,27 @@
     <!-- Vibrate for toast notifications -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Wake lock for background polling when screen is off -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Schedule exact alarms (for restart after task removed) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Allow scheduling via AlarmManager (for restart on task removed) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- DownloadManager — for certificate image downloads -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- MediaStore.Images.Media insert on Android 10+ uses scoped storage
-         and doesn't need WRITE_EXTERNAL_STORAGE, but on Android 9 and
-         below, we need it. -->
+    <!-- Request ignore battery optimizations (for reliable background
+         polling on Android 6+). The user will be prompted to allow this
+         on first launch. Without this, manufacturers like Xiaomi/Huawei/
+         Samsung will kill the service after a few minutes. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".FIAApp"
@@ -69,16 +81,27 @@
             </intent-filter>
         </activity>
 
-        <!-- Foreground service — 5s poll for new notifications, fires
-             native OS notification (popup + sound + vibrate) on new
-             items. START_STICKY so the OS restarts it if killed. -->
+        <!-- ============================================================
+             Foreground service — polls /api/notifications every 30s
+             and fires native OS notifications for new items.
+
+             CRITICAL ATTRIBUTES for reliable background operation:
+             - foregroundServiceType="dataSync" — required for
+               Android 14+
+             - stopWithTask="false" (default) — when the user swipes the
+               app away, the service keeps running (we restart it via
+               onTaskRemoved)
+             - enabled="true" — system can start it
+             - exported="false" — only our app can bind to it
+             ============================================================ -->
         <service
             android:name=".NotificationPollService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Boot receiver — restart poller after reboot -->
+        <!-- Boot receiver — restart poller after reboot or app update -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -86,7 +109,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
     </application>
+
 </manifest>

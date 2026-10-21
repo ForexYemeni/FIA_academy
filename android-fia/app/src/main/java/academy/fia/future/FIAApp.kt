@@ -1,56 +1,157 @@
 package academy.fia.future
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
+import android.util.Log
+import androidx.work.Configuration
+import androidx.work.WorkManager
 import com.onesignal.OneSignal
 
 /**
- * Application class — initializes OneSignal SDK with the appId from
- * the live site (957cba56-ba48-479e-9e43-1e506d30dc10).
+ * ============================================================================
+ * FIA ACADEMY — APPLICATION CLASS (RELIABLE NOTIFICATIONS EDITION)
+ * ============================================================================
  *
- * OneSignal provides instant external OS-level push notifications
- * even when the app is force-killed. We use the OneSignal "external
- * user ID" feature to target notifications per-user (the web side
- * sends the user.id from the auth store as the external_id).
+ * Initializes:
+ * 1. OneSignal SDK for instant push notifications (even when app is killed)
+ * 2. WorkManager for the NotificationFallbackWorker
+ * 3. Notification channels
+ * 4. Schedules the fallback worker so it runs every 15 minutes to restart
+ *    the polling service if it's been killed
  *
- * CRITICAL: In OneSignal 5.x SDK, the proper flow is:
- *   1. initWithContext(appId) — initializes the SDK
- *   2. login(externalId) — registers the device with the user's
- *      external ID, so the server can target pushes to this user
- *
- * Step 2 happens when FIANativeBridge.setUserId(userId) is called
- * by the web side after the user logs in. Without step 2, pushes
- * sent with `external_user_id` from the web server never reach
- * this device — they have no OneSignal subscription to deliver to.
+ * The fallback worker is THE KEY FIX that makes notifications reliable
+ * even when:
+ * - User swipes the app away from recents
+ * - Manufacturer's battery optimizer kills the service
+ * - OS kills the service for memory pressure
+ * - App is force-stopped and then reopened
+ * ============================================================================
  */
-class FIAApp : Application() {
+class FIAApp : Application(), Configuration.Provider {
+
     companion object {
         private const val ONESIGNAL_APP_ID = "957cba56-ba48-479e-9e43-1e506d30dc10"
         private const val TAG = "FIAApp"
     }
 
+    /**
+     * WorkManager Configuration — make FIAApp the work manager
+     * configuration provider so we control initialization.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setMinimumLoggingLevel(android.util.Log.INFO)
+            .build()
+
     override fun onCreate() {
         super.onCreate()
         try {
-            // Initialize OneSignal. We use the latest 5.x SDK which
-            // requires initWithContext + appId.
-            OneSignal.initWithContext(this, ONESIGNAL_APP_ID)
-            // Verbose logging is disabled in production builds.
+            // Initialize WorkManager (using our custom Configuration).
+            // In Application class, WorkManager.initialize is called
+            // automatically when Configuration.Provider is implemented.
+            Log.i(TAG, "🚀 FIAApp onCreate — initializing notification systems")
+
+            // Create notification channels early so they exist when
+            // the service starts.
+            createNotificationChannels()
+
+            // Initialize OneSignal
             try {
-                val logClass = Class.forName("com.onesignal.Debug")
-                val logLevelEnum = Class.forName("com.onesignal.Debug\$LogLevel")
-                val noneVal = logLevelEnum.enumConstants?.firstOrNull {
-                    (it as Enum<*>).name == "NONE"
+                OneSignal.initWithContext(this, ONESIGNAL_APP_ID)
+                // Verbose logging disabled in production
+                try {
+                    val logClass = Class.forName("com.onesignal.Debug")
+                    val logLevelEnum = Class.forName("com.onesignal.Debug\$LogLevel")
+                    val noneVal = logLevelEnum.enumConstants?.firstOrNull {
+                        (it as Enum<*>).name == "NONE"
+                    }
+                    if (noneVal != null) {
+                        val field = logClass.getDeclaredField("logLevel")
+                        field.isAccessible = true
+                        field.set(null, noneVal)
+                    }
+                } catch (_: Throwable) {}
+                Log.i(TAG, "✅ OneSignal initialized with appId: $ONESIGNAL_APP_ID")
+            } catch (e: Exception) {
+                Log.w(TAG, "OneSignal init failed", e)
+            }
+
+            // Schedule the fallback worker — runs every 15 min to check
+            // if the polling service is alive, restarts it if not.
+            try {
+                NotificationFallbackWorker.schedule(this)
+                Log.i(TAG, "✅ Notification fallback worker scheduled")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to schedule fallback worker", e)
+            }
+
+            // Try to start the polling service immediately on app launch.
+            // The service will check if a user_id is set in SharedPreferences
+            // and only poll if logged in.
+            try {
+                val prefs = getSharedPreferences("fia-prefs", Context.MODE_PRIVATE)
+                val userId = prefs.getString("user_id", null)
+                if (!userId.isNullOrBlank()) {
+                    val serviceIntent = android.content.Intent(this, NotificationPollService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
+                    }
+                    Log.i(TAG, "✅ Notification poll service started on app launch (user_id=$userId)")
+                } else {
+                    Log.d(TAG, "No user_id in prefs — service will start after login")
                 }
-                if (noneVal != null) {
-                    val field = logClass.getDeclaredField("logLevel")
-                    field.isAccessible = true
-                    field.set(null, noneVal)
-                }
-            } catch (_: Throwable) {
-                // Logging setup is optional — the SDK works without it.
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to start polling service on launch", e)
             }
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "OneSignal init failed", e)
+            Log.e(TAG, "FIAApp onCreate failed", e)
+        }
+    }
+
+    /**
+     * Creates the notification channels early so they exist when the
+     * service or any notification poster needs them.
+     */
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Channel 1 — silent foreground service notification
+            val serviceChannel = NotificationChannel(
+                "fia-service",
+                "خدمة الإشعارات",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "تبقيك على اطلاع بتحديثات الأكاديمية في الخلفية"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_SECRET
+            }
+            notifManager.createNotificationChannel(serviceChannel)
+
+            // Channel 2 — actual notifications (popup + sound + vibrate)
+            val notifChannel = NotificationChannel(
+                "fia-notifications-v3",
+                "إشعارات أكاديمية المستقبل الدولية",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "إشعارات الدفع، طلبات الشهادات، المواضيع، وأحداث الأكاديمية"
+                enableLights(true)
+                lightColor = 0xFFD4AF37.toInt()
+                enableVibration(true)
+                setShowBadge(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            notifManager.createNotificationChannel(notifChannel)
+        } catch (e: Exception) {
+            Log.w(TAG, "createNotificationChannels failed", e)
         }
     }
 }

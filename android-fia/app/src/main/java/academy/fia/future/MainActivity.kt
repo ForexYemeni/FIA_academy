@@ -503,6 +503,61 @@ class MainActivity : AppCompatActivity() {
                 permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
         }
+
+        // 🔥 KEY FIX: Request battery optimization exemption for reliable
+        // background notifications. Without this, manufacturers like
+        // Xiaomi/Huawei/Samsung/Oppo will kill the foreground service
+        // after a few minutes when the screen is off.
+        requestBatteryOptimizationExemption()
+    }
+
+    /**
+     * 🔥 KEY FIX: Requests permission to ignore battery optimizations.
+     *
+     * Android 6+ has a feature called "Battery Optimization" that puts
+     * apps into a deep sleep when the screen is off and the device is
+     * stationary. This kills background services — including our
+     * notification poller.
+     *
+     * To get reliable background notifications, we need the user to
+     * whitelist our app from battery optimization. This shows a system
+     * dialog asking the user to allow it.
+     *
+     * The dialog only appears ONCE per app install (we track it in
+     * SharedPreferences). If the user denies, we don't ask again —
+     * but the notifications will still work, just less reliably.
+     */
+    private fun requestBatteryOptimizationExemption() {
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (pm.isIgnoringBatteryOptimizations(packageName)) {
+                Log.d(TAG, "✅ App already whitelisted from battery optimization")
+                return
+            }
+
+            // Check if we already asked (don't spam the user)
+            val prefs = getSharedPreferences("fia-prefs", Context.MODE_PRIVATE)
+            val alreadyAsked = prefs.getBoolean("asked_battery_opt", false)
+            if (alreadyAsked) {
+                Log.d(TAG, "Already asked for battery opt exemption — skipping")
+                return
+            }
+            prefs.edit().putBoolean("asked_battery_opt", true).apply()
+
+            // Show the system dialog
+            val intent = Intent(
+                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            ).apply {
+                data = android.net.Uri.parse("package:$packageName")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            Log.i(TAG, "🔔 Requested battery optimization exemption")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to request battery optimization exemption", e)
+        }
     }
 
     /**

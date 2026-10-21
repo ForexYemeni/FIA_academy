@@ -11,8 +11,8 @@ android {
         applicationId = "academy.fia.future"
         minSdk = 24
         targetSdk = 34
-        versionCode = 25
-        versionName = "2.4.6"
+        versionCode = 26
+        versionName = "2.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -50,6 +50,12 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // 🔥 WorkManager — reliable background work scheduling. Survives
+    // app kills, device reboots, and is optimized for battery. Used by
+    // NotificationFallbackWorker to restart the polling service if it
+    // gets killed by the OS or manufacturer's battery optimizer.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // OneSignal SDK — instant external OS-level push notifications even
     // when the app is force-killed. Version 5.10.2 is the latest stable
