@@ -1561,3 +1561,31 @@ Stage Summary:
 - Files: api/trainer-earnings (NEW), api/payments, api/trainers, lib/notifications, dashboards/trainer-earnings (NEW), admin-trainer-earnings-royal (NEW), admin-trainers-royal, trainer, admin, shared-community, team-editor, supabase/migrations/016 (NEW).
 - NOTE: نسب المتدربين القديمة لا تُحتسب بأثر رجعي — حدد النسب من حساب الإدارة ثم ستُحتسب الموافقات الجديدة تلقائياً (يمكن إعادة تشغيل backfill لاحقاً عند الطلب).
 - APK v2.7 needs NO update (WebView remote).
+
+---
+Task ID: royal-v44-multi-currency-followers-museum-notifications
+Agent: main
+Task: v4.4 ROYAL — نظام العملات الكامل (الربح بالدولار يُسحب بالدولار + بقية العملات) + متحف المتابعين كقسم ملكي مستقل + عدد المتابعين في قسم المدربين بالإدارة + إصلاح أيقونة الإشعارات (تفتح دائماً + لا اهتزاز دائم) دون لمس أي تسليم إشعارات
+
+Work Log:
+- ROOT CAUSE CONFIRMED VIA PRODUCTION DB: مدرب ربح $20 (trainer_earnings صف بعملة '$') لكن طلب السحب أُنشئ بعملة 'ر.ي' الافتراضية — نافذة السحب لم تكن فيها اختيار عملة وإجماليات المحفظة كانت تخلط كل العملات في رقم واحد.
+- NEW src/lib/currency.ts: سجل ملكي للعملات ($ / ر.ي / ر.س / د.إ / د.ع / د.ك / ج.م / USDT…) + fmtMoney (تعرض $20 قبل الرقم للدولار و12,500 ر.ي بعده للغير) + currencyInfo + fmtNum.
+- API /api/trainer-earnings REWRITTEN MULTI-CURRENCY: getTotalsByCurrency (خزينة مستقلة لكل عملة: كُسب/متاح/مسحوب/معلق) + primary_currency. POST السحب يتطلب عملة ويتحقق من الرصيد بعملتها فقط (برسالة ذكية تعرض بقية أرصدته بعملات أخرى) + منع التكرار لكل (مبلغ،عملة). PUT الموافقة FIFO يستهلك صفوف بعملة الطلب نفسها فقط. GET admin=1 يرجع totals_by_currency لكل مدرب + حقول مسطحة للعملة الأساسية (توافق). GET المدرب يرجع totals_by_currency + withdrawals مع عملة مضمونة.
+- TRAINER «أرباحي» (trainer-earnings.tsx): الهيرو يعرض رصيد السحب لكل عملة على حدة (صفوف ذهبية بشارات عملة)، 4 بطاقات إحصائية بصفوف لكل عملة (MoneyLines)، نافذة السحب الجديدة: اختيار عملة فاخر (بطاقات لكل عملة مع رصيدها — المعطلة مقفلة) + مبلغ/اختصارات % محسوبة بعملة المختار + المعاينة تحوّل المبلغ بعملته، سجل السحب والأرباح بشارات عملة فاخرة (CurrencyPill).
+- ADMIN «أرباح المدربين» (admin-trainer-earnings-royal.tsx): LuxStats لكل عملة (كُسب/متاح/معلق/مصروف بصفوف لكل عملة عبر CurLines)، بطاقات المدربين الأربعة لكل عملة، مجموع المعلق لكل عملة، كل المبالغ عبر fmtMoney (حوارات الموافقة/الرفض تعرض عملة الطلب).
+- FOLLOWERS MUSEUM SECTION (trainer-followers.tsx NEW): قسم ملكي مستقل في لوحة المدرب (nav «متحف المتابعين» بعد متدربوّ) — هيرو بتاج وعداد حي، شريط إحصاءات (إجمالي/هذا الأسبوع/اليوم/آخر متابعة)، منصة الشرف لأول 3 متابعين (🥇🥈🥉 + الوصيف الأول)، سجل النخبة الكامل (بحث + فرز الأحدث/الأقدم + بطاقات بحلقات ذهبية وشارات الأحدث/جديد)، realtime + تحية ملكية عند متابع جديد.
+- TRAINER OVERVIEW: استبدال القسم الكبير بمعاينة مدمجة (شريط إحصاء + آخر 4 متابعين) وزر «دخول المتحف الكامل» ينقل للقسم الجديد (onOpenMuseum prop).
+- ADMIN TRAINERS (admin-trainers-royal.tsx): عدادات متابعين لكل مدرب من /api/trainer-follows (خريطة عامة) + realtime عبر trainer_follows + شارة «X متابع» على كل بطاقة + إحصاء «متابعو المدربين» في LuxStats.
+- NOTIFICATIONS BELL FIXED (notifications-bell.tsx) — دون أي لمس لمنطق التسليم (Realtime+polling fallback+dedup+announce+mute+اختبارات كما هي حرفياً):
+  1) «الاهتزاز المستمر»: استبدال animate-ping العدواني + animate-swing اللانهائي بـ fia-bell-glow (توهّج ذهبي يتنفس 2.8s) + fia-bell-swing (هزّة ترحيب محدودة تُعاد فقط عند وصول إشعار جديد عبر key=آخر id) — الجرس يرتاح ولا يهتز للأبد.
+  2) «الإشعارات لا تفتح عند الضغط»: openNotification — كل إشعار يفتح شيئاً دائماً: له رابط → تعليم مقروء + انتقال + إغلاق اللوحة؛ بلا رابط → يُعرض كاملاً في بطاقة تفصيلية ملكية (عرض تفصيلي بأيقونة ونوع وتاريخ كامل وزر عودة وزر فتح الهدف) بدل لا شيء.
+  3) فخامة: شريط ذهبي علوي، هيدر «مركز الإشعارات» بعداد غير المقروء من الإجمالي، عناصر بدخول متدرج (fia-item-in staggered) + شريط ذهبي يمين غير المقروء + chips نوع، دعم لوحة المفاتيح (Enter/Space)، lux-scrollbar.
+- globals.css: keyframes جديدة (fiaBellSwing/fiaBellGlow/fiaItemIn/fiaDetailIn) — animate-swing القديم بقيت لغيرها.
+- VERIFICATION: npx tsc → صفر أخطاء في كل الملفات المعدلة (17 خطأ قديم في ملفات لم تُمَس). next build SUCCEEDED كاملاً. node scripts/verify-currency-logic.ts على البيانات الحقيقية: خزينة $20 بالدولار تُقرأ بدقتها وFIFO بعملة الطلب.
+- NO DB MIGRATION NEEDED: أعمدة currency موجودة في trainer_earnings وwithdrawal_requests من ترحيل 016.
+
+Stage Summary:
+- Files: lib/currency (NEW), api/trainer-earnings, dashboards/trainer-earnings, admin-trainer-earnings-royal, trainer-followers (NEW), trainer, admin-trainers-royal, notifications-bell, app/globals.css, scripts/check-currencies + verify-currency-logic (أدوات تحقق).
+- UX: ما ربح بالدولار يُسحب بالدولار حرفياً — كل عملة خزينة مستقلة في حسابي المدرب والإدارة.
+- Notifications: التسليم (Realtime/polling/FCM/الأصوات/الاختبار) لم يُمَس — فقط واجهة أرقى وتفاعل يفتح دائماً.
+- APK v2.7 needs NO update (WebView remote).

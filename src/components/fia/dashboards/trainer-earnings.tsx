@@ -1,15 +1,16 @@
 'use client'
 
 // ============================================================================
-// TRAINER EARNINGS ROYAL — «أرباحي»
-// محفظة فاخرة للمدرب: الرصيد، نسبة الأرباح من كل دورة، طريقة الاستلام
-// (محلي أو عملات رقمية)، طلبات السحب بلقطات شاشة من الإدارة، وسجل كامل.
+// TRAINER EARNINGS ROYAL — «أرباحي» — خزينة متعددة العملات
+// محفظة فاخرة للمدرب: الرصيد بكل عملة على حدة (دولار، ريال يمني، سعودي…)،
+// نسبة الأرباح من كل دورة، طريقة الاستلام (محلي أو عملات رقمية)، وطلبات
+// سحب تُرسل بالعملة نفسها التي رُبح بها — مع لقطات شاشة من الإدارة.
 // ============================================================================
 import { useEffect, useState, useCallback } from 'react'
 import {
-  Wallet, TrendingUp, BadgePercent, Landmark, Bitcoin, Copy, CheckCircle2,
+  Wallet, TrendingUp, BadgePercent, Landmark, Bitcoin, CheckCircle2,
   Clock, XCircle, Image as ImageIcon, Send, Loader2, Sparkles, Crown, Coins,
-  ArrowDownToLine, Users, BookOpen, Eye, RefreshCw, Banknote, Gem,
+  ArrowDownToLine, Users, BookOpen, Eye, Banknote, Gem, ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,11 +21,10 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { SectionCard } from './shell'
 import { supabasePublic } from '@/lib/supabase'
+import { fmtMoney, currencyInfo } from '@/lib/currency'
 
 const LOCAL_METHODS = ['محفظة جيب', 'محفظة الكريمي', 'محفظة موبايل موني', 'حساب بنكي', 'الدفع عند المقابلة']
 const CRYPTO_METHODS = ['USDT (TRC20)', 'USDT (ERC20)', 'Binance Pay', 'Bitcoin (BTC)', 'Ethereum (ETH)']
-
-const fmt = (n: any) => (Number(n) || 0).toLocaleString('en-US')
 
 function StatusChip({ status }: { status: string }) {
   if (status === 'مكتمل')
@@ -36,6 +36,33 @@ function StatusChip({ status }: { status: string }) {
   if (status === 'متاح')
     return <Badge className="bg-gold/15 text-[#8a6d1d] border-gold/40 text-[10px] font-bold">◆ متاح</Badge>
   return <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] font-bold">⏳ قيد الانتظار</Badge>
+}
+
+/** شارة عملة فاخرة — gold pill بعملة صريحة */
+function CurrencyPill({ currency, size = 'sm' }: { currency: string; size?: 'sm' | 'xs' }) {
+  const info = currencyInfo(currency)
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-l from-gold/25 to-amber-500/15 border border-gold/50 text-[#8a6d1d] font-extrabold ${size === 'sm' ? 'px-2.5 py-0.5 text-[11px]' : 'px-2 py-0.5 text-[9px]'}`} dir="ltr">
+      {info.prefix ? <span className="text-[13px] leading-none">{info.symbol}</span> : info.symbol}
+      <span className="text-[8px] opacity-70">{info.short}</span>
+    </span>
+  )
+}
+
+/** صفوف مبالغ لكل عملة — تُستخدم داخل البطاقات الإحصائية */
+function MoneyLines({ byCur, pick, tone = 'navy' }: { byCur: Record<string, any>; pick: (t: any) => number; tone?: 'navy' | 'gold' | 'emerald' | 'purple' | 'blue' }) {
+  const entries = Object.entries(byCur || {}).filter(([, t]: any) => pick(t) !== 0)
+  const color = tone === 'gold' ? 'text-[#8a6d1d]' : tone === 'emerald' ? 'text-emerald-600' : tone === 'purple' ? 'text-purple-700' : tone === 'blue' ? 'text-blue-700' : 'text-navy'
+  if (entries.length === 0) return <p className={`text-2xl font-extrabold tabular-nums ${color}`} dir="ltr">{fmtMoney(0, 'ر.ي')}</p>
+  return (
+    <div className="space-y-0.5">
+      {entries.map(([cur, t]: any) => (
+        <p key={cur} className={`${entries.length > 1 ? 'text-base' : 'text-2xl'} font-extrabold tabular-nums leading-tight ${color}`} dir="ltr">
+          {fmtMoney(pick(t), cur)}
+        </p>
+      ))}
+    </div>
+  )
 }
 
 export function TrainerEarnings({ user }: { user: any }) {
@@ -51,6 +78,7 @@ export function TrainerEarnings({ user }: { user: any }) {
   // withdrawal dialog
   const [wdOpen, setWdOpen] = useState(false)
   const [wdAmount, setWdAmount] = useState('')
+  const [wdCurrency, setWdCurrency] = useState('')
   const [wdSubmitting, setWdSubmitting] = useState(false)
 
   // screenshot viewer
@@ -108,20 +136,37 @@ export function TrainerEarnings({ user }: { user: any }) {
     finally { setSavingPm(false) }
   }
 
+  // ---- Multi-currency helpers ----
+  const byCur: Record<string, any> = data?.totals_by_currency || {}
+  // العملات ذات رصيد — مرتبة تنازلياً بالمكتسب
+  const curEntries = Object.entries(byCur)
+    .map(([cur, t]: any) => ({ currency: cur, ...t }))
+    .sort((a: any, b: any) => b.total_earned - a.total_earned)
+  const hasAnyBalance = curEntries.some((c: any) => c.available > 0)
+  const wdCur = wdCurrency || curEntries.find((c: any) => c.available > 0)?.currency || data?.primary_currency || 'ر.ي'
+  const wdTotals = byCur[wdCur] || { total_earned: 0, available: 0, withdrawn: 0, pending_withdrawals: 0 }
+  const wdAvailable = wdTotals.available - wdTotals.pending_withdrawals
+
+  const openWithdrawDialog = () => {
+    const firstWithBalance = curEntries.find((c: any) => c.available > 0)?.currency || data?.primary_currency || 'ر.ي'
+    setWdCurrency(firstWithBalance)
+    setWdAmount('')
+    setWdOpen(true)
+  }
+
   const submitWithdrawal = async () => {
     const amount = parseInt(wdAmount) || 0
     if (amount <= 0) { toast.error('أدخل مبلغاً صحيحاً'); return }
-    const availableForWithdraw = (data?.totals?.available || 0) - (data?.totals?.pending_withdrawals || 0)
-    if (amount > availableForWithdraw) { toast.error(`المبلغ يتجاوز رصيدك المتاح (${fmt(availableForWithdraw)})`); return }
+    if (amount > wdAvailable) { toast.error(`المبلغ يتجاوز رصيدك المتاح بعملة ${wdCur} (${fmtMoney(wdAvailable, wdCur)})`); return }
     setWdSubmitting(true)
     try {
       const res = await fetch('/api/trainer-earnings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trainer_id: user.id, amount }),
+        body: JSON.stringify({ trainer_id: user.id, amount, currency: wdCur }),
       })
       const d = await res.json()
       if (res.ok) {
-        toast.success('💸 تم إرسال طلب السحب — الإدارة ستراجعه قريباً')
+        toast.success(`💸 تم إرسال طلب سحب ${fmtMoney(amount, wdCur)} — الإدارة ستراجعه قريباً`)
         setWdOpen(false); setWdAmount(''); load()
       } else toast.error(d.error || 'فشل إرسال الطلب')
     } catch { toast.error('خطأ في الاتصال') }
@@ -132,9 +177,7 @@ export function TrainerEarnings({ user }: { user: any }) {
     return <div className="text-center py-16"><Loader2 className="w-7 h-7 mx-auto animate-spin text-gold" /><p className="text-xs text-muted-foreground mt-3">جاري فتح خزينة أرباحك...</p></div>
   }
 
-  const totals = data?.totals || { total_earned: 0, available: 0, withdrawn: 0, pending_withdrawals: 0 }
   const percentage = Number(data?.profile?.percentage || 0)
-  const availableForWithdraw = totals.available - totals.pending_withdrawals
   const earnings = data?.earnings || []
   const withdrawals = data?.withdrawals || []
   const courses = data?.courses || []
@@ -142,7 +185,7 @@ export function TrainerEarnings({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
-      {/* ── Hero: الخزينة الذهبية ── */}
+      {/* ── Hero: الخزينة الذهبية متعددة العملات ── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-navy via-navy-light to-navy p-6 text-white shadow-xl ring-1 ring-gold/30">
         <div className="absolute inset-0 opacity-25" style={{
           backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
@@ -157,20 +200,35 @@ export function TrainerEarnings({ user }: { user: any }) {
               <Gem className="w-8 h-8 text-navy" strokeWidth={2.2} />
             </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-gold/80 text-xs font-bold flex items-center gap-1.5 mb-1">
-              <Sparkles className="w-3.5 h-3.5" /> خزينة أرباحك الملكية
+              <Sparkles className="w-3.5 h-3.5" /> خزينة أرباحك الملكية — كل عملة في خزنتها
             </p>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-extrabold tabular-nums tracking-tight" dir="ltr">{fmt(availableForWithdraw)}</span>
-              <span className="text-gold font-bold mb-1">{earnings[0]?.currency || 'ر.ي'}</span>
-            </div>
-            <p className="text-white/60 text-[11px] mt-1">الرصيد المتاح للسحب الآن {totals.pending_withdrawals > 0 ? `• لديك ${fmt(totals.pending_withdrawals)} طلبات قيد المراجعة` : ''}</p>
+            {/* أرصدة السحب لكل عملة — ما ربح بالدولار يُسحب بالدولار */}
+            {curEntries.filter((c: any) => c.available > 0 || c.pending_withdrawals > 0).length === 0 ? (
+              <div className="flex items-end gap-2">
+                <span className="text-4xl font-extrabold tabular-nums tracking-tight" dir="ltr">{fmtMoney(0, data?.primary_currency || 'ر.ي')}</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-end gap-x-5 gap-y-1.5 mt-0.5">
+                {curEntries.filter((c: any) => c.available > 0 || c.pending_withdrawals > 0).map((c: any) => (
+                  <div key={c.currency} className="flex items-end gap-1.5">
+                    <span className="text-3xl sm:text-4xl font-extrabold tabular-nums tracking-tight text-white" dir="ltr">{fmtMoney(c.available - c.pending_withdrawals, c.currency)}</span>
+                    <CurrencyPill currency={c.currency} size="xs" />
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-white/60 text-[11px] mt-1.5">
+              الرصيد المتاح للسحب الآن
+              {sumPending(byCur) > 0 ? ' • لديك طلبات سحب قيد المراجعة' : ''}
+              {curEntries.length > 1 ? ' • أرباحك محفوظة بكل عملة على حدة وتُسحب بعملتها' : ''}
+            </p>
           </div>
           <div className="flex flex-col gap-2 w-full sm:w-auto">
             <Button
-              onClick={() => setWdOpen(true)}
-              disabled={availableForWithdraw <= 0}
+              onClick={openWithdrawDialog}
+              disabled={!hasAnyBalance}
               className="relative overflow-hidden bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl shadow-lg active:scale-[0.97] transition-all disabled:opacity-40"
             >
               <span className="absolute inset-0 lux-shimmer" />
@@ -186,30 +244,30 @@ export function TrainerEarnings({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* ── Stats ── */}
+      {/* ── Stats — لكل عملة صفها الفاخر ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 fia-stagger">
         <Card className="p-4 border border-gold/25 bg-gradient-to-br from-white to-gold/5">
           <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-emerald-600" /><span className="text-[11px] font-bold text-muted-foreground">إجمالي الأرباح</span></div>
-          <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{fmt(totals.total_earned)}</p>
+          <MoneyLines byCur={byCur} pick={(t: any) => t.total_earned} tone="navy" />
         </Card>
         <Card className="p-4 border border-gold/25 bg-gradient-to-br from-white to-gold/5">
           <div className="flex items-center gap-2 mb-2"><Wallet className="w-4 h-4 text-gold" /><span className="text-[11px] font-bold text-muted-foreground">رصيد متاح</span></div>
-          <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{fmt(totals.available)}</p>
+          <MoneyLines byCur={byCur} pick={(t: any) => t.available} tone="gold" />
         </Card>
         <Card className="p-4 border border-gold/25 bg-gradient-to-br from-white to-gold/5">
           <div className="flex items-center gap-2 mb-2"><Clock className="w-4 h-4 text-amber-600" /><span className="text-[11px] font-bold text-muted-foreground">قيد السحب</span></div>
-          <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{fmt(totals.pending_withdrawals)}</p>
+          <MoneyLines byCur={byCur} pick={(t: any) => t.pending_withdrawals} tone="purple" />
         </Card>
         <Card className="p-4 border border-gold/25 bg-gradient-to-br from-white to-gold/5">
           <div className="flex items-center gap-2 mb-2"><ArrowDownToLine className="w-4 h-4 text-blue-600" /><span className="text-[11px] font-bold text-muted-foreground">تم سحبه</span></div>
-          <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{fmt(totals.withdrawn)}</p>
+          <MoneyLines byCur={byCur} pick={(t: any) => t.withdrawn} tone="emerald" />
         </Card>
       </div>
 
       {/* ── نسبة الأرباح من كل دورة ── */}
       <SectionCard
         title="نسبة أرباحك من الدورات"
-        description="حصتك المحددة من الإدارة لكل متدرب يشترك في دوراتك — تُضاف تلقائياً بعد تأكيد الدفع"
+        description="حصتك المحددة من الإدارة لكل متدرب يشترك في دوراتك — بعملة الدورة نفسها وتُضاف تلقائياً بعد تأكيد الدفع"
       >
         {percentage <= 0 ? (
           <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-l from-amber-500/[0.08] to-transparent p-4 flex items-center gap-3">
@@ -239,7 +297,7 @@ export function TrainerEarnings({ user }: { user: any }) {
                   <p className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
                     <span className="flex items-center gap-0.5"><Users className="w-3 h-3" /> {c.enrolled} متدرب</span>
                     <span>•</span>
-                    <span>سعر الاشتراك: <b dir="ltr">{fmt(c.price)} {c.currency}</b></span>
+                    <span>سعر الاشتراك: <b dir="ltr">{fmtMoney(c.price, c.currency)}</b></span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -249,7 +307,7 @@ export function TrainerEarnings({ user }: { user: any }) {
                   </div>
                   <div className="text-center rounded-lg bg-gradient-to-l from-gold/20 to-amber-500/10 border border-gold/40 px-2.5 py-1">
                     <p className="text-[8px] font-bold text-muted-foreground">حصتك لكل متدرب</p>
-                    <p className="text-xs font-extrabold text-[#8a6d1d] tabular-nums" dir="ltr">{fmt(c.my_share_per_student)} {c.currency}</p>
+                    <p className="text-xs font-extrabold text-[#8a6d1d] tabular-nums" dir="ltr">{fmtMoney(c.my_share_per_student, c.currency)}</p>
                   </div>
                 </div>
               </div>
@@ -304,7 +362,7 @@ export function TrainerEarnings({ user }: { user: any }) {
       </SectionCard>
 
       {/* ── سجل طلبات السحب ── */}
-      <SectionCard title="سجل طلبات السحب" description="طلباتك السابقة وقرارات الإدارة مع لقطات إثبات التحويل">
+      <SectionCard title="سجل طلبات السحب" description="طلباتك السابقة بعملاتها وقرارات الإدارة مع لقطات إثبات التحويل">
         {withdrawals.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Send className="w-10 h-10 mx-auto mb-2 opacity-25" />
@@ -320,7 +378,10 @@ export function TrainerEarnings({ user }: { user: any }) {
                     {w.status === 'مكتمل' ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : w.status === 'ملغي' ? <XCircle className="w-5 h-5 text-rose-600" /> : <Clock className="w-5 h-5 text-amber-600" />}
                   </div>
                   <div className="flex-1 min-w-[150px]">
-                    <p className="text-sm font-extrabold text-navy tabular-nums" dir="ltr">{fmt(w.amount)} {w.currency}</p>
+                    <p className="text-sm font-extrabold text-navy tabular-nums flex items-center gap-2" dir="ltr">
+                      {fmtMoney(w.amount, w.currency)}
+                      <CurrencyPill currency={w.currency} size="xs" />
+                    </p>
                     <p className="text-[10px] text-muted-foreground">{w.method_name || w.method_type} • <span dir="ltr">{w.account}</span></p>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(w.created_at).toLocaleString('ar-EG')}</p>
                   </div>
@@ -343,7 +404,7 @@ export function TrainerEarnings({ user }: { user: any }) {
       </SectionCard>
 
       {/* ── سجل الأرباح ── */}
-      <SectionCard title="سجل الأرباح التفصيلي" description="كل عملية ربح أُضيفت لمحفظتك بعد تأكيد الدفع">
+      <SectionCard title="سجل الأرباح التفصيلي" description="كل عملية ربح أُضيفت لمحفظتك بعملتها بعد تأكيد الدفع">
         {earnings.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Crown className="w-10 h-10 mx-auto mb-2 opacity-25" />
@@ -366,8 +427,8 @@ export function TrainerEarnings({ user }: { user: any }) {
                   <p className="text-[10px] font-extrabold text-navy" dir="ltr">{e.percentage}%</p>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-extrabold text-emerald-600 tabular-nums" dir="ltr">+{fmt(e.amount)}</p>
-                  <p className="text-[8px] text-muted-foreground">{e.currency}</p>
+                  <p className="text-sm font-extrabold text-emerald-600 tabular-nums" dir="ltr">+{fmtMoney(e.amount, e.currency)}</p>
+                  <CurrencyPill currency={e.currency} size="xs" />
                 </div>
                 <StatusChip status={e.status} />
               </div>
@@ -376,7 +437,7 @@ export function TrainerEarnings({ user }: { user: any }) {
         )}
       </SectionCard>
 
-      {/* ── Withdrawal dialog ── */}
+      {/* ── Withdrawal dialog — اختيار العملة الفاخر ── */}
       <Dialog open={wdOpen} onOpenChange={setWdOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -386,22 +447,54 @@ export function TrainerEarnings({ user }: { user: any }) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* اختيار العملة — كل عملة خزينة مستقلة */}
+            <div>
+              <Label className="text-xs font-extrabold text-navy flex items-center gap-1.5 mb-2">
+                <Coins className="w-3.5 h-3.5 text-gold" /> عملة السحب — تُسحب بعملة ربحك نفسها
+              </Label>
+              {curEntries.length === 0 ? (
+                <div className="rounded-xl border border-gold/25 bg-gold/[0.04] p-3 text-center text-[11px] text-muted-foreground">لا توجد أرباح بعد — بمجرد تأكيد أول دفعة تظهر عملة ربحك هنا</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto lux-scrollbar pl-1">
+                  {curEntries.map((c: any) => {
+                    const avail = c.available - c.pending_withdrawals
+                    const active = wdCur === c.currency
+                    return (
+                      <button key={c.currency} type="button" disabled={avail <= 0}
+                        onClick={() => { setWdCurrency(c.currency); setWdAmount('') }}
+                        className={`w-full flex items-center justify-between rounded-xl border px-3 py-2.5 transition-all text-right ${active ? 'border-gold bg-gradient-to-l from-gold/20 to-amber-500/10 shadow-sm ring-1 ring-gold/40' : 'border-gold/20 bg-white hover:border-gold/50'} ${avail <= 0 ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-extrabold text-[11px] ${active ? 'bg-gradient-to-br from-gold to-amber-500 text-navy' : 'bg-navy/5 text-navy border border-navy/10'}`} dir="ltr">
+                            {currencyInfo(c.currency).prefix ? currencyInfo(c.currency).symbol : currencyInfo(c.currency).short.slice(0, 2)}
+                          </span>
+                          <div>
+                            <p className="text-xs font-extrabold text-navy">{currencyInfo(c.currency).label}</p>
+                            <p className="text-[9px] text-muted-foreground">{avail <= 0 ? 'لا يوجد رصيد متاح' : `متاح: ${fmtMoney(avail, c.currency)}`}</p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-gold transition-transform ${active ? '-rotate-90' : 'rotate-90 opacity-40'}`} />
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             <div className="relative overflow-hidden rounded-xl bg-gradient-to-l from-navy via-navy-light to-navy p-4 text-white border border-gold/30">
               <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }} />
               <div className="relative flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-gold/80 font-bold">الرصيد المتاح للسحب</p>
-                  <p className="text-2xl font-extrabold tabular-nums" dir="ltr">{fmt(availableForWithdraw)} <span className="text-sm text-gold">{earnings[0]?.currency || 'ر.ي'}</span></p>
+                  <p className="text-[10px] text-gold/80 font-bold">الرصيد المتاح بعملة {currencyInfo(wdCur).label}</p>
+                  <p className="text-2xl font-extrabold tabular-nums" dir="ltr">{fmtMoney(wdAvailable, wdCur)}</p>
                 </div>
                 <Wallet className="w-8 h-8 text-gold/70" />
               </div>
             </div>
             <div>
-              <Label className="text-xs font-bold text-navy">مبلغ السحب</Label>
+              <Label className="text-xs font-bold text-navy">مبلغ السحب ({currencyInfo(wdCur).label})</Label>
               <Input type="number" value={wdAmount} onChange={(e) => setWdAmount(e.target.value)} dir="ltr" className="mt-1 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 font-bold text-lg" placeholder="0" />
               <div className="flex gap-1.5 mt-2">
                 {[25, 50, 75, 100].map((p) => (
-                  <button key={p} type="button" onClick={() => setWdAmount(String(Math.floor(availableForWithdraw * p / 100)))}
+                  <button key={p} type="button" onClick={() => setWdAmount(String(Math.floor(wdAvailable * p / 100)))}
                     className="text-[10px] font-bold rounded-full border border-gold/25 bg-white hover:bg-gold/10 px-2.5 py-0.5 text-navy transition-colors">{p}%</button>
                 ))}
               </div>
@@ -409,14 +502,14 @@ export function TrainerEarnings({ user }: { user: any }) {
             <div className="rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center gap-2.5">
               {pmType === 'محلي' ? <Landmark className="w-4 h-4 text-gold flex-shrink-0" /> : <Bitcoin className="w-4 h-4 text-gold flex-shrink-0" />}
               <div className="text-[11px] text-muted-foreground leading-relaxed">
-                يُحوَّل المبلغ إلى: <b className="text-navy">{pmName || 'طريقة الدفع المسجلة'}</b>
+                يُحوَّل <b className="text-navy" dir="ltr">{fmtMoney(parseInt(wdAmount) || 0, wdCur)}</b> إلى: <b className="text-navy">{pmName || 'طريقة الدفع المسجلة'}</b>
                 {pmAccount && <> — <span dir="ltr" className="text-navy font-bold">{pmAccount}</span></>}
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWdOpen(false)}>إلغاء</Button>
-            <Button onClick={submitWithdrawal} disabled={wdSubmitting} className="bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
+            <Button onClick={submitWithdrawal} disabled={wdSubmitting || wdAvailable <= 0} className="bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
               {wdSubmitting ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
               إرسال الطلب للإدارة
             </Button>
@@ -439,4 +532,9 @@ export function TrainerEarnings({ user }: { user: any }) {
       </Dialog>
     </div>
   )
+}
+
+/** مجموع الطلبات المعلقة عبر كل العملات (للشريط السفلي في الهيرو) */
+function sumPending(byCur: Record<string, any>): number {
+  return Object.values(byCur || {}).reduce((a: number, t: any) => a + (t.pending_withdrawals || 0), 0)
 }

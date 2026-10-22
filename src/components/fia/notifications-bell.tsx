@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Bell, CheckCircle2, Clock, MessageSquare, Star, CreditCard, Users,
   AlertCircle, Award, Mail, Newspaper, Trophy, GraduationCap,
-  Volume2, VolumeX, X, BellRing, Trash2, Play, Loader2,
+  Volume2, VolumeX, X, BellRing, Trash2, Play, Loader2, ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
@@ -89,6 +89,9 @@ export function NotificationsBell() {
   const [muted, setMutedState] = useState(false)
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>('default')
+  // ⚡ ROYAL v4.4 — عرض تفصيلي فاخر: كل إشعار "يفتح" دائماً عند الضغط عليه —
+  // إشعار بلا رابط يُعرض كاملاً في بطاقة ملكية بدل لا شيء.
+  const [detail, setDetail] = useState<any>(null)
   const ref = useRef<HTMLDivElement>(null)
   // ⚡ Track recently announced notification IDs to prevent duplicates.
   // Both the Realtime subscription AND the polling fallback call
@@ -543,6 +546,11 @@ export function NotificationsBell() {
     }
   }, [open])
 
+  // ⚡ ROYAL v4.4 — عند إغلاق اللوحة نعود دائماً من العرض التفصيلي للقائمة
+  useEffect(() => {
+    if (!open) setDetail(null)
+  }, [open])
+
   const unread = items.filter((n) => !n.read_at)
   const unreadCount = unread.length
 
@@ -613,53 +621,70 @@ export function NotificationsBell() {
     }
   }
 
-  const markOneRead = async (n: any) => {
-    if (n.read_at) {
-      // Already read — navigate if there's a link
-      navigateToLink(n.link)
-      return
-    }
-    // Mark as read locally + via API
-    setItems((prev) => prev.map((x) => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x))
-    try {
-      await fetch('/api/notifications', {
+  // ⚡ ROYAL v4.4 — فتح إشعار: كل ضغطة تفتح شيئاً دائماً:
+  //  • إشعار له رابط → يُعلّم مقروءاً + ينتقل فوراً (ويُغلق اللوحة)
+  //  • إشعار بلا رابط → يُعلّم مقروءاً + يُعرض كاملاً في بطاقة تفصيلية ملكية
+  //  (لا يبقى أي إشعار "لا يفتح" أبداً — والتحديث للحالة محلي فوري)
+  const openNotification = (n: any) => {
+    if (!n.read_at) {
+      setItems((prev) => prev.map((x) => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x))
+      fetch('/api/notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: [n.id] }),
-      })
-    } catch {}
-    navigateToLink(n.link)
+      }).catch(() => {})
+    }
+    if (n.link) {
+      setDetail(null)
+      setOpen(false)
+      navigateToLink(n.link)
+    } else {
+      setDetail(n)
+    }
   }
 
   if (!user) return null
 
+  const latestId = items[0]?.id || 'none'
+
   return (
-    <div className="relative flex-shrink-0" ref={ref}>
-      {/* ⚡ Magical bell button — animated gold glow when unread */}
+    <div className="relative flex-shrink-0 notifications-bell-container" ref={ref}>
+      {/* ⚡ ROYAL v4.4 — جرس ملكي: توهّج ذهبي ناعم يتنفس + هزّة ترحيب راقية محدودة
+          (تهتز مرات قليلة عند وصول إشعار جديد ثم ترتاح — لا اهتزاز دائم مزعج) */}
       <button
-        onClick={() => { setOpen(!open); if (!open) load() }}
-        className="relative w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center transition-all"
-        title="الإشعارات"
+        type="button"
+        onClick={() => { setOpen((o) => !o); if (!open) load() }}
+        aria-expanded={open}
         aria-label="الإشعارات"
+        title="الإشعارات"
+        className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 hover:bg-gold/10"
       >
         {unreadCount > 0 && (
-          <div className="absolute inset-0 rounded-xl bg-gold/20 animate-ping opacity-50" />
+          <span className="absolute inset-0 rounded-xl bg-gold/30 fia-bell-glow" />
         )}
-        <Bell className={`relative w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-navy animate-swing' : 'text-muted-foreground'}`} />
+        <Bell
+          key={latestId}
+          className={`relative w-5 h-5 transition-colors ${unreadCount > 0 ? 'text-gold fia-bell-swing drop-shadow-[0_0_6px_rgba(212,175,55,0.45)]' : 'text-muted-foreground'}`}
+        />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-gradient-to-br from-red-500 to-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-gradient-to-br from-red-500 to-rose-600 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center shadow-md ring-2 ring-white"
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* ⚡ Magical dropdown panel */}
+      {/* ⚡ ROYAL v4.4 — لوحة الإشعارات الملكية */}
       {open && (
         <div
-          className="absolute left-0 top-full mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] bg-white border-2 border-gold/30 rounded-2xl shadow-2xl z-50 overflow-hidden"
-          style={{ animation: 'fiaBellSlide 0.18s ease-out', boxShadow: '0 20px 60px rgba(11, 22, 53, 0.25), 0 0 40px -10px rgba(212, 175, 55, 0.3)' }}
+          className="absolute left-0 top-full mt-2 w-[350px] max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl z-50 overflow-hidden border border-gold/40"
+          style={{ animation: 'fiaBellSlide 0.2s ease-out', boxShadow: '0 24px 70px rgba(11, 22, 53, 0.3), 0 0 50px -12px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(212,175,55,0.25)' }}
         >
-          {/* ⚡ Magical header */}
+          {/* شريط ذهبي علوي */}
+          <div className="h-1 bg-gradient-to-l from-gold via-amber-300 to-gold" />
+
+          {/* ⚡ الهيدر الملكي */}
           <div className="relative flex items-center justify-between p-3 bg-gradient-to-l from-navy via-navy-light to-navy text-white overflow-hidden">
             <div className="absolute inset-0 opacity-25" style={{
               backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
@@ -667,19 +692,21 @@ export function NotificationsBell() {
             }} />
             <div className="absolute -top-6 -right-6 w-16 h-16 bg-gold/15 rounded-full blur-2xl" />
             <div className="relative flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0 relative">
                 <Bell className="w-4 h-4 text-navy" />
+                {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-navy" />}
               </div>
-              <h4 className="font-bold text-sm">الإشعارات</h4>
-              {unreadCount > 0 && (
-                <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 shadow-sm">
-                  {unreadCount} غير مقروء
-                </span>
-              )}
+              <div className="min-w-0">
+                <h4 className="font-extrabold text-sm leading-tight">{detail ? 'تفاصيل الإشعار' : 'مركز الإشعارات'}</h4>
+                <p className="text-[9px] text-gold/70 font-bold">
+                  {detail ? 'القاعة الملكية' : unreadCount > 0 ? `${unreadCount} غير مقروء من ${items.length}` : 'كل شيء مقروء ✓'}
+                </p>
+              </div>
             </div>
             <div className="relative flex items-center gap-0.5 flex-shrink-0">
               {/* Mute toggle */}
               <button
+                type="button"
                 onClick={toggleMute}
                 className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
                 title={muted ? 'تفعيل الأصوات' : 'كتم الأصوات'}
@@ -687,8 +714,9 @@ export function NotificationsBell() {
                 {muted ? <VolumeX className="w-3.5 h-3.5 text-white/60" /> : <Volume2 className="w-3.5 h-3.5 text-gold" />}
               </button>
               {/* Mark all as read */}
-              {unreadCount > 0 && (
+              {unreadCount > 0 && !detail && (
                 <button
+                  type="button"
                   onClick={markAllRead}
                   className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
                   title="تعليم الكل كمقروء"
@@ -698,6 +726,7 @@ export function NotificationsBell() {
               )}
               {/* Close */}
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="w-7 h-7 rounded-md hover:bg-white/10 flex items-center justify-center transition-colors"
                 title="إغلاق"
@@ -713,13 +742,14 @@ export function NotificationsBell() {
               banner entirely. The APK has its own native notification
               system (NotificationPollService + OneSignal) which is
               always active when the user installs the app.) === */}
-          {!isAndroidWebView() && notifPerm !== 'granted' && (
+          {!isAndroidWebView() && notifPerm !== 'granted' && !detail && (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); requestNotificationPermission() }}
               className="w-full p-3 bg-gradient-to-r from-gold/10 to-gold/5 border-b border-gold/20 hover:bg-gold/15 transition-colors flex items-center gap-3 text-right"
             >
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-gold to-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
-                <BellRing className="w-4 h-4 text-navy animate-swing" />
+                <BellRing className="w-4 h-4 text-navy fia-bell-swing" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-navy">فعّل الإشعارات الصوتية والمنبثقة</p>
@@ -731,7 +761,7 @@ export function NotificationsBell() {
           {/* === APK-specific banner — replaces the "enable browser
               notifications" banner inside the FIA APK. Tells the user
               that notifications are handled natively by the app. === */}
-          {isAndroidWebView() && (
+          {isAndroidWebView() && !detail && (
             <div className="w-full p-3 bg-gradient-to-r from-green-500/10 to-green-500/5 border-b border-green-500/20 flex items-center gap-3 text-right">
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center flex-shrink-0 shadow-md">
                 <BellRing className="w-4 h-4 text-white" />
@@ -744,26 +774,75 @@ export function NotificationsBell() {
           )}
 
           {/* === Audio-unlocked indicator (subtle, only when not unlocked) === */}
-          {!audioUnlocked && (
+          {!audioUnlocked && !detail && (
             <div className="px-3 py-1.5 bg-blue-500/5 border-b border-blue-500/10 text-[10px] text-blue-600 text-center">
               💡 الصوت سيعمل عند أول نقرة في الصفحة
             </div>
           )}
 
-          {/* Body — scrollable notifications list */}
-          <div className="max-h-[60vh] overflow-y-auto">
-            {loading && items.length === 0 ? (
+          {/* Body */}
+          <div className="max-h-[60vh] overflow-y-auto lux-scrollbar">
+            {detail ? (
+              /* ⚡ ROYAL v4.4 — العرض التفصيلي الملكي: كل إشعار يُفتح كاملاً */
+              <div className="fia-detail-in">
+                <div className="p-3 border-b border-gold/15 bg-gradient-to-l from-gold/[0.06] to-transparent">
+                  <button
+                    type="button"
+                    onClick={() => setDetail(null)}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-gold hover:text-navy transition-colors"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" /> عودة لقائمة الإشعارات
+                  </button>
+                </div>
+                <div className="p-5 text-center">
+                  {(() => {
+                    const Icon = TYPE_ICON[detail.type] || AlertCircle
+                    const color = TYPE_COLOR[detail.type] || 'bg-muted text-muted-foreground'
+                    const label = TYPE_LABEL[detail.type] || 'إشعار'
+                    return (
+                      <>
+                        <div className="relative inline-block mb-3">
+                          <div className="absolute inset-0 bg-gold/25 rounded-full blur-2xl animate-pulse" />
+                          <div className={`relative w-16 h-16 mx-auto rounded-2xl flex items-center justify-center shadow-lg border-2 border-gold/40 ${color}`}>
+                            <Icon className="w-8 h-8" />
+                          </div>
+                        </div>
+                        <span className="inline-block text-[9px] font-extrabold rounded-full bg-gold/15 border border-gold/40 text-[#8a6d1d] px-2.5 py-0.5 mb-3">{label}</span>
+                        <h5 className="text-sm font-extrabold text-navy leading-relaxed mb-2">{detail.title}</h5>
+                        {detail.body && (
+                          <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap bg-muted/30 rounded-xl border border-border p-3 text-right">
+                            {detail.body}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-3 flex items-center justify-center gap-1">
+                          <Clock className="w-3 h-3" /> {new Date(detail.created_at).toLocaleString('ar-EG')}
+                        </p>
+                        {detail.link && (
+                          <Button
+                            size="sm"
+                            onClick={() => { setDetail(null); setOpen(false); navigateToLink(detail.link) }}
+                            className="mt-3 bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl"
+                          >
+                            فتح الهدف ←
+                          </Button>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+            ) : loading && items.length === 0 ? (
               <div className="p-10 text-center text-xs text-muted-foreground">
-                <div className="w-8 h-8 mx-auto mb-2 border-2 border-navy/20 border-t-navy rounded-full animate-spin" />
+                <div className="w-8 h-8 mx-auto mb-2 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                 جاري تحميل الإشعارات...
               </div>
             ) : items.length === 0 ? (
-              /* ⚡ Magical empty state */
+              /* ⚡ العميل الفارغ الفاخر */
               <div className="p-10 text-center">
                 <div className="relative inline-block mb-3">
                   <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
-                  <div className="relative w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
-                    <Bell className="w-7 h-7 text-gold" />
+                  <div className="relative w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                    <Bell className="w-8 h-8 text-gold" />
                   </div>
                 </div>
                 <p className="text-sm font-bold text-navy mb-1">لا توجد إشعارات</p>
@@ -771,7 +850,7 @@ export function NotificationsBell() {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {items.map((n) => {
+                {items.map((n, idx) => {
                   const Icon = TYPE_ICON[n.type] || AlertCircle
                   const color = TYPE_COLOR[n.type] || 'bg-muted text-muted-foreground'
                   const label = TYPE_LABEL[n.type] || 'إشعار'
@@ -779,11 +858,18 @@ export function NotificationsBell() {
                   return (
                     <div
                       key={n.id}
-                      className={`group relative w-full text-right p-3 hover:bg-muted/40 transition-colors flex items-start gap-3 ${isUnread ? 'bg-gold/5' : ''}`}
-                      onClick={() => markOneRead(n)}
+                      className={`group relative w-full text-right p-3 pl-10 hover:bg-gold/[0.04] transition-colors flex items-start gap-3 cursor-pointer fia-item-in ${isUnread ? 'bg-gold/[0.06]' : ''}`}
+                      style={{ animationDelay: `${Math.min(idx, 8) * 30}ms` }}
+                      onClick={() => openNotification(n)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNotification(n) } }}
                     >
+                      {/* شريط ذهبي للإشعار غير المقروء */}
+                      {isUnread && <span className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-gold to-amber-500" />}
                       {/* Delete button — appears on hover */}
                       <button
+                        type="button"
                         onClick={(e) => deleteNotification(e, n)}
                         className="absolute top-2 left-2 w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-opacity flex items-center justify-center"
                         title="حذف"
@@ -791,20 +877,19 @@ export function NotificationsBell() {
                         <Trash2 className="w-3 h-3 text-red-500" />
                       </button>
                       {/* Icon */}
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border ${color} ${isUnread ? 'border-gold/40 shadow-sm' : 'border-transparent opacity-80'}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">{label}</span>
-                          <span className="text-[10px] text-muted-foreground/70">•</span>
+                          <span className="text-[9px] font-extrabold text-gold/90 bg-gold/10 rounded-full px-1.5 py-0.5">{label}</span>
                           <span className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
                             <Clock className="w-2.5 h-2.5" /> {fmtRelative(n.created_at)}
                           </span>
-                          {isUnread && <div className="w-2 h-2 bg-gold rounded-full flex-shrink-0 mr-auto" title="غير مقروء" />}
+                          {isUnread && <div className="w-2 h-2 bg-gold rounded-full flex-shrink-0 mr-auto shadow-[0_0_6px_rgba(212,175,55,0.6)]" title="غير مقروء" />}
                         </div>
-                        <h5 className="text-xs font-bold text-navy line-clamp-1 leading-snug mb-0.5">{n.title}</h5>
+                        <h5 className="text-xs font-extrabold text-navy line-clamp-1 leading-snug mb-0.5">{n.title}</h5>
                         {n.body && <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">{n.body}</p>}
                       </div>
                     </div>
@@ -815,19 +900,21 @@ export function NotificationsBell() {
           </div>
 
           {/* Footer — mark all read + delete all */}
-          {items.length > 0 && (
-            <div className="flex border-t border-gray-100">
+          {items.length > 0 && !detail && (
+            <div className="flex border-t border-gray-100 bg-gradient-to-l from-gold/[0.03] to-transparent">
               {unreadCount > 0 && (
                 <button
+                  type="button"
                   onClick={markAllRead}
-                  className="flex-1 p-2.5 text-center text-xs text-navy font-semibold hover:bg-muted/40 transition-colors bg-muted/20"
+                  className="flex-1 p-2.5 text-center text-xs text-navy font-bold hover:bg-gold/10 transition-colors"
                 >
                   ✓ تعليم الكل كمقروء
                 </button>
               )}
               <button
+                type="button"
                 onClick={deleteAllNotifications}
-                className="flex-1 p-2.5 text-center text-xs text-red-500 font-semibold hover:bg-red-500/10 transition-colors border-r border-gray-100"
+                className="flex-1 p-2.5 text-center text-xs text-red-500 font-bold hover:bg-red-500/10 transition-colors border-r border-gray-100"
               >
                 🗑 حذف الكل
               </button>
@@ -841,27 +928,31 @@ export function NotificationsBell() {
                  (test notification — inserts to DB, fires Realtime +
                  polling, plays sound + toast + browser notif)
           */}
-          <div className="flex gap-2 p-2 border-t border-gray-100 bg-gradient-to-r from-navy/5 to-gold/5">
-            <button
-              onClick={testSoundOnly}
-              className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-navy py-2 px-2 rounded-lg bg-white border border-navy/20 hover:bg-navy/5 transition-colors"
-              title="اختبر الصوت فقط"
-            >
-              <Volume2 className="w-3.5 h-3.5" /> اختبار الصوت
-            </button>
-            <button
-              onClick={sendTestNotification}
-              disabled={testing}
-              className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white py-2 px-2 rounded-lg bg-gradient-to-r from-navy to-navy-light hover:opacity-90 transition-opacity disabled:opacity-50"
-              title="اختبر الإشعار الكامل (صوت + toast + browser notification)"
-            >
-              {testing ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري...</>
-              ) : (
-                <><Play className="w-3.5 h-3.5" /> اختبار الإشعار</>
-              )}
-            </button>
-          </div>
+          {!detail && (
+            <div className="flex gap-2 p-2 border-t border-gray-100 bg-gradient-to-r from-navy/5 to-gold/5">
+              <button
+                type="button"
+                onClick={testSoundOnly}
+                className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-navy py-2 px-2 rounded-lg bg-white border border-navy/20 hover:bg-navy/5 transition-colors"
+                title="اختبر الصوت فقط"
+              >
+                <Volume2 className="w-3.5 h-3.5" /> اختبار الصوت
+              </button>
+              <button
+                type="button"
+                onClick={sendTestNotification}
+                disabled={testing}
+                className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white py-2 px-2 rounded-lg bg-gradient-to-r from-navy to-navy-light hover:opacity-90 transition-opacity disabled:opacity-50"
+                title="اختبر الإشعار الكامل (صوت + toast + browser notification)"
+              >
+                {testing ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري...</>
+                ) : (
+                  <><Play className="w-3.5 h-3.5" /> اختبار الإشعار</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

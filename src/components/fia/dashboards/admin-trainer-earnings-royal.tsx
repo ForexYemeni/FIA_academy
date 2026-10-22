@@ -19,8 +19,23 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { LuxSection, LuxStats, LuxEmpty, LuxRow, LuxBadge } from './luxury'
 import { supabasePublic } from '@/lib/supabase'
+import { fmtMoney, currencyInfo } from '@/lib/currency'
 
-const fmt = (n: any) => (Number(n) || 0).toLocaleString('en-US')
+
+/** صفوف مبالغ لكل عملة داخل بطاقة إحصائية أو بطاقة مدرب */
+function CurLines({ byCur, pick, cls = 'text-white' }: { byCur: Record<string, any>; pick: (t: any) => number; cls?: string }) {
+  const entries = Object.entries(byCur || {}).filter(([, t]: any) => pick(t) !== 0)
+  if (entries.length === 0) return <span className={cls} dir="ltr">{fmtMoney(0, 'ر.ي')}</span>
+  return (
+    <div className="space-y-0.5">
+      {entries.map(([cur, t]: any) => (
+        <div key={cur} className={`${cls} ${entries.length > 1 ? 'text-sm' : 'text-xl'} font-extrabold leading-none tabular-nums`} dir="ltr">
+          {fmtMoney(pick(t), cur)}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function compressImage(file: File, maxW = 1400, maxH = 1400, quality = 0.85): Promise<File> {
   return new Promise((resolve, reject) => {
@@ -138,10 +153,19 @@ export function AdminTrainerEarningsRoyal() {
   const withdrawals = data?.withdrawals || []
   const pending = withdrawals.filter((w: any) => w.status === 'قيد الانتظار')
   const processed = withdrawals.filter((w: any) => w.status !== 'قيد الانتظار')
-  const totalOwed = perTrainer.reduce((a: number, t: any) => a + t.available, 0)
-  const totalPaid = perTrainer.reduce((a: number, t: any) => a + t.withdrawn, 0)
-  const totalPending = pending.reduce((a: number, w: any) => a + w.amount, 0)
-  const totalEarnedAll = perTrainer.reduce((a: number, t: any) => a + t.total_earned, 0)
+  // ⚡ إجماليات عالمية لكل عملة — كل عملة خزينة مستقلة
+  const globalByCur: Record<string, any> = {}
+  for (const t of perTrainer) {
+    for (const [cur, tt] of Object.entries(t.totals_by_currency || {}) as any[]) {
+      if (!globalByCur[cur]) globalByCur[cur] = { total_earned: 0, available: 0, withdrawn: 0, pending_withdrawals: 0 }
+      globalByCur[cur].total_earned += tt.total_earned || 0
+      globalByCur[cur].available += tt.available || 0
+      globalByCur[cur].withdrawn += tt.withdrawn || 0
+      globalByCur[cur].pending_withdrawals += tt.pending_withdrawals || 0
+    }
+  }
+  const pendingByCur: Record<string, number> = {}
+  for (const w of pending) pendingByCur[w.currency || 'ر.ي'] = (pendingByCur[w.currency || 'ر.ي'] || 0) + (w.amount || 0)
 
   return (
     <LuxSection
@@ -153,10 +177,10 @@ export function AdminTrainerEarningsRoyal() {
       stats={
         <LuxStats
           items={[
-            { icon: TrendingUp, label: 'إجمالي ما كُسب للمدربين', value: fmt(totalEarnedAll), grad: 'from-emerald-500 to-teal-600' },
-            { icon: Hourglass, label: 'مستحقات بانتظار السحب', value: fmt(totalOwed), grad: 'from-amber-500 to-gold' },
-            { icon: Clock, label: 'طلبات سحب معلقة', value: pending.length, grad: 'from-purple-500 to-fuchsia-600' },
-            { icon: CheckCircle2, label: 'إجمالي ما تم صرفه', value: fmt(totalPaid), grad: 'from-blue-500 to-indigo-600' },
+            { icon: TrendingUp, label: 'إجمالي ما كُسب للمدربين', value: <CurLines byCur={globalByCur} pick={(t: any) => t.total_earned} />, grad: 'from-emerald-500 to-teal-600' },
+            { icon: Hourglass, label: 'مستحقات بانتظار السحب', value: <CurLines byCur={globalByCur} pick={(t: any) => t.available} />, grad: 'from-amber-500 to-gold' },
+            { icon: Clock, label: 'طلبات سحب معلقة', value: <CurLines byCur={pendingByCur} pick={(v: any) => v} />, grad: 'from-purple-500 to-fuchsia-600' },
+            { icon: CheckCircle2, label: 'إجمالي ما تم صرفه', value: <CurLines byCur={globalByCur} pick={(t: any) => t.withdrawn} />, grad: 'from-blue-500 to-indigo-600' },
           ]}
         />
       }
@@ -165,7 +189,7 @@ export function AdminTrainerEarningsRoyal() {
       <div className="mb-3 flex items-center gap-2">
         <h3 className="text-sm font-extrabold text-navy flex items-center gap-1.5"><Clock className="w-4 h-4 text-amber-600" /> طلبات السحب بانتظار قرارك</h3>
         {pending.length > 0 && <LuxBadge tone="gold">{pending.length}</LuxBadge>}
-        {pending.length > 0 && <span className="text-[10px] text-muted-foreground">بمجموع {fmt(totalPending)}</span>}
+        {pending.length > 0 && <span className="text-[10px] text-muted-foreground">بمجموع <CurLines byCur={pendingByCur} pick={(v: any) => v} cls="text-navy font-extrabold" /></span>}
       </div>
       {pending.length === 0 ? (
         <div className="rounded-xl border border-gold/20 bg-gradient-to-l from-gold/[0.04] to-transparent p-6 text-center mb-6">
@@ -189,7 +213,7 @@ export function AdminTrainerEarningsRoyal() {
                 <div className="flex-1 min-w-[180px]">
                   <p className="text-sm font-extrabold text-navy flex items-center gap-1.5">
                     {w.trainer_name}
-                    <span className="text-[9px] font-bold rounded-full bg-gold/15 border border-gold/40 text-[#8a6d1d] px-2 py-0.5" dir="ltr">{fmt(w.amount)} {w.currency}</span>
+                    <span className="text-[9px] font-bold rounded-full bg-gold/15 border border-gold/40 text-[#8a6d1d] px-2 py-0.5" dir="ltr">{fmtMoney(w.amount, w.currency)}</span>
                   </p>
                   <div className="mt-1 space-y-0.5">
                     <LuxRow icon={w.method_type === 'عملات رقمية' ? Bitcoin : Landmark}>
@@ -249,23 +273,23 @@ export function AdminTrainerEarningsRoyal() {
                       </span>
                     )}
                   </div>
-                  {/* 4 mini numbers */}
+                  {/* 4 mini numbers — لكل عملة صفها الفاخر */}
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     <div className="rounded-lg bg-navy/[0.03] border border-navy/10 px-2 py-1.5 text-center">
                       <p className="text-[8px] font-bold text-muted-foreground">كُسب</p>
-                      <p className="text-xs font-extrabold text-navy tabular-nums" dir="ltr">{fmt(t.total_earned)}</p>
+                      <CurLines byCur={t.totals_by_currency || {}} pick={(t2: any) => t2.total_earned} cls="text-navy" />
                     </div>
                     <div className="rounded-lg bg-amber-500/[0.07] border border-amber-500/20 px-2 py-1.5 text-center">
                       <p className="text-[8px] font-bold text-muted-foreground">متاح</p>
-                      <p className="text-xs font-extrabold text-[#8a6d1d] tabular-nums" dir="ltr">{fmt(t.available)}</p>
+                      <CurLines byCur={t.totals_by_currency || {}} pick={(t2: any) => t2.available} cls="text-[#8a6d1d]" />
                     </div>
                     <div className="rounded-lg bg-purple-500/[0.07] border border-purple-500/20 px-2 py-1.5 text-center">
                       <p className="text-[8px] font-bold text-muted-foreground">معلق</p>
-                      <p className="text-xs font-extrabold text-purple-700 tabular-nums" dir="ltr">{fmt(t.pending_withdrawals)}</p>
+                      <CurLines byCur={t.totals_by_currency || {}} pick={(t2: any) => t2.pending_withdrawals} cls="text-purple-700" />
                     </div>
                     <div className="rounded-lg bg-emerald-500/[0.07] border border-emerald-500/20 px-2 py-1.5 text-center">
                       <p className="text-[8px] font-bold text-muted-foreground">مصروف</p>
-                      <p className="text-xs font-extrabold text-emerald-700 tabular-nums" dir="ltr">{fmt(t.withdrawn)}</p>
+                      <CurLines byCur={t.totals_by_currency || {}} pick={(t2: any) => t2.withdrawn} cls="text-emerald-700" />
                     </div>
                   </div>
                   {/* expand earnings log */}
@@ -286,7 +310,7 @@ export function AdminTrainerEarningsRoyal() {
                                 <p className="text-[10px] font-bold text-navy truncate">{e.course_title || 'دورة'}</p>
                                 <p className="text-[8px] text-muted-foreground truncate">{e.student_name || '—'} • {new Date(e.created_at).toLocaleDateString('ar-EG')}</p>
                               </div>
-                              <p className="text-[10px] font-extrabold text-emerald-600 tabular-nums" dir="ltr">+{fmt(e.amount)}</p>
+                              <p className="text-[10px] font-extrabold text-emerald-600 tabular-nums" dir="ltr">+{fmtMoney(e.amount, e.currency)}</p>
                               <span className={`text-[8px] font-bold rounded-full px-1.5 py-0.5 border ${e.status === 'متاح' ? 'bg-gold/15 text-[#8a6d1d] border-gold/40' : 'bg-navy/10 text-navy border-navy/20'}`}>{e.status}</span>
                             </div>
                           ))}
@@ -315,7 +339,7 @@ export function AdminTrainerEarningsRoyal() {
                   {w.status === 'مكتمل' ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <XCircle className="w-5 h-5 text-rose-600" />}
                 </div>
                 <div className="flex-1 min-w-[140px]">
-                  <p className="text-xs font-extrabold text-navy">{w.trainer_name} — <span dir="ltr">{fmt(w.amount)} {w.currency}</span></p>
+                  <p className="text-xs font-extrabold text-navy">{w.trainer_name} — <span dir="ltr">{fmtMoney(w.amount, w.currency)}</span></p>
                   <p className="text-[9px] text-muted-foreground">عولج في {new Date(w.processed_at || w.created_at).toLocaleString('ar-EG')}</p>
                 </div>
                 {w.admin_note && <p className="text-[10px] text-muted-foreground max-w-[220px] truncate">📝 {w.admin_note}</p>}
@@ -350,7 +374,7 @@ export function AdminTrainerEarningsRoyal() {
                   {approveTarget?.method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />}
                   {approveTarget?.method_name} — <span dir="ltr" className="font-bold text-gold">{approveTarget?.account}</span>
                 </p>
-                <p className="text-2xl font-extrabold mt-2" dir="ltr">{fmt(approveTarget?.amount)} <span className="text-sm text-gold">{approveTarget?.currency}</span></p>
+                <p className="text-2xl font-extrabold mt-2" dir="ltr">{fmtMoney(approveTarget?.amount, approveTarget?.currency)}</p>
               </div>
             </div>
             <div>
@@ -405,7 +429,7 @@ export function AdminTrainerEarningsRoyal() {
           <div className="space-y-3 py-2">
             <div className="rounded-xl bg-rose-500/[0.06] border border-rose-500/25 p-3">
               <p className="text-xs text-navy">
-                طلب <b>{rejectTarget?.trainer_name}</b> بمبلغ <b dir="ltr">{fmt(rejectTarget?.amount)} {rejectTarget?.currency}</b> — سيعود المبلغ إلى رصيده المتاح.
+                طلب <b>{rejectTarget?.trainer_name}</b> بمبلغ <b dir="ltr">{fmtMoney(rejectTarget?.amount, rejectTarget?.currency)}</b> — سيعود المبلغ إلى رصيده المتاح بعملته نفسها.
               </p>
             </div>
             <div>
