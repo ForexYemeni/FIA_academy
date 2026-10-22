@@ -12,7 +12,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /** كل جدول يُمسح عند حذف قسم محدد — يطابق حرفياً منطق الحذف في المسار */
 export const DZ_SECTION_TABLES: Record<string, string[]> = {
-  courses: ['payments', 'certificates', 'certificate_requests', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics', 'course_modules', 'course_lessons', 'coupon_usages', 'courses'],
+  // 👑 ملاحظة v5.5: جدول certificate_requests غير موجود أصلاً في القاعدة
+  //    (طلبات الشهات تخزن في payments بترميز ذكي) — أُزيل من كل القوائم
+  //    لأن محاولة مسحه كانت تفشل وتظهر «فشل حذف بعض الجداول» زوراً!
+  courses: ['payments', 'certificates', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics', 'course_modules', 'course_lessons', 'coupon_usages', 'courses'],
   trainers: ['trainers'],
   students: ['payments', 'users'],
   payments: ['payments'],
@@ -41,7 +44,7 @@ export const DZ_FULL_TABLES = [
   // مالية وأرباح
   'withdrawal_requests', 'trainer_earnings', 'payments',
   // شهادات وتقييمات
-  'certificates', 'certificate_requests', 'reviews',
+  'certificates', 'reviews',
   // محتوى اجتماعي
   'forum_posts', 'forum_topics', 'blog_posts', 'contact_messages',
   // تجارة ومتابعة وإشعارات
@@ -56,7 +59,7 @@ const RESTORE_ORDER = [
   'users', 'trainers', 'courses', 'team_members', 'payment_methods',
   'course_modules', 'course_lessons', 'exam_questions',
   'payments', 'trainer_earnings', 'withdrawal_requests',
-  'certificates', 'certificate_requests', 'reviews',
+  'certificates', 'reviews',
   'exam_attempts', 'lesson_progress', 'course_progress',
   'coupons', 'coupon_usages', 'blog_posts', 'forum_topics', 'forum_posts',
   'contact_messages', 'notifications', 'trainer_follows',

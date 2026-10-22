@@ -162,18 +162,34 @@ export async function POST(req: NextRequest) {
     if (!course_id) return NextResponse.json({ error: 'course_id مطلوب' }, { status: 400 })
 
     // 🛡️ الخادم يقرر المجاني/المدفوع من الدورة نفسها — لا يُقبل كلام العميل
+    // 👑 إصلاح ملكي v5.5: كان SELECT يطلب عمود «offer_ends_at» غير الموجود
+    //    أصلاً في جدول courses (نظام العروض يعمل بمدة offer_duration_value/unit)
+    //    فكان PostgREST يُفشل الاستعلام كاملاً فيظهر «الدورة غير موجودة» رغم
+    //    وجودها = عطل «فشل التسجيل» لكل تسجيل مجاني ورفع إثبات دفع!
+    //    الآن: select('*') لا ينكسر أبداً + حساب العرض من المدة الفعلية.
     const { data: courseRow } = await supabaseAdmin
       .from('courses')
-      .select('price, currency, price_type, offer_price, offer_ends_at')
+      .select('*')
       .eq('id', course_id)
       .maybeSingle()
     if (!courseRow) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
 
     let serverPrice = Number(courseRow.price || 0)
-    const offerActive = courseRow.offer_price != null &&
-      (!courseRow.offer_ends_at || new Date(courseRow.offer_ends_at).getTime() > Date.now())
-    if (offerActive && Number(courseRow.offer_price) < serverPrice) {
-      serverPrice = Number(courseRow.offer_price)
+    // سعر العرض الرسمي — مطابق تماماً لمنطق واجهة المتجر:
+    // عرض محدود المدة = آخر تحديث للدورة + المدة؛ وأي عرض آخر بسعر أقل يسري.
+    if (courseRow.offer_price != null && Number(courseRow.offer_price) < serverPrice) {
+      if (courseRow.offer_type === 'limited_time') {
+        const dur = Number(courseRow.offer_duration_value) || 0
+        const start = courseRow.updated_at ? new Date(courseRow.updated_at).getTime() : 0
+        const unitMs = courseRow.offer_duration_unit === 'hours' ? 3600000 :
+          courseRow.offer_duration_unit === 'weeks' ? 604800000 :
+          courseRow.offer_duration_unit === 'months' ? 2592000000 : 86400000
+        if (dur > 0 && start > 0 && start + dur * unitMs > Date.now()) {
+          serverPrice = Number(courseRow.offer_price)
+        }
+      } else {
+        serverPrice = Number(courseRow.offer_price)
+      }
     }
     const isFree = serverPrice <= 0 || courseRow.price_type === 'مجانية'
 

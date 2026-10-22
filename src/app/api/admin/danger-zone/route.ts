@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
     switch (section) {
       case 'courses':
         // Cascade delete: wipe course-related rows first, then courses.
-        for (const t of ['payments', 'certificates', 'certificate_requests', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics']) {
+        // 👑 v5.5: أُزيل certificate_requests (جدول غير موجود أصلاً — طلبات
+        //    الشهات في payments) حتى لا يُفشل المسح فشلاً زوراً.
+        for (const t of ['payments', 'certificates', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics']) {
           try {
             // The payments/certificates/etc tables have course_id
             // — we delete by it. But we can't filter by course_id
@@ -74,16 +76,27 @@ export async function POST(req: NextRequest) {
         label = 'الدورات'
         break
 
-      case 'trainers':
-        const { data: td } = await supabaseAdmin.from('trainers').select('id')
-        count = td?.length || 0
+      case 'trainers': {
+        // 👑 إصلاح ملكي v5.5 — «حماية البلاطين الملكية»: كان هذا المسح يمحو
+        //    كل المدربين بمن فيهم المؤسس وأعضاء الفريق (علامة __TEAM_MEMBER__)
+        //    فاختفت صفحة المؤسس والفريق كلياً! الآن يُحذف غير أعضاء الفريق
+        //    فقط — المطابق تماماً لحرفية الحذف الشامل.
+        const { data: td } = await supabaseAdmin.from('trainers').select('id, password')
+        const TEAM_MARKER_PREFIX_LOCAL = '__TEAM_MEMBER__:'
+        const toDelete = (td || [])
+          .filter((t: any) => !(t.password && String(t.password).startsWith(TEAM_MARKER_PREFIX_LOCAL)))
+          .map((t: any) => t.id)
+        count = toDelete.length
         // 👑 الخاتم الملكي: تحرير الدورتين المحميتين من أي trainer_id ميت قبل مسح المدربين
         if (royal.has) {
           try { await supabaseAdmin.from('courses').update({ trainer_id: null }).in('id', royal.courseIds) } catch {}
         }
-        await supabaseAdmin.from('trainers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-        label = 'المدربون'
+        if (toDelete.length > 0) {
+          await supabaseAdmin.from('trainers').delete().in('id', toDelete)
+        }
+        label = 'المدربون (المؤسس وأعضاء الفريق محفوظون)'
         break
+      }
 
       case 'students':
         // Delete users with role='student'

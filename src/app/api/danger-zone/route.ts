@@ -65,7 +65,14 @@ export async function POST(req: NextRequest) {
         }
         if (royalModulesNot && table === 'course_lessons') del = del.not('module_id', 'in', royalModulesNot)
         const res = await del
-        results[table] = res.error ? { ok: false, error: res.error.message } : { ok: true }
+        // 👑 إصلاح ملكي v5.5: جدول غير موجود أصلاً = لا شيء ليُحذف = نجاح
+        //    (كان يُحسب فشلاً فيظهر «فشل حذف بعض الجداول» زوراً رغم أن
+        //    كل عمليات الحذف الحقيقية نجحت)
+        if (res.error && /does not exist|could not find the table|schema cache/i.test(res.error.message || '')) {
+          results[table] = { ok: true, count: 0 }
+        } else {
+          results[table] = res.error ? { ok: false, error: res.error.message } : { ok: true }
+        }
       } catch (e: any) {
         results[table] = { ok: false, error: e?.message || 'خطأ' }
       }
