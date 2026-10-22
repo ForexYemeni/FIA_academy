@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react'
 import {
   GraduationCap, Plus, Edit, Trash2, Mail, Phone, Lock, Eye, EyeOff, User,
   Award, Briefcase, FileText, Crown, Loader2, CheckCircle2, Users, Sparkles,
-  CalendarClock, BadgeCheck, Upload, X, BadgePercent, Landmark, Bitcoin, Wallet,
+  CalendarClock, BadgeCheck, Upload, X, BadgePercent, Landmark, Bitcoin, Wallet, HeartHandshake,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -39,9 +39,30 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
   const [search, setSearch] = useState('')
   const [titleFilter, setTitleFilter] = useState('')
   const [specFilter, setSpecFilter] = useState('')
+  // ⚡ ROYAL v4.4 — عدادات المتابعين لكل مدرب (متحف المتابعين)
+  const [followCounts, setFollowCounts] = useState<Record<string, number>>({})
 
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
+
+  // ⚡ عدد المتابعين لكل مدرب — يُحدّث لحظياً مع كل متابعة جديدة
+  useEffect(() => {
+    const loadFollows = () => {
+      fetch('/api/trainer-follows')
+        .then((r) => r.json())
+        .then((d) => { if (d && !d.error) setFollowCounts(d) })
+        .catch(() => {})
+    }
+    loadFollows()
+    let channel: any
+    try {
+      channel = supabasePublic
+        .channel('admin-trainers-followers')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_follows' }, () => loadFollows())
+        .subscribe()
+    } catch {}
+    return () => { try { supabasePublic.removeChannel(channel) } catch {} }
+  }, [])
 
   // ⚡ REAL-TIME: trainers — admin sees trainer changes INSTANTLY
   useEffect(() => {
@@ -105,6 +126,7 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
   const teamCount = items.filter((t) => t.password && t.password.startsWith('__TEAM_MEMBER__')).length
   const totalYears = items.reduce((acc, t) => acc + (parseInt(t.years_experience) || 0), 0)
   const specsCount = new Set(items.map((t) => t.specialization).filter(Boolean)).size
+  const totalFollowers = items.reduce((acc, t) => acc + (followCounts[t.id] || 0), 0)
 
   return (
     <LuxSection
@@ -117,9 +139,9 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
         <LuxStats
           items={[
             { icon: GraduationCap, label: 'إجمالي المدربين', value: items.length, grad: 'from-navy to-navy-light' },
+            { icon: HeartHandshake, label: 'متابعو المدربين', value: totalFollowers, grad: 'from-emerald-500 to-teal-600' },
             { icon: Crown, label: 'أعضاء الفريق', value: teamCount, grad: 'from-amber-500 to-gold' },
-            { icon: CalendarClock, label: 'مجموع سنوات الخبرة', value: `+${totalYears}`, grad: 'from-blue-500 to-indigo-600' },
-            { icon: BadgeCheck, label: 'التخصصات المغطاة', value: specsCount, grad: 'from-emerald-500 to-teal-600' },
+            { icon: BadgeCheck, label: 'التخصصات المغطاة', value: specsCount, grad: 'from-blue-500 to-indigo-600' },
           ]}
         />
       }
@@ -205,6 +227,11 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                     {years > 0 && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-500/10 border border-blue-500/25 rounded-full px-2 py-0.5">
                         <CalendarClock className="w-3 h-3" /> {years} سنة خبرة
+                      </span>
+                    )}
+                    {(followCounts[t.id] || 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5" title="متابعوه من المتدربين">
+                        <HeartHandshake className="w-3 h-3" /> {followCounts[t.id]} متابع
                       </span>
                     )}
                     {(Number(t.profit_percentage) || 0) > 0 && (
