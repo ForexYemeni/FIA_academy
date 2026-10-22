@@ -10,14 +10,15 @@
 // v6: purges every stale v5 copy — an old cached /download page used to
 // appear first (ugly version) before the fresh royal one loaded. v6 wipes
 // all previous caches on activation so that can never happen again.
-const APP_SHELL_CACHE = 'fia-shell-v6'
-const DYNAMIC_CACHE = 'fia-dynamic-v6'
+const APP_SHELL_CACHE = 'fia-shell-v7'
+const DYNAMIC_CACHE = 'fia-dynamic-v7'
 
 const APP_SHELL = [
   '/',
   '/manifest.json',
   '/fia/logo-fia.png',
   '/fia/favicon.svg',
+  '/offline.html',
 ]
 
 // === Install: cache app shell ===
@@ -101,6 +102,9 @@ self.addEventListener('fetch', (event) => {
   // Network-first for HTML pages — fall back to cache if offline.
   // We DO cache the latest HTML so the app works offline, but we
   // always prefer the network version when available.
+  // 👑 اللمسة الملكية: إن لم تكن الصفحة في الذاكرة أصلاً (أول زيارة
+  //    بدون شبكة) يفتح القصر صفحة «لا يوجد اتصال» الأنيقة بدلاً من
+  //    شاشة الخطأ الجافة للمتصفح.
   if (request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(request)
@@ -109,7 +113,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(DYNAMIC_CACHE).then((c) => c.put(request, clone)).catch(() => {})
           return res
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request).then((m) => m || caches.match('/offline.html')))
     )
     return
   }
