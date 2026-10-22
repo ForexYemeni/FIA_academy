@@ -4284,6 +4284,11 @@ function AdminAccount({ user, updateUser, logout }: any) {
   const [dzSnapBusy, setDzSnapBusy] = useState('')
   const [dzRestoreOpen, setDzRestoreOpen] = useState(false)
   const [dzRestoreTarget, setDzRestoreTarget] = useState<DzSnapshotRow | null>(null)
+  // 👑 v5.6: حذف نهائي لنسخة إنقاذ (بكلمة مرور + تأكيد مزدوج)
+  const [dzDeleteOpen, setDzDeleteOpen] = useState(false)
+  const [dzDeleteTarget, setDzDeleteTarget] = useState<DzSnapshotRow | null>(null)
+  const [dzConfirmText, setDzConfirmText] = useState('')
+  const [dzPasswordOpenFor, setDzPasswordOpenFor] = useState<null | 'snapshot-delete'>(null)
 
   const fetchDzSnapshots = async () => {
     setDzSnapLoading(true)
@@ -4322,6 +4327,33 @@ function AdminAccount({ user, updateUser, logout }: any) {
     }
   }
 
+  // 👑 v5.6 — الحذف النهائي لنسخة إنقاذ: كلمة مرور + كتابة عبارة التأكيد
+  const deleteDzSnapshot = async (password: string) => {
+    if (!dzDeleteTarget) return
+    setDzSnapBusy(dzDeleteTarget.id)
+    try {
+      const res = await fetch(`/api/admin/danger-zone/snapshots?id=${dzDeleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, password }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('🗑️ حُذفت نسخة الإنقاذ نهائياً من الأرشيف الملكي')
+        setDzDeleteOpen(false)
+        setDzDeleteTarget(null)
+        setDzConfirmText('')
+        fetchDzSnapshots()
+      } else {
+        toast.error(data.error || 'فشل الحذف النهائي')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setDzSnapBusy('')
+    }
+  }
+
 // Arabic labels for each Danger Zone section (used in the
 // confirmation dialog so the user sees what they're wiping in Arabic).
 const DZ_SECTION_LABELS: Record<string, string> = {
@@ -4332,8 +4364,8 @@ const DZ_SECTION_LABELS: Record<string, string> = {
   certificates: 'الشهادات',
   reviews: 'التقييمات',
   coupons: 'الكوبونات',
-  blog: 'منشورات المدوّنة',
-  forum: 'مواضيع المنتدى',
+  blog: 'المدوّنة والتعليقات والتفاعلات',
+  forum: 'المنتدى والمواضيع والتفاعلات',
   contact: 'رسائل التواصل',
   payment_methods: 'طرق الدفع',
   team: 'أعضاء الفريق',
@@ -4766,6 +4798,16 @@ type DzSnapshotRow = {
                       {dzSnapBusy === s.id ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5 ml-1" />}
                       استعادة
                     </Button>
+                    <Button
+                      size="sm"
+                      disabled={dzSnapBusy === s.id}
+                      onClick={() => { setDzDeleteTarget(s); setDzConfirmText(''); setDzDeleteOpen(true) }}
+                      className="h-8 px-3 bg-gradient-to-l from-red-500/90 to-red-600 text-white rounded-lg text-xs shadow-sm active:scale-95 transition-all"
+                      title="حذف نهائي لهذه النسخة"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 ml-1" />
+                      حذف
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -4932,6 +4974,84 @@ type DzSnapshotRow = {
       loading={!!dzRestoreTarget && dzSnapBusy === dzRestoreTarget.id}
     />
 
+    {/* ===== 👑 v5.6 تأكيد الحذف النهائي لنسخة الإنقاذ — درع مزدوج: كلمة مرور + عبارة تأكيد ===== */}
+    {dzDeleteOpen && (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={() => { if (dzSnapBusy === '') { setDzDeleteOpen(false); setDzDeleteTarget(null); setDzConfirmText('') } }}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative bg-gradient-to-br from-red-500 to-red-700 p-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 1.5px), radial-gradient(circle at 80% 70%, #fecaca 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px'
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-2 border border-white/30">
+              <Trash2 className="w-7 h-7 text-white" />
+            </div>
+            <h3 className="relative text-white text-lg font-bold">حذف نهائي للنسخة</h3>
+          </div>
+          <div className="p-5 text-center">
+            <p className="text-sm text-gray-600 mb-2">سيتم حذف نسخة الإنقاذ التالية نهائياً من الأرشيف:</p>
+            <p className="font-bold text-navy text-sm mb-1">
+              {dzDeleteTarget?.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzDeleteTarget?.section || ''] || dzDeleteTarget?.section || ''}`}
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              {dzDeleteTarget?.row_total || 0} سجل · {dzDeleteTarget ? new Date(dzDeleteTarget.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-right">
+              <p className="text-xs text-red-600 leading-relaxed">
+                ⚠️ بعد الحذف النهائي لن تستطيع استعادة بيانات هذه النسخة أبداً. هذه العملية لا رجعة فيها.
+              </p>
+            </div>
+            <div className="text-right mb-3">
+              <Label className="text-navy font-bold text-xs flex items-center gap-1 mb-1.5">
+                اكتب عبارة التأكيد: <span className="text-red-600 font-mono">حذف نهائي</span>
+              </Label>
+              <Input
+                value={dzConfirmText}
+                onChange={(e) => setDzConfirmText(e.target.value)}
+                placeholder="حذف نهائي"
+                className="h-10 text-sm"
+                disabled={dzSnapBusy !== ''}
+              />
+            </div>
+            <PasswordConfirmDialog
+              open={dzPasswordOpenFor === 'snapshot-delete'}
+              onOpenChange={(o) => { if (!o && dzSnapBusy === '') setDzPasswordOpenFor(null) }}
+              title="تأكيد الحذف النهائي بكلمة المرور"
+              message="لحظة أمان ملكية أخيرة — أدخل كلمة مرور حسابك لإتمام حذف النسخة نهائياً."
+              itemLabel="النسخة المحذوفة:"
+              itemName={dzDeleteTarget ? (dzDeleteTarget.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzDeleteTarget.section] || dzDeleteTarget.section}`) : ''}
+              confirmLabel="حذف نهائي لا رجعة فيه"
+              onConfirm={(pw: string) => deleteDzSnapshot(pw)}
+              loading={!!dzDeleteTarget && dzSnapBusy === dzDeleteTarget.id}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setDzDeleteOpen(false); setDzDeleteTarget(null); setDzConfirmText('') }}
+                disabled={dzSnapBusy !== ''}
+                className="flex-1 h-11 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors disabled:opacity-50"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={() => { if (dzConfirmText.trim() === 'حذف نهائي') setDzPasswordOpenFor('snapshot-delete') }}
+                disabled={dzSnapBusy !== '' || dzConfirmText.trim() !== 'حذف نهائي'}
+                className="flex-1 h-11 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {dzSnapBusy !== '' && dzDeleteTarget ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                تأكيد الحذف النهائي
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* ===== Danger Zone confirmation dialog ===== */}
     {/* === Danger Zone — professional custom overlay (matches chat delete) === */}
     {dzOpen && (
@@ -4959,7 +5079,7 @@ type DzSnapshotRow = {
           {/* Body */}
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 mb-1">سيتم حذف جميع البيانات نهائياً:</p>
-            <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل</p>
+            <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة والتعليقات، المنتدى والتفاعلات، الكوبونات، الإشعارات، أرباح المدربين وطلبات السحب، رسائل التواصل، المسوقون، التراخيص، الشركاء، الأسئلة الشائعة، الملفات العامة للمتدربين، سجل المحادثات</p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-amber-800 leading-relaxed">
                 👑 <span className="font-bold">الخاتم الملكي:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» لا تُحذفان أبداً — تبقيان بكل دروسهما وبنك أسئلتهما، ويُعاد تسجيل الفريق فيهما تلقائياً بعد الحذف.
@@ -4967,12 +5087,12 @@ type DzSnapshotRow = {
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
-                ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق، إعدادات الموقع، والدورتين الملكيتين. هذه العملية جسيمة ولا تُستعجل.
+                ⚠️ بعد الحذف لن يبقى سوى: حساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق وملفاتهم العامة، إعدادات الموقع وطرق الدفع، تصنيفات المنتدى، والدورتين الملكيتين. هذه العملية جسيمة ولا تُستعجل.
               </p>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
               <p className="text-xs text-green-700 leading-relaxed">
-                🛡️ درع الإنقاذ الملكي: قبل الحذف ستُلتقط نسخة كاملة تلقائياً لكل ما سيُمسى — ويمكن استعادتها بالكامل من «أرشيف الإنقاذ الملكي» في لوحة منطقة الخطر.
+                🛡️ درع الإنقاذ الملكي: قبل الحذف ستُلتقط نسخة كاملة تلقائياً لكل ما سيُمسى — ويمكن استعادتها بالكامل من «أرشيف الإنقاذ الملكي» في لوحة منطقة الخطر. روابط إشعارات أجهزتك محفوظة دائماً فلا تنطفئ المنبثقات أبداً.
               </p>
             </div>
 

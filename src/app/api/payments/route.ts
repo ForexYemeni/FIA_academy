@@ -89,6 +89,9 @@ export async function GET(req: NextRequest) {
       .or('amount.gt.0,method.neq.free')
       // Also exclude certificate requests stored in the payments table
       .neq('method', 'certificate_request')
+      // 👑 v5.6: تسجيلات الفريق التلقائية في الدليلين الملكيين (GUIDE-FREE)
+      //    إدارية خالصة — لا تظهر كـ«مدفوعات» في أي قسم بعد الحذف الشامل
+      .neq('reference', 'GUIDE-FREE')
       .order('date', { ascending: false })
     if (userId) query = query.eq('user_id', userId)
     if (limit > 0) {
