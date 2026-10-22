@@ -22,8 +22,8 @@ export const DZ_SECTION_TABLES: Record<string, string[]> = {
   certificates: ['certificates'],
   reviews: ['reviews'],
   coupons: ['coupon_usages', 'coupons'],
-  blog: ['blog_posts'],
-  forum: ['forum_posts', 'forum_topics'],
+  blog: ['blog_comments', 'blog_reactions', 'blog_posts'],
+  forum: ['forum_reactions', 'forum_posts', 'forum_topics'],
   contact: ['contact_messages'],
   payment_methods: ['payment_methods'],
   team: ['team_members'],
@@ -33,9 +33,13 @@ export const DZ_SECTION_TABLES: Record<string, string[]> = {
 /**
  * كل جدول يُمسح عند "حذف جميع البيانات" الشامل — يطابق حرفياً ما يقوله
  * حوار التأكيد (الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة،
- * المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل…).
- * يبقى محفوظاً دائماً: المؤسس والإدارة، أعضاء الفريق، إعدادات الموقع،
- * ونسخ الإنقاذ نفسها.
+ * المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل، المسوقون،
+ * التراخيص، الشركاء، الأسئلة الشائعة…).
+ *
+ * 👑 أمر ملكي v5.6: بعد المحو لا يبقى شيء سوى المؤسس والإدارة وأعضاء
+ *    الفريق + الدورتين الملكيتين + إعدادات الموقع وطرق الدفع وتصنيفات
+ *    المنتدى (هيكل تشغيلي) + توكنات الإشعارات (شريان الحياة — لا تُمس
+ *    أبداً حتى لا تنطفئ المنبثقات خارج التطبيق) + نسخ الإنقاذ نفسها.
  */
 export const DZ_FULL_TABLES = [
   // محتوى الدورات والاختبارات (أبناء قبل الآباء)
@@ -46,12 +50,36 @@ export const DZ_FULL_TABLES = [
   // شهادات وتقييمات
   'certificates', 'reviews',
   // محتوى اجتماعي
-  'forum_posts', 'forum_topics', 'blog_posts', 'contact_messages',
+  'forum_reactions', 'forum_posts', 'forum_topics',
+  'blog_comments', 'blog_reactions', 'blog_posts', 'contact_messages',
   // تجارة ومتابعة وإشعارات
   'coupon_usages', 'coupons', 'trainer_follows', 'notifications',
   'chat_messages', 'chat_conversations',
+  // 👑 v5.6 — المسوقون والتراخيص والشركاء والأسئلة الشائعة والملفات العامة اليتيمة
+  'affiliate_referrals', 'affiliate_clicks', 'affiliates',
+  'licenses', 'partners', 'faqs', 'public_profiles',
+  // كاش تلجرام (ملفات مرفوعة — لا قيمة لها بعد المحو)
+  'telegram_upload_cache', 'telegram_file_cache',
   // الدورات والمدربون والمستخدمون (الآباء — أخيراً)
   'courses', 'trainers', 'users',
+]
+
+/** 👑 v5.6: جداول تُمسح انتقائياً في المحو الشامل (وليس حذف كل الصفوف) */
+export const DZ_SELECTIVE_WIPES: Record<string, (q: any) => any> = {
+  // الملفات العامة: تُمسح ملفات المتدربين والمدربين الممسوحين فقط —
+  // تبقى ملفات المؤسس والقيادة والفريق والإدارة (هوية صفحة الفريق).
+  public_profiles: (q) => q.in('role', ['student', 'trainer']),
+}
+
+/** 👑 v5.6: جداول محظورة نهائياً على أي محو — شريان الحياة والهوية */
+export const DZ_NEVER_WIPE = [
+  'fcm_tokens',          // توكنات الإشعارات المنبثقة — مسحها = انطفاء الإشعارات
+  'app_secrets',         // خزنة الأسرار (JWT)
+  'site_settings',       // إعدادات الموقع
+  'team_members',        // المؤسس وأعضاء الفريق
+  'payment_methods',     // طرق الدفع (إعداد تشغيلي)
+  'forum_categories',    // تصنيفات المنتدى (هيكل)
+  'danger_zone_snapshots', // أرشيف الإنقاذ نفسه
 ]
 
 /** ترتيب الاستعادة الملكي: الآباء أولاً ثم الأبناء */
@@ -61,10 +89,19 @@ const RESTORE_ORDER = [
   'payments', 'trainer_earnings', 'withdrawal_requests',
   'certificates', 'reviews',
   'exam_attempts', 'lesson_progress', 'course_progress',
-  'coupons', 'coupon_usages', 'blog_posts', 'forum_topics', 'forum_posts',
+  'coupons', 'coupon_usages', 'blog_posts', 'blog_comments', 'blog_reactions',
+  'forum_topics', 'forum_posts', 'forum_reactions',
+  'affiliates', 'affiliate_clicks', 'affiliate_referrals',
+  'licenses', 'partners', 'faqs', 'public_profiles',
   'contact_messages', 'notifications', 'trainer_follows',
   'chat_conversations', 'chat_messages',
+  'telegram_upload_cache', 'telegram_file_cache',
 ]
+
+/** 👑 v5.6: عمود التعارض لكل جدول عند الاستعادة (الافتراضي id) */
+const RESTORE_CONFLICT: Record<string, string> = {
+  public_profiles: 'user_id',
+}
 
 export interface DangerSnapshotMeta {
   id: string
@@ -192,7 +229,9 @@ export async function restoreDangerSnapshot(
     // رفع على دفعات لتجنّب حدود حجم الطلب
     for (let i = 0; i < rows.length; i += 200) {
       const chunk = rows.slice(i, i + 200)
-      const { error: upErr } = await supabaseAdmin.from(t).upsert(chunk, { onConflict: 'id' })
+      const { error: upErr } = await supabaseAdmin
+        .from(t)
+        .upsert(chunk, { onConflict: RESTORE_CONFLICT[t] || 'id' })
       if (upErr) {
         return { ok: false, restored, rowTotal, error: `${t}: ${upErr.message}` }
       }

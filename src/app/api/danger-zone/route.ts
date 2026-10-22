@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
-import { DZ_FULL_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
+import { DZ_FULL_TABLES, DZ_SELECTIVE_WIPES, DZ_NEVER_WIPE, createDangerSnapshot } from '@/lib/danger-snapshot'
 import { guardDangerZone } from '@/lib/api-auth'
 import {
   ROYAL_SLUG_ADMIN_GUIDE,
@@ -55,9 +55,15 @@ export async function POST(req: NextRequest) {
     for (const table of DZ_FULL_TABLES) {
       // المدربون يُحذفون بدقة أدناه (باستثناء أعضاء الفريق)
       if (table === 'trainers') continue
+      // 👑 v5.6: جداول محظورة نهائياً — شريان الحياة (دفاع مزدوج)
+      if (DZ_NEVER_WIPE.includes(table)) continue
       try {
         let del = supabaseAdmin.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
         if (table === 'users') del = del.neq('role', 'admin')
+        // 👑 v5.6: مسح انتقائي (public_profiles يفقد ملفات المتدربين والمدربين
+        //     الممسوحين فقط — ملفات المؤسس والفريق باقية)
+        const selective = DZ_SELECTIVE_WIPES[table]
+        if (selective) del = selective(del)
         // 👑 الخاتم الملكي — استبعاد صفوف الدورتين المحميتين من المحو:
         if (royalCoursesNot) {
           if (table === 'courses') del = del.not('id', 'in', royalCoursesNot)

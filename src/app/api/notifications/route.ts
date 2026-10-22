@@ -1,14 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { guardAdmin, guardAuth } from '@/lib/api-auth'
+import { guardAdmin, guardAuth, getAuthUser, rateLimit, clientIp, tooMany } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+
+/**
+ * 👑 إصلاح ملكي v5.6 — عودة نبض الإشعارات للتطبيق الأصلي (APK v2.7)
+ * ============================================================================
+ * خدمة الترقب الأصلية NotificationPollService (تعمل داخل التطبيق حتى وهو
+ * مغلق تماماً كل 10 ثوانٍ) كانت تنادي هذا المسار بـ user_id وحده دون توقيع
+ * — وهكذا كانت الإشعارات المنبثقة تعمل 100% خارج التطبيق.
+ *
+ * منذ الدرع v5.0 أصبح المسار يطلب توقيعاً فمات النبض: الخدمة الأصلية لا
+ * تملك JWT ← 401 ← لا منبثقة خارج التطبيق مهما فعلنا (وFCM وحده لا يكفي
+ * على كل الأجهزة — نوم العمليات وDoze وROMs عدوانية تقتله).
+ *
+ * الآن مساران متينان (نفس فلسفة إصلاح fcm/register في v5.5):
+ *   (أ) توقيع صالح  → الهوية من التوقيع الملكي (تطبيق الويب والجسر)
+ *   (ب) بلا توقيع   → مسار التطبيق الأصلي: user_id صريح + يجب أن يكون
+ *                     حساباً حياً في قاعدة البيانات + حد محاولات صارم
+ *                     لكل IP (1200/5د — الترقب 6/د لكل جهاز) — أضيق
+ *                     بكثير من الباب المفتوح القديم قبل v5.0.
+ * ============================================================================
+ */
+async function resolveNotificationUserId(
+  req: NextRequest,
+  body?: any
+): Promise<
+  { ok: true; userId: string } | { ok: false; res: NextResponse }
+> {
+  // المسار (أ): توقيع ملكي صالح → الهوية منه حصراً
+  const authUser = await getAuthUser(req)
+  if (authUser) return { ok: true, userId: authUser.id }
+
+  // المسار (ب): التطبيق الأصلي — user_id صريح + حساب حي + حد محاولات
+  const rl = rateLimit(`notifpoll:${clientIp(req)}`, 1200, 5 * 60 * 1000)
+  if (!rl.ok) return { ok: false, res: tooMany(rl.retryAfterSec) }
+
+  const candidate =
+    req.nextUrl.searchParams.get('user_id') ||
+    (body && typeof body === 'object' ? body?.user_id : null)
+  if (!candidate) {
+    return { ok: false, res: NextResponse.json(
+      { error: 'يجب تسجيل الدخول أولاً' },
+      { status: 401 }
+    ) }
+  }
+
+  // حساب حي فقط — لا رابط ميت يمرّ (users ثم trainers حسابات المدربين)
+  const { data: liveUser } = await supabaseAdmin
+    .from('users').select('id').eq('id', candidate).maybeSingle()
+  if (liveUser) return { ok: true, userId: liveUser.id }
+  const { data: liveTrainer } = await supabaseAdmin
+    .from('trainers').select('id').eq('id', candidate).maybeSingle()
+  if (liveTrainer) return { ok: true, userId: liveTrainer.id }
+
+  return { ok: false, res: NextResponse.json(
+    { error: 'الحساب غير موجود — سجّل الدخول مرة واحدة من التطبيق' },
+    { status: 404 }
+  ) }
+}
 
 // GET /api/notifications?user_id=...&unread=1 — list user's notifications
 export async function GET(req: NextRequest) {
   try {
-    // 🛡️ كل مستخدم يقرأ إشعاراته هو فقط — الهوية من التوقيع
-    const g = await guardAuth(req)
-    if (!g.ok) return g.res
-    const userId = g.user.id
+    // 🛡️ كل مستخدم يقرأ إشعاراته هو فقط — من التوقيع أو من مسار التطبيق الأصلي
+    const r = await resolveNotificationUserId(req)
+    if (!r.ok) return r.res
+    const userId = r.userId
     const unreadOnly = req.nextUrl.searchParams.get('unread') === '1'
     if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
 
@@ -82,13 +139,12 @@ export async function POST(req: NextRequest) {
 // PUT — mark notifications as read (?ids=... or all unread for user)
 export async function PUT(req: NextRequest) {
   try {
-    // 🛡️ تعليم المقروء لإشعاراتك أنت فقط
-    const g = await guardAuth(req)
-    if (!g.ok) return g.res
-    const { user_id, ids } = await req.json()
-    if (user_id && user_id !== g.user.id) {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
-    }
+    // 🛡️ تعليم المقروء لإشعاراتك أنت فقط — من التوقيع أو مسار التطبيق الأصلي
+    const body = await req.json().catch(() => ({}) as any)
+    const r = await resolveNotificationUserId(req, body)
+    if (!r.ok) return r.res
+    const { ids } = body as any
+    const user_id = r.userId
     const now = new Date().toISOString()
     let query = supabaseAdmin.from('notifications').update({ read_at: now })
     if (ids && Array.isArray(ids) && ids.length > 0) {

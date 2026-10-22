@@ -18,6 +18,46 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// DELETE /api/admin/danger-zone/snapshots?id=...
+// Body: { user_id, password }
+// → حذف نهائي لنسخة إنقاذ واحدة من الأرشيف الملكي
+// 🛡️ الحرس الملكي: هوية إدارة + كلمة مرور صحيحة في الخادم + حد محاولات
+export async function DELETE(req: NextRequest) {
+  try {
+    const snapshot_id = req.nextUrl.searchParams.get('id')
+    const body = await req.json().catch(() => ({})) as { user_id?: string; password?: string }
+    if (!snapshot_id) {
+      return NextResponse.json({ error: 'snapshot_id مطلوب' }, { status: 400 })
+    }
+
+    const guard = await guardDangerZone(req, body.user_id, body.password)
+    if (!guard.ok) return guard.res
+
+    // كل النسخ قابلة للحذف النهائي بأمر الإدارة الصريح (كلمة مرور + تأكيد)
+    const { data: meta } = await supabaseAdmin
+      .from('danger_zone_snapshots')
+      .select('id, kind, section, label, row_total')
+      .eq('id', snapshot_id)
+      .maybeSingle()
+    if (!meta) {
+      return NextResponse.json({ error: 'النسخة غير موجودة — ربما حُذفت سابقاً' }, { status: 404 })
+    }
+
+    const { error } = await supabaseAdmin
+      .from('danger_zone_snapshots')
+      .delete()
+      .eq('id', snapshot_id)
+    if (error) throw error
+
+    return NextResponse.json({
+      success: true,
+      deleted: { id: meta.id, label: meta.label, row_total: meta.row_total },
+    })
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'خطأ غير متوقع' }, { status: 500 })
+  }
+}
+
 // POST /api/admin/danger-zone/snapshots
 // Body: { snapshot_id, user_id, password } → royal restore of every captured row
 // 🛡️ الحرس الملكي: هوية إدارة + كلمة مرور صحيحة في الخادم + حد محاولات
