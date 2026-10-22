@@ -43,7 +43,7 @@ export function AdminExamQuestionsRoyal() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => {
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => {
       const arr = Array.isArray(d) ? d : []
       setCourses(arr)
       if (arr.length > 0 && !selectedCourse) setSelectedCourse(arr[0].id)
@@ -269,7 +269,7 @@ export function AdminExamQuestionsRoyal() {
           course={selectedCourseObj}
           onSaved={(updated: any) => {
             // Refresh the courses list so the new stats reflect instantly
-            fetch('/api/courses').then((r) => r.json()).then((d) => {
+            fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => {
               const arr = Array.isArray(d) ? d : []
               setCourses(arr)
             }).catch(() => {})

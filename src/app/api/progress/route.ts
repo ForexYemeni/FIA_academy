@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // GET /api/progress?user_id=...&course_id=... — list user's lesson progress
 export async function GET(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const userId = req.nextUrl.searchParams.get('user_id')
     const courseId = req.nextUrl.searchParams.get('course_id')
     if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
 // POST — update lesson progress (called periodically as the student studies)
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const {
       user_id,
       course_id,

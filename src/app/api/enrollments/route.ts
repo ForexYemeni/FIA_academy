@@ -4,6 +4,7 @@ import {
   notifyFreeEnrollment, notifyPaymentRequest, notifyCourseCompleted,
 } from '@/lib/notifications'
 import { tgEnrollmentFree, tgPaymentRequest as tgPayReq, tgCourseCompleted as tgComp } from '@/lib/telegram'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 
 // We store enrollments in the existing `payments` table creatively.
 // - amount = 0 means FREE enrollment
@@ -107,7 +108,11 @@ function toEnrollment(p: StoredEnrollment): any {
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ كل مستخدم يرى تسجيلاته فقط — الإدارة ترى الكل
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const paramUserId = req.nextUrl.searchParams.get('user_id')
+    const userId = g.user.role === 'admin' ? (paramUserId || null) : g.user.id
     const courseId = req.nextUrl.searchParams.get('course_id')
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
     const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
@@ -148,16 +153,40 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ تسجيل شخصي فقط — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const body = await req.json()
+    const user_id = g.user.id
+    const course_id = body.course_id
+    if (!course_id) return NextResponse.json({ error: 'course_id مطلوب' }, { status: 400 })
 
-    // Check if already enrolled (payment record exists for this user+course)
-    // But allow re-subscription if the previous enrollment was REJECTED ('ملغي')
-    const { data: existing } = await supabaseAdmin
+    // 🛡️ الخادم يقرر المجاني/المدفوع من الدورة نفسها — لا يُقبل كلام العميل
+    const { data: courseRow } = await supabaseAdmin
+      .from('courses')
+      .select('price, currency, price_type, offer_price, offer_ends_at')
+      .eq('id', course_id)
+      .maybeSingle()
+    if (!courseRow) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
+
+    let serverPrice = Number(courseRow.price || 0)
+    const offerActive = courseRow.offer_price != null &&
+      (!courseRow.offer_ends_at || new Date(courseRow.offer_ends_at).getTime() > Date.now())
+    if (offerActive && Number(courseRow.offer_price) < serverPrice) {
+      serverPrice = Number(courseRow.offer_price)
+    }
+    const isFree = serverPrice <= 0 || courseRow.price_type === 'مجانية'
+
+    // Check if already enrolled — بقراءة آمنة لا تنكسر مع الصفوف المكررة
+    // (allow re-subscription if the previous enrollment was REJECTED 'ملغي')
+    const { data: existingRows } = await supabaseAdmin
       .from('payments')
       .select('id, status')
-      .eq('user_id', body.user_id)
-      .eq('course_id', body.course_id)
-      .maybeSingle()
+      .eq('user_id', user_id)
+      .eq('course_id', course_id)
+      .order('date', { ascending: false })
+      .limit(2)
+    const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null
 
     if (existing) {
       // If the existing enrollment is REJECTED ('ملغي'), allow re-subscription
@@ -170,38 +199,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const isFree = body.payment_status === 'free' || !body.amount_paid || body.amount_paid === 0
-
-    // For paid courses, set status to 'قيد الانتظار' (pending) so the admin
-    // sees it in their payments inbox and can approve/reject. For free
-    // courses, set status to 'مكتمل' (completed) immediately.
     const initialStatus = isFree ? 'مكتمل' : 'قيد الانتظار'
+    const amountToCharge = isFree ? 0 : (body.amount_paid && Number(body.amount_paid) <= serverPrice ? Number(body.amount_paid) : serverPrice)
 
-    // Look up the course to get the correct currency — if the caller
-    // didn't pass a currency, we use the course's currency rather than
-    // defaulting to 'ر.ي' (which is wrong for USD courses).
-    let currency = body.currency
-    let coursePrice = body.amount_paid || 0
-    if (!currency || !coursePrice) {
-      try {
-        const { data: courseRow } = await supabaseAdmin
-          .from('courses')
-          .select('currency, price')
-          .eq('id', body.course_id)
-          .maybeSingle()
-        if (!currency) currency = courseRow?.currency || 'ر.ي'
-        if (!coursePrice) coursePrice = courseRow?.price || 0
-      } catch {
-        if (!currency) currency = 'ر.ي'
-      }
-    }
+    // العملة والسعر من الخادم حصراً — لا يُقبل سعر من العميل
+    const currency = courseRow.currency || 'ر.ي'
+    const coursePrice = serverPrice
 
     const { data, error } = await supabaseAdmin
       .from('payments')
       .insert({
-        user_id: body.user_id,
-        course_id: body.course_id,
-        amount: body.amount_paid || 0,
+        user_id,
+        course_id,
+        amount: amountToCharge,
         currency,
         method: body.payment_method || (isFree ? 'free' : null),
         status: initialStatus,
@@ -214,22 +224,19 @@ export async function POST(req: NextRequest) {
     if (error) throw error
 
     // ===== Record coupon usage (per-user restriction) =====
-    // If a coupon was applied to this enrollment, record it in the
-    // `coupon_usages` table so the student can't reuse the same
-    // coupon on another course from their account.
-    const appliedCouponMatch = body.payment_reference?.match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
+    const appliedCouponMatch = (body.payment_reference || '')?.match(/COUPON:\s*([A-Za-z0-9_-]+)/i)
     const appliedCouponCode = appliedCouponMatch ? appliedCouponMatch[1].toUpperCase() : null
-    if (appliedCouponCode && body.user_id && body.course_id) {
+    if (appliedCouponCode && course_id) {
       try {
         await supabaseAdmin
           .from('coupon_usages')
           .insert({
             coupon_code: appliedCouponCode,
-            user_id: body.user_id,
-            course_id: body.course_id,
+            user_id,
+            course_id,
             payment_id: data?.id,
             // The discount = original course price − amount the student paid.
-            discount_amount: Math.max(0, (coursePrice || 0) - (body.amount_paid || 0)),
+            discount_amount: Math.max(0, (coursePrice || 0) - (amountToCharge || 0)),
           })
       } catch {
         // coupon_usages table might not exist yet (pre-migration).
@@ -243,12 +250,12 @@ export async function POST(req: NextRequest) {
     // handles different types of enrollment (free vs paid-pending).
     try {
       if (isFree) {
-        await notifyFreeEnrollment(body.user_id, body.course_id)
-        await tgEnrollmentFree(body.user_id, body.course_id)
+        await notifyFreeEnrollment(user_id, course_id)
+        await tgEnrollmentFree(user_id, course_id)
       } else {
         // Paid enrollment: payment is pending admin approval
-        await notifyPaymentRequest(body.user_id, body.course_id, body.amount_paid || coursePrice, currency)
-        await tgPayReq(body.user_id, body.course_id, body.amount_paid || coursePrice, currency, body.payment_method)
+        await notifyPaymentRequest(user_id, course_id, amountToCharge, currency)
+        await tgPayReq(user_id, course_id, amountToCharge, currency, body.payment_method)
       }
     } catch {}
 
@@ -260,8 +267,39 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { id, ...updates } = await req.json()
+    // 🛡️ الطالب يحدّث تقدمه فقط — تغيير الحالة/المبلغ للإدارة حصراً
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const isAdmin = g.user.role === 'admin'
+    const bodyPut = await req.json()
+    const id = bodyPut.id
+    let updates: any = { ...(bodyPut || {}) }
+    delete updates.id
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    // جلب الصف الحالي — للملكية ولقيمة التقدم السابقة
+    const { data: currentRow } = await supabaseAdmin
+      .from('payments').select('user_id, course_id, reference, status').eq('id', id).maybeSingle()
+    if (!currentRow) return NextResponse.json({ error: 'التسجيل غير موجود' }, { status: 404 })
+
+    if (!isAdmin) {
+      // الملكية: الطالب يعدّل تسجيله هو فقط
+      if (currentRow.user_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — هذا التسجيل ليس لك' }, { status: 403 })
+      }
+      // الطالب يُمس فقط بحقل التقدم — أي محاولة تغيير حالة/مبلغ تُتجاهل
+      const allowedKeys = ['progress']
+      updates = Object.fromEntries(Object.entries(updates).filter(([k]) => allowedKeys.includes(k)))
+      if (updates.progress !== undefined) {
+        const prev = Number(currentRow.reference?.match(/__PROGRESS__:(\d+)/)?.[1] || 0)
+        const next = Math.max(0, Math.min(100, Math.floor(Number(updates.progress) || 0)))
+        // لا رجوع للورم ولا قفزات مستحيلة
+        if (next < prev) updates.progress = prev
+      }
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json({ error: 'لا يوجد أي تغيير مسموح' }, { status: 403 })
+      }
+    }
 
     // Map enrollment fields back to payment fields
     const paymentUpdates: any = {}
@@ -278,12 +316,7 @@ export async function PUT(req: NextRequest) {
     let prevProgress = 0
     if (updates.progress !== undefined) {
       // Fetch current reference to preserve payment proof info
-      const { data: existing } = await supabaseAdmin
-        .from('payments')
-        .select('reference')
-        .eq('id', id)
-        .maybeSingle()
-      const existingRef = existing?.reference || ''
+      const existingRef = currentRow?.reference || ''
       // Extract the PRE-progress value
       const prevMatch = existingRef.match(/__PROGRESS__:(\d+)/)
       prevProgress = prevMatch ? parseInt(prevMatch[1]) : 0
@@ -325,6 +358,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف التسجيلات للإدارة فقط
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('payments').delete().eq('id', id)
     if (error) throw error

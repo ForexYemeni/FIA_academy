@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // POST /api/blog/react — toggle like/dislike on a blog post
 // Body: { user_id, blog_post_id, reaction: 'like' | 'dislike' }
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const { user_id, blog_post_id, reaction } = await req.json()
     if (!user_id || !blog_post_id || !reaction) {
       return NextResponse.json({ error: 'user_id + blog_post_id + reaction required' }, { status: 400 })

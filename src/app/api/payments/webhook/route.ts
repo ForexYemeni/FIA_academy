@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { webhookKey } from '../create-intent/route'
 
-// POST /api/payments/webhook
-// Receives ?payment_id=...&status=success from Stripe/Moyasar or our own checkout flow.
+// POST /api/payments/webhook?payment_id=...&key=...
+// 🛡️ محمي بتوقيع ملكي (HMAC) — أي نداء بلا توقيع صحيح يُرفض فوراً.
+// كان سابقاً مفتوحاً: أي شخص يضع payment_id الخاص به فيصبح مسجلاً مجاناً!
 export async function POST(req: NextRequest) {
   try {
     const paymentId = req.nextUrl.searchParams.get('payment_id') || (await req.json().catch(() => ({}))).payment_id
-    const status = req.nextUrl.searchParams.get('status') || 'success'
+    const key = req.nextUrl.searchParams.get('key') || ''
 
     if (!paymentId) return NextResponse.json({ error: 'payment_id required' }, { status: 400 })
+
+    // 🛡️ التحقق من التوقيع الملكي
+    const expected = await webhookKey(String(paymentId))
+    if (!key || key !== expected) {
+      return NextResponse.json({ error: 'توقيع غير صالح' }, { status: 403 })
+    }
 
     const { data: payment } = await supabaseAdmin
       .from('payments')
@@ -71,20 +79,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Also accept GET for redirect-from-gateway flows (Stripe / Moyasar callback URLs)
+// GET — فقط إعادة توجيه أنيقة بعد العودة من بوابة الدفع (بدون أي اعتماد للدفع)
+// تأكيد الدفع يتم عبر نداء البوابة الموقّع (POST) أو موافقة الإدارة اليدوية.
 export async function GET(req: NextRequest) {
   const paymentId = req.nextUrl.searchParams.get('payment_id')
-  const status = req.nextUrl.searchParams.get('status') || 'success'
   if (!paymentId) return NextResponse.redirect(new URL('/', req.url))
-
-  // Replicate POST logic via internal fetch
-  const base = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-  await fetch(`${base}/api/payments/webhook`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ payment_id: paymentId, status }),
-  }).catch(() => {})
-
-  // Redirect to home with success flag
-  return NextResponse.redirect(new URL('/?payment=success', req.url))
+  return NextResponse.redirect(new URL('/?payment=pending', req.url))
 }

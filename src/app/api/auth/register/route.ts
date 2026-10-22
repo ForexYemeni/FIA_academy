@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit, clientIp, tooMany } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { hashPassword, signToken } from '@/lib/auth-server'
 import { notifyUserRegistered } from '@/lib/notifications'
@@ -6,6 +7,9 @@ import { tgUserRegistered } from '@/lib/telegram'
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ حد محاولات التسجيل — ضد إنشاء حسابات آلية
+    const rl = rateLimit(`register:${clientIp(req)}`, 6, 60 * 60 * 1000)
+    if (!rl.ok) return tooMany(rl.retryAfterSec)
     const { name, email, password, phone, affiliate_code } = await req.json()
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'الاسم والبريد وكلمة المرور مطلوبة' }, { status: 400 })

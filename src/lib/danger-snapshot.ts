@@ -12,7 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /** كل جدول يُمسح عند حذف قسم محدد — يطابق حرفياً منطق الحذف في المسار */
 export const DZ_SECTION_TABLES: Record<string, string[]> = {
-  courses: ['payments', 'certificates', 'certificate_requests', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics', 'courses'],
+  courses: ['payments', 'certificates', 'certificate_requests', 'reviews', 'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress', 'forum_topics', 'course_modules', 'course_lessons', 'coupon_usages', 'courses'],
   trainers: ['trainers'],
   students: ['payments', 'users'],
   payments: ['payments'],
@@ -27,16 +27,40 @@ export const DZ_SECTION_TABLES: Record<string, string[]> = {
   notifications: ['notifications'],
 }
 
-/** كل جدول يُمسح عند "حذف جميع البيانات" الشامل */
-export const DZ_FULL_TABLES = ['certificates', 'payments', 'courses', 'trainers', 'users']
+/**
+ * كل جدول يُمسح عند "حذف جميع البيانات" الشامل — يطابق حرفياً ما يقوله
+ * حوار التأكيد (الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة،
+ * المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل…).
+ * يبقى محفوظاً دائماً: المؤسس والإدارة، أعضاء الفريق، إعدادات الموقع،
+ * ونسخ الإنقاذ نفسها.
+ */
+export const DZ_FULL_TABLES = [
+  // محتوى الدورات والاختبارات (أبناء قبل الآباء)
+  'lesson_progress', 'course_progress', 'exam_attempts', 'exam_questions',
+  'course_lessons', 'course_modules',
+  // مالية وأرباح
+  'withdrawal_requests', 'trainer_earnings', 'payments',
+  // شهادات وتقييمات
+  'certificates', 'certificate_requests', 'reviews',
+  // محتوى اجتماعي
+  'forum_posts', 'forum_topics', 'blog_posts', 'contact_messages',
+  // تجارة ومتابعة وإشعارات
+  'coupon_usages', 'coupons', 'trainer_follows', 'notifications',
+  'chat_messages', 'chat_conversations',
+  // الدورات والمدربون والمستخدمون (الآباء — أخيراً)
+  'courses', 'trainers', 'users',
+]
 
 /** ترتيب الاستعادة الملكي: الآباء أولاً ثم الأبناء */
 const RESTORE_ORDER = [
   'users', 'trainers', 'courses', 'team_members', 'payment_methods',
-  'payments', 'certificates', 'certificate_requests', 'reviews',
-  'exam_questions', 'exam_attempts', 'lesson_progress', 'course_progress',
+  'course_modules', 'course_lessons', 'exam_questions',
+  'payments', 'trainer_earnings', 'withdrawal_requests',
+  'certificates', 'certificate_requests', 'reviews',
+  'exam_attempts', 'lesson_progress', 'course_progress',
   'coupons', 'coupon_usages', 'blog_posts', 'forum_topics', 'forum_posts',
-  'contact_messages', 'notifications',
+  'contact_messages', 'notifications', 'trainer_follows',
+  'chat_conversations', 'chat_messages',
 ]
 
 export interface DangerSnapshotMeta {

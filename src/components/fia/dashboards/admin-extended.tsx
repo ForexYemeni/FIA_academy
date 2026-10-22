@@ -61,7 +61,12 @@ export function AdminCoupons() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/coupons', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/coupons', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف الكوبون')
       setDeleteTarget(null)
       load()
@@ -285,7 +290,12 @@ export function AdminAffiliates() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/affiliates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/affiliates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف المسوّق')
       setDeleteTarget(null)
       load()
@@ -502,7 +512,7 @@ export function AdminExamQuestions() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => {
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => {
       const arr = Array.isArray(d) ? d : []
       setCourses(arr)
       if (arr.length > 0 && !selectedCourse) setSelectedCourse(arr[0].id)
@@ -521,7 +531,12 @@ export function AdminExamQuestions() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/exam-questions', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/exam-questions', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف السؤال')
       setDeleteTarget(null)
       if (selectedCourse) {
@@ -821,7 +836,7 @@ export function AdminReviews() {
     fetch(url).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {})
   }
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
   useEffect(() => { load() }, [courseFilter])
 
@@ -1034,7 +1049,12 @@ export function AdminForum() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/forum-categories', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/forum-categories', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف الفئة')
       setDeleteTarget(null); loadCats()
     } finally { setDeleting(false) }
@@ -1376,7 +1396,12 @@ export function AdminForum() {
                     }}><Award className="w-3.5 h-3.5" /></Button>
                     <Button size="sm" variant="outline" className="border-rose-500/30 text-rose-500 hover:bg-rose-500/10 rounded-xl" onClick={async (e) => {
                       e.stopPropagation()
-                      await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+                      const res = await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}))
+                        toast.error(err.error || 'فشلت العملية')
+                        return
+                      }
                       toast.success('تم حذف الموضوع'); loadTopics()
                     }}><Trash2 className="w-3.5 h-3.5" /></Button>
                   </div>
@@ -1544,7 +1569,12 @@ export function AdminBlog() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/blog', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/blog', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف المقال')
       setDeleteTarget(null); load()
     } finally { setDeleting(false) }
@@ -2206,7 +2236,12 @@ export function AdminFaqs() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/faqs', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/faqs', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف السؤال')
       setDeleteTarget(null); load()
     } finally { setDeleting(false) }

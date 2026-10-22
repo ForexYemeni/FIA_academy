@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyExamGraded, notifyTrainerGradedExam } from '@/lib/notifications'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // ============================================================================
 // EXAM ATTEMPTS API — v4 royal exam system
@@ -19,9 +20,13 @@ import { notifyExamGraded, notifyTrainerGradedExam } from '@/lib/notifications'
 // GET — list attempts
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ الطالب يرى محاولاته هو فقط — قراءة محاولات الآخرين (all=1) للإدارة والمدربين
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const isStaff = g.user.role === 'admin' || g.user.role === 'trainer'
+    const userId = isStaff ? req.nextUrl.searchParams.get('user_id') : g.user.id
     const courseId = req.nextUrl.searchParams.get('course_id')
-    const all = req.nextUrl.searchParams.get('all') === '1'
+    const all = req.nextUrl.searchParams.get('all') === '1' && isStaff
     const submittedOnly = req.nextUrl.searchParams.get('submitted') === '1'
 
     if (!all && !userId) {
@@ -45,9 +50,14 @@ export async function GET(req: NextRequest) {
 // POST — start (or resume) a new attempt for a course's question bank
 export async function POST(req: NextRequest) {
   try {
-    const { user_id, course_id, ip_address, user_agent } = await req.json()
-    if (!user_id || !course_id) {
-      return NextResponse.json({ error: 'user_id و course_id مطلوبان' }, { status: 400 })
+    // 🛡️ بدء المحاولة لحسابك أنت فقط — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const body = await req.json()
+    const { course_id, ip_address, user_agent } = body
+    const user_id = g.user.id
+    if (!course_id) {
+      return NextResponse.json({ error: 'course_id مطلوب' }, { status: 400 })
     }
 
     // 1) ENROLLMENT GATE — canonical enrollment rows live in the `payments`
@@ -269,6 +279,10 @@ export async function POST(req: NextRequest) {
 // PUT — submit & auto-grade, OR trainer/admin review-correction
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ الحرس الملكي: التسليم لصاحب المحاولة — التصحيح (review) للإدارة والمدربين حصراً
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const isStaff = g.user.role === 'admin' || g.user.role === 'trainer'
     const body = await req.json()
     const { id } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
@@ -294,6 +308,9 @@ export async function PUT(req: NextRequest) {
 
     // ============ TRAINER/ADMIN REVIEW-CORRECTION ============
     if (body.review) {
+      if (!isStaff) {
+        return NextResponse.json({ error: 'التصحيح مخصص للإدارة والمدربين فقط' }, { status: 403 })
+      }
       const { score, note, reviewer_id, reviewer_name } = body.review || {}
       const finalScore = Math.max(0, Math.min(100, Math.round(Number(score) || 0)))
       const finalPassed = finalScore >= passScore
@@ -338,6 +355,10 @@ export async function PUT(req: NextRequest) {
     // ============ STUDENT SUBMIT + AUTO-GRADE ============
     const { answers, tab_switches } = body
     if (!answers) return NextResponse.json({ error: 'id and answers required' }, { status: 400 })
+    // 🛡️ الملكية: الطالب يسلّم محاولته هو فقط
+    if (attempt.user_id !== g.user.id) {
+      return NextResponse.json({ error: 'غير مصرح — هذه المحاولة ليست لك' }, { status: 403 })
+    }
     if (attempt.submitted_at) {
       return NextResponse.json({ error: 'تم تسليم هذه المحاولة مسبقاً' }, { status: 400 })
     }
@@ -455,6 +476,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف المحاولات للإدارة فقط — كان الطالب يحذف رسبته ويعيد تعيين ميزانية إعادات المحاولة!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('exam_attempts').delete().eq('id', id)
     if (error) throw error

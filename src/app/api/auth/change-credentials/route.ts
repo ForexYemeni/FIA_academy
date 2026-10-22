@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyPassword, hashPassword } from '@/lib/auth-server'
 
@@ -6,7 +7,11 @@ const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, currentEmail, currentPassword, newEmail, newPassword, role } = await req.json()
+    // 🛡️ تغيير بيانات حسابك أنت فقط — الهوية من التوقيع
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const { currentEmail, currentPassword, newEmail, newPassword, role } = await req.json()
+    const userId = g.user.id
 
     if (!userId || !currentPassword) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })

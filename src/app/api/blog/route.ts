@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardStaff, guardAdmin, getAuthUser } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Generate a URL-friendly ASCII slug from a title — strips Arabic and other
@@ -84,7 +85,11 @@ async function resolveAuthor(authorId: string | null): Promise<any | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, excerpt, body, cover, author_id, tags } = await req.json()
+    // 🛡️ النشر للإدارة والمدربين — والمؤلف هو أنت حصراً (لا نشر باسم غيرك)
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
+    const { title, excerpt, body, cover, tags } = await req.json()
+    const author_id = g.user.id
     if (!title || !body) {
       return NextResponse.json({ error: 'العنوان والمحتوى مطلوبان' }, { status: 400 })
     }
@@ -139,7 +144,16 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ التعديل لكاتب المقال أو الإدارة فقط
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
+    if (g.user.role !== 'admin') {
+      const { data: post } = await supabaseAdmin.from('blog_posts').select('author_id').eq('id', id).maybeSingle()
+      if (post?.author_id && post.author_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك تعديل مقالاتك فقط' }, { status: 403 })
+      }
+    }
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     if (updates.title && !updates.slug) {
       // Keep slug as-is when editing
@@ -159,7 +173,16 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ الحذف لكاتب المقال أو الإدارة فقط
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
+    if (g.user.role !== 'admin') {
+      const { data: post } = await supabaseAdmin.from('blog_posts').select('author_id').eq('id', id).maybeSingle()
+      if (post?.author_id && post.author_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك حذف مقالاتك فقط' }, { status: 403 })
+      }
+    }
     const { error } = await supabaseAdmin.from('blog_posts').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

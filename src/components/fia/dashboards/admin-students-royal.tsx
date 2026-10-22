@@ -35,7 +35,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }, [])
 
@@ -75,7 +75,12 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setItems(items.filter((s) => s.id !== deleteTarget.id))
       setDeleteTarget(null)

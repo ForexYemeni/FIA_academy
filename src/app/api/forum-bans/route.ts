@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // GET /api/forum-bans?user_id=... — check if a user is banned (returns ban records)
 export async function GET(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const userId = req.nextUrl.searchParams.get('user_id')
     if (userId) {
       const { data, error } = await supabaseAdmin
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
 // POST — ban a user (admin / trainer / team only)
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { banned_user_id, banned_by_user_id, reason, scope, expires_at } = await req.json()
     if (!banned_user_id || !banned_by_user_id) {
       return NextResponse.json({ error: 'banned_user_id + banned_by_user_id required' }, { status: 400 })
@@ -105,6 +108,7 @@ export async function POST(req: NextRequest) {
 // DELETE — unban a user
 export async function DELETE(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { id, banned_user_id, scope } = await req.json()
     let query = supabaseAdmin.from('forum_bans').delete()
     if (id) query = query.eq('id', id)

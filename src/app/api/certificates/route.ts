@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
+
+// ⚡ رقم شهادة ملكي فريد — محاولة متعددة ضد التصادم (كان عشوائياً بلا فحص)
+async function uniqueCertificateNumber(): Promise<string> {
+  for (let i = 0; i < 6; i++) {
+    const candidate = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+    const { data } = await supabaseAdmin
+      .from('certificates').select('id').eq('certificate_number', candidate).limit(1)
+    if (!data || data.length === 0) return candidate
+  }
+  // احتمال نظري ضئيل — لاحقة زمنية تضمن التفرّد
+  return `FIA-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`
+}
 
 // ⚡ Adaptive insert helper — resilience against live-schema drift.
 // Inserts into `table`; when PostgREST reports a missing column
@@ -30,6 +43,13 @@ export async function GET(req: NextRequest) {
     const num = req.nextUrl.searchParams.get('number')
     const studentName = req.nextUrl.searchParams.get('student_name')
     const status = req.nextUrl.searchParams.get('status')
+
+    // 🛡️ فحص شهادة برقمها — عام (صفحة التحقق). أية قراءة أخرى للإدارة فقط
+    if (!num && !studentName) {
+      const g = await guardAdmin(req)
+      if (!g.ok) return g.res
+    }
+
     let query = supabaseAdmin.from('certificates').select('*')
     if (num) query = query.eq('certificate_number', num)
     if (studentName) query = query.eq('student_name', studentName)
@@ -44,6 +64,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ إصدار الشهادات للإدارة فقط — كان أي زائر يمنح نفسه شهادة رسمية!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const body = await req.json()
 
     // === Reissue mode: invalidate old cert & issue new one with same data ===
@@ -64,8 +87,8 @@ export async function POST(req: NextRequest) {
         .update({ status: 'مستبدلة' })
         .eq('id', body.id)
 
-      // Generate new certificate number (different from old)
-      const newNumber = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+      // Generate new certificate number (different from old) — فريد بفحص
+      const newNumber = await uniqueCertificateNumber()
 
       // Insert new certificate with same data but new number + new issued_at
       const newCert: any = {
@@ -98,9 +121,9 @@ export async function POST(req: NextRequest) {
     }
 
     // === Default: create new certificate ===
-    // Auto-generate certificate number if not provided
+    // Auto-generate certificate number if not provided — فريد بفحص
     if (!body.certificate_number) {
-      body.certificate_number = `FIA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
+      body.certificate_number = await uniqueCertificateNumber()
     }
 
     // ⚡ Adaptive insert: try with ALL provided fields; if the live table lacks a
@@ -117,6 +140,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل/إبطال الشهادات للإدارة فقط
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     const { data, error } = await supabaseAdmin
       .from('certificates')
@@ -133,6 +159,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف الشهادات للإدارة فقط
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('certificates').delete().eq('id', id)
     if (error) throw error

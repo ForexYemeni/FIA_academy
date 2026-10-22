@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { hashPassword, verifyPassword, signToken } from '@/lib/auth-server'
+import { hashPassword, verifyPassword } from '@/lib/auth-server'
+import { signTokenAsync, rateLimit, clientIp, tooMany } from '@/lib/api-auth'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 const BIO_SEPARATOR = '\n\n===FIA_EXTRA===\n'
@@ -36,6 +37,10 @@ export async function POST(req: NextRequest) {
     if (!email || !password) {
       return NextResponse.json({ error: 'البريد وكلمة المرور مطلوبان' }, { status: 400 })
     }
+
+    // 🛡️ حد محاولات ملكي — ضد تخمين كلمات المرور (10 محاولات كل 5 دقائق لكل بريد+IP)
+    const rl = rateLimit(`login:${String(email).toLowerCase().trim()}:${clientIp(req)}`, 10, 5 * 60 * 1000)
+    if (!rl.ok) return tooMany(rl.retryAfterSec)
 
     // Check users table FIRST (admin role is respected)
     const { data: userRow } = await supabaseAdmin
@@ -87,7 +92,7 @@ export async function POST(req: NextRequest) {
           title: userRow.title,
           bio: mergeLegacyBio(userRow.bio),
         }
-        const token = signToken({
+        const token = await signTokenAsync({
           sub: userRow.id,
           email: userRow.email,
           role: userRow.role,
@@ -112,14 +117,9 @@ export async function POST(req: NextRequest) {
         if (sepIdx !== -1) {
           const afterRole = afterPrefix.substring(sepIdx + 2)
           const actualPassword = afterRole.startsWith(':') ? afterRole.substring(1) : ''
-          // Team members use bcrypt too — but legacy ones may still use plain text
-          const { valid, needsRehash } = await verifyPassword(actualPassword || '', trainer.password)
-          // The team member's actual password is stored AFTER the colon, not hashed yet.
-          // So we compare plain vs plain here, not via verifyPassword (which expects
-          // the stored value to be either bcrypt OR plain — but for team members
-          // the stored value is the marker string, not the actual password).
-          const isMatch = actualPassword === password
-          if (isMatch) {
+          // 🛡️ تحقق مرن: كلمة المرور داخل العلامة قد تكون bcrypt حديثة أو نصية قديمة
+          const { valid } = await verifyPassword(String(password), actualPassword || '')
+          if (valid) {
             const role = afterPrefix.substring(0, sepIdx) || 'team'
             const user = {
               id: trainer.id,
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
               title: trainer.title,
               bio: mergeLegacyBio(trainer.bio),
             }
-            const token = signToken({
+            const token = await signTokenAsync({
               sub: trainer.id,
               email: trainer.email,
               role: 'trainer',
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
           title: trainer.title,
           bio: mergeLegacyBio(trainer.bio),
         }
-        const token = signToken({
+        const token = await signTokenAsync({
           sub: trainer.id,
           email: trainer.email,
           role: 'trainer',

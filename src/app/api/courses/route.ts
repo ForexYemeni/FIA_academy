@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgCourseCreated, tgCourseUpdated, tgCourseDeleted } from '@/lib/telegram'
 import { notifyFollowersNewCourse, resolveTrainerProfileId } from '@/lib/notifications'
+import { guardAdmin, guardStaff, getAuthUser } from '@/lib/api-auth'
 
 // Modules and lessons are stored INLINE in the course's `description`
 // field, after a `===FIA_MODULES===` separator. This is a legacy format
@@ -46,8 +47,36 @@ function countModulesAndLessons(modules: any[]): { modules_count: number; lesson
   return { modules_count: modulesCount, lessons_count: lessonsCount }
 }
 
+/**
+ * 🛡️ تعقيم الدورة للعامة — يستبدل JSON الوحدات الكامل (روابط الفيديو/PDF
+ * ومحتوى الدروس وإجابات الاختبارات) بمعاينة مناهج آمنة (عناوين فقط)،
+ * فلا يسرّب أي زائر محتوى مدفوعاً قبل الدفع.
+ */
+function sanitizeCourseForPublic(c: any): any {
+  if (!c) return c
+  const { description, ...rest } = c
+  const { description: text, modules } = parseCourseContent(description || '')
+  const safeModules = (modules || []).map((m: any) => ({
+    id: m.id,
+    title: m.title,
+    description: m.description || '',
+    position: m.position,
+    lessons: ((m.lessons as any[]) || []).map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      lesson_type: l.lesson_type || l.type,
+      duration_minutes: l.duration_minutes,
+      position: l.position,
+      is_preview: !!l.is_preview,
+    })),
+  }))
+  return { ...rest, description: text, __curriculum__: safeModules }
+}
+
 export async function GET(req: NextRequest) {
   try {
+    const authUser = await getAuthUser(req)
+    const isAdmin = authUser?.role === 'admin'
     const slug = req.nextUrl.searchParams.get('slug')
     if (slug) {
       const { data, error } = await supabaseAdmin
@@ -57,9 +86,17 @@ export async function GET(req: NextRequest) {
         .maybeSingle()
       if (error) throw error
       if (!data) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
+      // 🛡️ الدورات السرية للإدارة — الرابط العام يظهر «غير موجودة» لأي غير إدارة
+      if (data.visibility === 'admin_only' && !isAdmin) {
+        return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
+      }
+      // 🛡️ المحتوى الكامل للإدارة فقط — البقية معاينة مناهج آمنة
+      if (!isAdmin) return NextResponse.json(sanitizeCourseForPublic(data))
       return NextResponse.json(data)
     }
     const includeDrafts = req.nextUrl.searchParams.get('include_drafts') === 'true'
+    // 🛡️ المسودات والدورات السرية للإدارة حصراً — كانت كلمة واحدة تكشفها للجميع
+    const effectiveDrafts = includeDrafts && isAdmin
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
     const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
     let query = supabaseAdmin
@@ -68,7 +105,7 @@ export async function GET(req: NextRequest) {
     // ⚡ Only show published courses to students/visitors.
     // Admins pass include_drafts=true to see ALL courses (published + drafts).
     // This is enforced at the API level so no student client can bypass it.
-    if (!includeDrafts) {
+    if (!effectiveDrafts) {
       query = query.neq('status', 'مسودة')
       // 🛡️ دورات الإدارة السرية (visibility='admin_only') لا تظهر أبداً
       //    للمتدربين أو المدربين أو الزوار — فقط للإدارة في لوحتها.
@@ -80,7 +117,9 @@ export async function GET(req: NextRequest) {
     }
     const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
-    return NextResponse.json(data || [])
+    // 🛡️ القوائم العامة معقّمة — كوبونات التسجيل التلقائي للمسجلين فقط
+    const rows = (data || []).map((c: any) => isAdmin ? c : sanitizeCourseForPublic(c))
+    return NextResponse.json(rows)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -88,7 +127,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ إنشاء الدورات: إدارة أو مدرب — لم يكن محمياً إطلاقاً!
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     let body = await req.json()
+    // المدرب ينشئ دورته باسمه هو حصراً
+    if (g.user.role !== 'admin') body.trainer_id = g.user.id
 
     // === Duplicate-slug safety net ===
     // If the body doesn't include a slug, or the provided slug already
@@ -149,8 +193,23 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل الدورات: إدارة أو مدرب الدورة نفسها
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     const { id, description, ...otherUpdates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    if (g.user.role !== 'admin') {
+      const { data: courseRow } = await supabaseAdmin
+        .from('courses').select('trainer_id').eq('id', id).maybeSingle()
+      let owns = courseRow?.trainer_id === g.user.id
+      if (!owns && courseRow?.trainer_id) {
+        const { data: tRow } = await supabaseAdmin
+          .from('trainers').select('email, id').eq('id', courseRow.trainer_id).maybeSingle()
+        owns = tRow?.email === g.user.email || tRow?.id === g.user.id
+      }
+      if (!owns) return NextResponse.json({ error: 'غير مصرح — هذه الدورة ليست لك' }, { status: 403 })
+    }
 
     const updates: any = { ...otherUpdates }
 
@@ -278,8 +337,23 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف الدورات: إدارة أو مدرب الدورة نفسها — كان يحذف أي دورة أي زائر!
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    if (g.user.role !== 'admin') {
+      const { data: courseRow } = await supabaseAdmin
+        .from('courses').select('trainer_id').eq('id', id).maybeSingle()
+      let owns = courseRow?.trainer_id === g.user.id
+      if (!owns && courseRow?.trainer_id) {
+        const { data: tRow } = await supabaseAdmin
+          .from('trainers').select('email, id').eq('id', courseRow.trainer_id).maybeSingle()
+        owns = tRow?.email === g.user.email || tRow?.id === g.user.id
+      }
+      if (!owns) return NextResponse.json({ error: 'غير مصرح — هذه الدورة ليست لك' }, { status: 403 })
+    }
 
     // ====== CASCADE DELETE — remove ALL related rows ======
     // When a course is deleted, we must also delete:

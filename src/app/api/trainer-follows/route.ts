@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyTrainerGainedFollower, resolveTrainerUserId } from '@/lib/notifications'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // ============================================================================
 // TRAINER FOLLOWS API — ROYAL v4.2 magical follow system
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const { follower_id, trainer_id } = await req.json()
     if (!follower_id || !trainer_id) {
       return NextResponse.json({ error: 'follower_id و trainer_id مطلوبان' }, { status: 400 })
@@ -150,6 +152,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const { follower_id, trainer_id } = await req.json()
     if (!follower_id || !trainer_id) {
       return NextResponse.json({ error: 'follower_id و trainer_id مطلوبان' }, { status: 400 })

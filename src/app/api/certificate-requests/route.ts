@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth, getAuthUser } from '@/lib/api-auth'
 import {
   notifyCertificateRequested, notifyTrainerApprovedCertificate,
   notifyCertificateApproved, notifyCertificateRejected,
@@ -79,7 +80,11 @@ function serializeRequest(req: Partial<CertRequest>): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ الإدارة والمدربون يرون الكل — الطالب يرى طلباته فقط
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const paramUserId = req.nextUrl.searchParams.get('user_id')
+    const userId = g.user.role === 'admin' || g.user.role === 'trainer' ? (paramUserId || null) : g.user.id
     const status = req.nextUrl.searchParams.get('status')
 
     // Fetch all payments that are certificate requests
@@ -106,7 +111,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ الطالب يطلب شهادته لحسابه هو فقط
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const body = await req.json()
+    body.user_id = g.user.id
     const { user_id, course_id, student_name, course_title, fee } = body
 
     if (!user_id || !course_id || !student_name) {
@@ -199,6 +208,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ معالجة طلبات الشهادات للإدارة والمدربين فقط
+    const g = await guardStaff(req)
+    if (!g.ok) return g.res
     const { id, action, note, cert_number, verify_code } = await req.json()
     // action: 'trainer_approve' | 'admin_approve' | 'issue' | 'reject'
 

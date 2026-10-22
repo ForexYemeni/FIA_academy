@@ -2,27 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
 import { DZ_SECTION_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
+import { guardDangerZone } from '@/lib/api-auth'
 
 // POST /api/admin/danger-zone
-// Body: { section: 'courses'|'trainers'|'students'|'payments'|
-//                'certificates'|'reviews'|'coupons'|'blog'|
-//                'forum'|'contact'|'payment_methods'|'team',
-//         user_id?: string }
+// Body: { section, user_id, password }
 //
 // Wipes an entire section of data. Used by the admin's Danger Zone
-// panel. Each call only wipes ONE section to reduce the chance of
-// an accidental total wipe.
+// panel. 🛡️ الحرس الملكي: هوية إدارة حية (JWT) + كلمة مرور صحيحة في
+// الخادم + حد محاولات — لم يعد بإمكان أي زائر محو أي قسم.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { section, user_id } = body as { section: string, user_id?: string }
+    const { section, user_id, password } = body as { section: string, user_id?: string, password?: string }
     if (!section) return NextResponse.json({ error: 'section مطلوب' }, { status: 400 })
+
+    const guard = await guardDangerZone(req, user_id, password)
+    if (!guard.ok) return guard.res
+    const adminId = guard.user.id
 
     // 🛡️ الدرع الملكي: التقاط نسخة إنقاذ كاملة قبل أي محو — فلا يُفقد شيء أبداً
     let snapshotId: string | null = null
     const snapshotTables = DZ_SECTION_TABLES[section]
     if (snapshotTables) {
-      const snap = await createDangerSnapshot('section', section, section, snapshotTables, user_id)
+      const snap = await createDangerSnapshot('section', section, section, snapshotTables, adminId)
       snapshotId = snap?.id || null
     }
 
@@ -143,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // Telegram audit log
     try {
-      await tgDangerZoneWiped(label, count, user_id, snapshotId)
+      await tgDangerZoneWiped(label, count, adminId, snapshotId)
     } catch {}
 
     return NextResponse.json({

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code')
+    // 🛡️ جلب قائمة كل الكوبونات للإدارة فقط — بالكود المحدد يُسمح أثناء الدفع
+    if (!code) {
+      const g = await guardAdmin(req)
+      if (!g.ok) return g.res
+    }
     const userId = req.nextUrl.searchParams.get('user_id')
 
     if (code) {
@@ -68,6 +74,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const body = await req.json()
     // Generate code if not provided
     if (!body.code) {
@@ -103,6 +110,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     if (updates.code) updates.code = String(updates.code).toUpperCase().trim()
@@ -121,6 +129,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('coupons').delete().eq('id', id)
     if (error) throw error

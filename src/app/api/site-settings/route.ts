@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyPassword, hashPassword } from '@/lib/auth-server'
+import { guardAdmin } from '@/lib/api-auth'
 
 // Default settings (returned if table is empty)
 const DEFAULTS = {
@@ -59,13 +60,15 @@ function parseRow(row: any) {
     phone: row.phone || '',
     email: row.email || '',
     address: cleanAddress || '',
-    telegram_bot_token: row.telegram_bot_token || '',
+    // 🛡️ التوكن لا يُرسل للعميل أبداً — فقط مؤشر وجوده للواجهة
+    telegram_bot_token: '',
+    telegram_token_set: !!row.telegram_bot_token,
     telegram_channel_id: row.telegram_channel_id || '',
     ...extra,
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     // Select only known-existing columns to avoid schema cache errors
     const { data, error } = await supabaseAdmin
@@ -84,6 +87,9 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل إعدادات الموقع للإدارة فقط
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const body = await req.json()
 
     // === Telegram integration protection ===
@@ -135,8 +141,12 @@ export async function PUT(req: NextRequest) {
       academy_name: body.academy_name,
       phone: body.phone,
       email: body.email,
-      telegram_bot_token: body.telegram_bot_token,
       telegram_channel_id: body.telegram_channel_id,
+    }
+    // 🛡️ التوكن: يُحدَّث فقط عند إرسال قيمة غير فارغة — الحفظ العادي (بلا توكن
+    // لأن GET لا يعيده أبداً) لا يمس التوكن المخزن إطلاقاً
+    if (body.telegram_bot_token && String(body.telegram_bot_token).trim() !== '') {
+      basicFields.telegram_bot_token = String(body.telegram_bot_token).trim()
     }
 
     // Build extra JSON from all non-basic fields (excluding password + user_id which we used above)

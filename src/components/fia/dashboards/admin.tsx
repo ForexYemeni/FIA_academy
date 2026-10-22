@@ -170,7 +170,7 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
   // compute the count from the payments/enrollments table.
   useEffect(() => {
     Promise.all([
-      fetch('/api/courses').then((r) => r.json()).catch(() => []),
+      fetch('/api/courses?include_drafts=true').then((r) => r.json()).catch(() => []),
       fetch('/api/enrollments').then((r) => r.json()).catch(() => []),
     ]).then(([c, e]: any) => {
       setCourses(Array.isArray(c) ? c : [])
@@ -665,6 +665,11 @@ const AdminCourses = React.memo(function AdminCourses() {
     setDeleteTarget(null)
     try {
       const res = await fetch('/api/courses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deletedId }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       if (res.ok) {
         toast.success('تم حذف الدورة بنجاح')
       } else {
@@ -845,7 +850,7 @@ function AdminExams() {
     setLoading(true)
     Promise.all([
       fetch('/api/exam-questions').then(r => r.json()).catch(() => []),
-      fetch('/api/courses').then(r => r.json()).catch(() => []),
+      fetch('/api/courses?include_drafts=true').then(r => r.json()).catch(() => []),
     ]).then(([q, c]) => {
       const qArr = Array.isArray(q) ? q : []
       setQuestions(qArr)
@@ -1144,7 +1149,7 @@ const AdminStudents = React.memo(function AdminStudents() {
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }, [])
 
@@ -1188,7 +1193,12 @@ const AdminStudents = React.memo(function AdminStudents() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/students', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setItems(items.filter((s) => s.id !== deleteTarget.id))
       setDeleteTarget(null)
@@ -1478,7 +1488,7 @@ const AdminPayments = React.memo(function AdminPayments() {
 
   const load = () => {
     fetch('/api/payments').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
   }
   useEffect(() => { load() }, [])
 
@@ -1580,6 +1590,13 @@ const AdminPayments = React.memo(function AdminPayments() {
       setItems(previousItems)
       toast.error('خطأ في الاتصال')
     }
+  }
+
+  // === APPROVAL CONFIRMATION FLOW 💰 — الموافقة بضغطة واحدة كانت سهلة الخطأ ===
+  const [approveTarget, setApproveTarget] = useState<any | null>(null)
+  const openApproveDialog = (payment: any) => {
+    setApproveTarget(payment)
+    setSelectedPayment(null)
   }
 
   // === REJECTION CONFIRMATION FLOW ===
@@ -1864,7 +1881,7 @@ const AdminPayments = React.memo(function AdminPayments() {
                     </Button>
                     {isPending && (
                       <>
-                        <Button size="sm" className="h-8 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-lg shadow-sm" onClick={() => updateStatus(p.id, 'مكتمل')}>
+                        <Button size="sm" className="h-8 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-lg shadow-sm" onClick={() => openApproveDialog(p)}>
                           <CheckCircle2 className="w-3.5 h-3.5 ml-0.5" /> قبول
                         </Button>
                         <Button size="sm" variant="outline" className="h-8 px-2 border-rose-500/40 text-rose-500 hover:bg-rose-500/10 text-[11px] rounded-lg" onClick={() => openRejectDialog(p)}>
@@ -1988,7 +2005,7 @@ const AdminPayments = React.memo(function AdminPayments() {
 
               {selectedPayment.status === 'قيد الانتظار' && (
                 <div className="flex gap-2 pt-2">
-                  <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all" onClick={() => updateStatus(selectedPayment.id, 'مكتمل')}>
+                  <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl shadow-md active:scale-[0.97] transition-all" onClick={() => openApproveDialog(selectedPayment)}>
                     <CheckCircle2 className="w-4 h-4 ml-1" /> قبول الدفع
                   </Button>
                   <Button variant="outline" className="flex-1 border-rose-500/40 text-rose-500 hover:bg-rose-500/10 rounded-xl" onClick={() => openRejectDialog(selectedPayment)} disabled={rejecting}>
@@ -2003,6 +2020,25 @@ const AdminPayments = React.memo(function AdminPayments() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* === APPROVAL DIALOG 💰 — تأكيد قبل تفعيل الدورة للمتدرب === */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        onOpenChange={(o) => { if (!o) setApproveTarget(null) }}
+        title="تأكيد قبول الدفعة"
+        message="سيتم تفعيل الدورة للمتدرب فوراً وإشعاره، واحتساب ربح المدرب تلقائياً. تأكد من صحة الإثبات قبل الموافقة."
+        itemLabel="الدفعة:"
+        itemName={approveTarget?.user_name || approveTarget?.user_id || 'دفعة'}
+        confirmLabel="قبول وتفعيل"
+        cancelLabel="تراجع"
+        variant="success"
+        onConfirm={async () => {
+          if (approveTarget) {
+            await updateStatus(approveTarget.id, 'مكتمل')
+            setApproveTarget(null)
+          }
+        }}
+      />
 
       {/* === REJECTION DIALOG — Professional design matching ConfirmDialog === */}
       <Dialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) closeRejectDialog() }}>
@@ -2139,7 +2175,12 @@ function AdminPaymentMethods() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/payment-methods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setDeleteTarget(null)
       load()
@@ -2554,7 +2595,7 @@ const AdminCertificates = React.memo(function AdminCertificates() {
   const load = () => {
     fetch('/api/certificates').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
     fetch('/api/certificate-requests').then((r) => r.json()).then((d) => setRequests(Array.isArray(d) ? d : []))
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
+    fetch('/api/courses?include_drafts=true').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : []))
     fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
   }
   useEffect(() => { load() }, [])
@@ -2595,7 +2636,12 @@ const AdminCertificates = React.memo(function AdminCertificates() {
     if (!certDeleteTarget) return
     setCertDeleting(true)
     try {
-      await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certDeleteTarget.id }) })
+      const res = await fetch('/api/certificates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: certDeleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setCertDeleteTarget(null)
       load()
@@ -3067,7 +3113,12 @@ const AdminTrainers = React.memo(function AdminTrainers() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/trainers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setDeleteTarget(null)
       load()
@@ -3436,7 +3487,12 @@ const AdminPartners = React.memo(function AdminPartners() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/partners', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setDeleteTarget(null)
       load()
@@ -3570,7 +3626,12 @@ const AdminLicenses = React.memo(function AdminLicenses() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/licenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم الحذف')
       setDeleteTarget(null)
       load()
@@ -4236,14 +4297,14 @@ function AdminAccount({ user, updateUser, logout }: any) {
 
   useEffect(() => { fetchDzSnapshots() }, [])
 
-  const restoreDzSnapshot = async () => {
+  const restoreDzSnapshot = async (password?: string) => {
     if (!dzRestoreTarget) return
     setDzSnapBusy(dzRestoreTarget.id)
     try {
       const res = await fetch('/api/admin/danger-zone/snapshots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot_id: dzRestoreTarget.id, user_id: user.id }),
+        body: JSON.stringify({ snapshot_id: dzRestoreTarget.id, user_id: user.id, password: password || '' }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -4825,14 +4886,14 @@ type DzSnapshotRow = {
       itemLabel="القسم المراد حذفه:"
       itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
       confirmLabel="حذف القسم نهائياً"
-      onConfirm={async () => {
+      onConfirm={async (pw: string) => {
         if (!dzSection) return
         setDzSectionLoading(true)
         try {
           const res = await fetch('/api/admin/danger-zone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ section: dzSection, user_id: user.id }),
+            body: JSON.stringify({ section: dzSection, user_id: user.id, password: pw }),
           })
           const data = await res.json()
           if (res.ok) {
@@ -4861,7 +4922,7 @@ type DzSnapshotRow = {
       itemLabel="النسخة المستعادة:"
       itemName={dzRestoreTarget ? (dzRestoreTarget.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzRestoreTarget.section] || dzRestoreTarget.section}`) : ''}
       confirmLabel="استعادة الآن"
-      onConfirm={restoreDzSnapshot}
+      onConfirm={(pw: string) => restoreDzSnapshot(pw)}
       loading={!!dzRestoreTarget && dzSnapBusy === dzRestoreTarget.id}
     />
 
@@ -4892,7 +4953,7 @@ type DzSnapshotRow = {
           {/* Body */}
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 mb-1">سيتم حذف جميع البيانات نهائياً:</p>
-            <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى</p>
+            <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل</p>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
                 ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية جسيمة ولا تُستعجل.
@@ -4968,7 +5029,7 @@ function AdminReports() {
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetch('/api/courses').then(r => r.json()),
+      fetch('/api/courses?include_drafts=true').then(r => r.json()),
       fetch('/api/payments').then(r => r.json()),
       fetch('/api/students?role=student').then(r => r.json()),
       fetch('/api/enrollments').then(r => r.json()),
@@ -5157,7 +5218,7 @@ function AdminLogs() {
     Promise.all([
       fetch('/api/payments').then(r => r.json()),
       fetch('/api/enrollments').then(r => r.json()),
-      fetch('/api/courses').then(r => r.json()),
+      fetch('/api/courses?include_drafts=true').then(r => r.json()),
     ]).then(([p, e, c]) => {
       const payments = Array.isArray(p) ? p : []
       const enrollments = Array.isArray(e) ? e : []

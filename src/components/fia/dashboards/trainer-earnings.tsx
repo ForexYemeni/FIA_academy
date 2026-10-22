@@ -107,9 +107,12 @@ export function TrainerEarnings({ user }: { user: any }) {
     let ch1: any, ch2: any
     try {
       ch1 = supabasePublic.channel(`trainer-earnings:${user.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_earnings' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_earnings' }, (payload: any) => {
           load()
-          toast.success('💰 أرباح جديدة أُضيفت إلى محفظتك!')
+          // ⚡ الإشعار فقط عند إضافة ربح فعلي — لا «أرباح جديدة» عند السحب أو المحاسبة!
+          if (payload?.eventType === 'INSERT') {
+            toast.success('💰 أرباح جديدة أُضيفت إلى محفظتك!')
+          }
         })
         .subscribe()
       ch2 = supabasePublic.channel(`trainer-withdrawals:${user.id}`)

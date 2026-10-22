@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyPaymentApproved, notifyPaymentRejected } from '@/lib/notifications'
 import { tgPaymentApproved, tgPaymentRejected as tgReject } from '@/lib/telegram'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 
 // ===========================================================================
 // ROYAL EARNINGS ACCRUAL — when the admin approves a student's payment,
@@ -75,7 +76,10 @@ async function accrueTrainerEarning(payment: any): Promise<void> {
 // to keep the admin's "المدفوعات" view clean.
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ المالك يرى مدفوعاته — الإدارة ترى الكل
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const userId = g.user.role === 'admin' ? req.nextUrl.searchParams.get('user_id') : g.user.id
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
     const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
     let query = supabaseAdmin
@@ -98,9 +102,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — admin: manually create a payment record
+// POST — الإدارة فقط: إنشاء سجل دفعة يدوي
 export async function POST(req: NextRequest) {
   try {
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const body = await req.json()
     const { data, error } = await supabaseAdmin
       .from('payments')
@@ -124,6 +130,9 @@ export async function POST(req: NextRequest) {
 // the approved status for consistency.
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ الموافقة/الرفض للإدارة فقط — كانت مفتوحة على أي زائر!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id, status, rejection_reason, ...otherUpdates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     if (!status) return NextResponse.json({ error: 'status required' }, { status: 400 })
@@ -146,6 +155,25 @@ export async function PUT(req: NextRequest) {
       .select()
       .single()
     if (updateError) throw updateError
+
+    // 2.4) 💰 عكس أرباح المدرب عند إلغاء دفعة كانت مكتملة — فلا يبقى ربحٌ
+    //      عن دفعة لم تعد صحيحة. نرفض الإلغاء إن كان الربح قد سُحب فعلاً.
+    if ((status === 'ملغي' || status === 'cancelled') && updated?.course_id) {
+      try {
+        const { data: linked } = await supabaseAdmin
+          .from('trainer_earnings').select('id, status').eq('payment_id', id)
+        if (linked && linked.length > 0) {
+          const withdrawn = linked.find((r: any) => r.status === 'مسحوب')
+          if (withdrawn) {
+            return NextResponse.json(
+              { error: 'لا يمكن إلغاء هذه الدفعة — ربحها أُصرف للمدرب بالفعل. تواصل مع المدرب أولاً.' },
+              { status: 409 }
+            )
+          }
+          await supabaseAdmin.from('trainer_earnings').update({ status: 'ملغي' }).eq('payment_id', id)
+        }
+      } catch {}
+    }
 
     // 2) Only update duplicate rows on APPROVAL (not rejection)
     if (status === 'مكتمل' && updated?.user_id && updated?.course_id) {

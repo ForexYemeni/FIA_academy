@@ -15,7 +15,12 @@ export interface PasswordConfirmDialogProps {
   itemName?: string
   itemLabel?: string
   confirmLabel?: string
-  onConfirm: () => void | Promise<void>
+  /**
+   * يُستدعى بعد التحقق المحلي من كلمة المرور — ويستلم كلمة المرور نفسها
+   * حتى يرسلها المكوّن الأب إلى الخادم للتحقق الملكي النهائي (bcrypt/نصي)
+   * في مسارات منطقة الخطر. الاستخدامات القديمة () => void ما زالت تعمل.
+   */
+  onConfirm: (password: string) => void | Promise<void>
   loading?: boolean
 }
 
@@ -71,10 +76,10 @@ export function PasswordConfirmDialog({
       })
       const data = await res.json()
       if (!res.ok || !data.valid) {
-        setError(data.error || 'كلمة المرور غير صحيحة')
+        setError(data.error || data.message || 'كلمة المرور غير صحيحة')
         return
       }
-      await onConfirm()
+      await onConfirm(password)
       setPassword('')
     } catch {
       setError('خطأ في الاتصال')
