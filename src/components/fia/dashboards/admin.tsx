@@ -55,36 +55,44 @@ import { CertificateViewer } from '@/components/fia/certificate-viewer'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 import { supabasePublic } from '@/lib/supabase'
 
+// ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 6 ترويسات ذهبية
+// (الترتيب داخل كل مجموعة يُعرض كما هو هنا حرفياً)
 const NAV: NavItem[] = [
-  { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
-  { id: 'courses', label: 'الدورات', icon: BookOpen },
-  { id: 'content', label: 'محتوى الدورات', icon: FileText },
-  { id: 'exams', label: 'الاختبارات', icon: FileText },
-  { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle },
-  { id: 'students', label: 'المتدربون', icon: Users },
-  { id: 'payments', label: 'المدفوعات', icon: CreditCard },
-  { id: 'trainer-applications', label: 'طلبات المدربين', icon: ClipboardCheck },
-  { id: 'trainer-earnings', label: 'أرباح المدربين', icon: Wallet },
-  { id: 'withdrawal-methods', label: 'طرق السحب', icon: Landmark },
-  { id: 'specializations', label: 'التخصصات', icon: GraduationCap },
-  { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
-  { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
-  { id: 'affiliates', label: 'المسوّقون', icon: Users },
-  { id: 'certificates', label: 'الشهادات', icon: Award },  // Re-enabled
-  { id: 'trainers', label: 'المدربون', icon: GraduationCap },
-  { id: 'reviews', label: 'تقييمات المتدربين', icon: Star },
-  { id: 'partners', label: 'الشركاء', icon: Building2 },
-  { id: 'licenses', label: 'التراخيص', icon: Shield },
-  { id: 'founder', label: 'المؤسس والفريق', icon: UserCog },
-  { id: 'blog', label: 'المدونة', icon: Newspaper },
-  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
-  { id: 'forum-bans', label: 'حظر المنتدى', icon: Ban },
-  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
-  { id: 'contact', label: 'صندوق الرسائل', icon: Mail },
-  { id: 'site', label: 'إعدادات الموقع', icon: Settings },
-  { id: 'account', label: 'الحساب والأمان', icon: User },
-  { id: 'reports', label: 'التقارير', icon: BarChart3 },
-  { id: 'logs', label: 'سجل العمليات', icon: ScrollText },
+  // الرئيسية
+  { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard, group: 'الرئيسية' },
+  // الدورات والتدريب
+  { id: 'courses', label: 'الدورات', icon: BookOpen, group: 'الدورات والتدريب' },
+  { id: 'content', label: 'محتوى الدورات', icon: FileText, group: 'الدورات والتدريب' },
+  { id: 'exams', label: 'الاختبارات', icon: FileText, group: 'الدورات والتدريب' },
+  { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle, group: 'الدورات والتدريب' },
+  { id: 'specializations', label: 'التخصصات', icon: GraduationCap, group: 'الدورات والتدريب' },
+  { id: 'certificates', label: 'الشهادات', icon: Award, group: 'الدورات والتدريب' },
+  { id: 'reviews', label: 'تقييمات المتدربين', icon: Star, group: 'الدورات والتدريب' },
+  // الأشخاص
+  { id: 'students', label: 'المتدربون', icon: Users, group: 'الأشخاص' },
+  { id: 'trainers', label: 'المدربون', icon: GraduationCap, group: 'الأشخاص' },
+  { id: 'trainer-applications', label: 'طلبات المدربين', icon: ClipboardCheck, group: 'الأشخاص' },
+  { id: 'partners', label: 'الشركاء', icon: Building2, group: 'الأشخاص' },
+  // المالية
+  { id: 'payments', label: 'المدفوعات', icon: CreditCard, group: 'المالية' },
+  { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign, group: 'المالية' },
+  { id: 'trainer-earnings', label: 'أرباح المدربين', icon: Wallet, group: 'المالية' },
+  { id: 'withdrawal-methods', label: 'طرق السحب', icon: Landmark, group: 'المالية' },
+  { id: 'coupons', label: 'كوبونات الخصم', icon: Gift, group: 'المالية' },
+  { id: 'affiliates', label: 'المسوّقون', icon: Users, group: 'المالية' },
+  // المحتوى والمجتمع
+  { id: 'blog', label: 'المدونة', icon: Newspaper, group: 'المحتوى والمجتمع' },
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare, group: 'المحتوى والمجتمع' },
+  { id: 'forum-bans', label: 'حظر المنتدى', icon: Ban, group: 'المحتوى والمجتمع' },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle, group: 'المحتوى والمجتمع' },
+  { id: 'contact', label: 'صندوق الرسائل', icon: Mail, group: 'المحتوى والمجتمع' },
+  // النظام والإعدادات
+  { id: 'site', label: 'إعدادات الموقع', icon: Settings, group: 'النظام والإعدادات' },
+  { id: 'account', label: 'الحساب والأمان', icon: User, group: 'النظام والإعدادات' },
+  { id: 'licenses', label: 'التراخيص', icon: Shield, group: 'النظام والإعدادات' },
+  { id: 'founder', label: 'المؤسس والفريق', icon: UserCog, group: 'النظام والإعدادات' },
+  { id: 'reports', label: 'التقارير', icon: BarChart3, group: 'النظام والإعدادات' },
+  { id: 'logs', label: 'سجل العمليات', icon: ScrollText, group: 'النظام والإعدادات' },
 ]
 
 export function AdminDashboard() {
