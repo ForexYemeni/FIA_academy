@@ -1818,3 +1818,14 @@ Stage Summary:
 4) **سلامة تامة**: معرّفات الأقسام بلا أي تغيير (روابط hash/الإشعارات/الجيت الملكي للمدرب تعمل حرفياً — navForDisplay ينشر group تلقائياً عبر spread)، عدادات v6.6 الذهبية بنفس المنطق والمخزن المشترك (كبُرت الشارة 22→24px فقط لتناسب الأزرار الأكبر)، sw.js v6 لم يُمس (git diff صفر)، لا تغيير على أي API أو قاعدة بيانات.
 
 تحقق: bunx tsc صفر أخطاء في الملفات المعدلة + next build ✓ 86/86 صفحة + git push 36a9848.
+
+## v6.8 — الدروس الصوتية الملكية عبر خزينة تيليجرام (صفر تكلفة + حماية كاملة)
+
+1) **الرفع للإدارة والمدرب**: نوع درس جديد «صوتي» في نافذة الدروس (شريحة ذهبية، 5 أنواع) — بطاقة رفع ذهبية ترسل عبر sendAudio (sendAudio يُبقي الصوت بصيغته الأصلية) إلى القناة/البوت الموجودين أصلاً (site_settings: telegram_bot_token + telegram_channel_id) — يُرجع file_id دائماً + المدة تلقائياً (تُعبّئ مدة الدرس) + الحجم، مع سقف 19MB (حد بث getFile=20MB) وكاش telegram_upload_cache ضد التكرار (kind='audio' + file_id يُخزن الآن فعلاً).
+2) **بوابة البث المحمية /api/lessons/audio-stream**: تحلّل الدرس من JSON الدورة (course_id اختياري لتخطي المسح) ثم بوابة صلاحيات مطابقة لعقد GET /api/lessons (إدارة / مدرب مالك بالـ id أو البريد عبر trainers / payments مكتمل / is_preview للزوار) — ثم getFile وسحب من api.telegram.org/file بالتوكن داخل الخادم حصراً + تمرير Range/206 للتقديم الفوري + Content-Type من audio_mime.
+3) **المشغل الملكي LuxAudioPlayer** (lux-audio-player.tsx): موجة ذهبية 28 شريطاً بمزامنة luxWave (تستقر عند التوقف وتحترم prefers-reduced-motion) + شريط تقدم ذهبي قابل للسحب (LTR قياسي داخل RTL) + سرعات 1/1.25/1.5/2/0.75 + إكمال بنمط VideoPlayer الرسمي (firedRef + onEnded + 95% timeupdate) + حالات تحميل/خطأ/إعادة.
+4) **التوثيق الشامل**: lesson-preview-modal (معاينة الإدارة/المدرب + courseId prop جديد) وstudent-course-viewer (عرض الطالب + courseId للبوابة) وcourse-content-manager (رفع + منع حفظ بلا ملف) + شارة «صوتي 🎙️» في royal-guide-banner وtranslateLessonType في telegram-publish وtgLessonCreated.
+5) **حقول الدرس الصوتي** في JSON الدروس: audio_file_id / audio_duration / audio_mime / audio_size — صفر ترحيل قاعدة بيانات، صفر مساس بالفيديو/PDF/النص/الاختبارات.
+
+تحقق: tsc نظيف + next build 87/87 ✓ (بوابة البث صفحة جديدة) + الإنتاج: HOME 200 + البوابة ترجع 400/404 برسائل عربية سليمة + مسار APK الإشعارات حي.
+احتياط (القاعدة الإلزامية): OLD v6.7-slim (62c36c2) + NEW v6.8-slim (cd5f3ae) — 12MB لكل منهما، بدون أرشيف download/ بقرار صاحب المنصة، كلمة المرور الموحدة.
