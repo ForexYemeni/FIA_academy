@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لا يوجد اتصال | أكاديمية المستقبل الدولية</title>
+  <link rel="icon" href="/fia/favicon.svg">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #04102b 0%, #0a1f4d 50%, #04102b 100%);
+      padding: 24px;
+    }
+    .card {
+      text-align: center;
+      max-width: 440px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(212,175,55,0.35);
+      border-radius: 28px;
+      padding: 44px 30px;
+      backdrop-filter: blur(8px);
+    }
+    .icon {
+      width: 84px; height: 84px;
+      margin: 0 auto 20px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.08));
+      border: 2px solid rgba(212,175,55,0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 38px;
+      box-shadow: 0 8px 40px rgba(212,175,55,0.25);
+    }
+    h1 { color: #fff; font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+    p { color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.9; margin-bottom: 26px; }
+    button {
+      padding: 12px 30px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #D4AF37, #b8942e);
+      border: none;
+      color: #04102b;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 20px rgba(212,175,55,0.35);
+    }
+    button:active { transform: scale(0.97); }
+    .brand { color: rgba(212,175,55,0.55); font-size: 11px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📶</div>
+    <h1>انقطع اتصال القصر مؤقتاً</h1>
+    <p>لا يوجد اتصال بالإنترنت الآن — المحتوى الذي زرته سابقاً يبقى متاحاً من الذاكرة الملكية. عُد معنا فور عودة الشبكة.</p>
+    <button onclick="location.reload()">🔄 حاول مجدداً</button>
+    <div class="brand">أكاديمية المستقبل الدولية</div>
+  </div>
+</body>
+</html>

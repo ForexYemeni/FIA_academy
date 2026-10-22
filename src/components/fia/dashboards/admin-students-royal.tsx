@@ -7,12 +7,14 @@
 import React, { useEffect, useState } from 'react'
 import {
   Users, BookOpen, CheckCircle2, Clock, Mail, Phone, Calendar, Eye, Trash2,
-  Search, X, GraduationCap, TrendingUp, Wallet, Award,
+  Search, X, GraduationCap, TrendingUp, Wallet, Award, UserPlus, Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
@@ -32,6 +34,11 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // 👑 التسجيل اليدوي الملكي + تصدير Excel
+  const [enrollOpen, setEnrollOpen] = useState(false)
+  const [enrollUserId, setEnrollUserId] = useState('')
+  const [enrollCourseId, setEnrollCourseId] = useState('')
+  const [enrollLoading, setEnrollLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
@@ -92,6 +99,75 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
 
   const getStudentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
 
+  // 👑 التسجيل اليدوي الملكي — الإدارة تسجّل متدرباً في دورة فوراً
+  const handleManualEnroll = async () => {
+    if (!enrollUserId || !enrollCourseId) {
+      toast.error('اختر المتدرب والدورة أولاً')
+      return
+    }
+    setEnrollLoading(true)
+    try {
+      const res = await fetch('/api/admin/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: enrollUserId, course_id: enrollCourseId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل التسجيل')
+        return
+      }
+      toast.success(`👑 سجّلت "${data.student_name}" في "${data.course_title}" بنجاح`)
+      setEnrollOpen(false)
+      setEnrollUserId('')
+      setEnrollCourseId('')
+      // تحديث فوري للتسجيلات
+      fetch('/api/enrollments').then((r) => r.json()).then((d) => setEnrollments(Array.isArray(d) ? d : []))
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setEnrollLoading(false)
+    }
+  }
+
+  // 👑 تصدير Excel الملكي (CSV بترميز عربي سليم يفتح مباشرة في Excel)
+  const exportExcel = () => {
+    try {
+      const rows: string[][] = [
+        ['الاسم', 'البريد', 'الهاتف', 'الحالة', 'عدد الدورات', 'مكتملة', 'معلّقة', 'الدورات المسجّل فيها', 'تاريخ الانضمام'],
+      ]
+      for (const s of filtered) {
+        const sEnrs = getStudentEnrollments(s.id)
+        const completed = sEnrs.filter((e) => e.status === 'completed' || e.status === 'مكتمل').length
+        const pending = sEnrs.filter((e) => e.payment_status === 'pending').length
+        const courseTitles = sEnrs
+          .map((e) => courses.find((c) => c.id === e.course_id)?.title || '')
+          .filter(Boolean)
+          .join(' | ')
+        const st = STATUS_META[studentStatus(s.id)]?.label || ''
+        rows.push([
+          s.name || '', s.email || '', s.phone || '', st,
+          String(sEnrs.length), String(completed), String(pending),
+          courseTitles,
+          s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '',
+        ])
+      }
+      const csv = '\uFEFF' + rows
+        .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `FIA-المتدربون-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`📊 صُدّر ${filtered.length} متدرباً إلى ملف Excel`)      
+    } catch {
+      toast.error('فشل التصدير')
+    }
+  }
+
   // Status derivation per student
   const studentStatus = (studentId: string) => {
     const sEnrs = getStudentEnrollments(studentId)
@@ -147,17 +223,29 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
         />
       }
       toolbar={
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <LuxSearch value={search} onChange={setSearch} placeholder="ابحث بالاسم أو البريد أو الهاتف..." className="lg:col-span-2" />
-          <LuxSelect value={statusFilter} onChange={setStatusFilter} placeholder="كل الحالات"
-            options={[
-              { value: 'learning', label: 'قيد التعلّم', emoji: '📖' },
-              { value: 'completed', label: 'مكتمل', emoji: '✅' },
-              { value: 'pending', label: 'بانتظار الدفع', emoji: '⏳' },
-              { value: 'new', label: 'بدون دورات', emoji: '✨' },
-            ]} />
-          <LuxSelect value={courseFilter} onChange={setCourseFilter} placeholder="كل الدورات"
-            options={courses.map((c) => ({ value: c.id, label: c.title, emoji: '📘' }))} />
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <LuxSearch value={search} onChange={setSearch} placeholder="ابحث بالاسم أو البريد أو الهاتف..." className="lg:col-span-2" />
+            <LuxSelect value={statusFilter} onChange={setStatusFilter} placeholder="كل الحالات"
+              options={[
+                { value: 'learning', label: 'قيد التعلّم', emoji: '📖' },
+                { value: 'completed', label: 'مكتمل', emoji: '✅' },
+                { value: 'pending', label: 'بانتظار الدفع', emoji: '⏳' },
+                { value: 'new', label: 'بدون دورات', emoji: '✨' },
+              ]} />
+            <LuxSelect value={courseFilter} onChange={setCourseFilter} placeholder="كل الدورات"
+              options={courses.map((c) => ({ value: c.id, label: c.title, emoji: '📘' }))} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => { setEnrollUserId(''); setEnrollCourseId(''); setEnrollOpen(true) }}
+              className="bg-gradient-to-r from-gold to-amber-600 hover:from-amber-600 hover:to-gold text-navy rounded-xl font-bold shadow-md h-8 text-[11px]">
+              <UserPlus className="w-3.5 h-3.5 ml-1" /> تسجيل يدوي في دورة
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportExcel}
+              className="rounded-xl border-gold/40 hover:bg-gold/10 text-navy h-8 text-[11px] font-bold">
+              <Download className="w-3.5 h-3.5 ml-1" /> تصدير Excel ({filtered.length})
+            </Button>
+          </div>
         </div>
       }
     >
@@ -404,6 +492,60 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* 👑 حوار التسجيل اليدوي الملكي */}
+      <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
+        <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 25% 40%, #D4AF37 1.5px, transparent 1.5px)',
+              backgroundSize: '20px 20px',
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-2xl bg-white/10 border border-gold/30 flex items-center justify-center mb-2">
+              <UserPlus className="w-7 h-7 text-gold" />
+            </div>
+            <DialogTitle className="text-white text-xl font-bold">التسجيل اليدوي الملكي</DialogTitle>
+            <p className="relative text-white/70 text-xs mt-1">سجّل متدرباً في دورة فوراً — مثلاً بعد تحويل بنكي خارج المنصة أو هدية ملكية</p>
+          </div>
+          <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
+            <div>
+              <Label className="text-navy font-medium mb-1.5 block">المتدرب</Label>
+              <select
+                value={enrollUserId}
+                onChange={(e) => setEnrollUserId(e.target.value)}
+                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
+              >
+                <option value="">— اختر المتدرب —</option>
+                {items.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} {s.phone ? `— ${s.phone}` : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-navy font-medium mb-1.5 block">الدورة</Label>
+              <select
+                value={enrollCourseId}
+                onChange={(e) => setEnrollCourseId(e.target.value)}
+                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
+              >
+                <option value="">— اختر الدورة —</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+            <Button
+              onClick={handleManualEnroll}
+              disabled={enrollLoading}
+              className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
+            >
+              <UserPlus className="w-4 h-4 ml-1" />
+              {enrollLoading ? 'جاري التسجيل...' : 'سجّل الآن'}
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center">يصل المتدرب إشعار افتتاحي فخم فور التسجيل — ولا يتكرر التسجيل في نفس الدورة</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PasswordConfirmDialog
         open={!!deleteTarget}
