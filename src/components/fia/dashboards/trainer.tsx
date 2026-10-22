@@ -6,7 +6,7 @@ import {
   Plus, Edit, Trash2, Video, FileUp, Star, ArrowRight, Lock, Mail, CheckCircle2, Eye, EyeOff, Loader2,
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
   GraduationCap, Crown, Calendar, Clock, TrendingUp,
-  Phone, Briefcase, Sparkles, Award, KeyRound, Save, HeartHandshake,
+  Phone, Briefcase, Sparkles, Award, KeyRound, Save, HeartHandshake, Wallet, Search, UserCheck,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -28,6 +28,7 @@ import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 import { TrainerQuestionBank } from './trainer-questions'
 import { TrainerResultsCenter } from './trainer-results'
+import { TrainerEarnings } from './trainer-earnings'
 import { supabasePublic } from '@/lib/supabase'
 
 const NAV: NavItem[] = [
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
   { id: 'exams', label: 'الاختبارات', icon: FileText },
   { id: 'question-bank', label: 'بنك الأسئلة', icon: HelpCircle },
   { id: 'results', label: 'نتائج المتدربين', icon: TrendingUp },
+  { id: 'earnings', label: 'أرباحي', icon: Wallet },
   { id: 'forum', label: 'المنتدى', icon: MessageSquare },
   { id: 'blog', label: 'المدونة', icon: Newspaper },
   { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
@@ -229,6 +231,7 @@ export function TrainerDashboard() {
       {active === 'exams' && <TrainerExams courses={courses} />}
       {active === 'question-bank' && <TrainerQuestionBank courses={courses} />}
       {active === 'results' && <TrainerResultsCenter user={user} courses={courses} />}
+      {active === 'earnings' && <TrainerEarnings user={user} />}
       {active === 'forum' && <SharedForumRoyal user={user} />}
       {active === 'blog' && <SharedBlog />}
       {active === 'faqs' && <SharedFAQ />}
@@ -272,6 +275,7 @@ function TrainerOverview({ user, courses, students }: any) {
   // ⚡ ROYAL v4.2 — magical FOLLOWERS hub: count + live follower list.
   const [followers, setFollowers] = useState<any[]>([])
   const [followersLoading, setFollowersLoading] = useState(true)
+  const [followerSearch, setFollowerSearch] = useState('')
   useEffect(() => {
     let cancelled = false
     const load = () => {
@@ -370,41 +374,110 @@ function TrainerOverview({ user, courses, students }: any) {
         />
       </div>
 
-      {/* ⚡ ROYAL v4.2 — followers hall */}
-      <SectionCard title="متابعوك" description="الأساتذة والمتدربون الذين يتابعونك — يتلقون إشعاراً فورياً بكل دورة أو درس جديد تنشره">
+      {/* ⚡ ROYAL v4.3 — متحف المتابعين الفاخر */}
+      <SectionCard
+        title="متحف متابعيك المخلصين"
+        description="جمهورك الخاص الذي يتلقى إشعاراً فورياً بكل دورة أو درس جديد تنشره"
+      >
         {followersLoading ? (
           <div className="text-center py-8"><Loader2 className="w-6 h-6 mx-auto animate-spin text-gold" /></div>
         ) : followers.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            <HeartHandshake className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="font-bold text-navy mb-1">لا يوجد متابعون بعد</p>
-            <p className="text-xs">عندما يتابعك متدرب سيظهر هنا فوراً مع إشعار مباشر لك ✨</p>
+          <div className="relative overflow-hidden rounded-2xl border border-gold/20 bg-gradient-to-br from-white to-gold/5 p-12 text-center">
+            <div className="absolute inset-0 opacity-25" style={{
+              backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px',
+            }} />
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <HeartHandshake className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="relative font-bold text-navy text-base mb-1.5">لا يوجد متابعون بعد</h3>
+            <p className="relative text-xs text-muted-foreground max-w-xs mx-auto">عندما يتابعك متدرب سيظهر هنا فوراً في قاعة المتابعين الملكية مع إشعار مباشر لك ✨</p>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <div className="rounded-xl bg-gradient-to-l from-gold/[0.1] to-transparent border border-gold/25 px-4 py-2 flex items-center gap-2">
-                <HeartHandshake className="w-5 h-5 text-gold" />
-                <span className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{followers.length}</span>
-                <span className="text-[10px] font-bold text-muted-foreground">متابع إجمالاً</span>
+            {/* Stats strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-l from-navy via-navy-light to-navy p-3.5 text-white border border-gold/30">
+                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }} />
+                <div className="relative">
+                  <HeartHandshake className="w-4 h-4 text-gold mb-1.5" />
+                  <p className="text-2xl font-extrabold tabular-nums" dir="ltr">{followers.length}</p>
+                  <p className="text-[9px] text-gold/80 font-bold">إجمالي المتابعين</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-white to-gold/5 p-3.5">
+                <UserCheck className="w-4 h-4 text-emerald-600 mb-1.5" />
+                <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{followers.filter((f: any) => Date.now() - new Date(f.created_at).getTime() < 7 * 864e5).length}</p>
+                <p className="text-[9px] font-bold text-muted-foreground">متابعون هذا الأسبوع</p>
+              </div>
+              <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-white to-gold/5 p-3.5">
+                <Crown className="w-4 h-4 text-amber-500 mb-1.5" />
+                <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{followers.filter((f: any) => Date.now() - new Date(f.created_at).getTime() < 864e5).length}</p>
+                <p className="text-[9px] font-bold text-muted-foreground">اليوم</p>
+              </div>
+              <div className="rounded-xl border border-gold/25 bg-gradient-to-br from-white to-gold/5 p-3.5">
+                <Sparkles className="w-4 h-4 text-gold mb-1.5" />
+                <p className="text-2xl font-extrabold text-navy tabular-nums" dir="ltr">{followers.length > 0 ? new Date(Math.max(...followers.map((f: any) => new Date(f.created_at).getTime()))).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) : '—'}</p>
+                <p className="text-[9px] font-bold text-muted-foreground">آخر متابعة</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {followers.map((f: any) => (
-                <div key={f.id} className="flex items-center gap-2 rounded-xl border border-gold/20 bg-white px-2.5 py-1.5 shadow-sm">
-                  <Avatar className="w-7 h-7 rounded-lg border border-gold/30">
-                    <AvatarImage src={f.follower?.avatar || ''} />
-                    <AvatarFallback className="text-[10px] font-extrabold bg-gradient-to-br from-navy to-navy-light text-gold rounded-lg">
-                      {f.follower?.name?.charAt(0) || '؟'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-navy truncate max-w-[120px]">{f.follower?.name || 'متدرب'}</div>
-                    <div className="text-[8px] text-muted-foreground">{new Date(f.created_at).toLocaleDateString('ar-EG')}</div>
-                  </div>
-                </div>
-              ))}
+
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                value={followerSearch}
+                onChange={(e) => setFollowerSearch(e.target.value)}
+                placeholder="ابحث عن متابع بالاسم..."
+                className="w-full rounded-xl border border-gold/25 bg-white py-2.5 pr-10 pl-4 text-sm focus:outline-none focus:ring-2 focus:ring-gold/25 focus:border-gold transition-all"
+              />
             </div>
+
+            {/* Followers grid */}
+            {(() => {
+              const q = followerSearch.trim().toLowerCase()
+              const shown = q
+                ? followers.filter((f: any) => (f.follower?.name || '').toLowerCase().includes(q))
+                : followers
+              if (shown.length === 0) {
+                return <p className="text-center text-xs text-muted-foreground py-6">لا توجد نتائج مطابقة للبحث</p>
+              }
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {shown.map((f: any, idx: number) => {
+                    const isNew = Date.now() - new Date(f.created_at).getTime() < 3 * 864e5
+                    const isLatest = idx === 0 && !q
+                    return (
+                      <div key={f.id} className="group relative overflow-hidden rounded-xl border border-gold/20 bg-gradient-to-br from-white to-gold/5 p-3.5 text-center hover:border-gold/50 hover:shadow-md transition-all">
+                        <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-l from-gold via-amber-300 to-gold opacity-60" />
+                        {isLatest && (
+                          <span className="absolute top-1.5 left-1.5 rounded-full bg-gradient-to-l from-gold to-amber-500 text-navy text-[7px] font-extrabold px-1.5 py-0.5 shadow">الأحدث ✦</span>
+                        )}
+                        {isNew && !isLatest && (
+                          <span className="absolute top-1.5 left-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 text-[7px] font-extrabold px-1.5 py-0.5">جديد</span>
+                        )}
+                        <div className="relative inline-block mb-2 mt-1">
+                          <div className="absolute inset-0 bg-gold/40 blur-md rounded-full scale-90" />
+                          <Avatar className="relative w-12 h-12 rounded-xl border-2 border-gold/60 shadow-md">
+                            <AvatarImage src={f.follower?.avatar || ''} />
+                            <AvatarFallback className="text-sm font-extrabold bg-gradient-to-br from-navy to-navy-light text-gold rounded-xl">
+                              {f.follower?.name?.charAt(0) || '؟'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <p className="text-xs font-extrabold text-navy truncate">{f.follower?.name || 'متدرب'}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                          <Calendar className="w-2.5 h-2.5" /> متابعة منذ {new Date(f.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </>
         )}
       </SectionCard>

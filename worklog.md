@@ -1537,3 +1537,27 @@ Stage Summary:
 - Files: api/exam-attempts, api/exam-retake, api/certificate-requests, api/courses, api/lessons, api/blog, api/trainer-follows (NEW), lib/notifications, dashboards/student, trainer, admin-questions-royal, trainer-questions, shared-community, exam-retake-dialog, app/exam/[attemptId]/client, app/forum (NEW page+client), app/blog/page+client, components/fia/header.
 - Server-side enforcement is authoritative (budget + void + certificate gate); UI is awareness only.
 - APK v2.7 needs NO update (WebView loads remote).
+
+---
+Task ID: royal-v43-trainer-earnings-payouts-blog-upload-followers-hall
+Agent: main
+Task: v4.3 ROYAL — محفظة أرباح المدربين (نسبة لكل مدرب + استحقاق تلقائي بعد تأكيد الدفع + طلبات سحب بلقطات إثبات) + رفع صور المدونة للمدرب مثل الإدارة + متحف المتابعين الفاخر + ملف مدرب فاخر في الإدارة
+
+Work Log:
+- DB MIGRATION 016 APPLIED DIRECTLY via pooler: trainers += profit_percentage/payment_method_type/payment_method_name/payment_account; NEW tables trainer_earnings (UNIQUE payment_id partial index + trainer,status index) & withdrawal_requests (2 indexes). Verified via pg.
+- ACCRUAL ENGINE (api/payments PUT): on approval (مكتمل) → accrueTrainerEarning(): enrollment payments only (skips RETAKE:/__CERT_REQUEST__/free/certificate_request), course→trainer→resolveTrainerProfileId→profit_percentage>0 → INSERT trainer_earnings (amount=round(pay×pct/100)) + notifyTrainerNewEarning. Idempotent: UNIQUE(payment_id) + per-student+course app guard (duplicates never double-pay).
+- NEW /api/trainer-earnings: GET ?trainer_id (wallet: totals+enriched earnings+withdrawals+courses with % و حصة لكل متدرب) / GET ?admin=1 (per-trainer summary + all withdrawals enriched) / POST (trainer withdrawal request — validates payout method exists + amount ≤ available−pending + no dup pending) / PUT (admin approve مكتمل REQUIRES screenshot_url → FIFO marks oldest متاح rows مسحوب + notify with screenshot / reject ملغي + reason notify). notifyAdmins helper added to lib/notifications.
+- TRAINER «أرباحي» (dashboards/trainer-earnings.tsx NEW + nav): خزينة ذهبية hero (available = متاح − معلق), 4 stats, نسبة أرباحك من كل دورة (سعر + % + حصتك لكل متدرب), طريقة استلام (محلي/عملات رقمية + اقتراحات جيب/كريمي/USDT... + حفظ), طلب سحب dialog (25/50/75/100% shortcuts), سجل طلبات بلقطات الإثبات (viewer), سجل أرباح تفصيلي, realtime channels + toasts.
+- ADMIN «أرباح المدربين» (admin-trainer-earnings-royal.tsx NEW + nav after المدفوعات): 4 LuxStats, طلبات معلقة cards → موافقة dialog (لقطة شاشة إلزامية مع ضغط + ملاحظة اختيارية) / رفض dialog (سبب إلزامي), ملخص مستحقات كل مدرب (كُسب/متاح/معلق/مصروف + نسبته + طريقة استلام + expandable سجل أرباحه), سجل الطلبات المعالجة. Realtime.
+- TRAINER DIALOG ROYAL (admin-trainers-royal.tsx): إعادة بناء كاملة بنمط الملف الشخصي — بطاقة بطل كحلية بنقاط ذهبية + صورة رسمية بزر رفع دائري + معاينة اسم/مسمى، قسم 💰 نظام الأرباح (± 5% + presets 10-50% + preview مباشر «من كل 100 ر.ي تُضاف له X»)، قسم 🏦 طريقة الاستلام (محلي/عملات + اقتراحات)، بطاقات المدربين تُظهر شارة النسبة وطريقة الدفع.
+- TEAM DIALOG (team-editor.tsx): عناوين أقسام ملكية بنفس نمط الملف الشخصي (الهوية/بيانات الدخول/المعلومات المهنية/التواصل/الخبرة) — نفس الحلاوة. Fixed pre-existing TS error (TeamMember.password).
+- BLOG TRAINER EDITOR (shared-community.tsx): استبدال «رابط صورة الغلاف» بمحرر مطابق للإدارة تماماً — رفع صورة (افتراضي) مع ضغط 1600×900/0.82 + تبديل رابط (متقدم) + وضع معاينة حية مع chip الكاتب + هيدر ملكي. Fixed pre-existing syntax corruption (const [myReaction,...]).
+- FOLLOWERS HALL v4.3 (trainer.tsx overview): متحف متابعيك المخلصين — شريط إحصاءات (إجمالي/هذا الأسبوع/اليوم/آخر متابعة) + بحث + شبكة بطاقات بحلقات ذهبية وشارات «الأحدث ✦»/«جديد».
+- DB-LEVEL VERIFICATION (savepoint tx, rolled back clean): accrual 50×30%=15 ✓، UNIQUE payment_id يمنع التكرار (23505) ✓، طلب سحب قيد الانتظار ✓، FIFO على الموافقة ✓، totals صحيحة ✓.
+- tsc: صفر أخطاء في كل الملفات المعدلة (تبقى فقط أخطاء قديمة في ملفات لم تُمَس). supabase/migrations/016_trainer_earnings.sql موثقة.
+- Local API smoke via next dev: admin=1 مسار يعمل؛ مسارات trainer تعمل (البطء فقط بسبب غياب .env.local محلياً + latency الـ sandbox — الإنتاج على Vercel بجوار Supabase EU سريع).
+
+Stage Summary:
+- Files: api/trainer-earnings (NEW), api/payments, api/trainers, lib/notifications, dashboards/trainer-earnings (NEW), admin-trainer-earnings-royal (NEW), admin-trainers-royal, trainer, admin, shared-community, team-editor, supabase/migrations/016 (NEW).
+- NOTE: نسب المتدربين القديمة لا تُحتسب بأثر رجعي — حدد النسب من حساب الإدارة ثم ستُحتسب الموافقات الجديدة تلقائياً (يمكن إعادة تشغيل backfill لاحقاً عند الطلب).
+- APK v2.7 needs NO update (WebView remote).

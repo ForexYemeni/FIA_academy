@@ -41,6 +41,9 @@ interface TeamMember {
   years_experience?: number
   display_order?: number
   is_active?: boolean
+  password?: string
+  signatory_name?: string | null
+  signatory_position?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -540,6 +543,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           </div>
 
           {/* Basic: Name + Title + Role in one row */}
+          <SectionTitle icon={User} label="الهوية والصلاحيات" />
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -567,7 +571,9 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
 
           {/* Login credentials — for founder/leader only */}
           {(role === 'founder' || role === 'leader') && (
-            <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
+            <>
+              <SectionTitle icon={Lock} label="بيانات الدخول للحساب" />
+              <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
               <div>
                 <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                   <Mail className="w-3.5 h-3.5 text-gold" /> البريد لتسجيل الدخول
@@ -581,9 +587,11 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
                 <Input value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" className="text-sm rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="••••••••" />
               </div>
             </div>
+            </>
           )}
 
           {/* Unified text field — all professional info in one place */}
+          <SectionTitle icon={Award} label="المعلومات المهنية الكاملة" />
           <div className="border-t border-gold/20 pt-4">
             <Label className="text-sm font-bold text-navy flex items-center gap-2 mb-2">
               <Award className="w-4 h-4 text-gold" /> المعلومات المهنية
@@ -652,6 +660,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           )}
 
           {/* Contact info — compact */}
+          <SectionTitle icon={Phone} label="بيانات التواصل والتفاعل" />
           <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -742,6 +751,7 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
           )}
 
           {/* Years + order */}
+          <SectionTitle icon={Layers} label="الخبرة وترتيب العرض" />
           <div className="grid grid-cols-2 gap-3 border-t border-gold/20 pt-4">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -766,5 +776,18 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Section divider — same royal style as the trainer profile dialog
+function SectionTitle({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center shadow-sm border border-gold/30">
+        <Icon className="w-3.5 h-3.5 text-gold" />
+      </div>
+      <span className="text-xs font-extrabold text-navy">{label}</span>
+      <div className="flex-1 h-px bg-gradient-to-l from-gold/30 to-transparent" />
+    </div>
   )
 }
