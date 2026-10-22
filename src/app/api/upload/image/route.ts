@@ -54,8 +54,8 @@ async function cacheUpload(hash: string, url: string, fileId: string | null, kin
   } catch {}
 }
 
-// Upload via Telegram Bot API — supports photos, videos, documents (PDFs)
-async function uploadViaTelegram(file: File, botToken: string, channelId: string): Promise<{ url: string | null; error?: string; file_id?: string | null }> {
+// Upload via Telegram Bot API — supports photos, videos, documents (PDFs), and audio (sendAudio)
+async function uploadViaTelegram(file: File, botToken: string, channelId: string): Promise<{ url: string | null; error?: string; file_id?: string | null; duration?: number; mime?: string }> {
   if (!botToken || !channelId) {
     return { url: null, error: 'إعدادات تيليجرام غير مُهيأة' }
   }
@@ -66,6 +66,7 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
   const isImage = file.type.startsWith('image/')
   const isVideo = file.type.startsWith('video/')
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  const isAudio = file.type.startsWith('audio/')
 
   let apiMethod = 'sendDocument'
   let fileField = 'document'
@@ -75,6 +76,11 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
   } else if (isVideo) {
     apiMethod = 'sendVideo'
     fileField = 'video'
+  } else if (isAudio) {
+    // 🎙️ sendAudio يحفظ الصوت بصيغته الأصلية كاملة الجودة مع المدة تلقائياً
+    apiMethod = 'sendAudio'
+    fileField = 'audio'
+    formData.append('title', (formData.get('caption') as string) || 'FIA Audio Lesson')
   }
   formData.append(fileField, file)
 
@@ -93,11 +99,17 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
     }
     // Extract file_id
     let fileId: string | null = null
+    let audioDuration: number | undefined
+    let audioMime: string | undefined
     if (isImage) {
       const photos = data.result?.photo
       if (photos && photos.length > 0) fileId = photos[photos.length - 1].file_id
     } else if (isVideo) {
       fileId = data.result?.video?.file_id || data.result?.document?.file_id
+    } else if (isAudio) {
+      fileId = data.result?.audio?.file_id || data.result?.document?.file_id
+      audioDuration = data.result?.audio?.duration
+      audioMime = data.result?.audio?.mime_type
     } else {
       fileId = data.result?.document?.file_id
     }
@@ -114,7 +126,7 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
     }
     const filePath = fileData.result.file_path
     // 🛡️ رابط ملكي آمن عبر البروكسي — التوكن لا يغادر الخادم أبداً
-    return { url: `/api/telegram-file/stream?path=${encodeURIComponent(filePath)}`, file_id: fileId }
+    return { url: `/api/telegram-file/stream?path=${encodeURIComponent(filePath)}`, file_id: fileId, duration: audioDuration, mime: audioMime }
   } catch (e: any) {
     if (e.name === 'AbortError') {
       return { url: null, error: 'انتهت مهلة الرفع (أكثر من 55 ثانية)' }
@@ -170,28 +182,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 })
     }
 
-    // Validate file type — accept images, videos, and PDFs
+    // Validate file type — accept images, videos, PDFs, and audio
     const isImage = file.type.startsWith('image/')
     const isVideo = file.type.startsWith('video/')
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    const isAudio = file.type.startsWith('audio/')
 
-    if (!isImage && !isVideo && !isPdf) {
-      return NextResponse.json({ error: 'الملف يجب أن يكون صورة أو فيديو أو PDF' }, { status: 400 })
+    if (!isImage && !isVideo && !isPdf && !isAudio) {
+      return NextResponse.json({ error: 'الملف يجب أن يكون صورة أو فيديو أو PDF أو صوت' }, { status: 400 })
     }
 
     // Validate file size (Telegram limit is 50MB for videos, 10MB for others;
     // our local fallback has no real limit, but we cap at 100MB to be safe)
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 50 * 1024 * 1024
+    // 🎙️ الصوت: سقف 19MB — لأن بث getFile من تيليجرام محدود بـ 20MB
+    const maxSize = isVideo ? 100 * 1024 * 1024 : isAudio ? 19 * 1024 * 1024 : 50 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json({
-        error: `حجم الملف كبير جداً (الحد ${isVideo ? '100' : '50'} ميجابايت)`,
+        error: isAudio
+          ? 'حجم الصوت كبير جداً (الحد 19 ميجابايت ≈ ساعة صوت واضح — قسّم الدرس لأجزاء)'
+          : `حجم الملف كبير جداً (الحد ${isVideo ? '100' : '50'} ميجابايت)`,
       }, { status: 400 })
     }
 
     // ⚡ ROYAL UPLOAD-ONCE — dedup by content hash before any Telegram call
     const buf = Buffer.from(await file.arrayBuffer())
     const contentHash = crypto.createHash('sha1').update(buf).digest('hex')
-    const kind = isImage ? 'image' : isVideo ? 'video' : 'pdf'
+    const kind = isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'pdf'
     const cachedUrl = await findCachedUpload(contentHash)
     if (cachedUrl) {
       return NextResponse.json({ url: cachedUrl, folder, method: 'telegram', deduped: true })
@@ -202,8 +218,16 @@ export async function POST(req: NextRequest) {
     if (token && channelId) {
       const result = await uploadViaTelegram(file, token, channelId)
       if (result.url) {
-        await cacheUpload(contentHash, result.url, null, kind)
-        return NextResponse.json({ url: result.url, folder, method: 'telegram' })
+        await cacheUpload(contentHash, result.url, result.file_id || null, kind)
+        return NextResponse.json({
+          url: result.url,
+          folder,
+          method: 'telegram',
+          file_id: result.file_id || null,
+          duration: result.duration ?? null,
+          mime: result.mime || file.type || null,
+          size: file.size,
+        })
       }
       // Telegram failed — fall through to local storage
       console.warn('Telegram upload failed, falling back to local storage:', result.error)

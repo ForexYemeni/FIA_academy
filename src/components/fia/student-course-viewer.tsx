@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import {
-  ChevronDown, ChevronUp, Video, FileText, HelpCircle, FileUp,
+  ChevronDown, ChevronUp, Video, FileText, HelpCircle, FileUp, Mic,
   Clock, Play, Lock, CheckCircle2, ArrowRight, Loader2, BookOpen,
   Sparkles, Star, Award, Gift,
 } from 'lucide-react'
@@ -28,10 +28,14 @@ interface Lesson {
   id: string
   module_id?: string
   title: string
-  lesson_type: 'video' | 'text' | 'exam' | 'pdf'
+  lesson_type: 'video' | 'text' | 'exam' | 'pdf' | 'audio'
   content?: string
   video_url?: string
   pdf_url?: string
+  audio_file_id?: string | null
+  audio_duration?: number | null
+  audio_mime?: string | null
+  audio_size?: number | null
   duration_minutes?: number
   position?: number
   is_preview?: boolean
@@ -39,6 +43,7 @@ interface Lesson {
 
 const LESSON_TYPES: Record<string, { label: string; icon: any; color: string; gradient: string }> = {
   video: { label: 'فيديو', icon: Video, color: 'bg-red-500/15 text-red-600 border-red-500/30', gradient: 'from-red-500 to-rose-600' },
+  audio: { label: 'صوتي', icon: Mic, color: 'bg-amber-500/15 text-amber-600 border-amber-500/30', gradient: 'from-amber-500 to-yellow-600' },
   text: { label: 'نص', icon: FileText, color: 'bg-blue-500/15 text-blue-600 border-blue-500/30', gradient: 'from-blue-500 to-indigo-600' },
   exam: { label: 'اختبار', icon: HelpCircle, color: 'bg-purple-500/15 text-purple-600 border-purple-500/30', gradient: 'from-purple-500 to-fuchsia-600' },
   pdf: { label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30', gradient: 'from-emerald-500 to-teal-600' },
@@ -622,6 +627,7 @@ export function StudentCourseViewer({
         onOpenChange={(o) => { if (!o) setPreviewLesson(null) }}
         lesson={previewLesson}
         modules={modules}
+        courseId={course.id}
         completedLessons={completedLessons}
         onLessonComplete={(l: Lesson) => { markComplete(l) }}
         onNavigate={(l) => setPreviewLesson(l)}

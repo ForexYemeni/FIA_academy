@@ -891,3 +891,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .fia-nav-count, .fia-count-halo { animation: none; }
 }
+
+/* 🎙️ v6.8 — الموجة الذهبية للمشغل الصوتي الملكي */
+@keyframes luxWave {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.lux-wave {
+  height: 36px;
+  transform-origin: bottom;
+  animation-name: luxWave;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lux-wave { animation: none; height: 10px !important; }
+}

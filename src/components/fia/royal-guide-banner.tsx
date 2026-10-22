@@ -78,6 +78,7 @@ export function RoyalGuideBanner({ slug, title, subtitle }: RoyalGuideBannerProp
 
   const typeLabel: Record<string, string> = {
     video: '🎬 فيديو',
+    audio: '🎙️ صوتي',
     text: '📖 نص فاخر',
     pdf: '📕 ملف',
     exam: '🧪 اختبار',
