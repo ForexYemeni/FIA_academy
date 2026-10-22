@@ -4616,7 +4616,7 @@ type DzSnapshotRow = {
       {/* Body */}
       <div className="relative p-4 space-y-4">
         <p className="text-sm text-navy">
-          سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
+          سيتم حذف: المتدربين، المدربين (غير الفريق)، الدورات العادية، المدفوعات، الشهادات
         </p>
         <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 p-3">
           <Shield className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -4625,7 +4625,7 @@ type DzSnapshotRow = {
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
-          سيتم الاحتفاظ بحساب المؤسس التنفيذي فقط — وكذلك إعدادات الموقع.
+          سيتم الاحتفاظ: بحساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق في قسم «المؤسس والفريق»، إعدادات الموقع، والدورتين الملكيتين — وكذلك رموز إشعارات الأجهزة فتبقى الإشعارات المنبثقة تعمل بعد الحذف.
         </p>
         <Button
           variant="outline"
@@ -4888,7 +4888,7 @@ type DzSnapshotRow = {
       open={dzSectionOpen}
       onOpenChange={(o) => { if (!o && !dzSectionLoading) setDzSectionOpen(false) }}
       title={`حذف قسم: ${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}`}
-      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً.${dzSection === 'courses' ? ' دورتا «إتقان الإدارة» و«دليل المتدربين والمدربين» محميتان بالخاتم الملكي ولن تُمسا.' : ''} ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
+      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً.${dzSection === 'courses' ? ' دورتا «إتقان الإدارة» و«دليل المتدربين والمدربين» محميتان بالخاتم الملكي ولن تُمسا.' : ''}${dzSection === 'trainers' ? ' المؤسس وأعضاء الفريق محميون ولن يُمسوا.' : ''} ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
       itemLabel="القسم المراد حذفه:"
       itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
       confirmLabel="حذف القسم نهائياً"
@@ -4967,7 +4967,7 @@ type DzSnapshotRow = {
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
-                ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية جسيمة ولا تُستعجل.
+                ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق، إعدادات الموقع، والدورتين الملكيتين. هذه العملية جسيمة ولا تُستعجل.
               </p>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">

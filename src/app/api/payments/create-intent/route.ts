@@ -25,19 +25,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch the course to get the price — من الخادم حصراً (لا يُقبل سعر من العميل)
+    // 👑 إصلاح ملكي v5.5: كان SELECT يطلب عمود «offer_ends_at» غير الموجود في
+    //    الجدول فكان يُفشل العثور على الدورة أصلاً — select('*') لا ينكسر أبداً.
     const { data: course } = await supabaseAdmin
       .from('courses')
-      .select('id, title, price, currency, price_type, offer_price, offer_ends_at')
+      .select('*')
       .eq('id', course_id)
       .maybeSingle()
     if (!course) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
 
     let finalAmount = course.price || 0
-    // سعر العرض الرسمي — إن كان ساري المدة (مطابق للوحة الطالب)
-    const offerActive = course.offer_price != null && course.offer_price !== undefined &&
-      (!course.offer_ends_at || new Date(course.offer_ends_at).getTime() > Date.now())
-    if (offerActive && Number(course.offer_price) < finalAmount) {
-      finalAmount = Number(course.offer_price)
+    // سعر العرض الرسمي — إن كان ساري المدة (مطابق للوحة الطالب والمتجر)
+    if (course.offer_price != null && Number(course.offer_price) < finalAmount) {
+      if (course.offer_type === 'limited_time') {
+        const dur = Number(course.offer_duration_value) || 0
+        const start = course.updated_at ? new Date(course.updated_at).getTime() : 0
+        const unitMs = course.offer_duration_unit === 'hours' ? 3600000 :
+          course.offer_duration_unit === 'weeks' ? 604800000 :
+          course.offer_duration_unit === 'months' ? 2592000000 : 86400000
+        if (dur > 0 && start > 0 && start + dur * unitMs > Date.now()) {
+          finalAmount = Number(course.offer_price)
+        }
+      } else {
+        finalAmount = Number(course.offer_price)
+      }
     }
     let discount = 0
 
