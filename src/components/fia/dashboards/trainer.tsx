@@ -225,44 +225,55 @@ export function TrainerDashboard() {
     setActive('content')
   }
 
+  // 👑 البوابة الملكية: المدرب غير المعتمد (بانتظار الموافقة/التوقيع/مرفوض)
+  // لا يرى قاعات العمل إطلاقاً — كل التبويبات التشغيلية تُستبدل ببوابة القصر
+  // (والخادم يمنع فعلياً أي إنشاء/تعديل/حذف دورات — هنا مجرد مهابة ملكية)
+  const POWER_TABS = ['courses', 'content', 'students', 'followers', 'exams', 'question-bank', 'results', 'earnings', 'withdrawal-accounts']
+  const gated = Boolean(trainerStatus && trainerStatus !== 'approved')
+  const gateElement = (
+    <TrainerRoyalGate
+      status={trainerStatus!}
+      name={user?.name || profile.name}
+      agreement={trainerAgreement}
+      rejectedReason={trainerRejectedReason}
+      specialization={profile.specialization}
+      onRefresh={refreshTrainerProfile}
+    />
+  )
+  // أقفال مهيبة على التبويبات المقفلة في القائمة الجانبية
+  const navForDisplay = gated
+    ? NAV.map((n) => POWER_TABS.includes(n.id) ? { ...n, label: `🔒 ${n.label}` } : n)
+    : NAV
+
   return (
     <DashboardShell
-      nav={NAV}
+      nav={navForDisplay}
       active={active}
       onNavigate={(id) => { setActive(id); if (id !== 'content') setContentCourseId(null) }}
       roleLabel="مدرب"
       roleColor="bg-green-500/15 text-green-600 border-green-500/30"
     >
       {active === 'overview' && (
-        trainerStatus && trainerStatus !== 'approved' ? (
-          <TrainerRoyalGate
-            status={trainerStatus}
-            name={user?.name || profile.name}
-            agreement={trainerAgreement}
-            rejectedReason={trainerRejectedReason}
-            specialization={profile.specialization}
-            onRefresh={refreshTrainerProfile}
-          />
-        ) : (
+        gated ? gateElement : (
           <TrainerOverview user={user} courses={courses} students={myStudents} onOpenMuseum={() => setActive('followers')} />
         )
       )}
-      {active === 'withdrawal-accounts' && <TrainerWithdrawalAccounts />}
-      {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
-      {active === 'content' && contentCourseId && (
+      {active === 'withdrawal-accounts' && (gated ? gateElement : <TrainerWithdrawalAccounts />)}
+      {active === 'courses' && (gated ? gateElement : <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />)}
+      {active === 'content' && contentCourseId && (gated ? gateElement : (
         <div className="space-y-4">
           <Button variant="ghost" onClick={() => setActive('courses')} className="text-navy hover:bg-navy/5">
             <ArrowRight className="w-4 h-4 ml-1" /> العودة للدورات
           </Button>
           <CourseContentManager courseId={contentCourseId} />
         </div>
-      )}
-      {active === 'students' && <TrainerStudents students={myStudents} courses={courses} />}
-      {active === 'followers' && <TrainerFollowersMuseum user={user} />}
-      {active === 'exams' && <TrainerExams courses={courses} />}
-      {active === 'question-bank' && <TrainerQuestionBank courses={courses} />}
-      {active === 'results' && <TrainerResultsCenter user={user} courses={courses} />}
-      {active === 'earnings' && <TrainerEarnings user={user} />}
+      ))}
+      {active === 'students' && (gated ? gateElement : <TrainerStudents students={myStudents} courses={courses} />)}
+      {active === 'followers' && (gated ? gateElement : <TrainerFollowersMuseum user={user} />)}
+      {active === 'exams' && (gated ? gateElement : <TrainerExams courses={courses} />)}
+      {active === 'question-bank' && (gated ? gateElement : <TrainerQuestionBank courses={courses} />)}
+      {active === 'results' && (gated ? gateElement : <TrainerResultsCenter user={user} courses={courses} />)}
+      {active === 'earnings' && (gated ? gateElement : <TrainerEarnings user={user} />)}
       {active === 'forum' && <SharedForumRoyal user={user} />}
       {active === 'blog' && <SharedBlog />}
       {active === 'faqs' && <SharedFAQ />}
