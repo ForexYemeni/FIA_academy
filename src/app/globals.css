@@ -907,3 +907,30 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .lux-wave { animation: none; height: 10px !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   👆 v6.8.3 — منع التحديد والنسخ بالضغط المطوّل على عناصر الواجهة
+   ───────────────────────────────────────────────────────────────
+   على أجهزة اللمس فقط (هواتف/APK): الضغط المطوّل على العناوين
+   والبطاقات كان يفتح تحديد الكلمات وقائمة النسخ — الآن العناصر
+   تعامل كواجهة تطبيق لا كنص قابل للتحديد.
+   • حقول الإدخال (input/textarea/contenteditable) تبقى قابلة
+     للتحديد واللصق كالمعتاد.
+   • سطح المكتب (فأرة) غير متأثر إطلاقاً — التحديد بالسحب يعمل.
+   ═══════════════════════════════════════════════════════════════ */
+@media (hover: none) and (pointer: coarse) {
+  * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+  input,
+  textarea,
+  select,
+  [contenteditable='true'],
+  [data-selectable='true'] {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+}

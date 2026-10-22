@@ -84,6 +84,40 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
     firedCompleteRef.current = null
   }, [lesson?.id])
 
+  // 🎫 v6.8.3 — تجهيز رابط البث الصوتي برمز إعلامي قصير العمر (mt)
+  // عنصر <audio> لا يرسل ترويسة Authorization، لذا كان الطلب يصل البوابة
+  // بلا هوية → 403 → «تعذّر تحميل الصوت». الآن: نطلب الرمز عبر fetch عادي
+  // (يحمل التوقيع تلقائياً عبر جسر المصادقة) ثم نمرر رابط البث الجاهز.
+  const [audioSrc, setAudioSrc] = useState<string | null>(null)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [audioError, setAudioError] = useState<string | null>(null)
+  const [audioRetry, setAudioRetry] = useState(0)
+  useEffect(() => {
+    setAudioSrc(null)
+    setAudioError(null)
+    if (!lesson || lesson.lesson_type !== 'audio' || !lesson.id) return
+    let cancelled = false
+    setAudioLoading(true)
+    const params = new URLSearchParams({ lesson_id: lesson.id })
+    if (courseId) params.set('course_id', courseId)
+    fetch(`/api/lessons/audio-token?${params.toString()}`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null)
+        if (cancelled) return
+        if (r.ok && data?.url) setAudioSrc(data.url as string)
+        else setAudioError(data?.error || 'تعذّر تجهيز رابط الصوت — أعد المحاولة')
+      })
+      .catch(() => {
+        if (!cancelled) setAudioError('تعذّر تجهيز رابط الصوت — تحقق من الاتصال ثم أعد المحاولة')
+      })
+      .finally(() => {
+        if (!cancelled) setAudioLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [lesson?.id, lesson?.lesson_type, courseId, audioRetry])
+
   if (!lesson) return null
 
   const fireComplete = () => {
@@ -255,11 +289,31 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 onComplete when the student actually finishes viewing. */}
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
             {lesson.lesson_type === 'audio' && (
-              <LuxAudioPlayer
-                src={`/api/lessons/audio-stream?lesson_id=${encodeURIComponent(lesson.id)}${courseId ? `&course_id=${encodeURIComponent(courseId)}` : ''}`}
-                title={lesson.title}
-                onComplete={fireComplete}
-              />
+              audioError ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-red-300/50 bg-red-500/10 p-4">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
+                  <span className="flex-1 text-sm font-bold text-red-700">{audioError}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAudioRetry((k) => k + 1)}
+                    className="flex-shrink-0 border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    إعادة المحاولة
+                  </Button>
+                </div>
+              ) : !audioSrc ? (
+                <div className="flex items-center justify-center gap-2 rounded-2xl border border-gold/30 bg-navy/5 p-6 text-navy/70">
+                  <Loader2 className="h-5 w-5 animate-spin text-gold" />
+                  <span className="text-sm font-bold">جاري تجهيز الصوت الملكي…</span>
+                </div>
+              ) : (
+                <LuxAudioPlayer
+                  src={audioSrc}
+                  title={lesson.title}
+                  onComplete={fireComplete}
+                />
+              )
             )}
             {lesson.lesson_type === 'text' && <TextContent content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}

@@ -77,6 +77,29 @@ export async function signTokenAsync(payload: {
   return jwt.sign(payload, secret, { expiresIn: '7d' })
 }
 
+/**
+ * 🔊 رمز البث الإعلامي قصير العمر — لعناصر <audio>/<video> التي لا تستطيع
+ * إرسال ترويسات Authorization. رمز مخصص لغرض واحد (درس واحد لمستخدم واحد)
+ * وينتهي خلال 15 دقيقة — لا يصلح لأي مسار آخر.
+ */
+export async function signMediaToken(sub: string, lid: string): Promise<string> {
+  const secret = await getJwtSecret()
+  return jwt.sign({ typ: 'media-audio', sub, lid }, secret, { expiresIn: '15m' })
+}
+
+export async function verifyMediaToken(
+  token: string
+): Promise<{ sub: string; lid: string } | null> {
+  try {
+    const secret = await getJwtSecret()
+    const p = jwt.verify(token, secret) as any
+    if (p?.typ !== 'media-audio' || !p?.sub || !p?.lid) return null
+    return { sub: String(p.sub), lid: String(p.lid) }
+  } catch {
+    return null
+  }
+}
+
 /** التحقق من رمز ملكي — يعيد الحمولة أو null */
 export async function verifyTokenAsync(token: string): Promise<any | null> {
   try {
@@ -112,11 +135,21 @@ export async function getAuthUser(req: Request): Promise<AuthUser | null> {
   if (!token) return null
   const payload = await verifyTokenAsync(token)
   if (!payload?.sub) return null
+  return getAuthUserBySub(String(payload.sub), payload.role === 'team')
+}
 
+/**
+ * جلب الهوية الحية من معرف الحساب مباشرة (users أولاً ثم trainers).
+ * تُستخدم من getAuthUser ومن مسار رموز البث الإعلامي (mt) على حد سواء.
+ */
+export async function getAuthUserBySub(
+  sub: string,
+  teamFlag = false
+): Promise<AuthUser | null> {
   const { data: u } = await supabaseAdmin
     .from('users')
     .select('id, role, email, name')
-    .eq('id', payload.sub)
+    .eq('id', sub)
     .maybeSingle()
   if (u) {
     return {
@@ -124,14 +157,14 @@ export async function getAuthUser(req: Request): Promise<AuthUser | null> {
       role: (u.role as AuthUser['role']) || 'student',
       email: u.email || '',
       name: u.name || '',
-      teamRole: payload.role === 'team' ? 'team' : undefined,
+      teamRole: teamFlag ? 'team' : undefined,
     }
   }
 
   const { data: t } = await supabaseAdmin
     .from('trainers')
     .select('id, email, name, password')
-    .eq('id', payload.sub)
+    .eq('id', sub)
     .maybeSingle()
   if (t) {
     const marker = t.password && String(t.password).startsWith('__TEAM_MEMBER__:')
@@ -141,7 +174,7 @@ export async function getAuthUser(req: Request): Promise<AuthUser | null> {
       email: t.email || '',
       name: t.name || '',
       trainerProfile: true,
-      teamRole: marker ? 'team' : undefined,
+      teamRole: marker || teamFlag ? 'team' : undefined,
     }
   }
   return null
