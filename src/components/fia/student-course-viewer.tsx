@@ -53,6 +53,7 @@ export function StudentCourseViewer({
   enrollment?: any
   onBack: () => void
 }) {
+  const { user } = useAuth()
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -102,6 +103,32 @@ export function StudentCourseViewer({
         setCompletedLessons(new Set(arr))
       } catch {}
     }
+    // 👑 المزامنة الذهبية: جلب الحقيقة الملكية من الخادم (lesson_progress)
+    //    — التقدم يتبع الطالب إلى أي جهاز/متصفح، ولا يضيع أبداً عند
+    //    مسح بيانات المتصفح. يُدمج مع المحلي (الاتحاد لا الاستبدال) فلا
+    //    يفقد الطالب درساً أكمله من أي جهة.
+    const uid = user?.id || currentEnrollment?.user_id
+    if (uid) {
+      ;(async () => {
+        try {
+          const res = await fetch(`/api/progress?user_id=${uid}&course_id=${course.id}`)
+          if (!res.ok) return
+          const data = await res.json()
+          const doneIds: string[] = (data.lessons || [])
+            .filter((l: any) => l.status === 'completed')
+            .map((l: any) => l.lesson_id)
+          if (doneIds.length > 0) {
+            setCompletedLessons((prev) => {
+              const merged = new Set(prev)
+              doneIds.forEach((id) => merged.add(id))
+              localStorage.setItem(key, JSON.stringify(Array.from(merged)))
+              return merged
+            })
+          }
+        } catch {}
+      })()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course.id])
 
   // ⚡ Cleanup stale completed-lesson IDs once modules load. If the
@@ -177,6 +204,26 @@ export function StudentCourseViewer({
     // Persist in localStorage
     const key = `fia_completed_lessons_${course.id}`
     localStorage.setItem(key, JSON.stringify(Array.from(next)))
+
+    // 👑 المزامنة الذهبية: كتابة الإكمال إلى الخادم (lesson_progress +
+    //    course_progress) — فبقى التقدم محفوظاً ملكياً في قاعدة البيانات،
+    //    ينتقل مع الطالب بين الهاتف والحاسوب، ويغذي تقارير المدرب والإدارة.
+    try {
+      const uid = user?.id || currentEnrollment?.user_id
+      if (uid) {
+        await fetch('/api/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: uid,
+            course_id: course.id,
+            lesson_id: lesson.id,
+            status: 'completed',
+            progress_percent: 100,
+          }),
+        })
+      }
+    } catch {}
 
     // Calculate completion from ALL lessons (not just loaded ones)
     const allL = modules.flatMap((m) => m.lessons || [])

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
-  Sparkles, X, Mail, Lock, User, Phone, Loader2,
+  Sparkles, X, Mail, Lock, User, Phone, Loader2, KeyRound,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 
@@ -24,6 +24,9 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
   const setAuth = useAuth((s) => s.setAuth)
 
   const submit = async () => {
@@ -52,6 +55,33 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
       toast.error('حدث خطأ غير متوقع')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const submitForgot = async () => {
+    if (!forgotEmail.trim()) {
+      toast.error('أدخل بريدك الإلكتروني')
+      return
+    }
+    setForgotLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل إرسال الطلب')
+        return
+      }
+      toast.success(data.message || 'وصل طلبك إلى الإدارة — ستتواصل معك الأكاديمية 👑')
+      setForgotOpen(false)
+      setForgotEmail('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setForgotLoading(false)
     }
   }
 
@@ -151,6 +181,15 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                   {loading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
                   {loading ? 'جاري المعالجة...' : 'دخول'}
                 </Button>
+                {/* 👑 بوابة الاستعادة الملكية */}
+                <button
+                  type="button"
+                  onClick={() => { setForgotOpen(true); setForgotEmail(form.email) }}
+                  className="w-full text-center text-xs text-navy/70 hover:text-gold font-medium transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  نسيت كلمة المرور؟ استعدها بخطوة واحدة
+                </button>
               </TabsContent>
 
               <TabsContent value="register" className="space-y-4 pt-4">
@@ -228,6 +267,54 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
           </div>
         </div>
       </DialogContent>
+
+      {/* 👑 حوار استعادة كلمة المرور الملكي */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-sm p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-25" style={{
+              backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px)',
+              backgroundSize: '24px 24px'
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-2xl bg-white/10 border border-gold/30 flex items-center justify-center mb-2">
+              <KeyRound className="w-7 h-7 text-gold" />
+            </div>
+            <DialogTitle className="text-white text-xl font-bold">استعادة كلمة المرور</DialogTitle>
+            <DialogDescription className="text-white/70 text-center mt-1">
+              أدخل بريدك المسجّل — سيصل طلبك للإدارة فوراً وتصدر لك كلمة مرور جديدة
+            </DialogDescription>
+          </div>
+          <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
+            <div>
+              <Label htmlFor="forgot-email" className="flex items-center gap-1.5 mb-1.5 text-navy font-medium">
+                <Mail className="w-3.5 h-3.5 text-gold" />
+                البريد الإلكتروني المسجّل
+              </Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="example@fia.edu"
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                dir="ltr"
+                onKeyDown={(e) => { if (e.key === 'Enter') submitForgot() }}
+              />
+            </div>
+            <Button
+              onClick={submitForgot}
+              disabled={forgotLoading}
+              className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
+            >
+              {forgotLoading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
+              {forgotLoading ? 'جاري الإرسال...' : 'أرسل طلب الاستعادة'}
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+              سيصل طلبك إلى قصر الإدارة باسمك وبريدك ورقم هاتفك المسجّل — وتواصل معك الأكاديمية لإصدار كلمة مرور جديدة.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

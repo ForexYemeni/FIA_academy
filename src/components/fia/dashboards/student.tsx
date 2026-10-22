@@ -2702,12 +2702,23 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
 
   const cleanReference = (ref: string | null | undefined) => {
     if (!ref) return null
-    // Strip both PROOF: and COUPON: markers so the user sees only the
+    // Strip PROOF:, COUPON: and REJECTION: markers so the user sees only the
     // transaction reference they typed, not the internal storage markers.
     return ref
       .replace(/\s*\|\s*PROOF:.*$/i, '')
       .replace(/\s*\|\s*COUPON:.*$/i, '')
+      .replace(/\s*\|\s*REJECTION:.*$/i, '')
+      .replace(/REJECTION:.*$/i, '')
       .trim() || null
+  }
+
+  // 👑 سبب الرفض الملكي — يُخزن في المرجع كـ "| REJECTION: السبب" ويعرض
+  //    هنا للطالب بلوحة حمراء واضحة حتى يعرف لماذا رُفض دفعه وماذا يفعل.
+  const getRejectionReason = (p: any): string | null => {
+    const ref = p?.reference
+    if (!ref) return null
+    const match = String(ref).match(/REJECTION:\s*([^|]+)/i)
+    return match ? match[1].trim() : null
   }
 
   const getProofUrl = (p: any): string | null => {
@@ -2742,6 +2753,7 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
             const dateStr = fmtDate(p.date)
             const proofUrl = getProofUrl(p)
             const couponCode = getCouponCode(p)
+            const rejectionReason = getRejectionReason(p)
             const currency = getCurrency(p)
             const hasCoupon = !!couponCode
             // Status-based magical theme
@@ -2837,6 +2849,22 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
                       <div className="text-[10px] font-mono text-navy break-all leading-tight" dir="ltr">{ref}</div>
                     </div>
                   )}
+
+                  {/* 👑 لوحة سبب الرفض الملكية — وضوح كامل للطالب */}
+                  {rejectionReason && (
+                    <div className="pt-1">
+                      <div className="rounded-lg border border-red-300/60 bg-red-50 p-2.5">
+                        <div className="flex items-start gap-1.5">
+                          <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <div className="text-[10px] font-bold text-red-700 mb-0.5">سبب رفض الدفع</div>
+                            <div className="text-[10px] text-red-600 leading-relaxed">{rejectionReason}</div>
+                            <div className="text-[9px] text-red-500/80 mt-1">يمكنك إعادة الاشتراك برفع إثبات دفع صحيح بعد معالجة السبب.</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             )
@@ -2876,16 +2904,33 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
   const save = async () => {
     setLoading(true)
     try {
-      // Update locally — in real app, would call /api/students PUT
+      // 👑 الحفظ الملكي الحقيقي: كتابة الملف الشخصي إلى قاعدة البيانات
+      //    عبر /api/profile (هوية حية + حقول بيضاء فقط) — لم يعد نجاحاً
+      //    زائفاً في المتصفح؛ الملف يبقى محفوظاً عبر كل الأجهزة.
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profile.name,
+          phone: profile.phone,
+          title: profile.title,
+          bio: joinBio(profile.bio, user?.bio),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل حفظ الملف الشخصي')
+        return
+      }
       updateUser({
         name: profile.name,
         phone: profile.phone,
         title: profile.title,
         bio: joinBio(profile.bio, user?.bio),
       })
-      toast.success('تم تحديث الملف الشخصي')
+      toast.success('تم حفظ ملفك الشخصي في قصر الأكاديمية بنجاح 👑')
     } catch {
-      toast.error('فشل التحديث')
+      toast.error('خطأ في الاتصال — لم يتم الحفظ')
     } finally {
       setLoading(false)
     }

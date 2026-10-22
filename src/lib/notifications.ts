@@ -240,6 +240,27 @@ export async function notifyUserRegistered(userId: string, name: string, role: s
     `سجّل مستخدم جديد: "${name}" (${role}).`, '/')
 }
 
+// === ACCOUNT RECOVERY ===
+
+/**
+ * 👑 طلب استعادة كلمة مرور — يُشعر الإدارة كاملة بطلب المتدرب مع بياناته
+ *    (الاسم/البريد/الهاتف/المعرّف) حتى يصدر لكلمة مرور جديدة من لوحة
+ *    المستخدمين ويتواصلوا معه فوراً.
+ */
+export async function notifyPasswordResetRequested(
+  requesterId: string,
+  name: string,
+  email: string,
+  phone?: string | null
+) {
+  const admins = await getAdminIds()
+  await sendToMany(admins, 'password_reset', '🔑 طلب استعادة كلمة مرور',
+    `طلب "${name}" استعادة كلمة مروره. البريد: ${email}${phone ? ` — الهاتف: ${phone}` : ''}. مُعرّف الحساب: ${requesterId}. أصدر كلمة مرور جديدة من إدارة المستخدمين وتواصل معه.`,
+    '/#users')
+  await send(requesterId, 'password_reset', 'استلمنا طلب استعادة كلمة المرور ✅',
+    `وصل طلبك إلى قصر الأكاديمية يا ${name}. ستصدر كلمة مرور جديدة إليك من الإدارة في أقرب وقت — إن كان الأمر عاجلاً تواصل معنا عبر «تواصل معنا».`, '/')
+}
+
 // === REVIEW EVENTS ===
 
 /** Student submitted a review for a course. Notify trainer + admins. */
