@@ -199,6 +199,15 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
             >
               {loading ? 'جاري المعالجة...' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
             </Button>
+            {mode === 'register' && (
+              <a
+                href="/register?type=trainer"
+                className="group mt-2 flex items-center justify-center gap-2 rounded-xl border border-[#C9A961]/35 bg-gradient-to-l from-[#C9A961]/10 to-transparent px-4 py-3 text-xs font-bold text-[#E5C77E] transition-all hover:border-[#C9A961]/60 hover:bg-[#C9A961]/15 active:scale-[0.98]"
+              >
+                <GraduationCap className="h-4 w-4 transition-transform group-hover:scale-110" />
+                تريد الانضمام مدرباً إلى النخبة؟ سجّل كمدرب مع ملفك الاحترافي الكامل 👑
+              </a>
+            )}
           </div>
         </div>
 

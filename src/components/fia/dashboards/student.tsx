@@ -2911,7 +2911,6 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: profile.name,
           phone: profile.phone,
           title: profile.title,
           bio: joinBio(profile.bio, user?.bio),
@@ -2965,7 +2964,10 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
             <Label className="text-navy flex items-center gap-1.5 mb-1.5">
               <User className="w-3.5 h-3.5 text-gold" /> الاسم الكامل
             </Label>
-            <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+            <Input value={profile.name} disabled readOnly className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
+            <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+              🔒 الاسم مغلّف ملكياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله (يظهر على شهاداتك الرسمية)
+            </p>
           </div>
           <div>
             <Label className="text-navy flex items-center gap-1.5 mb-1.5">

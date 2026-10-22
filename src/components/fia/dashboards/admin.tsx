@@ -11,6 +11,7 @@ import {
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
   Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
+  ClipboardCheck, Landmark,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -36,6 +37,8 @@ import {
 } from './admin-extended'
 import { AdminForumBans } from './shared-community'
 import { AdminTrainersRoyal } from './admin-trainers-royal'
+import { AdminTrainerApplications } from './admin-trainer-applications'
+import { AdminWithdrawalMethods } from './admin-withdrawal-methods'
 import { AdminStudentsRoyal } from './admin-students-royal'
 import { AdminCertificatesRoyal } from './admin-certificates-royal'
 import { AdminExamQuestionsRoyal } from './admin-questions-royal'
@@ -58,7 +61,9 @@ const NAV: NavItem[] = [
   { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle },
   { id: 'students', label: 'المتدربون', icon: Users },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
+  { id: 'trainer-applications', label: 'طلبات المدربين', icon: ClipboardCheck },
   { id: 'trainer-earnings', label: 'أرباح المدربين', icon: Wallet },
+  { id: 'withdrawal-methods', label: 'طرق السحب', icon: Landmark },
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
   { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
   { id: 'affiliates', label: 'المسوّقون', icon: Users },
@@ -135,7 +140,9 @@ export function AdminDashboard() {
       {active === 'exam-questions' && <AdminExamQuestionsRoyal />}
       {active === 'students' && <AdminStudentsRoyal />}
       {active === 'payments' && <AdminPayments />}
+      {active === 'trainer-applications' && <AdminTrainerApplications />}
       {active === 'trainer-earnings' && <AdminTrainerEarningsRoyal />}
+      {active === 'withdrawal-methods' && <AdminWithdrawalMethods />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
       {active === 'coupons' && <AdminCoupons />}
       {active === 'affiliates' && <AdminAffiliatesRoyal />}

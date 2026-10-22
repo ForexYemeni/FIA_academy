@@ -161,6 +161,9 @@ export async function GET(req: NextRequest) {
     const id = req.nextUrl.searchParams.get('id')
     let query = supabaseAdmin.from('trainers').select('*')
     if (id) query = query.eq('id', id)
+    // 👑 القائمة العامة تُظهر المعتمدين فقط — المعلّق/المرفوض لا يظهران إلا للإدارة
+    //    أو لصاحب الملف نفسه في لوحته (?id= يبقى متاحاً للجميع لأنه يُفلتس الحقول الحساسة)
+    if (!id && !isAdmin) query = query.eq('status', 'approved')
     query = query.order('name', { ascending: true })
     const { data, error } = await query
     if (error) throw error
@@ -239,7 +242,12 @@ export async function PUT(req: NextRequest) {
     // Bio is stored as plain string now — no encoding.
     // We only update fields that are explicitly provided.
     const patch: any = {}
-    for (const key of ['name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count', 'profit_percentage', 'payment_method_type', 'payment_method_name', 'payment_account']) {
+    for (const key of [
+      'name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count',
+      'profit_percentage', 'payment_method_type', 'payment_method_name', 'payment_account',
+      // 👑 المنظومة الملكية: ملف المدرب الكامل + الاعتماد والاتفاق
+      'qualifications', 'achievements', 'experiences', 'country', 'status', 'agreement', 'rejected_reason',
+    ]) {
       if (updates[key] !== undefined) patch[key] = updates[key]
     }
     // Password update is optional — hashed always
