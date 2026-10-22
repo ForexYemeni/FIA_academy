@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SectionCard } from './shell'
+import { LuxSelect } from './luxury'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
@@ -218,10 +219,11 @@ function CouponDialog({ open, onOpenChange, initial, onSaved }: any) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Sparkles className="w-3.5 h-3.5 text-gold" /> نوع الخصم</Label>
-              <select value={form.discount_type} onChange={(e) => setForm({ ...form, discount_type: e.target.value })} className="w-full px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30">
-                <option value="percentage">نسبة مئوية %</option>
-                <option value="fixed">مبلغ ثابت</option>
-              </select>
+              <LuxSelect value={form.discount_type} onChange={(v) => setForm({ ...form, discount_type: v })} title="نوع الخصم" icon={Sparkles}
+                options={[
+                  { value: 'percentage', label: 'نسبة مئوية %', emoji: '📊' },
+                  { value: 'fixed', label: 'مبلغ ثابت', emoji: '💰' },
+                ]} />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Hash className="w-3.5 h-3.5 text-gold" /> القيمة</Label>
@@ -548,10 +550,8 @@ export function AdminExamQuestions() {
   return (
     <SectionCard title="بنك الأسئلة" description={`${items.length} سؤال`} action={
       <div className="flex gap-2 items-center">
-        <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30">
-          <option value="">— اختر دورة —</option>
-          {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-        </select>
+        <LuxSelect value={selectedCourse} onChange={setSelectedCourse} title="اختر الدورة" icon={HelpCircle} className="sm:w-64"
+          options={[{ value: '', label: 'كل الدورات — اختر للعمل', emoji: '📚' }, ...courses.map((c: any) => ({ value: c.id, label: c.title, emoji: '📖' }))]} />
         <Button className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all" disabled={!selectedCourse} onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> سؤال جديد</Button>
       </div>
     }>
@@ -735,19 +735,21 @@ function ExamQuestionDialog({ open, onOpenChange, initial, courseId, onSaved }: 
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><HelpCircle className="w-3.5 h-3.5 text-gold" /> نوع السؤال</Label>
-              <select value={form.question_type} onChange={(e) => setForm({ ...form, question_type: e.target.value })} className={`w-full px-3 py-2 rounded-xl bg-white text-sm focus:ring-gold/30 ${form.question_type === 'mcq' ? 'border-2 border-purple-500 ring-1 ring-purple-500/30' : 'border border-gold/30 focus:border-gold'}`}>
-                <option value="mcq">اختيارات متعددة</option>
-                <option value="truefalse">صح / خطأ</option>
-                <option value="short_answer">إجابة قصيرة</option>
-              </select>
+              <LuxSelect value={form.question_type} onChange={(v) => setForm({ ...form, question_type: v })} title="نوع السؤال" icon={HelpCircle}
+                options={[
+                  { value: 'mcq', label: 'اختيارات متعددة', emoji: '☑️' },
+                  { value: 'truefalse', label: 'صح / خطأ', emoji: '⚖️' },
+                  { value: 'short_answer', label: 'إجابة قصيرة', emoji: '✍️' },
+                ]} />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Award className="w-3.5 h-3.5 text-gold" /> الصعوبة</Label>
-              <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })} className="w-full px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30">
-                <option value="سهل">سهل</option>
-                <option value="متوسط">متوسط</option>
-                <option value="صعب">صعب</option>
-              </select>
+              <LuxSelect value={form.difficulty} onChange={(v) => setForm({ ...form, difficulty: v })} title="مستوى الصعوبة" icon={Award}
+                options={[
+                  { value: 'سهل', label: 'سهل', emoji: '🟢' },
+                  { value: 'متوسط', label: 'متوسط', emoji: '🟡' },
+                  { value: 'صعب', label: 'صعب', emoji: '🔴' },
+                ]} />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Hash className="w-3.5 h-3.5 text-gold" /> النقاط</Label>
@@ -876,10 +878,8 @@ export function AdminReviews() {
 
   return (
     <SectionCard title="تقييمات المتدربين" description={`${total} تقييم · معدل ${avg.toFixed(1)} من 5`} action={
-      <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30">
-        <option value="">كل الدورات</option>
-        {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-      </select>
+      <LuxSelect value={courseFilter} onChange={setCourseFilter} title="ترشيح التقييمات" icon={Star} className="sm:w-64"
+        options={[{ value: '', label: 'كل الدورات', emoji: '🗂️' }, ...courses.map((c: any) => ({ value: c.id, label: c.title, emoji: '📖' }))]} />
     }>
       {/* Aggregate summary */}
       {total > 0 && (
@@ -1428,10 +1428,8 @@ export function AdminForum() {
           <div className="space-y-4 p-5">
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3.5 h-3.5 text-gold" /> الفئة *</Label>
-              <select value={newTopicCat} onChange={(e) => setNewTopicCat(e.target.value)} className="w-full px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30">
-                <option value="">— اختر فئة —</option>
-                {cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
+              <LuxSelect value={newTopicCat} onChange={setNewTopicCat} title="اختر فئة المنتدى" icon={MessageSquare}
+                options={cats.map((c: any) => ({ value: c.id, label: c.name, emoji: c.icon || '💬' }))} />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><FileText className="w-3.5 h-3.5 text-gold" /> العنوان *</Label>

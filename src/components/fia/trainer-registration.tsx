@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
+import { LuxCombo } from './dashboards/luxury'
+import { useSpecializationCatalog } from '@/lib/use-specializations'
 import {
   Crown, GraduationCap, User, Briefcase, Target, CalendarDays, Globe2, Camera,
   FileText, Award, Trophy, Star, ShieldCheck, CheckCircle2, ArrowLeft, ArrowRight,
@@ -60,6 +62,17 @@ export function TrainerRegistration() {
   const [title, setTitle] = useState('')
   const [specialization, setSpecialization] = useState('')
   const [years, setYears] = useState('')
+  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة بدل الكتابة الحرة
+  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
+  const titleOpts = catTitles.length ? catTitles : [
+    { value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'مدرب معتمد', label: 'مدرب معتمد', emoji: '🏅' },
+    { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' },
+    { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' },
+  ]
+  const specOpts = catSpecs.length ? catSpecs : [
+    { value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' },
+  ]
+  const countryOpts = COUNTRIES.map((c) => ({ value: c, label: c, emoji: c === 'اليمن' ? '🏛️' : '📍' }))
   const [country, setCountry] = useState('اليمن')
   const [bio, setBio] = useState('')
 
@@ -360,11 +373,11 @@ export function TrainerRegistration() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label className={labelCls}><Briefcase className="ml-1 inline h-3.5 w-3.5" /> المسمى الوظيفي *</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="استشاري / أستاذ مساعد / مدرب معتمد..." className={inputCls} />
+                <LuxCombo value={title} onChange={setTitle} options={titleOpts} title="اختر المسمى الوظيفي" icon={Briefcase} searchPlaceholder="ابحث: مدرب، استشاري، أخصائي، محاضر..." placeholder="— اختر المسمى —" className="bg-white rounded-xl shadow-sm" />
               </div>
               <div>
                 <Label className={labelCls}><Target className="ml-1 inline h-3.5 w-3.5" /> التخصص *</Label>
-                <Input value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="طب القلب / إدارة الأعمال / التسويق الرقمي..." className={inputCls} />
+                <LuxCombo value={specialization} onChange={setSpecialization} options={specOpts} title="اختر التخصص من الكتالوج العالمي" icon={Target} searchPlaceholder="ابحث في التخصصات العالمية..." placeholder="— اختر التخصص —" className="bg-white rounded-xl shadow-sm" />
               </div>
               <div>
                 <Label className={labelCls}><CalendarDays className="ml-1 inline h-3.5 w-3.5" /> سنوات الخبرة</Label>
@@ -372,9 +385,7 @@ export function TrainerRegistration() {
               </div>
               <div>
                 <Label className={labelCls}><Globe2 className="ml-1 inline h-3.5 w-3.5" /> بلد الإقامة</Label>
-                <select value={country} onChange={(e) => setCountry(e.target.value)} className={`${inputCls} w-full appearance-none px-3 text-sm`}>
-                  {COUNTRIES.map((c) => <option key={c} value={c} className="bg-[#0A1F44] text-white">{c}</option>)}
-                </select>
+                <LuxCombo value={country} onChange={setCountry} options={countryOpts} title="اختر بلد الإقامة" icon={Globe2} searchPlaceholder="ابحث عن الدولة..." className="bg-white rounded-xl shadow-sm" />
                 <p className="mt-1 text-[10px] text-white/45">تظهر طرق سحب الأرباح المتاحة بحسب بلدك</p>
               </div>
             </div>

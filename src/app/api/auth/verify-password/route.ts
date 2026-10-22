@@ -36,6 +36,24 @@ export async function POST(req: NextRequest) {
       .eq('id', user_id)
       .maybeSingle()
     if (error) throw error
+    // 🪞 حسابات المدربين الذاتية: كلمة مرورهم في جدول trainers (المرآة في users بلا كلمة مرور)
+    if ((!user || !user.password) && g.user.role === 'trainer') {
+      const { data: t } = await supabaseAdmin
+        .from('trainers')
+        .select('id, password')
+        .eq('id', user_id)
+        .maybeSingle()
+      if (t?.password) {
+        const r = await verifyPassword(String(password), String(t.password))
+        if (r.valid && r.needsRehash) {
+          try {
+            const newHash = await hashPassword(String(password))
+            await supabaseAdmin.from('trainers').update({ password: newHash }).eq('id', t.id)
+          } catch {}
+        }
+        return NextResponse.json({ valid: r.valid })
+      }
+    }
     if (!user) {
       return NextResponse.json({ valid: false, message: 'المستخدم غير موجود' }, { status: 404 })
     }

@@ -498,3 +498,31 @@ export async function notifyTrainerAgreementRevised(trainerUserId: string, perce
   await send(trainerUserId, 'trainer_agreement', '📜 عرض اتفاق محدّث',
     `راجعت الإدارة العرض وحدّثت نسبة الأرباح إلى ${percentage}%. تفحّص الاتفاق الجديد في لوحتك ووقّعه.`, '/#overview')
 }
+
+// =========================================================================
+// AFFILIATE PAYOUTS (v6.3) — إشعارات عمولات المسوّقين وسحبها
+// =========================================================================
+
+/** للمسوّق: حُسبت له عمولة جديدة بعد اعتماد دفعة متدرب سجّل برابطه. */
+export async function notifyAffiliateCommission(affiliateUserId: string, amount: number, currency: string, percent: number, courseTitle?: string | null) {
+  await send(affiliateUserId, 'affiliate_commission', '🤝 عمولة جديدة في محفظتك',
+    `أُضيفت إليك عمولة ${amount.toLocaleString('en-US')} ${currency} (${percent}% من قيمة اشتراك${courseTitle ? ` في دورة "${courseTitle}"` : ' متدرب سجّل برابطك'}). افتح قسم التسويق بالعمولة لتفاصيلك وسحب أرباحك.`, '/#affiliate')
+}
+
+/** للإدارة: وصل طلب سحب عمولة من مسوّق. */
+export async function notifyAffiliateWithdrawalRequested(name: string, amount: number, currency: string) {
+  await notifyAdmins('affiliate_withdrawal', '💸 طلب سحب عمولة جديد',
+    `طلب المسوّق "${name}" سحب ${amount.toLocaleString('en-US')} ${currency} من عمولاته — راجعه من قسم المسوّقين.`, '/#affiliates')
+}
+
+/** للمسوّق: وافقت الإدارة على سحب عمولته. */
+export async function notifyAffiliateWithdrawalApproved(affiliateUserId: string, amount: number, currency: string, hasScreenshot: boolean) {
+  await send(affiliateUserId, 'affiliate_withdrawal', '✅ تمت الموافقة على سحب عمولتك',
+    `وافقت الإدارة على طلب سحبك بمبلغ ${amount.toLocaleString('en-US')} ${currency}${hasScreenshot ? ' وأرفقت لقطة إثبات التحويل — تجدها في قسم التسويق بالعمولة' : ''}.`, '/#affiliate')
+}
+
+/** للمسوّق: رُفض طلب سحب العمولة. */
+export async function notifyAffiliateWithdrawalRejected(affiliateUserId: string, amount: number, currency: string, reason?: string | null) {
+  await send(affiliateUserId, 'affiliate_withdrawal', '❌ تم رفض طلب سحب العمولة',
+    `رُفض طلب سحبك بمبلغ ${amount.toLocaleString('en-US')} ${currency}${reason ? ` — السبب: ${reason}` : ''}. يمكنك المحاولة مجدداً بعد مراجعة بيانات حسابك.`, '/#affiliate')
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { guardAuth } from '@/lib/api-auth'
+import { guardAuth, verifyOwnPassword } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +79,13 @@ export async function DELETE(req: NextRequest) {
   const user = g.user!
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 })
+
+  // 🔐 تأكيد الحذف بكلمة مرور صاحب الحساب — لا حذف بلا تحقق (ترحيل v6.3)
+  const confirmPw = req.headers.get('x-confirm-password') || ''
+  if (!confirmPw) return NextResponse.json({ error: 'تأكيد كلمة المرور مطلوب لحذف الحساب' }, { status: 400 })
+  const pwOk = await verifyOwnPassword(user.id, user.role, confirmPw)
+  if (!pwOk) return NextResponse.json({ error: 'كلمة المرور غير صحيحة — لم يُحذف الحساب' }, { status: 403 })
+
   try {
     let q = supabaseAdmin.from('trainer_withdrawal_accounts').delete().eq('id', id)
     if (user.role !== 'admin') q = q.eq('trainer_id', user.id)

@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import { supabasePublic } from '@/lib/supabase'
+import { useSpecializationCatalog } from '@/lib/use-specializations'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxPicker, LuxEmpty, LuxBadge,
   LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput,
@@ -42,6 +43,17 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
   const [specFilter, setSpecFilter] = useState('')
   // ⚡ ROYAL v4.4 — عدادات المتابعين لكل مدرب (متحف المتابعين)
   const [followCounts, setFollowCounts] = useState<Record<string, number>>({})
+  // 🎓 الكتالوج المهني الموحد — المسميات والتخصصات من قسم «التخصصات» (بديل القوائم الثابتة)
+  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
+  const titleOpts = catTitles.length ? catTitles : TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))
+  const specOpts = catSpecs.length ? catSpecs : SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))
+  const COUNTRY_OPTS = ['اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق', 'مصر', 'الأردن', 'فلسطين', 'لبنان', 'السودان', 'ليبيا', 'تونس', 'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'دولة أخرى'].map((c) => ({ value: c, label: c, emoji: c === 'اليمن' ? '🏛️' : '📍' }))
+  const STATUS_OPTS = [
+    { value: 'approved', label: 'معتمد — يظهر للعامة', emoji: '✅' },
+    { value: 'agreement_pending', label: 'بانتظار توقيع الاتفاق', emoji: '📜' },
+    { value: 'pending', label: 'بانتظار موافقة الإدارة', emoji: '⏳' },
+    { value: 'rejected', label: 'مرفوض', emoji: '🚫' },
+  ]
 
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
@@ -163,10 +175,10 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
       toolbar={
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <LuxSearch value={search} onChange={setSearch} placeholder="ابحث بالاسم أو البريد أو التخصص..." className="lg:col-span-2" />
-          <LuxSelect value={titleFilter} onChange={setTitleFilter} placeholder="كل المسميات"
-            options={TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))} />
-          <LuxSelect value={specFilter} onChange={setSpecFilter} placeholder="كل التخصصات"
-            options={SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))} />
+          <LuxSelect value={titleFilter} onChange={setTitleFilter} placeholder="كل المسميات" title="المسمى الوظيفي" icon={Award}
+            options={titleOpts} />
+          <LuxSelect value={specFilter} onChange={setSpecFilter} placeholder="كل التخصصات" title="التخصص" icon={Briefcase}
+            options={specOpts} />
         </div>
       }
     >
@@ -301,6 +313,17 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
 // بطاقة بطل كحلية بنقاط ذهبية + بطاقات حقول فاخرة + نظام الأرباح وطريقة الاستلام
 // ============================================================================
 function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
+  // 🎓 الكتالوج المهني الموحد + خيارات البلدان والحالة (قوائم فاخرة)
+  const { titles: catTitlesD, specializations: catSpecsD } = useSpecializationCatalog()
+  const titleOptsD = catTitlesD.length ? catTitlesD : TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))
+  const specOptsD = catSpecsD.length ? catSpecsD : SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))
+  const COUNTRY_OPTS_D = ['اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق', 'مصر', 'الأردن', 'فلسطين', 'لبنان', 'السودان', 'ليبيا', 'تونس', 'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'دولة أخرى'].map((c) => ({ value: c, label: c, emoji: c === 'اليمن' ? '🏛️' : '📍' }))
+  const STATUS_OPTS_D = [
+    { value: 'approved', label: 'معتمد — يظهر للعامة', emoji: '✅' },
+    { value: 'agreement_pending', label: 'بانتظار توقيع الاتفاق', emoji: '📜' },
+    { value: 'pending', label: 'بانتظار موافقة الإدارة', emoji: '⏳' },
+    { value: 'rejected', label: 'مرفوض', emoji: '🚫' },
+  ]
   const [form, setForm] = useState<any>(
     initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [] }
   )
@@ -476,7 +499,7 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           value={form.title || ''}
           onChange={(v) => setForm({ ...form, title: v })}
           placeholder="— اختر المسمى —"
-          options={TITLES.map((t) => ({ value: t, label: t, emoji: '🎓' }))}
+          options={titleOptsD}
         />
         <LuxPicker
           label="التخصص"
@@ -485,20 +508,15 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           value={form.specialization || ''}
           onChange={(v) => setForm({ ...form, specialization: v })}
           placeholder="— اختر التخصص —"
-          options={SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))}
+          options={specOptsD}
         />
         <LuxField label="بلد الإقامة" icon={Globe2} hint="تظهر طرق سحب الأرباح المتاحة بحسب بلده">
-          <select value={form.country || 'اليمن'} onChange={(e) => setForm({ ...form, country: e.target.value })} className={luxInput + ' text-sm'}>
-            {['اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق', 'مصر', 'الأردن', 'فلسطين', 'لبنان', 'السودان', 'ليبيا', 'تونس', 'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'دولة أخرى'].map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <LuxSelect value={form.country || 'اليمن'} onChange={(v) => setForm({ ...form, country: v })} title="بلد الإقامة" icon={Globe2}
+            options={COUNTRY_OPTS_D} />
         </LuxField>
-        <LuxField label="حالة الاعتماد الملكية" icon={ShieldCheck} hint="فقط للمنظومة الجديدة: معتمد يظهر في «مدربينا» — المعلّق/المرفوض لا يظهران">
-          <select value={form.status || 'approved'} onChange={(e) => setForm({ ...form, status: e.target.value })} className={luxInput + ' text-sm'}>
-            <option value="approved">معتمد ✅ (يظهر للعامة)</option>
-            <option value="agreement_pending">بانتظار توقيع الاتفاق 📜</option>
-            <option value="pending">بانتظار موافقة الإدارة ⏳</option>
-            <option value="rejected">مرفوض 🚫</option>
-          </select>
+        <LuxField label="حالة الاعتماد" icon={ShieldCheck} hint="فقط للمنظومة الجديدة: معتمد يظهر في «مدربينا»">
+          <LuxSelect value={form.status || 'approved'} onChange={(v) => setForm({ ...form, status: v })} title="حالة الاعتماد" icon={ShieldCheck}
+            options={STATUS_OPTS_D} />
         </LuxField>
       </div>
 

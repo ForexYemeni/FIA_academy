@@ -45,6 +45,8 @@ import { AdminExamQuestionsRoyal } from './admin-questions-royal'
 import { AdminAffiliatesRoyal } from './admin-affiliates-royal'
 import { AdminForumRoyal } from './admin-forum-royal'
 import { AdminTrainerEarningsRoyal } from './admin-trainer-earnings-royal'
+import { AdminSpecializations } from './admin-specializations'
+import { useSpecializationCatalog } from '@/lib/use-specializations'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxCombo, LuxEmpty,
   LuxBadge, LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput, luxTheme,
@@ -64,6 +66,7 @@ const NAV: NavItem[] = [
   { id: 'trainer-applications', label: 'طلبات المدربين', icon: ClipboardCheck },
   { id: 'trainer-earnings', label: 'أرباح المدربين', icon: Wallet },
   { id: 'withdrawal-methods', label: 'طرق السحب', icon: Landmark },
+  { id: 'specializations', label: 'التخصصات', icon: GraduationCap },
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
   { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
   { id: 'affiliates', label: 'المسوّقون', icon: Users },
@@ -143,6 +146,7 @@ export function AdminDashboard() {
       {active === 'trainer-applications' && <AdminTrainerApplications />}
       {active === 'trainer-earnings' && <AdminTrainerEarningsRoyal />}
       {active === 'withdrawal-methods' && <AdminWithdrawalMethods />}
+      {active === 'specializations' && <AdminSpecializations />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
       {active === 'coupons' && <AdminCoupons />}
       {active === 'affiliates' && <AdminAffiliatesRoyal />}
@@ -1740,16 +1744,18 @@ const AdminPayments = React.memo(function AdminPayments() {
             className="pr-10 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
           />
         </div>
-        <select
+        <LuxSelect
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gold/30 rounded-xl bg-white text-sm font-medium text-navy focus:border-gold focus:ring-gold/30 outline-none"
-        >
-          <option value="all">كل الحالات</option>
-          <option value="قيد الانتظار">قيد الانتظار</option>
-          <option value="مكتمل">مكتمل</option>
-          <option value="ملغي">ملغي</option>
-        </select>
+          onChange={setStatusFilter}
+          title="حالة الدفعة" icon={CreditCard}
+          className="sm:w-52"
+          options={[
+            { value: 'all', label: 'كل الحالات', emoji: '🗂️' },
+            { value: 'قيد الانتظار', label: 'قيد الانتظار', emoji: '⏳' },
+            { value: 'مكتمل', label: 'مكتمل', emoji: '✅' },
+            { value: 'ملغي', label: 'ملغي', emoji: '❌' },
+          ]}
+        />
       </div>
 
       {/* ⚡ Magical state-aware stats strip */}
@@ -2789,12 +2795,13 @@ const AdminCertificates = React.memo(function AdminCertificates() {
               <Input placeholder="بحث برقم الشهادة أو اسم المتدرب..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 bg-white" />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold/60" />
             </div>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
-              <option value="all">كل الحالات</option>
-              <option value="صالحة">صالحة</option>
-              <option value="ملغاة">ملغاة</option>
-              <option value="مستبدلة">مستبدلة</option>
-            </select>
+            <LuxSelect value={statusFilter} onChange={setStatusFilter} title="حالة الشهادة" icon={Award} className="sm:w-48"
+              options={[
+                { value: 'all', label: 'كل الحالات', emoji: '🗂️' },
+                { value: 'صالحة', label: 'صالحة', emoji: '✅' },
+                { value: 'ملغاة', label: 'ملغاة', emoji: '⛔' },
+                { value: 'مستبدلة', label: 'مستبدلة', emoji: '🔄' },
+              ]} />
           </div>
 
           {filtered.length === 0 ? (
@@ -3317,6 +3324,10 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
 
   const TITLES = ['استشاري', 'أخصائي', 'محاضر', 'مدرب معتمد', 'مدرس']
   const SPECIALIZATIONS = ['الطب الباطني', 'طب الطوارئ', 'التمريض', 'الإنعاش القلبي الرئوي', 'مكافحة العدوى', 'صحة الأم والطفل', 'الصيدلة السريرية', 'إدارة المنشآت الصحية', 'التعليم الطبي']
+  // 🎓 الكتالوج المهني الموحد (قسم التخصصات) — بديل القوائم الثابتة عند توفره
+  const { titles: dlgTitles, specializations: dlgSpecs } = useSpecializationCatalog()
+  const titleList = dlgTitles.length ? dlgTitles.map((t) => t.value) : TITLES
+  const specList = dlgSpecs.length ? dlgSpecs.map((s) => s.value) : SPECIALIZATIONS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -3377,19 +3388,15 @@ function TrainerDialog({ open, onOpenChange, initial, onSaved }: any) {
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <Award className="w-3.5 h-3.5 text-gold" /> المسمى
               </Label>
-              <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
-                <option value="">— اختر —</option>
-                {TITLES.map((t: string) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <LuxSelect value={form.title} onChange={(v) => setForm({ ...form, title: v })} title="المسمى الوظيفي" icon={Award}
+                options={titleList.map((t: string) => ({ value: t, label: t, emoji: '🎓' }))} />
             </div>
             <div>
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
               </Label>
-              <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
-                <option value="">— اختر —</option>
-                {SPECIALIZATIONS.map((s: string) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <LuxSelect value={form.specialization} onChange={(v) => setForm({ ...form, specialization: v })} title="التخصص" icon={Briefcase}
+                options={specList.map((s: string) => ({ value: s, label: s, emoji: '🩺' }))} />
             </div>
           </div>
 
@@ -4686,27 +4693,28 @@ type DzSnapshotRow = {
 
           {/* Select dropdown */}
           <div className="flex flex-col sm:flex-row gap-2">
-            <select
+            <LuxSelect
               value={dzSection}
-              onChange={(e) => setDzSection(e.target.value)}
+              onChange={setDzSection}
               disabled={dzSectionLoading}
-              className="flex-1 h-10 px-3 text-sm border border-red-500/30 rounded-xl bg-white focus:border-red-500 focus:ring-red-500/20 outline-none"
-            >
-              <option value="">— اختر القسم —</option>
-              <option value="courses">📚 الدورات (وكافة تبعاتها)</option>
-              <option value="trainers">👨‍⚕️ المدربون</option>
-              <option value="students">🎓 المتدربون</option>
-              <option value="payments">💳 المدفوعات + التسجيلات</option>
-              <option value="certificates">📜 الشهادات</option>
-              <option value="reviews">⭐ التقييمات</option>
-              <option value="coupons">🎟️ الكوبونات</option>
-              <option value="blog">📰 منشورات المدوّنة</option>
-              <option value="forum">💬 مواضيع المنتدى</option>
-              <option value="contact">📧 رسائل التواصل</option>
-              <option value="payment_methods">🏦 طرق الدفع</option>
-              <option value="team">👥 أعضاء الفريق</option>
-              <option value="notifications">🔔 الإشعارات</option>
-            </select>
+              title="اختر القسم المراد حذفه" icon={Trash2}
+              className="flex-1"
+              options={[
+                { value: 'courses', label: 'الدورات (وكافة تبعاتها)', emoji: '📚' },
+                { value: 'trainers', label: 'المدربون', emoji: '👨‍⚕️' },
+                { value: 'students', label: 'المتدربون', emoji: '🎓' },
+                { value: 'payments', label: 'المدفوعات + التسجيلات', emoji: '💳' },
+                { value: 'certificates', label: 'الشهادات', emoji: '📜' },
+                { value: 'reviews', label: 'التقييمات', emoji: '⭐' },
+                { value: 'coupons', label: 'الكوبونات', emoji: '🎟️' },
+                { value: 'blog', label: 'منشورات المدوّنة', emoji: '📰' },
+                { value: 'forum', label: 'مواضيع المنتدى', emoji: '💬' },
+                { value: 'contact', label: 'رسائل التواصل', emoji: '📧' },
+                { value: 'payment_methods', label: 'طرق الدفع', emoji: '🏦' },
+                { value: 'team', label: 'أعضاء الفريق', emoji: '👥' },
+                { value: 'notifications', label: 'الإشعارات', emoji: '🔔' },
+              ]}
+            />
             <Button
               variant="outline"
               disabled={!dzSection || dzSectionLoading}

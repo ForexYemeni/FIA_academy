@@ -9,7 +9,7 @@ import { guardAuth } from '@/lib/api-auth'
  * 🔒 الاسم مغلّق نهائياً (طلب المالك): يُحدد مرة واحدة عند التسجيل ولا يُعدَّل
  * أبداً من أي حساب متدرب أو مدرب — أمر تعديل الاسم يُتجاهل ويُردّ برسالة ملكية.
  */
-const ALLOWED_FIELDS = ['phone', 'title', 'bio'] as const
+const ALLOWED_FIELDS = ['phone', 'title', 'specialization', 'bio'] as const
 
 export async function PUT(req: NextRequest) {
   try {
@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest) {
       .from('users')
       .update(updates)
       .eq('id', g.user.id)
-      .select('id, name, phone, title, bio')
+      .select('id, name, phone, title, specialization, bio')
       .single()
     if (error) throw error
 

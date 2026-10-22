@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { LuxDialog, LuxField, LuxSection, LuxStats, LuxSearch, LuxEmpty, luxInput, LuxCombo } from './luxury'
-import { ConfirmDialog } from '@/components/fia/confirm-dialog'
+import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import { cn } from '@/lib/utils'
 import {
   Plus, Trash2, Loader2, Globe2, RefreshCw, Coins, Power, Landmark,
@@ -137,13 +137,19 @@ export function AdminWithdrawalMethods() {
     } catch { toast.error('تعذر الاتصال') }
   }
 
-  const remove = async (id: string) => {
+  const remove = async (id: string, password: string) => {
+    setBusy(true)
     try {
-      const res = await fetch(`/api/withdrawal-methods?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) { toast.error('تعذر الحذف'); return }
-      toast.success('حُذفت الطريقة من الكتالوج')
+      const res = await fetch(`/api/withdrawal-methods?id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-confirm-password': password },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(data.error || 'تعذر الحذف'); return }
+      toast.success('حُذفت الطريقة من الكتالوج بتأكيد كلمة المرور')
       load()
     } catch { toast.error('تعذر الاتصال') }
+    setBusy(false)
     setDeleteFor(null)
   }
 
@@ -367,15 +373,16 @@ export function AdminWithdrawalMethods() {
         </div>
       </LuxDialog>
 
-      {/* تأكيد الحذف */}
-      <ConfirmDialog
+      {/* 🔐 تأكيد الحذف بكلمة مرور الإدارة — لا حذف بلا تحقق */}
+      <PasswordConfirmDialog
         open={!!deleteFor}
         onOpenChange={(o) => !o && setDeleteFor(null)}
-        title="حذف طريقة سحب؟"
-        message={`سيتم حذف «${deleteFor?.name || ''}» (${deleteFor?.country || ''}) نهائياً من الكتالوج — المدربون الذين أضافوا حسابات عليها لن يتأثروا بحساباتهم، لكنها لن تظهر للمدربين الجدد.`}
+        title="تأكيد حذف طريقة السحب"
+        message={`سيتم حذف «${deleteFor?.name || ''}» (${deleteFor?.country || ''}) نهائياً من الكتالوج — حسابات المدربين المرتبطة بها تبقى سليمة. أدخل كلمة مرورك الإدارية للمتابعة.`}
         itemName={deleteFor?.name}
         confirmLabel="حذف نهائياً"
-        onConfirm={() => remove(deleteFor!.id)}
+        loading={busy}
+        onConfirm={(password) => remove(deleteFor!.id, password)}
       />
     </LuxSection>
   )

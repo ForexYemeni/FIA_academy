@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import {
   Users, Plus, Edit, Trash2, Copy, Link2, TrendingUp, Wallet, BadgeCheck,
   Loader2, Mail, Phone, KeyRound, Percent, UserCheck, UserX, Sparkles,
-  Target, Send,
+  Target, Send, HandCoins, CheckCircle2, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -151,6 +151,9 @@ export function AdminAffiliatesRoyal() {
         </div>
       }
     >
+      {/* ═══ لوحة طلبات سحب العمولات (v6.3) — كل شيء في قسم المسوّقين نفسه ═══ */}
+      <AffiliateWithdrawalsPanel />
+
       {filtered.length === 0 ? (
         <LuxEmpty
           icon={Users}
@@ -419,5 +422,121 @@ function AffiliateDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         </div>
       </LuxField>
     </LuxDialog>
+  )
+}
+
+// ============================================================================
+// لوحة طلبات سحب العمولات (v6.3) — الإدارة ترى الطلبات المعلقة وتعتمدها
+// أو ترفضها مع لقطة إثبات التحويل — كل شيء في قسم المسوّقين نفسه
+// ============================================================================
+function AffiliateWithdrawalsPanel() {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [screenshot, setScreenshot] = useState<Record<string, string>>({})
+  const [note, setNote] = useState<Record<string, string>>({})
+  const [showDone, setShowDone] = useState(false)
+
+  const load = () => fetch('/api/affiliate-withdrawals?admin=1')
+    .then((r) => r.json())
+    .then((d) => setRows(Array.isArray(d) ? d : []))
+    .catch(() => {})
+    .finally(() => setLoading(false))
+  useEffect(() => { load() }, [])
+
+  const act = async (id: string, action: 'approve' | 'reject') => {
+    setBusyId(id)
+    try {
+      const res = await fetch('/api/affiliate-withdrawals', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action, screenshot_url: screenshot[id] || '', admin_note: note[id] || '' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'تعذر التنفيذ'); return }
+      toast.success(action === 'approve' ? 'وُافق على السحب — أُرسل إشعار للمسوّق' : 'رُفض الطلب — عاد المبلغ متاحاً وأُرسل إشعار')
+      load()
+    } catch { toast.error('تعذر الاتصال') }
+    setBusyId(null)
+  }
+
+  const pending = rows.filter((r) => r.status === 'معلق')
+  const done = rows.filter((r) => r.status !== 'معلق')
+
+  if (loading) {
+    return (
+      <div className="mb-6 flex items-center justify-center gap-2 rounded-2xl border border-gold/20 bg-gradient-to-l from-gold/[0.05] to-transparent py-8">
+        <Loader2 className="h-5 w-5 animate-spin text-gold" />
+        <p className="text-xs font-bold text-muted-foreground">جارٍ تحميل طلبات سحب العمولات...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-b from-white to-gold/[0.02]">
+      <div className="flex items-center justify-between gap-2 border-b border-gold/15 bg-gradient-to-l from-gold/[0.1] to-transparent px-4 py-2.5">
+        <p className="flex items-center gap-2 text-xs font-extrabold text-navy">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-amber-500 text-white shadow-sm"><HandCoins className="h-3.5 w-3.5" /></span>
+          طلبات سحب العمولات
+          {pending.length > 0 && <Badge className="border-amber-300 bg-amber-100 text-[9px] text-amber-700">{pending.length} معلّق</Badge>}
+        </p>
+        {done.length > 0 && (
+          <button onClick={() => setShowDone(!showDone)} className="text-[10px] font-bold text-sky-600 hover:underline">
+            {showDone ? 'إخفاء المعالجة' : `عرض المعالجة (${done.length})`}
+          </button>
+        )}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-center text-xs text-muted-foreground">لا توجد طلبات سحب عمولات بعد — يرسلها المسوّقون من قسم «التسويق بالعمولة» في لوحاتهم</p>
+      ) : (
+        <div className="space-y-2.5 p-3">
+          {pending.map((w) => {
+            const affName = w.affiliate?.name || 'مسوّق'
+            return (
+              <div key={w.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-sm font-extrabold text-navy">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-amber-500 text-white shadow-sm"><Wallet className="h-3.5 w-3.5" /></span>
+                      {Number(w.amount).toLocaleString('en-US')} <span className="text-[11px] font-bold text-muted-foreground">{w.currency}</span>
+                      <span className="text-[11px] font-bold text-navy/70">— {affName}</span>
+                      {w.affiliate?.unique_code && <Badge variant="outline" className="font-mono text-[9px]">{w.affiliate.unique_code}</Badge>}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      💳 {w.method_name} • <span dir="ltr" className="font-mono">{w.account_number}</span>{w.account_name ? ` • ${w.account_name}` : ''}{w.account_country ? ` • ${w.account_country}` : ''}
+                    </p>
+                    <p className="mt-0.5 text-[9px] text-muted-foreground/70">طلب في {new Date(w.created_at).toLocaleString('ar')}</p>
+                  </div>
+                </div>
+                <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                  <Input value={screenshot[w.id] || ''} onChange={(e) => setScreenshot({ ...screenshot, [w.id]: e.target.value })} placeholder="رابط لقطة إثبات التحويل (اختياري عند الموافقة)" dir="ltr" className="h-9 rounded-xl border-gold/30 bg-white text-xs" />
+                  <Input value={note[w.id] || ''} onChange={(e) => setNote({ ...note, [w.id]: e.target.value })} placeholder="سبب الرفض (اختياري)" className="h-9 rounded-xl border-gold/30 bg-white text-xs" />
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <Button size="sm" disabled={busyId === w.id} onClick={() => act(w.id, 'approve')}
+                    className="relative flex-1 overflow-hidden rounded-xl bg-gradient-to-l from-emerald-500 to-teal-600 text-xs font-extrabold text-white shadow-md active:scale-[0.98]">
+                    {busyId === w.id ? <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="ml-1 h-3.5 w-3.5" />} موافقة وإرسال
+                  </Button>
+                  <Button size="sm" disabled={busyId === w.id} onClick={() => act(w.id, 'reject')} variant="outline"
+                    className="flex-1 rounded-xl border-red-200 text-xs font-bold text-red-500 hover:bg-red-50">
+                    <XCircle className="ml-1 h-3.5 w-3.5" /> رفض الطلب
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+
+          {showDone && done.map((w) => (
+            <div key={w.id} className="flex items-center justify-between gap-2 rounded-xl border border-gold/15 bg-white px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-navy">{Number(w.amount).toLocaleString('en-US')} {w.currency} — {w.affiliate?.name || 'مسوّق'}</p>
+                <p className="text-[10px] text-muted-foreground">{w.method_name} • {new Date(w.processed_at || w.created_at).toLocaleDateString('ar')}{w.admin_note ? ` • ${w.admin_note}` : ''}</p>
+              </div>
+              <Badge variant="outline" className={`text-[9px] ${w.status === 'مكتمل' ? 'border-emerald-300 text-emerald-600' : 'border-red-300 text-red-500'}`}>{w.status === 'مكتمل' ? '✅ مكتمل' : '❌ مرفوض'}</Badge>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

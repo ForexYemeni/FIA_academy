@@ -263,6 +263,24 @@ export async function verifyAccountPassword(
   return { valid: r.valid, needsRehash: r.needsRehash }
 }
 
+/**
+ * 🔐 التحقق من كلمة مرور صاحب الطلب نفسه — لتأكيد العمليات الحساسة
+ * (حذف طرق السحب مثلًا). يبحث في users أولاً، ثم في trainers للحسابات
+ * المدربية الذاتية التي كلمة مرورها في جدول المدربين (المرآة بلا كلمة مرور).
+ */
+export async function verifyOwnPassword(userId: string, role: string | undefined | null, plain: string): Promise<boolean> {
+  if (!userId || !plain) return false
+  try {
+    const { data: u } = await supabaseAdmin.from('users').select('id, password').eq('id', userId).maybeSingle()
+    if (u?.password) return (await verifyAccountPassword(u.password, plain)).valid
+    if (role === 'trainer') {
+      const { data: t } = await supabaseAdmin.from('trainers').select('id, password').eq('id', userId).maybeSingle()
+      if (t?.password) return (await verifyAccountPassword(t.password, plain)).valid
+    }
+  } catch {}
+  return false
+}
+
 // ============================================================================
 // حد المحاولات الملكي — ضد تخمين كلمات المرور وإغراق الرفع
 // ============================================================================

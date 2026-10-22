@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { notifyPaymentApproved, notifyPaymentRejected } from '@/lib/notifications'
 import { tgPaymentApproved, tgPaymentRejected as tgReject } from '@/lib/telegram'
 import { guardAdmin, guardAuth } from '@/lib/api-auth'
+import { notifyAffiliateCommission } from '@/lib/notifications'
 
 // ===========================================================================
 // ROYAL EARNINGS ACCRUAL — when the admin approves a student's payment,
@@ -68,6 +69,46 @@ async function accrueTrainerEarning(payment: any): Promise<void> {
   } catch {
     // Never break the approval flow because of earnings
   }
+}
+
+// ===========================================================================
+// AFFILIATE COMMISSION CREDIT (v6.3) — عند اعتماد دفعة، تُحتسب عمولة
+// المسوّق المرتبط بالإحالة (affiliate_referrals بحالة «معلق») وتُضاف إلى
+// رصيده (affiliates.total_earnings) مع إشعار فوري. متماثلة: status تتحول
+// إلى «مؤكد» فلا تُحسب مرتين أبداً.
+// ===========================================================================
+async function creditAffiliateCommission(payment: any): Promise<void> {
+  try {
+    if (!payment?.id) return
+    const { data: refs } = await supabaseAdmin
+      .from('affiliate_referrals')
+      .select('id, affiliate_id')
+      .eq('payment_id', payment.id)
+      .eq('status', 'معلق')
+    for (const ref of refs || []) {
+      const { data: aff } = await supabaseAdmin
+        .from('affiliates')
+        .select('id, commission_percent, total_earnings, user_id')
+        .eq('id', ref.affiliate_id)
+        .maybeSingle()
+      if (!aff) continue
+      const commission = Math.round(((payment.amount || 0) * (aff.commission_percent || 0) / 100) * 100) / 100
+      await supabaseAdmin.from('affiliate_referrals')
+        .update({ amount: payment.amount || 0, commission, status: 'مؤكد' })
+        .eq('id', ref.id)
+      await supabaseAdmin.from('affiliates')
+        .update({ total_earnings: (aff.total_earnings || 0) + commission })
+        .eq('id', aff.id)
+      if (aff.user_id) {
+        let courseTitle: string | null = null
+        try {
+          const { data: c } = await supabaseAdmin.from('courses').select('title').eq('id', payment.course_id).maybeSingle()
+          courseTitle = c?.title || null
+        } catch {}
+        notifyAffiliateCommission(aff.user_id, commission, payment.currency || 'ر.ي', aff.commission_percent || 0, courseTitle).catch(() => {})
+      }
+    }
+  } catch {}
 }
 
 // GET /api/payments — admin: list all PAID payments only.
@@ -195,6 +236,7 @@ export async function PUT(req: NextRequest) {
     // not free enrollments). Idempotent: unique payment_id + per-student guard.
     if (status === 'مكتمل' && updated?.course_id && updated?.user_id) {
       accrueTrainerEarning(updated).catch(() => {})
+      creditAffiliateCommission(updated).catch(() => {})
     }
 
     // 3) Send notification to the student about the decision

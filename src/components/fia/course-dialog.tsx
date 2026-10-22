@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { LuxSelect } from './dashboards/luxury'
 import {
-  Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon,
+  Loader2, FileUp, X, BookOpen, Tag, DollarSign, Settings, Image as ImageIcon, Clock,
   GraduationCap, Layers, Briefcase, ChevronDown, ChevronUp, Gift, Plus, Sparkles, CheckCircle2,
 } from 'lucide-react'
 
@@ -584,13 +585,14 @@ export function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }:
                     <div className="flex gap-2">
                       <Input type="number" value={form.offer_duration_value} onChange={(e) => setForm({ ...form, offer_duration_value: e.target.value })}
                         className="h-11 text-sm w-20 bg-white/80 border-amber-200/40 focus:border-amber-500 focus:ring-amber-500/30 rounded-xl" dir="ltr" placeholder="5" />
-                      <select value={form.offer_duration_unit || 'days'} onChange={(e) => setForm({ ...form, offer_duration_unit: e.target.value })}
-                        className="flex-1 h-11 px-3 text-sm bg-white/80 border border-amber-200/40 rounded-xl focus:border-amber-500 focus:ring-amber-500/30">
-                        <option value="hours">ساعات</option>
-                        <option value="days">أيام</option>
-                        <option value="weeks">أسابيع</option>
-                        <option value="months">أشهر</option>
-                      </select>
+                      <LuxSelect value={form.offer_duration_unit || 'days'} onChange={(v) => setForm({ ...form, offer_duration_unit: v })} title="وحدة المدة" icon={Clock}
+                        className="flex-1"
+                        options={[
+                          { value: 'hours', label: 'ساعات', emoji: '🕐' },
+                          { value: 'days', label: 'أيام', emoji: '📅' },
+                          { value: 'weeks', label: 'أسابيع', emoji: '🗓️' },
+                          { value: 'months', label: 'أشهر', emoji: '📆' },
+                        ]} />
                     </div>
                   </div>
                   <div>

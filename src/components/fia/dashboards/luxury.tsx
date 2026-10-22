@@ -15,7 +15,7 @@
 //  - luxTheme    : per-section gradient presets
 // ============================================================================
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Search, Sparkles, ChevronDown, Check, X } from 'lucide-react'
 import {
@@ -170,44 +170,184 @@ export function LuxSearch({ value, onChange, placeholder = 'بحث...', classNam
 }
 
 // ---------------------------------------------------------------------------
-// LuxSelect — professional native select (RTL-safe, always renders well)
+// LuxOptionSheet — محرّك قائمة الاختيار الفاخرة الموحّد (v4)
+// ورقة سفلية على الجوال / حوار مركزي على سطح المكتب — ترويسة ملكية متدرجة،
+// بحث حي، بطاقات خيارات متحركة، حالة مختارة ذهبية بعلامة خضراء.
+// يستخدمه LuxSelect و LuxCombo لتوحيد كل القوائم المنسدلة في التطبيق كاملاً.
 // ---------------------------------------------------------------------------
-export function LuxSelect({ value, onChange, options, placeholder = '— اختر —', className, disabled }: {
+function LuxOptionSheet({ open, onClose, title, icon: Icon, options, value, onPick, searchable = false, searchPlaceholder = 'ابحث...', renderOption, accent = 'gold' }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  icon?: any
+  options: { value: string; label: string; hint?: string; emoji?: string; meta?: string }[]
+  value: string
+  onPick: (v: string) => void
+  searchable?: boolean
+  searchPlaceholder?: string
+  renderOption?: (o: any, selected: boolean) => React.ReactNode
+  accent?: 'gold' | 'navy' | 'emerald' | 'amber' | 'blue'
+}) {
+  const [q, setQ] = useState('')
+  useEffect(() => { if (open) setQ('') }, [open])
+  if (!open) return null
+  const needle = q.trim().toLowerCase()
+  const filtered = needle
+    ? options.filter((o) => o.label.toLowerCase().includes(needle) || (o.hint || '').toLowerCase().includes(needle) || (o.meta || '').toLowerCase().includes(needle))
+    : options
+  const accents: Record<string, { gradient: string; bg: string; text: string; border: string; iconBg: string }> = {
+    gold:    { gradient: 'from-[#061024] via-navy to-[#3a2f10]', bg: 'from-gold/15 to-amber-500/5', text: 'text-navy', border: 'border-gold/45', iconBg: 'from-emerald-500 to-teal-600' },
+    navy:    { gradient: 'from-[#061024] via-navy to-navy-light', bg: 'from-navy/10 to-navy/3', text: 'text-navy', border: 'border-navy/25', iconBg: 'from-emerald-500 to-teal-600' },
+    emerald: { gradient: 'from-emerald-600 to-teal-700', bg: 'from-emerald-50 to-teal-50', text: 'text-emerald-700', border: 'border-emerald-300', iconBg: 'from-emerald-500 to-teal-600' },
+    amber:   { gradient: 'from-amber-500 to-orange-600', bg: 'from-amber-50 to-orange-50', text: 'text-amber-700', border: 'border-amber-300', iconBg: 'from-amber-500 to-orange-600' },
+    blue:    { gradient: 'from-blue-600 to-indigo-700', bg: 'from-blue-50 to-indigo-50', text: 'text-blue-700', border: 'border-blue-300', iconBg: 'from-emerald-500 to-teal-600' },
+  }
+  const a = accents[accent] || accents.gold
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center" style={{ animation: 'fadeIn 0.2s ease' }} role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        {/* الترويسة الملكية */}
+        <div className={cn('relative bg-gradient-to-br p-4 pb-3.5 overflow-hidden flex-shrink-0', a.gradient)}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+          <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-x-8 -translate-y-8" />
+          <div className="absolute bottom-0 right-0 w-20 h-20 bg-gold/20 rounded-full blur-2xl translate-x-6 translate-y-6" />
+          <div className="absolute inset-0 lux-shimmer pointer-events-none" />
+          <div className="relative flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/25 flex items-center justify-center shadow-sm flex-shrink-0">
+              {Icon ? <Icon className="w-5 h-5 text-white" /> : <Sparkles className="w-5 h-5 text-white" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold text-white tracking-tight truncate">{title}</h3>
+              <p className="text-white/70 text-[10px] flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> {options.length} خياراً — اختر ما يناسبك</p>
+            </div>
+            <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors flex-shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {searchable && (
+            <div className="relative mt-3">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold pointer-events-none" />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full h-10 pr-9 pl-9 rounded-xl border border-white/20 bg-white/10 text-sm text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:bg-white/15 transition-all"
+              />
+              {q && (
+                <button type="button" onClick={() => setQ('')} className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors" title="مسح">
+                  <X className="w-3 h-3 text-white/90" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {/* بطاقات الخيارات */}
+        <div className="flex-1 overflow-y-auto fia-scroll p-3 space-y-1.5" style={{ background: 'linear-gradient(to bottom, rgba(248,250,252,0.6), white)' }}>
+          {filtered.length === 0 && (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-gold/10 border border-gold/20 flex items-center justify-center mb-2"><Search className="w-5 h-5 text-gold/60" /></div>
+              <p className="text-xs text-muted-foreground">لا توجد نتائج مطابقة</p>
+            </div>
+          )}
+          {filtered.map((o, i) => {
+            const sel = o.value === value
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onPick(o.value); onClose() }}
+                style={{ animation: `slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) ${Math.min(i, 14) * 0.025}s both` }}
+                className={cn(
+                  'w-full p-3 rounded-2xl text-right text-sm font-medium flex items-center justify-between gap-2 border-2 transition-all',
+                  sel
+                    ? cn('bg-gradient-to-l shadow-sm', a.bg, a.text, a.border)
+                    : 'text-gray-600 bg-white border-transparent hover:bg-gold/[0.04] hover:text-navy hover:border-gold/25'
+                )}
+              >
+                {renderOption ? renderOption(o, sel) : (
+                  <span className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {sel ? (
+                      <div className={cn('w-6 h-6 rounded-full bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm', a.iconBg)}>
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] text-gray-400 font-bold">{o.emoji || i + 1}</span>
+                      </div>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate">{o.label}</span>
+                      {o.hint && <span className="block text-[10px] text-gray-400 truncate">{o.hint}</span>}
+                    </span>
+                  </span>
+                )}
+                {!renderOption && o.meta && <span className="text-[10px] font-bold text-gold bg-gold/10 border border-gold/25 rounded-full px-2 py-0.5 flex-shrink-0">{o.meta}</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// LuxSelect — قائمة اختيار فاخرة (v4): زر أنيق يفتح ورقة خيارات ملكية
+// RTL-safe، بحث تلقائي عند كثرة الخيارات، متوافقة مع كل الاستدعاءات القديمة
+// ---------------------------------------------------------------------------
+export function LuxSelect({ value, onChange, options, placeholder = '— اختر —', className, disabled, title, icon: Icon, accent }: {
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string; emoji?: string }[]
   placeholder?: string
   className?: string
   disabled?: boolean
+  title?: string
+  icon?: any
+  accent?: 'gold' | 'navy' | 'emerald' | 'amber' | 'blue'
 }) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find((o) => o.value === value)
   return (
-    <div className={cn('relative group/select', className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <div className={cn('relative', className)}>
+      <button
+        type="button"
         disabled={disabled}
+        onClick={() => setOpen(true)}
         className={cn(
-          'w-full h-11 pr-10 pl-9 rounded-xl border border-gold/30 bg-white text-sm text-navy font-medium',
-          'focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/25 shadow-sm transition-all appearance-none cursor-pointer',
-          disabled && 'opacity-50 cursor-not-allowed bg-muted/30',
-          'hover:border-gold/50'
+          'w-full h-11 px-4 rounded-xl border bg-white text-sm text-right flex items-center justify-between gap-2 transition-all shadow-sm',
+          'border-gold/30 hover:border-gold/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/25',
+          disabled && 'opacity-50 cursor-not-allowed bg-muted/30'
         )}
       >
-        <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.emoji ? `${o.emoji} ` : ''}{o.label}</option>
-        ))}
-      </select>
-      <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold pointer-events-none transition-transform group-focus-within/select:rotate-180" />
+        <span className={cn('truncate font-medium', !selected && 'text-muted-foreground/60 font-normal')}>
+          {selected ? (selected.emoji ? `${selected.emoji} ` : '') + selected.label : placeholder}
+        </span>
+        <ChevronDown className="w-4 h-4 text-gold flex-shrink-0" />
+      </button>
+      <LuxOptionSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title || placeholder || 'اختر من القائمة'}
+        icon={Icon}
+        options={options}
+        value={value}
+        onPick={onChange}
+        searchable={options.length > 7}
+        accent={accent}
+      />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// LuxCombo — searchable select (royal dropdown with live filtering)
-// Perfect for: student picker, course picker inside dialogs
+// LuxCombo — قائمة اختيار بحثية فاخرة (v4): محرّك الورقة الملكية نفسه
+// بحث حي دائماً + دعم القيمة الحالية خارج القائمة + renderOption كامل
+// Perfect for: student picker, course picker, countries, methods
 // ---------------------------------------------------------------------------
-export function LuxCombo({ value, onChange, options, placeholder = '— اختر —', searchPlaceholder = 'ابحث...', className, renderOption, disabled }: {
+export function LuxCombo({ value, onChange, options, placeholder = '— اختر —', searchPlaceholder = 'ابحث...', className, renderOption, disabled, title, icon: Icon, accent }: {
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string; hint?: string; emoji?: string; meta?: string }[]
@@ -216,95 +356,51 @@ export function LuxCombo({ value, onChange, options, placeholder = '— اختر
   className?: string
   renderOption?: (o: any, selected: boolean) => React.ReactNode
   disabled?: boolean
+  title?: string
+  icon?: any
+  accent?: 'gold' | 'navy' | 'emerald' | 'amber' | 'blue'
 }) {
   const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
   const selected = options.find((o) => o.value === value)
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', esc)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
-  }, [])
-
-  const filtered = options.filter((o) =>
-    !q.trim() || o.label.toLowerCase().includes(q.toLowerCase()) || (o.hint || '').toLowerCase().includes(q.toLowerCase()) || (o.meta || '').toLowerCase().includes(q.toLowerCase())
-  )
+  // ضمان ظهور القيمة الحالية حتى لو لم تعد ضمن القائمة (قيم نصية قديمة)
+  const effOptions = React.useMemo(() => {
+    if (value && !options.some((o) => o.value === value)) return [{ value, label: value, emoji: '📌' }, ...options]
+    return options
+  }, [value, options])
 
   return (
-    <div ref={ref} className={cn('relative', className)}>
+    <div className={cn('relative', className)}>
       {/* Trigger */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() => { setOpen(!open); setQ('') }}
+        onClick={() => setOpen(true)}
         className={cn(
           'w-full h-11 px-4 rounded-xl border bg-white text-sm text-right flex items-center justify-between gap-2 transition-all shadow-sm',
-          open ? 'border-gold ring-2 ring-gold/25 shadow-md' : 'border-gold/30 hover:border-gold/50',
+          'border-gold/30 hover:border-gold/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/25',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
       >
         <span className={cn('truncate font-medium', !selected && 'text-muted-foreground/60 font-normal')}>
           {selected ? (selected.emoji ? `${selected.emoji} ` : '') + selected.label : placeholder}
         </span>
-        <ChevronDown className={cn('w-4 h-4 text-gold flex-shrink-0 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className="w-4 h-4 text-gold flex-shrink-0" />
       </button>
 
-      {/* Panel */}
-      {open && (
-        <div className="absolute z-50 top-[calc(100%+6px)] inset-x-0 rounded-2xl border border-gold/30 bg-white shadow-2xl overflow-hidden lux-pop origin-top">
-          {/* Header + search */}
-          <div className="p-2.5 border-b border-gold/15 bg-gradient-to-b from-gold/[0.07] to-transparent">
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gold/70" />
-              <input
-                autoFocus
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full h-9 pr-9 px-3 rounded-lg border border-gold/25 bg-white text-xs text-navy focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold/25"
-              />
-            </div>
-          </div>
-          {/* Options */}
-          <div className="max-h-56 overflow-y-auto lux-scrollbar p-1.5 space-y-0.5">
-            {filtered.length === 0 && (
-              <div className="text-center py-6 text-xs text-muted-foreground">لا توجد نتائج مطابقة</div>
-            )}
-            {filtered.map((o) => {
-              const sel = o.value === value
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => { onChange(o.value); setOpen(false) }}
-                  className={cn(
-                    'w-full text-right px-3 py-2.5 rounded-xl transition-all flex items-center gap-2.5 border',
-                    sel ? 'bg-gradient-to-l from-gold/15 to-gold/5 border-gold/40 shadow-sm' : 'border-transparent hover:bg-gold/5 hover:border-gold/20'
-                  )}
-                >
-                  {renderOption ? renderOption(o, sel) : (
-                    <>
-                      <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm', sel ? 'bg-gradient-to-br from-gold to-amber-500 text-navy' : 'bg-navy/5 text-navy')}>
-                        {o.emoji || o.label?.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-navy truncate">{o.label}</div>
-                        {o.hint && <div className="text-[10px] text-muted-foreground truncate">{o.hint}</div>}
-                      </div>
-                      {o.meta && <span className="text-[10px] font-bold text-gold bg-gold/10 border border-gold/25 rounded-full px-2 py-0.5 flex-shrink-0">{o.meta}</span>}
-                    </>
-                  )}
-                  {sel && <Check className="w-4 h-4 text-gold flex-shrink-0" />}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {/* الورقة الملكية */}
+      <LuxOptionSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title || 'اختر من القائمة'}
+        icon={Icon}
+        options={effOptions}
+        value={value}
+        onPick={onChange}
+        searchable
+        searchPlaceholder={searchPlaceholder}
+        renderOption={renderOption}
+        accent={accent}
+      />
     </div>
   )
 }
@@ -359,75 +455,18 @@ export function LuxPicker({ label, value, onChange, options, icon: Icon, placeho
         </div>
       </button>
 
-      {/* Modal card */}
-      {open && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center" style={{ animation: 'fadeIn 0.2s ease' }}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-            {/* Royal gradient header */}
-            <div className={cn('relative bg-gradient-to-br p-4 pb-3 overflow-hidden', a.gradient)}>
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-              <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-x-8 -translate-y-8" />
-              <div className="absolute inset-0 lux-shimmer pointer-events-none" />
-              <div className="relative flex items-center gap-2.5">
-                {Icon && (
-                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-sm border border-white/25">
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="text-base font-bold text-white tracking-tight">{label}</h3>
-                  <p className="text-white/70 text-[10px] flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> اختر خياراً من القائمة</p>
-                </div>
-                <button type="button" onClick={() => setOpen(false)}
-                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Option cards */}
-            <div className="p-3 space-y-1.5 max-h-[50vh] overflow-y-auto fia-scroll" style={{ background: 'linear-gradient(to bottom, rgba(248,250,252,0.5), white)' }}>
-              {options.length === 0 && (
-                <div className="text-center py-6 text-xs text-muted-foreground">لا توجد خيارات متاحة</div>
-              )}
-              {options.map((o, i) => {
-                const isSelected = o.value === value
-                return (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => { onChange(o.value); setOpen(false) }}
-                    style={{ animation: `slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.03}s both` }}
-                    className={cn(
-                      'w-full p-3 rounded-2xl text-right text-sm font-medium flex items-center justify-between gap-2 transition-all',
-                      isSelected
-                        ? `bg-gradient-to-l ${a.bg} ${a.text} border-2 ${a.border} shadow-sm`
-                        : 'text-gray-600 bg-white border-2 border-transparent hover:bg-gray-50 hover:text-navy hover:border-gray-200/60'
-                    )}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      {isSelected ? (
-                        <div className={cn('w-6 h-6 rounded-full bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm', a.iconBg)}>
-                          <Check className="w-3.5 h-3.5 text-white" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] text-gray-400 font-bold">{o.emoji || i + 1}</span>
-                        </div>
-                      )}
-                      <span className="min-w-0">
-                        <span className="block truncate">{o.label}</span>
-                        {o.hint && <span className="block text-[10px] text-gray-400 truncate">{o.hint}</span>}
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* الورقة الملكية الموحدة */}
+      <LuxOptionSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={label || 'اختر من القائمة'}
+        icon={Icon}
+        options={options}
+        value={value}
+        onPick={onChange}
+        searchable={options.length > 7}
+        accent={accent}
+      />
     </>
   )
 }
