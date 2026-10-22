@@ -34,7 +34,7 @@ import { TrainerEarnings } from './trainer-earnings'
 import { TrainerFollowersMuseum } from './trainer-followers'
 import { TrainerRoyalGate, TrainerStatus } from './trainer-royal-gate'
 import { TrainerWithdrawalAccounts } from './trainer-withdrawal-accounts'
-import { LuxCombo, LuxSelect } from './luxury'
+import { LuxSelect } from './luxury'
 import { useSpecializationCatalog } from '@/lib/use-specializations'
 import { Landmark } from 'lucide-react'
 import { supabasePublic } from '@/lib/supabase'
@@ -1489,24 +1489,22 @@ function TrainerExams({ courses }: { courses: any[] }) {
 }
 
 function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile }: any) {
-  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة للمسمى الوظيفي والتخصص
-  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
-  const titleOpts = catTitles.length ? catTitles : [{ value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' }]
-  const specOpts = catSpecs.length ? catSpecs : [{ value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' }]
+  // 🔒 v6.6 — المسمى الوظيفي والتخصص حقلا رسميان للإدارة فقط: يعرضان مقفلين
+  //    (قراءة فقط) في ملف المدرب — لا قوائم اختيار هنا بعد الآن.
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
     setLoading(true)
     try {
-      // 👑 الحفظ الملكي الآمن: مسار مخصص للمدرب — يعدّل ملفه المهني هو فقط
-      //    (الهاتف/المسمى/التخصص/النبذة) — الاسم مغلّف ملكياً وللإدارة وحدها.
+      // 👑 الحفظ الملكي الآمن: مسار مخصص للمدرب — يعدّل ملفه هو فقط
+      //    (الهاتف/النبذة) — الاسم مغلّف ملكياً وللإدارة وحدها.
+      // 🔒 v6.6: المسمى الوظيفي والتخصص مغلّقان تماماً — يُعدّلان من حساب
+      //    الإدارة فقط («المدربون» → تعديل المدرب) — لا يُرسلان من هنا أصلاً.
       const res = await fetch('/api/trainers/self-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: profile.phone,
-          title: profile.title,
-          specialization: profile.specialization,
           bio: profile.bio,
         }),
       })
@@ -1601,15 +1599,20 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
                 <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
                 </Label>
-                <LuxCombo
-                  value={profile.specialization}
-                  onChange={(v) => setProfile({ ...profile, specialization: v })}
-                  options={specOpts}
-                  title="اختر التخصص من الكتالوج"
-                  icon={Briefcase}
-                  searchPlaceholder="ابحث في التخصصات العالمية..."
-                  placeholder="— اختر التخصص —"
-                />
+                {/* 🔒 v6.6 — التخصص مغلّق: يراه المدرب ولا يعدّله — للإدارة وحدها الحق */}
+                <div className="relative">
+                  <Input
+                    value={profile.specialization || '— لم يحدده الإدارة بعد —'}
+                    disabled
+                    readOnly
+                    className="rounded-xl border-gold/25 bg-gradient-to-l from-gold/[0.06] to-gray-50/80 text-muted-foreground cursor-not-allowed select-none pl-9"
+                  />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gold/70" />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-gold" />
+                  يُعدّل من إدارة الأكاديمية فقط
+                </p>
               </div>
               <div>
                 <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
@@ -1638,15 +1641,20 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <Award className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
               </Label>
-              <LuxCombo
-                value={profile.title}
-                onChange={(v) => setProfile({ ...profile, title: v })}
-                options={titleOpts}
-                title="اختر المسمى الوظيفي"
-                icon={Award}
-                searchPlaceholder="مدرب، استشاري، أخصائي، محاضر..."
-                placeholder="— اختر المسمى —"
-              />
+              {/* 🔒 v6.6 — المسمى الوظيفي مغلّق: رسمي ويوثّقه الأكاديمي — للإدارة وحدها */}
+              <div className="relative">
+                <Input
+                  value={profile.title || '— لم يحدده الإدارة بعد —'}
+                  disabled
+                  readOnly
+                  className="rounded-xl border-gold/25 bg-gradient-to-l from-gold/[0.06] to-gray-50/80 text-muted-foreground cursor-not-allowed select-none pl-9"
+                />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gold/70" />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                <Lock className="w-3 h-3 text-gold" />
+                يُعدّل من إدارة الأكاديمية فقط — لضمان رسمية الشهادات والمسميات
+              </p>
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { supabasePublic } from '@/lib/supabase'
+import { publishNotifications } from '@/lib/notification-counts'
 import { playSoundForNotification, unlockAudio, isMuted, setMuted, tryUnlockAudio, isAudioReady } from '@/lib/sounds'
 import { showNotificationToast } from '@/lib/notification-toast'
 import { isAndroidWebView } from '@/lib/certificate-download'
@@ -99,6 +100,14 @@ export function NotificationsBell() {
   // fire TWO browser notifications + TWO toasts + TWO sounds.
   // We use a ref (not state) so it doesn't trigger re-renders.
   const recentlyAnnouncedRef = useRef<Set<string>>(new Set())
+
+  // ⚡ v6.6 — عدادات القائمة الجانبية الملكية: نشر حالة الإشعارات إلى
+  // المخزن المشترك (notification-counts) عند كل تغيير — جلب أولي،
+  // Realtime (INSERT/UPDATE/DELETE)، التحديثات التفاؤلية عند الفتح/التعليم،
+  // والحذف. بلا أي طلب شبكي إضافي — القائمة الجانبية تقرأ من هنا.
+  useEffect(() => {
+    publishNotifications(items)
+  }, [items])
   // ⚡ Ref for the initialFallback timer so the subscribe() callback
   // can cancel it when Realtime connects. Without this, polling would
   // restart 5s after mount even though Realtime is working, causing

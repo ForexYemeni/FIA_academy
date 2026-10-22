@@ -860,3 +860,34 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .lux-shimmer::after, .lux-float, .lux-pop { animation: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ⚡ v6.6 — عدادات القائمة الجانبية الملكية (شارات ذهبية فاخرة)
+   تظهر عند وصول إشعار جديد يخص القسم — نبضة ظهور ملكية + هالة ذهبية
+   تتنفس ثلاث نبضات راقية ثم تستقر — ولا تُشتت بعدها.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes fiaCountPop {
+  0%   { transform: scale(0);    opacity: 0; }
+  55%  { transform: scale(1.3);  opacity: 1; }
+  75%  { transform: scale(0.94); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+.fia-nav-count {
+  animation: fiaCountPop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+  will-change: transform, opacity;
+}
+
+@keyframes fiaCountHalo {
+  0%   { transform: scale(1);    opacity: 0.55; }
+  70%  { transform: scale(2.1);  opacity: 0; }
+  100% { transform: scale(2.1);  opacity: 0; }
+}
+.fia-count-halo {
+  animation: fiaCountHalo 1.7s ease-out 0.45s 3;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fia-nav-count, .fia-count-halo { animation: none; }
+}

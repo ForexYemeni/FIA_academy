@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -9,6 +9,14 @@ import { Menu, LogOut, Bell, Crown, Star, Sparkles } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { NotificationsBell } from '@/components/fia/notifications-bell'
+import {
+  subscribeNotificationCounts,
+  getNotificationSnapshot,
+  getNotificationServerSnapshot,
+  countsByTab,
+  unreadIdsForTab,
+  markReadLocally,
+} from '@/lib/notification-counts'
 import { NotificationOptInPrompt } from '@/components/fia/notification-opt-in-prompt'
 import { ChatWidget } from '@/components/fia/chat-widget'
 
@@ -97,6 +105,38 @@ export function DashboardShell({
   const user = useAuth((s) => s.user)
   const logout = useAuth((s) => s.logout)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // ⚡ v6.6 — عدادات القائمة الجانبية الملكية:
+  // مصدر الحقيقة = إشعارات الجرس المنشورة (بلا أي طلب شبكي إضافي).
+  // لكل قسم نحسب عدد الإشعارات غير المقروءة التي تشير إليه
+  // (رابط «/#قسم» أولاً ثم نوع الإشعار كاحتياط) — ويظهر شارة ذهبية فاخرة.
+  const navIds = useMemo(() => new Set(nav.map((n) => n.id)), [nav])
+  const notifItems = useSyncExternalStore(
+    subscribeNotificationCounts,
+    getNotificationSnapshot,
+    getNotificationServerSnapshot,
+  )
+  const notifCounts = useMemo(
+    () => countsByTab(navIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notifItems, navIds],
+  )
+
+  // ⚡ v6.6 — زيارة القسم تُسكّت عداده: كل إشعار غير مقروء يشير إلى القسم
+  // المُفتوح الآن يُعلَّم مقروءاً (تفاؤلياً هنا + PUT للخادم بنفس عقد الجرس)
+  // فينخفض العداد فوراً ويهتزّ جرس الإشعارات بالتزامن معه.
+  useEffect(() => {
+    if (!active || !user?.id) return
+    const ids = unreadIdsForTab(active, navIds)
+    if (!ids.length) return
+    markReadLocally(ids)
+    fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
 
   // Override the role badge if the user is a team member (founder/leader/team).
   // The login route sets `user.team_role` from the trainers-table marker —
@@ -190,7 +230,22 @@ export function DashboardShell({
                 <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gold rounded-l-full" />
               )}
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
-              <span>{item.label}</span>
+              <span className="flex-1 text-right">{item.label}</span>
+              {/* ⚡ v6.6 — العداد الملكي: شارة ذهبية متوهجة تظهر عند وصول إشعار جديد
+                  لهذا القسم، وتنبض ثلاث نبضات راقية ثم تستقر — فاخرة جداً */}
+              {(() => {
+                const c = notifCounts[item.id] || 0
+                if (c <= 0) return null
+                return (
+                  <span
+                    key={`${item.id}:${c}`}
+                    className="fia-nav-count relative ms-auto inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-gradient-to-br from-amber-200 via-gold to-amber-600 text-navy text-[11px] font-black leading-none tabular-nums ring-1 ring-white/50 shadow-[0_0_14px_rgba(212,175,55,0.55),0_2px_6px_rgba(11,22,53,0.35)]"
+                  >
+                    <span className="fia-count-halo absolute inset-0 rounded-full bg-gold/50" />
+                    <span className="relative drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">{c > 99 ? '99+' : c}</span>
+                  </span>
+                )
+              })()}
             </button>
           )
         })}
