@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import {
   Users, BookOpen, CheckCircle2, Clock, Mail, Phone, Calendar, Eye, Trash2,
   Search, X, GraduationCap, TrendingUp, Wallet, Award, UserPlus, Download,
-  Briefcase, PencilLine, Save, Loader2, Lock,
+  PencilLine, Save, Loader2, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,8 @@ import {
 } from '@/components/ui/dialog'
 import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import { supabasePublic } from '@/lib/supabase'
-import { useSpecializationCatalog } from '@/lib/use-specializations'
 import {
-  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge, LuxRow, LuxCombo,
+  LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge, LuxRow,
 } from './luxury'
 
 // bio قد يحمل بيانات مهيكلة بعد علامة — نعرض النص فقط ونحفظ البنية (نفس منطق المتدرب)
@@ -51,19 +50,11 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
-  // 🔒 v6.4: تعديل بيانات المتدرب من الإدارة — المسمى الوظيفي والتخصص مغلّقان
-  // على المتدرب نفسه بعد التسجيل ويُحدَّدان من هنا حصراً (طلب صاحب المنصة)
+  // 🔒 v6.5 (طلب صاحب المنصة): المسمى الوظيفي والتخصص حقلا المدرّب حصراً —
+  // حُذفا نهائياً من واجهة المتدرب ومن هذا الحوار؛ تعديل المتدرب = هاتف + نبذة فقط
   const [editing, setEditing] = useState<any | null>(null)
-  const [editForm, setEditForm] = useState({ phone: '', title: '', specialization: '', bio: '' })
+  const [editForm, setEditForm] = useState({ phone: '', bio: '' })
   const [savingEdit, setSavingEdit] = useState(false)
-  // 🎓 كتالوج المسميات والتخصصات المركزي (ترحيل 026)
-  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
-  const titleOpts = catTitles.length ? catTitles : [
-    { value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' },
-  ]
-  const specOpts = catSpecs.length ? catSpecs : [
-    { value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' },
-  ]
   // 👑 التسجيل اليدوي الملكي + تصدير Excel
   const [enrollOpen, setEnrollOpen] = useState(false)
   const [enrollUserId, setEnrollUserId] = useState('')
@@ -129,12 +120,10 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
 
   const getStudentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
 
-  // 🔒 v6.4: فتح حوار تعديل بيانات المتدرب (الهاتف/المسمى/التخصص/النبذة)
+  // 🔒 v6.5: فتح حوار تعديل بيانات المتدرب (الهاتف/النبذة فقط)
   const openEdit = (s: any) => {
     setEditForm({
       phone: s.phone || '',
-      title: s.title || '',
-      specialization: s.specialization || '',
       bio: splitBio(s.bio),
     })
     setEditing(s)
@@ -147,15 +136,15 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
       const res = await fetch('/api/students', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editing.id, phone: editForm.phone, title: editForm.title, specialization: editForm.specialization, bio: joinBio(editForm.bio, editing.bio) }),
+        body: JSON.stringify({ id: editing.id, phone: editForm.phone, bio: joinBio(editForm.bio, editing.bio) }),
       })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error || 'فشل حفظ التعديلات')
         return
       }
-      setItems((prev) => prev.map((s) => s.id === editing.id ? { ...s, phone: editForm.phone, title: editForm.title, specialization: editForm.specialization, bio: joinBio(editForm.bio, editing.bio) } : s))
-      setSelectedStudent((prev: any) => (prev && prev.id === editing.id) ? { ...prev, phone: editForm.phone, title: editForm.title, specialization: editForm.specialization, bio: joinBio(editForm.bio, editing.bio) } : prev)
+      setItems((prev) => prev.map((s) => s.id === editing.id ? { ...s, phone: editForm.phone, bio: joinBio(editForm.bio, editing.bio) } : s))
+      setSelectedStudent((prev: any) => (prev && prev.id === editing.id) ? { ...prev, phone: editForm.phone, bio: joinBio(editForm.bio, editing.bio) } : prev)
       toast.success(`تم تحديث بيانات "${editing.name}" بنجاح`) 
       setEditing(null)
     } catch {
@@ -434,7 +423,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => setSelectedStudent(s)}>
                       <Eye className="w-3 h-3 ml-1" /> الملف الكامل
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 w-9 p-0 hover:bg-gold/10" title="تعديل البيانات (المسمى/التخصص/الهاتف)" onClick={() => openEdit(s)}>
+                    <Button size="sm" variant="ghost" className="h-8 w-9 p-0 hover:bg-gold/10" title="تعديل البيانات (الهاتف/النبذة)" onClick={() => openEdit(s)}>
                       <PencilLine className="w-3.5 h-3.5 text-gold" />
                     </Button>
                     <Button size="sm" variant="ghost" className="h-8 w-9 p-0 hover:bg-rose-500/10" onClick={() => setDeleteTarget(s)}>
@@ -603,7 +592,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
         </DialogContent>
       </Dialog>
 
-      {/* 🔒 v6.4 حوار تعديل بيانات المتدرب — المسمى الوظيفي والتخصص من الإدارة حصراً */}
+      {/* 🔒 v6.5 حوار تعديل بيانات المتدرب — هاتف + نبذة فقط (المسمى والتخصص حقلا المدرّب حصراً) */}
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o && !savingEdit) setEditing(null) }}>
         <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
           <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
@@ -615,17 +604,9 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
               <PencilLine className="w-7 h-7 text-gold" />
             </div>
             <DialogTitle className="text-white text-xl font-bold">تعديل بيانات المتدرب</DialogTitle>
-            <p className="relative text-white/70 text-xs mt-1 truncate px-4">{editing?.name} — المسمى الوظيفي والتخصص يُعدَّلان من الإدارة حصراً</p>
+            <p className="relative text-white/70 text-xs mt-1 truncate px-4">{editing?.name} — تعديل الهاتف والنبذة التعريفية</p>
           </div>
           <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4 max-h-[58vh] overflow-y-auto lux-scrollbar">
-            <div>
-              <Label className="text-navy font-medium mb-1.5 flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي</Label>
-              <LuxCombo value={editForm.title} onChange={(v: string) => setEditForm({ ...editForm, title: v })} options={titleOpts} title="اختر المسمى الوظيفي" icon={Briefcase} searchPlaceholder="مدرب، أخصائي، محاضر..." placeholder="— اختر المسمى أو اكتبه —" />
-            </div>
-            <div>
-              <Label className="text-navy font-medium mb-1.5 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-gold" /> التخصص</Label>
-              <LuxCombo value={editForm.specialization} onChange={(v: string) => setEditForm({ ...editForm, specialization: v })} options={specOpts} title="اختر التخصص من الكتالوج العالمي" icon={BookOpen} searchPlaceholder="ابحث في التخصصات..." placeholder="— اختر التخصص أو اكتبه —" />
-            </div>
             <div>
               <Label className="text-navy font-medium mb-1.5 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-gold" /> رقم الهاتف</Label>
               <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder="أدخل رقم الهاتف" />
@@ -636,7 +617,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
             </div>
             <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3 text-[11px] text-navy/80 flex items-start gap-2">
               <Lock className="w-3.5 h-3.5 text-gold mt-0.5 flex-shrink-0" />
-              <span>المسمى الوظيفي والتخصص مغلّقان على المتدرب بعد التسجيل — لا يمكنه تعديلهما من حسابه، وما تحدده هنا يظهر في ملفه مباشرة.</span>
+              <span>المسمى الوظيفي والتخصص حقلا المدرّب حصراً — لا يظهران للمتدرب إطلاقاً، وبيانات المدرّبين تُدار من قسم المدربين.</span>
             </div>
           </div>
           <div className="flex gap-2 p-4 bg-muted/20 border-t border-gold/15">

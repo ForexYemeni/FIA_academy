@@ -17,7 +17,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { LuxSection, LuxStats, LuxEmpty, LuxRow, LuxBadge } from './luxury'
+import { LuxSection, LuxStats, LuxEmpty, LuxBadge, LuxPayoutCard } from './luxury'
 import { supabasePublic } from '@/lib/supabase'
 import { fmtMoney, currencyInfo } from '@/lib/currency'
 
@@ -202,36 +202,46 @@ export function AdminTrainerEarningsRoyal() {
           {pending.map((w: any) => (
             <Card key={w.id} className="relative overflow-hidden p-0 border border-amber-500/40 bg-gradient-to-l from-amber-500/[0.06] to-transparent">
               <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-amber-500 to-gold" />
-              <div className="p-4 flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gold/30 blur-md rounded-full" />
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-gold/50 bg-navy-light">
-                    {w.trainer_avatar ? <img src={w.trainer_avatar} alt={w.trainer_name} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-lg bg-gradient-to-br from-navy to-navy-light">{w.trainer_name?.charAt(0)}</div>}
+              <div className="p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gold/30 blur-md rounded-full" />
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-gold/50 bg-navy-light">
+                      {w.trainer_avatar ? <img src={w.trainer_avatar} alt={w.trainer_name} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-lg bg-gradient-to-br from-navy to-navy-light">{w.trainer_name?.charAt(0)}</div>}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <p className="text-sm font-extrabold text-navy flex items-center gap-1.5">
+                      {w.trainer_name}
+                      <span className="text-[9px] font-bold rounded-full bg-gold/15 border border-gold/40 text-[#8a6d1d] px-2 py-0.5" dir="ltr">{fmtMoney(w.amount, w.currency)}</span>
+                    </p>
+                    <p className="text-[9px] text-muted-foreground mt-1">طلب بتاريخ {new Date(w.created_at).toLocaleString('ar-EG')}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={() => { setApproveTarget(w); setApproveShot(''); setApproveNote('') }}
+                      className="bg-gradient-to-l from-emerald-600 to-teal-600 hover:from-teal-600 hover:to-emerald-600 text-white rounded-xl shadow-md font-bold">
+                      <CheckCircle2 className="w-4 h-4 ml-1" /> موافقة + لقطة
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setRejectTarget(w); setRejectReason('') }}
+                      className="border-rose-500/40 text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold">
+                      <XCircle className="w-4 h-4 ml-1" /> رفض
+                    </Button>
                   </div>
                 </div>
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-sm font-extrabold text-navy flex items-center gap-1.5">
-                    {w.trainer_name}
-                    <span className="text-[9px] font-bold rounded-full bg-gold/15 border border-gold/40 text-[#8a6d1d] px-2 py-0.5" dir="ltr">{fmtMoney(w.amount, w.currency)}</span>
+                {/* 💳 v6.5: بيانات حساب الاستلام كاملة وقابلة للنسخ بنقرة — من حساب السحب الذي أضافه المدرب نفسه */}
+                <LuxPayoutCard
+                  method={w.method_name}
+                  owner={w.account_owner}
+                  account={w.account}
+                  country={w.account_country}
+                  title="بيانات حساب استلام المدرب — انقر أي صف لنسخه"
+                />
+                {!w.method_name && !w.account && !w.account_owner && (
+                  <p className="text-[10px] text-amber-700 bg-amber-500/[0.08] border border-amber-500/25 rounded-xl px-3 py-2">
+                    لا تحمل بيانات هذا الطلب بيانات حساب مرفقة (طلب قديم) — راجع بطاقة المدرب في «ملخص مستحقات المدربين» أدناه لعرض أحدث حساباته المضافة.
                   </p>
-                  <div className="mt-1 space-y-0.5">
-                    <LuxRow icon={w.method_type === 'عملات رقمية' ? Bitcoin : Landmark}>
-                      {w.method_name || '—'}{w.account_owner ? ` — ${w.account_owner}` : ''} • <span dir="ltr" className="font-bold">{w.account}</span>{w.account_country ? ` • ${w.account_country}` : ''}
-                    </LuxRow>
-                    <p className="text-[9px] text-muted-foreground">طلب بتاريخ {new Date(w.created_at).toLocaleString('ar-EG')}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => { setApproveTarget(w); setApproveShot(''); setApproveNote('') }}
-                    className="bg-gradient-to-l from-emerald-600 to-teal-600 hover:from-teal-600 hover:to-emerald-600 text-white rounded-xl shadow-md font-bold">
-                    <CheckCircle2 className="w-4 h-4 ml-1" /> موافقة + لقطة
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => { setRejectTarget(w); setRejectReason('') }}
-                    className="border-rose-500/40 text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold">
-                    <XCircle className="w-4 h-4 ml-1" /> رفض
-                  </Button>
-                </div>
+                )}
               </div>
             </Card>
           ))}
@@ -374,10 +384,17 @@ export function AdminTrainerEarningsRoyal() {
               <div className="relative">
                 <p className="text-[10px] text-gold/80 font-bold mb-1">تحويل إلى</p>
                 <p className="text-sm font-extrabold">{approveTarget?.trainer_name}</p>
-                <p className="text-[11px] text-white/70 mt-0.5 flex items-center gap-1">
-                  {approveTarget?.method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />}
-                  {approveTarget?.method_name}{approveTarget?.account_owner ? ` — ${approveTarget.account_owner}` : ''} — <span dir="ltr" className="font-bold text-gold">{approveTarget?.account}</span>{approveTarget?.account_country ? ` • ${approveTarget.account_country}` : ''}
-                </p>
+                {/* 💳 v6.5: بيانات الحساب قابلة للنسخ مباشرة قبل تنفيذ التحويل */}
+                <div className="mt-2">
+                  <LuxPayoutCard
+                    dark
+                    method={approveTarget?.method_name}
+                    owner={approveTarget?.account_owner}
+                    account={approveTarget?.account}
+                    country={approveTarget?.account_country}
+                    title="بيانات التحويل — انقر أي صف لنسخه"
+                  />
+                </div>
                 <p className="text-2xl font-extrabold mt-2" dir="ltr">{fmtMoney(approveTarget?.amount, approveTarget?.currency)}</p>
               </div>
             </div>

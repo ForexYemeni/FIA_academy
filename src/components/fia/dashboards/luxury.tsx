@@ -17,7 +17,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Search, Sparkles, ChevronDown, Check, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { Search, Sparkles, ChevronDown, Check, X, Copy, Landmark, Bitcoin, Wallet, User, Globe } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -638,6 +639,132 @@ export function LuxRow({ icon: Icon, children, mono }: { icon?: any; children: R
     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0">
       {Icon && <Icon className="w-2.5 h-2.5 flex-shrink-0 text-gold/70" />}
       <span className={cn('truncate text-navy font-medium', mono && 'font-mono')} dir={mono ? 'ltr' : undefined}>{children}</span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 💳 v6.5 — بيانات السحب القابلة للسحب/النسخ بنقرة واحدة
+// عند وصول طلب سحب (مدرب أو مسوّق) تقرأ الإدارة بيانات الحساب وتنسخها
+// مباشرة إلى تطبيق التحويل — بلا تحديد يدوي ولا أخطاء نسخ.
+// ---------------------------------------------------------------------------
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    ta.dir = 'ltr'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+/** صف بيانات قابل للنسخ بنقرة — عنوان صغير + قيمة + أيقونة نسخ */
+export function LuxCopyRow({ label, value, icon: Icon, mono = true, dark = false, hint }: {
+  label: string; value?: string | null; icon?: any; mono?: boolean; dark?: boolean; hint?: string
+}) {
+  const [copied, setCopied] = useState(false)
+  if (!value || !String(value).trim()) return null
+  const v = String(value).trim()
+  const doCopy = async () => {
+    const ok = await copyToClipboard(v)
+    if (ok) {
+      setCopied(true)
+      toast.success(`تم نسخ ${label} ✓`)
+      setTimeout(() => setCopied(false), 1600)
+    } else {
+      toast.error('تعذر النسخ — انسخ يدوياً')
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={doCopy}
+      title={hint || `انقر لنسخ ${label}`}
+      className={cn(
+        'group w-full flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-right transition-all active:scale-[0.98] cursor-pointer',
+        dark
+          ? 'border-gold/25 bg-white/[0.06] hover:bg-white/[0.12] hover:border-gold/50'
+          : 'border-gold/20 bg-white hover:border-gold/50 hover:bg-gold/[0.05] shadow-sm',
+      )}
+    >
+      {Icon && <Icon className={cn('w-3.5 h-3.5 flex-shrink-0', dark ? 'text-gold/80' : 'text-gold')} />}
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-[8px] font-bold', dark ? 'text-gold/70' : 'text-muted-foreground')}>{label}</span>
+        <span
+          className={cn('block text-[11px] font-extrabold truncate', dark ? 'text-white' : 'text-navy', mono && 'font-mono')}
+          dir={mono ? 'ltr' : undefined}
+          style={mono ? { textAlign: 'right' } : undefined}
+        >
+          {v}
+        </span>
+      </span>
+      <span className={cn(
+        'flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all',
+        copied
+          ? 'bg-emerald-500 text-white'
+          : dark ? 'bg-gold/15 text-gold group-hover:bg-gold/30' : 'bg-gold/10 text-gold group-hover:bg-gold group-hover:text-navy',
+      )}>
+        {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+      </span>
+    </button>
+  )
+}
+
+/** بطاقة بيانات استلام السحب كاملة — كل الحقول قابلة للنسخ + زر نسخ الكل */
+export function LuxPayoutCard({ method, owner, account, country, extra, dark = false, title = 'بيانات حساب الاستلام' }: {
+  method?: string | null; owner?: string | null; account?: string | null; country?: string | null
+  extra?: string | null; dark?: boolean; title?: string
+}) {
+  const rows: { label: string; value?: string | null; icon: any }[] = [
+    { label: 'طريقة الاستلام', value: method, icon: /(usdt|bitcoin|btc|ethereum|binance|tron|tether|عملات)/i.test(method || '') ? Bitcoin : method ? Wallet : Landmark },
+    { label: 'صاحب الحساب', value: owner, icon: User },
+    { label: 'رقم الحساب / المحفظة', value: account, icon: Landmark },
+    { label: 'الدولة', value: country, icon: Globe },
+    { label: 'ملاحظات إضافية', value: extra, icon: Landmark },
+  ]
+  if (!rows.some((r) => r.value && String(r.value).trim())) return null
+  const copyAll = async () => {
+    const text = rows.filter((r) => r.value && String(r.value).trim())
+      .map((r) => `${r.label}: ${String(r.value).trim()}`)
+      .join('\n')
+    const ok = await copyToClipboard(text)
+    if (ok) toast.success('تم نسخ جميع بيانات الحساب ✓')
+    else toast.error('تعذر النسخ')
+  }
+  return (
+    <div className={cn(
+      'rounded-xl border p-2.5 space-y-1.5',
+      dark ? 'border-gold/30 bg-navy/40' : 'border-gold/25 bg-gradient-to-b from-gold/[0.04] to-transparent',
+    )}>
+      <div className="flex items-center justify-between gap-2">
+        <p className={cn('text-[9px] font-extrabold flex items-center gap-1', dark ? 'text-gold' : 'text-navy/70')}>
+          <Wallet className="w-3 h-3 text-gold" /> {title}
+        </p>
+        <button
+          type="button"
+          onClick={copyAll}
+          className="flex items-center gap-1 rounded-lg border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-extrabold text-gold hover:bg-gold hover:text-navy transition-all active:scale-95 cursor-pointer"
+        >
+          <Copy className="w-2.5 h-2.5" /> نسخ الكل
+        </button>
+      </div>
+      {rows.map((r) => (
+        <LuxCopyRow key={r.label} label={r.label} value={r.value} icon={r.icon} dark={dark} />
+      ))}
     </div>
   )
 }

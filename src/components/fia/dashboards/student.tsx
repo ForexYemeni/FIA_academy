@@ -12,8 +12,8 @@ import {
   Users2, Search, BadgeCheck, Crown,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
-// 🔒 v6.4: LuxCombo + كتالوج التخصصات حُذفا من هنا — المسمى الوظيفي والتخصص
-// مغلّقان على المتدرب ويُعدَّلان من الإدارة فقط (قسم المتدربين)
+// 🔒 v6.5: المسمى الوظيفي والتخصص حقلا المدرّب حصراً — حُذفا نهائياً من واجهة
+// المتدرب كلياً (لا عرض ولا تعديل) بطلب صاحب المنصة
 import { useAuth } from '@/lib/auth-store'
 import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
@@ -132,7 +132,7 @@ export function StudentDashboard() {
   const [certificates, setCertificates] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', specialization: (user as any)?.specialization || '', bio: splitBio(user?.bio || '') })
+  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', bio: splitBio(user?.bio || '') })
 
   const loadEnrollments = () => {
     if (!user?.id) return
@@ -2901,9 +2901,9 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
 })
 
 const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser }: any) {
-  // 🔒 v6.4 (طلب صاحب المنصة): المسمى الوظيفي والتخصص مغلّقان على المتدرب
-  // بعد التسجيل — لا يُعدّلهما إلا حساب الإدارة حصراً (تُحدّث من قسم المتدربين
-  // في لوحة الإدارة). القفل خادمي أيضاً في PUT /api/profile.
+  // 🔒 v6.5 (طلب صاحب المنصة): المسمى الوظيفي والتخصص حقلا المدرّب حصراً —
+  // حُذفا نهائياً من واجهة المتدرب (لا عرض ولا تعديل). القفل الخادمي في
+  // PUT /api/profile باقٍ: أي محاولة تمرير الحقلين من متدرب تُتجاهل.
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
@@ -2917,8 +2917,6 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: profile.phone,
-          title: profile.title,
-          specialization: profile.specialization || '',
           bio: joinBio(profile.bio, user?.bio),
         }),
       })
@@ -2930,8 +2928,6 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
       updateUser({
         name: profile.name,
         phone: profile.phone,
-        title: profile.title,
-        specialization: profile.specialization || '',
         bio: joinBio(profile.bio, user?.bio),
       })
       toast.success('تم حفظ ملفك الشخصي بنجاح')
@@ -2987,24 +2983,6 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
               <Phone className="w-3.5 h-3.5 text-gold" /> رقم الهاتف
             </Label>
             <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
-          </div>
-          <div>
-            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
-              <Briefcase className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
-            </Label>
-            <Input value={profile.title || ''} disabled readOnly placeholder="— لم تحدده الإدارة بعد —" className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
-            <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
-              🔒 مغلّق بعد التسجيل — يُحدَّد ويُعدَّل من حساب الإدارة حصراً
-            </p>
-          </div>
-          <div>
-            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-gold" /> التخصص
-            </Label>
-            <Input value={profile.specialization || ''} disabled readOnly placeholder="— لم تحدده الإدارة بعد —" className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
-            <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
-              🔒 مغلّق بعد التسجيل — يُحدَّد ويُعدَّل من حساب الإدارة حصراً
-            </p>
           </div>
         </div>
         <div>
