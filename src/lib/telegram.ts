@@ -394,13 +394,27 @@ export async function tgCleanupOrphans(deletedPayments: number, deletedCertReqs:
   await sendTelegramMessage(msg)
 }
 
-export async function tgDangerZoneWiped(section: string, count: number, byUserId?: string) {
+export async function tgDangerZoneWiped(section: string, count: number, byUserId?: string, snapshotId?: string | null) {
   const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
+  const shield = snapshotId
+    ? line('🛡️ نسخة إنقاذ ملكية جاهزة للاستعادة', String(snapshotId).slice(0, 8))
+    : line('🛡️ نسخة الإنقاذ', 'تعذّر إنشاؤها — حذف مباشر')
   const msg =
     header('⚠️', 'تنظيف منطقة خطرة') +
     line('🗑️ القسم', section) +
     line('📊 عدد السجلات المحذوفة', count) +
+    shield +
     line('✨ نفّذها', by) +
-    `\n\n⚠️ هذا إجراء تدميري لا يمكن التراجع عنه.`
+    `\n\n⚠️ هذا إجراء تدميري — لكن نسخة الإنقاذ تسمح بالاستعادة الكاملة من أرشيف الإنقاذ الملكي.`
+  await sendTelegramMessage(msg)
+}
+
+export async function tgDangerZoneRestored(rowTotal: number, byUserId?: string) {
+  const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
+  const msg =
+    header('🛡️', 'استعادة إنقاذ ملكية') +
+    line('♻️ السجلات المستعادة', rowTotal) +
+    line('✨ نفّذها', by) +
+    `\n\n✅ تم إرجاع البيانات من أرشيف الإنقاذ بنجاح.`
   await sendTelegramMessage(msg)
 }

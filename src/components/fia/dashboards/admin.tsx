@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet,
+  Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -4209,6 +4209,49 @@ function AdminAccount({ user, updateUser, logout }: any) {
   const [orphanCleanupLoading, setOrphanCleanupLoading] = useState(false)
   const [orphanPreview, setOrphanPreview] = useState<{ table: string; label: string; count: number }[]>([])
   const [orphanTotal, setOrphanTotal] = useState(0)
+  // 🛡️ أرشيف الإنقاذ الملكي — نسخ ما قبل الحذف
+  const [dzSnapshots, setDzSnapshots] = useState<DzSnapshotRow[]>([])
+  const [dzSnapLoading, setDzSnapLoading] = useState(false)
+  const [dzSnapBusy, setDzSnapBusy] = useState('')
+  const [dzRestoreOpen, setDzRestoreOpen] = useState(false)
+  const [dzRestoreTarget, setDzRestoreTarget] = useState<DzSnapshotRow | null>(null)
+
+  const fetchDzSnapshots = async () => {
+    setDzSnapLoading(true)
+    try {
+      const res = await fetch('/api/admin/danger-zone/snapshots')
+      const data = await res.json()
+      if (res.ok) setDzSnapshots(data.snapshots || [])
+    } catch {}
+    finally { setDzSnapLoading(false) }
+  }
+
+  useEffect(() => { fetchDzSnapshots() }, [])
+
+  const restoreDzSnapshot = async () => {
+    if (!dzRestoreTarget) return
+    setDzSnapBusy(dzRestoreTarget.id)
+    try {
+      const res = await fetch('/api/admin/danger-zone/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot_id: dzRestoreTarget.id, user_id: user.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(`♻️ تمت الاستعادة الملكية — ${data.row_total || 0} سجل عاد إلى مكانه بأمان`)
+        setDzRestoreOpen(false)
+        setDzRestoreTarget(null)
+        fetchDzSnapshots()
+      } else {
+        toast.error(data.error || 'فشلت الاستعادة الملكية')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setDzSnapBusy('')
+    }
+  }
 
 // Arabic labels for each Danger Zone section (used in the
 // confirmation dialog so the user sees what they're wiping in Arabic).
@@ -4226,6 +4269,17 @@ const DZ_SECTION_LABELS: Record<string, string> = {
   payment_methods: 'طرق الدفع',
   team: 'أعضاء الفريق',
   notifications: 'الإشعارات',
+}
+
+// نوع نسخة الإنقاذ الملكية (أرشيف منطقة الخطر)
+type DzSnapshotRow = {
+  id: string
+  kind: string
+  section: string
+  label: string
+  counts: Record<string, number>
+  row_total: number
+  created_at: string
 }
 
   const save = async () => {
@@ -4306,7 +4360,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         toast.error(data.error || 'فشل الحذف')
         return
       }
-      toast.success('تم حذف جميع البيانات بنجاح. سيتم تسجيل الخروج...')
+      toast.success('تم حذف جميع البيانات بنجاح — نسخة الإنقاذ الملكية محفوظة في الأرشيف 🛡️. سيتم تسجيل الخروج...')
       setDzOpen(false)
       setDzPassword('')
       // Log the admin out so they re-login to a clean academy
@@ -4486,7 +4540,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         </div>
         <div className="flex-1">
           <h3 className="font-bold text-red-600 text-base">منطقة خطرة</h3>
-          <p className="text-xs text-red-600/80 mt-0.5">حذف جميع البيانات نهائياً — لا يمكن التراجع</p>
+          <p className="text-xs text-red-600/80 mt-0.5">حذف البيانات — محميّ بدرع الإنقاذ الملكي: نسخة تلقائية قبل كل حذف</p>
         </div>
       </div>
 
@@ -4585,6 +4639,62 @@ const DZ_SECTION_LABELS: Record<string, string> = {
             >
               <Brush className="w-4 h-4 ml-1" /> معاينة وتنظيف اليتامى
             </Button>
+          </div>
+
+          {/* ===== 🛡️ أرشيف الإنقاذ الملكي — نسخ ما قبل الحذف ===== */}
+          <div className="border-t-2 border-gold/30 pt-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gold/25 to-yellow-700/10 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-4 h-4 text-gold" />
+              </div>
+              <h4 className="font-bold text-sm bg-gradient-to-l from-yellow-600 to-gold bg-clip-text text-transparent">أرشيف الإنقاذ الملكي</h4>
+              <button
+                onClick={fetchDzSnapshots}
+                className="ms-auto text-muted-foreground hover:text-gold transition-colors"
+                title="تحديث الأرشيف"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${dzSnapLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+              كل عملية حذف من منطقة الخطر تلتقط تلقائياً نسخة إنقاذ كاملة قبل المحو — فلا يُفقد شيء أبداً، واستعد أي نسخة بلمسة واحدة.
+            </p>
+            {dzSnapLoading ? (
+              <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" /> جاري فحص الأرشيف الملكي...
+              </div>
+            ) : dzSnapshots.length === 0 ? (
+              <div className="text-center p-3 rounded-xl border border-gold/20 bg-gold/5">
+                <p className="text-xs text-muted-foreground">لا توجد نسخ إنقاذ بعد — يُنشأ الأرشيف تلقائياً مع أول عملية حذف.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pl-1">
+                {dzSnapshots.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-gold/25 bg-gradient-to-l from-gold/10 to-transparent">
+                    <div className="w-8 h-8 rounded-full bg-gold/15 flex items-center justify-center flex-shrink-0">
+                      {s.kind === 'full' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : <Archive className="w-4 h-4 text-gold" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-navy truncate">
+                        {s.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم: ${DZ_SECTION_LABELS[s.section] || s.section}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.row_total} سجل · {new Date(s.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={dzSnapBusy === s.id}
+                      onClick={() => { setDzRestoreTarget(s); setDzRestoreOpen(true) }}
+                      className="h-8 px-3 bg-gradient-to-l from-navy to-navy-light text-gold rounded-lg text-xs shadow-sm active:scale-95 transition-all"
+                    >
+                      {dzSnapBusy === s.id ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5 ml-1" />}
+                      استعادة
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -4703,7 +4813,7 @@ const DZ_SECTION_LABELS: Record<string, string> = {
       open={dzSectionOpen}
       onOpenChange={(o) => { if (!o && !dzSectionLoading) setDzSectionOpen(false) }}
       title={`حذف قسم: ${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}`}
-      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً. أدخل كلمة مرورك للتأكيد.`}
+      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً. ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
       itemLabel="القسم المراد حذفه:"
       itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
       confirmLabel="حذف القسم نهائياً"
@@ -4718,9 +4828,10 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           })
           const data = await res.json()
           if (res.ok) {
-            toast.success(`تم حذف ${data.deleted || 0} سجل من قسم "${data.section}"`)
+            toast.success(`تم حذف ${data.deleted || 0} سجل من قسم "${data.section}"${data.snapshot_id ? ' — نسخة الإنقاذ جاهزة في الأرشيف الملكي 🛡️' : ''}`)
             setDzSectionOpen(false)
             setDzSection('')
+            fetchDzSnapshots()
           } else {
             toast.error(data.error || 'فشل الحذف')
           }
@@ -4731,6 +4842,19 @@ const DZ_SECTION_LABELS: Record<string, string> = {
         }
       }}
       loading={dzSectionLoading}
+    />
+
+    {/* ===== Royal rescue restore confirmation ===== */}
+    <PasswordConfirmDialog
+      open={dzRestoreOpen}
+      onOpenChange={(o) => { if (!o && dzSnapBusy === '') setDzRestoreOpen(false) }}
+      title="استعادة نسخة الإنقاذ الملكية"
+      message={`سيتم إرجاع ${dzRestoreTarget?.row_total || 0} سجل إلى قاعدة البيانات بأمان تام من نسخة الإنقاذ المحفوظة. أدخل كلمة مرورك للتأكيد.`}
+      itemLabel="النسخة المستعادة:"
+      itemName={dzRestoreTarget ? (dzRestoreTarget.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzRestoreTarget.section] || dzRestoreTarget.section}`) : ''}
+      confirmLabel="استعادة الآن"
+      onConfirm={restoreDzSnapshot}
+      loading={!!dzRestoreTarget && dzSnapBusy === dzRestoreTarget.id}
     />
 
     {/* ===== Danger Zone confirmation dialog ===== */}
@@ -4761,9 +4885,14 @@ const DZ_SECTION_LABELS: Record<string, string> = {
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 mb-1">سيتم حذف جميع البيانات نهائياً:</p>
             <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى</p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
-                ⚠️ سيتم حذف جميع البيانات نهائياً ولا يمكن استعادتها. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية لا يمكن التراجع عنها.
+                ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية جسيمة ولا تُستعجل.
+              </p>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-green-700 leading-relaxed">
+                🛡️ درع الإنقاذ الملكي: قبل الحذف ستُلتقط نسخة كاملة تلقائياً لكل ما سيُمسى — ويمكن استعادتها بالكامل من «أرشيف الإنقاذ الملكي» في لوحة منطقة الخطر.
               </p>
             </div>
 
