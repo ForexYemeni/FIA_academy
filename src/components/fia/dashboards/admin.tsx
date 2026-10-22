@@ -4618,6 +4618,12 @@ type DzSnapshotRow = {
         <p className="text-sm text-navy">
           سيتم حذف: جميع المدربين، المتدربين، الفريق، الدورات، المدفوعات، الشهادات
         </p>
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 p-3">
+          <Shield className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <span className="font-bold">الخاتم الملكي:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» محميتان بالخاتم الملكي — لا تُحذفان أبداً بكل وحداتهما ودروسهما وبنك أسئلتهما، ويبقى الفريق مسجلاً فيهما بعد أي حذف.
+          </p>
+        </div>
         <p className="text-xs text-muted-foreground">
           سيتم الاحتفاظ بحساب المؤسس التنفيذي فقط — وكذلك إعدادات الموقع.
         </p>
@@ -4882,7 +4888,7 @@ type DzSnapshotRow = {
       open={dzSectionOpen}
       onOpenChange={(o) => { if (!o && !dzSectionLoading) setDzSectionOpen(false) }}
       title={`حذف قسم: ${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}`}
-      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً. ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
+      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً.${dzSection === 'courses' ? ' دورتا «إتقان الإدارة» و«دليل المتدربين والمدربين» محميتان بالخاتم الملكي ولن تُمسا.' : ''} ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
       itemLabel="القسم المراد حذفه:"
       itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
       confirmLabel="حذف القسم نهائياً"
@@ -4954,6 +4960,11 @@ type DzSnapshotRow = {
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 mb-1">سيتم حذف جميع البيانات نهائياً:</p>
             <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة، المنتدى، الكوبونات، الإشعارات، أرباح المدربين، رسائل التواصل</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+              <p className="text-xs text-amber-800 leading-relaxed">
+                👑 <span className="font-bold">الخاتم الملكي:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» لا تُحذفان أبداً — تبقيان بكل دروسهما وبنك أسئلتهما، ويُعاد تسجيل الفريق فيهما تلقائياً بعد الحذف.
+              </p>
+            </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
                 ⚠️ سيتم حذف جميع البيانات نهائياً. سيتم الاحتفاظ بحساب المؤسس فقط. هذه العملية جسيمة ولا تُستعجل.
