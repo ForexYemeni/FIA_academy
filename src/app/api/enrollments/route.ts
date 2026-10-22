@@ -177,7 +177,14 @@ export async function POST(req: NextRequest) {
     let serverPrice = Number(courseRow.price || 0)
     // سعر العرض الرسمي — مطابق تماماً لمنطق واجهة المتجر:
     // عرض محدود المدة = آخر تحديث للدورة + المدة؛ وأي عرض آخر بسعر أقل يسري.
-    if (courseRow.offer_price != null && Number(courseRow.offer_price) < serverPrice) {
+    // 🛡️ v6.4: عرض بسعر 0 أو سالب ليس عرضاً — بيانات تالفة كانت تُحسب
+    // خادمياً «سعراً نهائياً = 0» بينما الواجهة تعتبرها مدفوعة
+    // (offerPrice > 0 ? offerPrice : price)، فتُعتمد تسجيلات الدورة المدفوعة
+    // تلقائياً (مكتمل + مبلغ 0) رغم رفع المتدرب إثبات الدفع! الآن تُتجاهل
+    // العروض الصفرية تماماً — مطابق لمنطق الواجهة.
+    const offerNum = courseRow.offer_price != null && courseRow.offer_price !== ''
+      ? Number(courseRow.offer_price) : null
+    if (offerNum != null && Number.isFinite(offerNum) && offerNum > 0 && offerNum < serverPrice) {
       if (courseRow.offer_type === 'limited_time') {
         const dur = Number(courseRow.offer_duration_value) || 0
         const start = courseRow.updated_at ? new Date(courseRow.updated_at).getTime() : 0
@@ -185,13 +192,17 @@ export async function POST(req: NextRequest) {
           courseRow.offer_duration_unit === 'weeks' ? 604800000 :
           courseRow.offer_duration_unit === 'months' ? 2592000000 : 86400000
         if (dur > 0 && start > 0 && start + dur * unitMs > Date.now()) {
-          serverPrice = Number(courseRow.offer_price)
+          serverPrice = offerNum
         }
       } else {
-        serverPrice = Number(courseRow.offer_price)
+        serverPrice = offerNum
       }
     }
-    const isFree = serverPrice <= 0 || courseRow.price_type === 'مجانية'
+    // 🛡️ القاعدة الحاكمة v6.4 (طلب صاحب المنصة صريح): أي طلب تسجيل مرفق
+    // معه إثبات دفع يبقى «قيد الانتظار» حتماً حتى تعتمده الإدارة يدوياً —
+    // لا اعتماد تلقائي أبداً مهما كان سعر الدورة أو نوعها.
+    const hasPaymentProof = !!(body.payment_reference && /PROOF:\s*[^\s|]+/i.test(String(body.payment_reference)))
+    const isFree = !hasPaymentProof && (serverPrice <= 0 || courseRow.price_type === 'مجانية')
 
     // Check if already enrolled — بقراءة آمنة لا تنكسر مع الصفوف المكررة
     // (allow re-subscription if the previous enrollment was REJECTED 'ملغي')

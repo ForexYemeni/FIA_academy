@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { guardAdmin } from '@/lib/api-auth'
+import { guardAdmin, guardStaff } from '@/lib/api-auth'
 import { hashPassword } from '@/lib/auth-server'
 
 export async function GET(req: NextRequest) {
   try {
-    // 🛡️ قوائم المستخدمين للإدارة فقط — كانت تسرّب أرقام وبريد الجميع
-    const g = await guardAdmin(req)
+    // 🛡️ قوائم المستخدمين للطاقم (إدارة + مدربون) — كانت تسرّب أرقام وبريد الجميع
+    // 🛡️ v6.4: فُتح GET للمدربين أيضاً — كان shield v5.0 يمنعهم (403) فيظهر
+    // «متدرب» بدل اسم الطالب في نتائج الاختبارات وطلبات الشهادات، وتظل قائمة
+    // «متدربوّ» في لوحة المدرب فارغة رغم وجود تسجيلات! كلمة المرور تُشطب دائماً.
+    const g = await guardStaff(req)
     if (!g.ok) return g.res
     const role = req.nextUrl.searchParams.get('role') || 'student'
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
@@ -88,7 +91,9 @@ export async function PUT(req: NextRequest) {
     if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     // قائمة حقول بيضاء — لا حقول عشوائية
-    const allowed = ['name', 'email', 'password', 'phone', 'role', 'title', 'bio', 'avatar']
+    // 🔒 v6.4: «specialization» أُضيفت — الإدارة هي من يحدد المسمى الوظيفي
+    // والتخصص للمتدرب (مغلّقان على المتدرب نفسه بعد التسجيل)
+    const allowed = ['name', 'email', 'password', 'phone', 'role', 'title', 'specialization', 'bio', 'avatar']
     for (const k of Object.keys(updates)) {
       if (!allowed.includes(k)) delete updates[k]
     }

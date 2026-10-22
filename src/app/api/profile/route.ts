@@ -8,6 +8,9 @@ import { guardAuth } from '@/lib/api-auth'
  * أي حقل حساس (الدور/البريد/كلمة المرور/الأفاتار عبر مساراتها الخاصة).
  * 🔒 الاسم مغلّق نهائياً (طلب المالك): يُحدد مرة واحدة عند التسجيل ولا يُعدَّل
  * أبداً من أي حساب متدرب أو مدرب — أمر تعديل الاسم يُتجاهل ويُردّ برسالة ملكية.
+ * 🔒 v6.4: المسمى الوظيفي والتخصص للمتدرب مغلّقان بعد التسجيل (طلب المالك) —
+ * لا يُعدَّلان إلا من حساب الإدارة حصراً (PUT /api/students). أي قيمتين
+ * يرسلهما متدرب تُتجاهلان صامتاً حتى لا يتعطل حفظ هاتفه ونبذته.
  */
 const ALLOWED_FIELDS = ['phone', 'title', 'specialization', 'bio'] as const
 
@@ -23,6 +26,11 @@ export async function PUT(req: NextRequest) {
       if (typeof v === 'string') {
         updates[field] = v.trim()
       }
+    }
+    // 🔒 القفل الخادمي: متدرب لا يعدّل المسمى الوظيفي/التخصص أبداً
+    if (g.user.role === 'student') {
+      delete updates.title
+      delete updates.specialization
     }
     if (Object.keys(updates).length === 0) {
       // محاولة تعديل الاسم وحده → رد ملكي واضح
