@@ -19,7 +19,7 @@ import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { supabasePublic } from '@/lib/supabase'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxEmpty, LuxBadge,
-  LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput,
+  LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput, LuxPayoutCard,
 } from './luxury'
 
 const SITE_URL = 'https://fiaacademy.vercel.app'
@@ -502,9 +502,21 @@ function AffiliateWithdrawalsPanel() {
                       <span className="text-[11px] font-bold text-navy/70">— {affName}</span>
                       {w.affiliate?.unique_code && <Badge variant="outline" className="font-mono text-[9px]">{w.affiliate.unique_code}</Badge>}
                     </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      💳 {w.method_name} • <span dir="ltr" className="font-mono">{w.account_number}</span>{w.account_name ? ` • ${w.account_name}` : ''}{w.account_country ? ` • ${w.account_country}` : ''}
-                    </p>
+                    {/* 💳 v6.5: بيانات حساب استلام العمولة كاملة وقابلة للنسخ بنقرة */}
+                    <div className="mt-2">
+                      <LuxPayoutCard
+                        method={w.method_name}
+                        owner={w.account_name}
+                        account={w.account_number}
+                        country={w.account_country}
+                        title="بيانات حساب استلام العمولة — انقر أي صف لنسخه"
+                      />
+                    </div>
+                    {!w.method_name && !w.account_number && !w.account_name && (
+                      <p className="mt-2 text-[10px] text-amber-700 bg-amber-500/[0.08] border border-amber-500/25 rounded-xl px-3 py-2">
+                        لا تحمل بيانات هذا الطلب بيانات حساب مرفقة (طلب قديم) — راجع تبويب «حسابات السحب» في بطاقة المسوّق لعرض أحدث حساباته.
+                      </p>
+                    )}
                     <p className="mt-0.5 text-[9px] text-muted-foreground/70">طلب في {new Date(w.created_at).toLocaleString('ar')}</p>
                   </div>
                 </div>
