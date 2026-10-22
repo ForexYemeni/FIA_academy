@@ -70,6 +70,9 @@ export async function GET(req: NextRequest) {
     // This is enforced at the API level so no student client can bypass it.
     if (!includeDrafts) {
       query = query.neq('status', 'مسودة')
+      // 🛡️ دورات الإدارة السرية (visibility='admin_only') لا تظهر أبداً
+      //    للمتدربين أو المدربين أو الزوار — فقط للإدارة في لوحتها.
+      query = query.neq('visibility', 'admin_only')
     }
     // ⚡ Pagination: if limit is specified, apply range filtering
     if (limit > 0) {

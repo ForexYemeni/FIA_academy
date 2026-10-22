@@ -11,6 +11,7 @@ import {
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
 import { useHashTab } from '@/lib/use-hash-tab'
+import { RoyalGuideBanner } from '@/components/fia/royal-guide-banner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -361,6 +362,13 @@ function TrainerOverview({ user, courses, students, onOpenMuseum }: any) {
           </div>
         </div>
       </div>
+
+      {/* 🎓 الدليل الملكي — دليل استخدام الأكاديمية للمتدربين والمدربين */}
+      <RoyalGuideBanner
+        slug="fia-user-guide"
+        title="دليل استخدام أكاديمية المستقبل الدولية"
+        subtitle="رحلتك الفاخرة من الألف إلى الياء — كل أسرار المنصة كمتدرب وكمدرّب، درساً درساً."
+      />
 
       {/* ⚡ Magical StatCards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 fia-stagger">
