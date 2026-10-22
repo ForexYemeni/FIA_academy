@@ -1631,3 +1631,26 @@ Stage Summary:
 - Deployed via push 1695bc2 (Vercel auto). No APK update needed (all server-side).
 - Danger zone answer delivered: tables are NEVER lost, only rows; now fully reversible via royal rescue archive.
 - Direct links: https://github.com/ForexYemeni/FIA_academy/releases/download/v2.7-backup/FIA-Academy-v2.7.apk و .../FIA-Academy-v2.7-FULL-BACKUP-SECURE.zip
+
+---
+Task ID: v4.9-royal-courses
+Agent: main (Z.ai)
+Task: دورة إدارة ملكية سرية (مخفية عن المتدربين والمدربين) + دورة دليل الاستخدام للمتدربين والمدربين — حقيقية كاملة من الألف إلى الياء
+
+Work Log:
+- Migration 019 live: courses.visibility TEXT DEFAULT 'public' ('admin_only' يخفي الدورة عن الجميع ما عدا الإدارة).
+- /api/courses GET public branch: +neq('visibility','admin_only') → المتدربون والزوار لا يرونها.
+- /courses/[slug] Page(): +neq admin_only → الرابط العام يعرض «الدورة غير موجودة» لأي شخصٍ غير مصرح (تم التحقق: صفحة الإدارة مخفية HTTP بتصميم not-found).
+- مكون جديد royal-guide-banner.tsx: لافتة ذهبية سينمائية تجلب الدورة بالـ slug ثم تفتح دروسها داخل LessonPreviewModal الحقيقية (تجربة الدروس الكاملة داخل اللوحات) — غير مرئية إن لم توجد الدورة.
+- admin.tsx: اللافتة أعلى نظرة عامة (دورة الإدارة السرية). trainer.tsx: اللافتة أعلى نظرة عامة (دليل المستخدمين).
+- غلافان سينمائيان مولّدان: /fia/covers/fia-admin-guide.png + fia-user-guide.png (1344x768) — حيّان على الإنتاج HTTP 200.
+- courseA-data.mjs: دورة إتقان الإدارة — 6 وحدات/27 درساً (بما فيها درس الاختبار المدمج 8 أسئلة) + exam lesson JSON سليم.
+- courseB-data.mjs: دليل الاستخدام — 8 وحدات/29 درساً (اختبار مدمج 6 أسئلة).
+- create-courses.mjs: الإنشاء عبر POST الإنتاج الحقيقي (tgCourseCreated نُشر مرة واحدة لكل دورة) + idempotent بالـ slug + تسجيل تلقائي payments(amount 0, مكتمل, 'GUIDE-FREE') + بنك 10 أسئلة exam_questions نشطة لدورة المستخدمين + تحديث enrolled.
+- التسجيل النهائي: دورة الإدارة 5 مدراء مكتمل، دورة المستخدمين 8 (مستخدمون+مدربون) مكتمل.
+- validate.mjs: تحقق بنية البيانات + JSON الاختبارات قبل الإنتاج.
+
+Stage Summary:
+- دورة الإدارة 8af2166f (admin_only): مخفية تماماً — قائمة عامة ✓ لا، صفحة عامة ✓ مخفية، متاحة للافتة لوحة الإدارة بالـ slug.
+- دورة المستخدمين 86747879 (public): أعلى قائمة الدورات العامة، مسجَّل فيها الجميع، مع اختبار رسمي 10 أسئلة.
+- Deploy 1695bc2..v4.9 push. لا حاجة لتحديث APK.
