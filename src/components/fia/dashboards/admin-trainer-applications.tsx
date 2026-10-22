@@ -17,7 +17,7 @@ import {
   Crown, GraduationCap, Hourglass, CheckCircle2, XCircle, Percent, Loader2,
   Award, Trophy, Star, FileText, Globe2, Mail, Phone, ShieldCheck, ScrollText,
   Scale, Eye, RefreshCw, Sparkles, Clock, ChevronDown, ChevronUp,
-  Ban, PenLine, CalendarClock,
+  Ban, PenLine, CalendarClock, BadgeCheck, Lock,
 } from 'lucide-react'
 
 interface App {
@@ -40,6 +40,7 @@ interface App {
   profit_percentage?: number
   created_at?: string
   reviewed_at?: string | null
+  certified_at?: string | null
 }
 
 /* ⏳ زمن نسبي عربي أنيق */
@@ -57,19 +58,21 @@ function timeAgo(iso?: string | null): string {
   return new Date(iso).toLocaleDateString('ar-EG')
 }
 
-type FilterKey = 'all' | 'pending' | 'awaiting' | 'declined' | 'rejected'
+type FilterKey = 'all' | 'pending' | 'awaiting' | 'declined' | 'certified' | 'rejected'
 
 const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'الكل' },
+  { key: 'all', label: 'قيد المعالجة' },
   { key: 'pending', label: 'بانتظار الموافقة' },
   { key: 'awaiting', label: 'بانتظار التوقيع' },
   { key: 'declined', label: 'يحتاج تفاوضاً' },
+  { key: 'certified', label: 'المتفق معهم' },
   { key: 'rejected', label: 'مرفوضة' },
 ]
 
 export function AdminTrainerApplications() {
   const [apps, setApps] = useState<App[]>([])
   const [awaiting, setAwaiting] = useState<App[]>([])
+  const [certified, setCertified] = useState<App[]>([])
   const [rejected, setRejected] = useState<App[]>([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState<App | null>(null)
@@ -87,6 +90,7 @@ export function AdminTrainerApplications() {
       const data = await res.json()
       setApps(data.applications || [])
       setAwaiting(data.awaiting_signature || [])
+      setCertified(data.certified || [])
       setRejected(data.rejected || [])
       setLastSync(new Date())
     } catch {}
@@ -126,19 +130,21 @@ export function AdminTrainerApplications() {
   /* الترشيح حسب الفلتر المختار */
   const showPending = filter === 'all' || filter === 'pending'
   const showAwaiting = filter === 'all' || filter === 'awaiting' || filter === 'declined'
+  const showCertified = filter === 'certified'
   const showRejected = filter === 'all' || filter === 'rejected'
   const pendingList = apps.filter(matchQ)
   const awaitingList = (filter === 'declined' ? awaiting.filter((a) => a.agreement?.trainer_response === 'declined') : awaiting).filter(matchQ)
+  const certifiedList = certified.filter(matchQ)
   const rejectedList = rejected.filter(matchQ)
-  const nothingAtAll = !loading && filter === 'all' && total === 0
+  const nothingAtAll = !loading && filter === 'all' && total === 0 && certifiedList.length === 0
 
   return (
     <LuxSection
-      title="قصر الموافقات الملكي — طلبات المدربين"
-      subtitle="افحص ملفات المتقدمين بالكامل — وافق وأرسل اتفاق النسبة الفاخر — أو ارفض مع السبب. لا يظهر مدرب في «مدربينا» إلا بعد التوقيع"
+      title="طلبات المدربين — الموافقات والاتفاقات"
+      subtitle="افحص ملفات المتقدمين بالكامل — وافق وأرسل اتفاق النسبة — أو ارفض مع السبب. لا يظهر مدرب في «مدربينا» إلا بعد التوقيع، والاتفاق الموقّع من الطرفين يُغلق نهائياً"
       icon={GraduationCap}
       themeKey="trainers"
-      count={total}
+      count={total + certifiedList.length}
       actions={
         <Button onClick={load} variant="ghost" size="sm" className="border border-white/20 bg-white/5 text-white/85 hover:bg-white/15 hover:text-white">
           <RefreshCw className={cn('ml-1 h-3.5 w-3.5', loading && 'animate-spin')} /> تحديث
@@ -160,6 +166,7 @@ export function AdminTrainerApplications() {
                 : f.key === 'pending' ? apps.length
                 : f.key === 'awaiting' ? pureAwaiting.length
                 : f.key === 'declined' ? declinedCount
+                : f.key === 'certified' ? certified.length
                 : rejected.length
               return (
                 <button key={f.key} onClick={() => setFilter(f.key)}
@@ -176,9 +183,9 @@ export function AdminTrainerApplications() {
       }
       stats={
         <LuxStats items={[
+          { icon: BadgeCheck, label: 'المتفق معهم — معتمدون', value: certified.length, grad: 'from-gold to-amber-600' },
           { icon: Hourglass, label: 'بانتظار الموافقة', value: apps.length, grad: 'from-amber-400 to-orange-600' },
           { icon: ScrollText, label: 'بانتظار توقيع المدرب', value: pureAwaiting.length, grad: 'from-emerald-400 to-teal-600' },
-          { icon: Scale, label: 'رفض النسبة — تفاوض', value: declinedCount, grad: 'from-rose-400 to-red-600' },
           { icon: Ban, label: 'طلبات مرفوضة', value: rejected.length, grad: 'from-slate-500 to-slate-700' },
         ]} />
       }
@@ -186,13 +193,13 @@ export function AdminTrainerApplications() {
       {loading ? (
         <div className="flex flex-col items-center gap-3 py-14">
           <Loader2 className="h-10 w-10 animate-spin text-gold" />
-          <p className="text-xs font-bold text-muted-foreground">تُفتح أرشيفات القصر الملكية...</p>
+          <p className="text-xs font-bold text-muted-foreground">جارٍ تحميل الطلبات...</p>
         </div>
       ) : nothingAtAll && filter === 'all' ? (
         <LuxEmpty
-          icon={Crown}
-          title="القصر هادئ — لا طلبات في الأفق"
-          hint="عندما يسجّل مدرب من بوابة /register سيصل ملفه الكامل هنا بمؤهلاته وإنجازاته بانتظار حكمكم الملكي"
+          icon={GraduationCap}
+          title="لا طلبات حالياً"
+          hint="عندما يسجّل مدرب من بوابة /register سيصل ملفه الكامل هنا بمؤهلاته وإنجازاته بانتظار مراجعتكم"
         />
       ) : (
         <div className="space-y-6">
@@ -203,7 +210,7 @@ export function AdminTrainerApplications() {
               icon={Hourglass}
               accent="amber"
               empty={pendingList.length === 0}
-              emptyText={filter === 'all' ? 'لا طلبات جديدة — القصر هادئ 👑' : 'لا نتائج مطابقة في هذا القسم'}
+              emptyText={filter === 'all' ? 'لا طلبات جديدة حالياً' : 'لا نتائج مطابقة في هذا القسم'}
             >
               {pendingList.map((a) => (
                 <ApplicationCard key={a.id} a={a} onDetail={() => setDetail(a)} onApprove={() => setApproveFor(a)} onReject={() => setRejectFor(a)} mode="pending" />
@@ -235,6 +242,21 @@ export function AdminTrainerApplications() {
             </RoyalGroup>
           )}
 
+          {/* === المتفق معهم — اتفاق موقّع ومغلق === */}
+          {showCertified && (
+            <RoyalGroup
+              title={`المتفق معهم — مدربون معتمدون (${certifiedList.length})`}
+              icon={BadgeCheck}
+              accent="emerald"
+              empty={certifiedList.length === 0}
+              emptyText={filter === 'certified' ? 'لا يوجد مدربون معتمدون بعد — بعد موافقة المدرب على النسبة يظهر هنا' : 'لا نتائج مطابقة في هذا القسم'}
+            >
+              {certifiedList.map((a) => (
+                <ApplicationCard key={a.id} a={a} onDetail={() => setDetail(a)} mode="certified" />
+              ))}
+            </RoyalGroup>
+          )}
+
           {/* === المرفوضة حديثاً === */}
           {showRejected && rejectedList.length > 0 && (
             <RoyalGroup
@@ -255,7 +277,7 @@ export function AdminTrainerApplications() {
       {/* حوار الملف الكامل */}
       <LuxDialog
         open={!!detail} onOpenChange={(o) => !o && setDetail(null)}
-        title={`الملف الملكي — ${detail?.name || ''}`} subtitle={detail ? `${detail.title || ''}${detail.specialization ? ' • ' + detail.specialization : ''}` : ''}
+        title={`الملف الكامل — ${detail?.name || ''}`} subtitle={detail ? `${detail.title || ''}${detail.specialization ? ' • ' + detail.specialization : ''}` : ''}
         icon={Crown} maxWidth="sm:max-w-2xl"
       >
         {detail && <FullProfile a={detail} />}
@@ -320,7 +342,7 @@ function ApplicationCard({ a, onDetail, onApprove, onReject, mode, note }: {
   onDetail: () => void
   onApprove?: () => void
   onReject?: () => void
-  mode: 'pending' | 'awaiting' | 'declined' | 'rejected'
+  mode: 'pending' | 'awaiting' | 'declined' | 'certified' | 'rejected'
   note?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -330,13 +352,15 @@ function ApplicationCard({ a, onDetail, onApprove, onReject, mode, note }: {
   const nExp = (a.experiences || []).length
 
   const statusBadge =
-    mode === 'pending' ? <Badge className="border-amber-400/40 bg-amber-400/10 text-amber-700"><Hourglass className="ml-1 h-3 w-3" /> بانتظار الموافقة</Badge>
+    mode === 'certified' ? <Badge className="border-gold/50 bg-gradient-to-l from-gold/20 to-amber-500/10 text-amber-700"><Lock className="ml-1 h-3 w-3" /> اتفاق موقّع ومغلق</Badge>
+    : mode === 'pending' ? <Badge className="border-amber-400/40 bg-amber-400/10 text-amber-700"><Hourglass className="ml-1 h-3 w-3" /> بانتظار الموافقة</Badge>
     : mode === 'awaiting' ? <Badge className="border-emerald-400/40 bg-emerald-400/10 text-emerald-700"><ScrollText className="ml-1 h-3 w-3" /> بانتظار توقيعه</Badge>
     : mode === 'declined' ? <Badge className="border-red-400/40 bg-red-400/10 text-red-700"><Scale className="ml-1 h-3 w-3" /> رفض العرض — يحتاج تعديلاً</Badge>
     : <Badge variant="outline" className="border-red-300 text-red-500">مرفوض</Badge>
 
   const ribbonCls =
-    mode === 'pending' ? 'bg-gradient-to-l from-amber-400 to-orange-500'
+    mode === 'certified' ? 'bg-gradient-to-l from-gold via-amber-400 to-amber-500'
+    : mode === 'pending' ? 'bg-gradient-to-l from-amber-400 to-orange-500'
     : mode === 'awaiting' ? 'bg-gradient-to-l from-emerald-400 to-teal-500'
     : mode === 'declined' ? 'bg-gradient-to-l from-rose-400 to-red-500'
     : 'bg-gradient-to-l from-slate-300 to-slate-400'
@@ -356,7 +380,7 @@ function ApplicationCard({ a, onDetail, onApprove, onReject, mode, note }: {
             <div className="flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-gold/50 bg-gradient-to-br from-navy to-navy-light text-lg font-bold text-gold shadow-[0_4px_14px_rgba(212,175,55,0.25)]">{a.name?.charAt(0)}</div>
           )}
           <span className={cn('absolute -bottom-0.5 -left-0.5 h-4 w-4 rounded-full border-2 border-white',
-            mode === 'pending' ? 'bg-amber-400' : mode === 'awaiting' ? 'bg-emerald-400' : mode === 'declined' ? 'bg-red-400' : 'bg-slate-300')} />
+            mode === 'certified' ? 'bg-gold' : mode === 'pending' ? 'bg-amber-400' : mode === 'awaiting' ? 'bg-emerald-400' : mode === 'declined' ? 'bg-red-400' : 'bg-slate-300')} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -382,14 +406,19 @@ function ApplicationCard({ a, onDetail, onApprove, onReject, mode, note }: {
             </div>
           )}
           {note && <p className="mt-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-red-700">{note}</p>}
+          {mode === 'certified' && a.certified_at && (
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-700/80">
+              <BadgeCheck className="h-3 w-3" /> تاريخ التوقيع والاعتماد: {new Date(a.certified_at).toLocaleDateString('ar-EG')}
+            </p>
+          )}
         </div>
 
         {/* لوحة النسبة الذهبية للعروض القائمة */}
-        {mode === 'awaiting' && a.agreement?.percentage !== undefined && (
+        {(mode === 'awaiting' || mode === 'certified') && a.agreement?.percentage !== undefined && (
           <div className="relative hidden overflow-hidden rounded-2xl border border-gold/35 bg-gradient-to-br from-gold/15 via-gold/5 to-transparent px-4 py-2 text-center sm:block">
             <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 30% 30%, #D4AF37 1px, transparent 1px)', backgroundSize: '9px 9px' }} />
             <p className="relative text-xl font-black leading-none text-gold" dir="ltr">{a.agreement.percentage}%</p>
-            <p className="relative mt-0.5 text-[9px] font-bold text-navy/60">نسبة معروضة</p>
+            <p className="relative mt-0.5 text-[9px] font-bold text-navy/60">{mode === 'certified' ? 'نسبة معتمدة' : 'نسبة معروضة'}</p>
           </div>
         )}
 
@@ -492,7 +521,7 @@ function FullProfile({ a }: { a: App }) {
       {/* سجل الاتفاق */}
       {a.agreement?.history?.length > 0 && (
         <div className="rounded-2xl border border-gold/25 bg-gradient-to-l from-gold/5 to-transparent p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><ScrollText className="h-4 w-4 text-gold" /> سجل الاتفاق الملكي</p>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><ScrollText className="h-4 w-4 text-gold" /> سجل الاتفاق</p>
           <div className="space-y-1.5">
             {a.agreement.history.map((h: any, i: number) => (
               <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-white/60 px-3 py-1.5 text-[11px]">
@@ -572,8 +601,8 @@ function ApproveDialog({ app, busy, onClose, onSubmit }: {
   return (
     <LuxDialog
       open={!!app} onOpenChange={(o) => !o && onClose()}
-      title={isReoffer ? `عرض محدّث — ${app.name}` : `موافقة ملكية — ${app.name}`}
-      subtitle={isReoffer ? 'عدّل النسبة والشروط ثم أرسل العرض الجديد للتوقيع' : 'وافق على المدرب وحدّد نسبة أرباحه — ستصله بطاقة اتفاق فاخرة للتوقيع'}
+      title={isReoffer ? `عرض محدّث — ${app.name}` : `موافقة على الطلب — ${app.name}`}
+      subtitle={isReoffer ? 'عدّل النسبة والشروط ثم أرسل العرض الجديد للتوقيع' : 'وافق على المدرب وحدّد نسبة أرباحه — ستصله بطاقة الاتفاق للتوقيع، وبعد قبوله يُغلق الاتفاق نهائياً'}
       icon={Crown}
       footer={
         <div className="flex w-full gap-2">
@@ -601,11 +630,11 @@ function ApproveDialog({ app, busy, onClose, onSubmit }: {
             </div>
           </div>
         </LuxField>
-        <LuxField label="بنود الاتفاق الملكي (اختياري)" icon={ScrollText} hint="تظهر في بطاقة الاتفاق عند المدرب — مثل: مدة السداد، شروط الترجمة، الحد الأدنى للسحب...">
+        <LuxField label="بنود الاتفاق (اختياري)" icon={ScrollText} hint="تظهر في بطاقة الاتفاق عند المدرب — مثل: مدة السداد، شروط الترجمة، الحد الأدنى للسحب...">
           <Textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={4} placeholder={'مثال:\n• تُصرف الأرباح أسبوعياً عبر الطريقة المتفق عليها\n• الحد الأدنى للسحب 5,000 ر.ي\n• يلتزم المدرب بجودة المحتوى وسياسات الأكاديمية'} className={luxInput} />
         </LuxField>
         <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] leading-relaxed text-emerald-800">
-          <CheckCircle2 className="ml-1 inline h-3.5 w-3.5" /> بعد الإرسال: يصل المدرب إشعار فوري (جرس + إشعار منبثق حتى لو التطبيق مغلق) — يقبل فيُعتمد ملكياً ويظهر في «مدربينا»، أو يرفض فيعود إليك بملاحظته لإعادة التفاوض. ولن يستطيع إنشاء الدورات إلا بعد توقيعه.
+          <CheckCircle2 className="ml-1 inline h-3.5 w-3.5" /> بعد الإرسال: يصل المدرب إشعار فوري (جرس + إشعار منبثق حتى لو التطبيق مغلق) — يقبل فيُعتمد رسمياً ويظهر في «مدربينا»، أو يرفض فيعود إليك بملاحظته لإعادة التفاوض. ولن يستطيع إنشاء الدورات إلا بعد توقيعه، وبعد التوقيع يُغلق الاتفاق نهائياً ولا يمكن تعديله.
         </p>
       </div>
     </LuxDialog>

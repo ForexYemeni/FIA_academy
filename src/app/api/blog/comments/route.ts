@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { assertTrainerCertified } from '@/lib/trainer-gate'
 
 // GET /api/blog/comments?blog_post_id=... — list comments with author profiles
 export async function GET(req: NextRequest) {
@@ -39,6 +40,11 @@ export async function POST(req: NextRequest) {
     const { blog_post_id, user_id, body, parent_id } = await req.json()
     if (!blog_post_id || !user_id || !body) {
       return NextResponse.json({ error: 'blog_post_id + user_id + body required' }, { status: 400 })
+    }
+    // 🛡️ بوابة الاعتماد: المدرب غير المعتمد (قبل توقيع الاتفاق) يقرأ المدونة فقط — لا تعليقات
+    const commentGate = await assertTrainerCertified(g.user.id, 'blog')
+    if (!commentGate.ok) {
+      return NextResponse.json({ error: commentGate.message }, { status: 403 })
     }
     const { data, error } = await supabaseAdmin
       .from('blog_comments')

@@ -316,7 +316,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
               {forgotLoading ? 'جاري الإرسال...' : 'أرسل طلب الاستعادة'}
             </Button>
             <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-              سيصل طلبك إلى قصر الإدارة باسمك وبريدك ورقم هاتفك المسجّل — وتواصل معك الأكاديمية لإصدار كلمة مرور جديدة.
+              سيصل طلبك إلى إدارة الأكاديمية باسمك وبريدك ورقم هاتفك المسجّل — وتواصل معك الأكاديمية لإصدار كلمة مرور جديدة.
             </p>
           </div>
         </DialogContent>

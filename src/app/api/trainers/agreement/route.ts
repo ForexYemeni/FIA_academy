@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `🏅 تم اعتمادك ملكياً يا ${trainer.name} — أهلاً بك في نخبة مدربي الأكاديمية`,
+        message: `تم اعتمادك رسمياً يا ${trainer.name} — أهلاً بك في نخبة مدربي الأكاديمية`,
       })
     }
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'أُرسلت ملاحظتك الملكية إلى الإدارة — سيراجعون العرض ويعودون إليك بعرض جديد',
+      message: 'أُرسلت ملاحظتك إلى الإدارة — سيراجعون العرض ويعودون إليك بعرض جديد',
     })
   } catch (e: any) {
     console.error('trainer agreement error:', e?.message)

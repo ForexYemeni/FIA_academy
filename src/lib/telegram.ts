@@ -430,7 +430,7 @@ export async function tgTrainerApplication(name: string, email: string, specialt
     line('💼 التخصص', specialty || '—') +
     line('🌍 الدولة', country || '—') +
     line('📧 البريد', email) +
-    `\n\n⏳ بانتظار الموافقة الملكية في لوحة الإدارة → طلبات المدربين.`
+    `\n\n⏳ بانتظار الموافقة في لوحة الإدارة → طلبات المدربين.`
   await sendTelegramMessage(msg)
 }
 
@@ -441,7 +441,7 @@ export async function tgTrainerApplicationApproved(name: string, percentage: num
     line('👤 الاسم', name) +
     line('💰 نسبة الأرباح المعروضة', percentage + '%') +
     line('✨ وافقت', by) +
-    `\n\n📜 الآن يصل الاتفاق الفاخر للمدرب ليقبل النسبة أو يرفضها.`
+    `\n\n📜 الآن يصل اتفاق النسبة للمدرب ليقبلها أو يرفضها.`
   await sendTelegramMessage(msg)
 }
 
@@ -457,7 +457,7 @@ export async function tgTrainerApplicationRejected(name: string, reason?: string
 
 export async function tgTrainerCertified(name: string, percentage: number) {
   const msg =
-    header('🏅', 'اعتماد مدرب ملكياً') +
+    header('🏅', 'اعتماد مدرب') +
     line('👤 الاسم', name) +
     line('🤝 نسبة الأرباح المتفق عليها', percentage + '%') +
     line('👑 الحالة', 'معتمد — يظهر الآن في نخبة مدربي الأكاديمية')

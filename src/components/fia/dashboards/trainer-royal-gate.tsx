@@ -41,16 +41,16 @@ function PendingScreen() {
           <Hourglass className="h-11 w-11 animate-pulse text-[#E5C77E]" />
         </div>
         <h2 className="mb-2 text-2xl font-extrabold text-white">
-          ملفك قيد <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">المراجعة الملكية</span>
+          ملفك قيد <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">المراجعة</span>
         </h2>
         <p className="mx-auto mb-7 max-w-md text-sm leading-relaxed text-white/65">
-          طلب انضمامك إلى نخبة المدربين وصل قصر الإدارة وتُفحص مؤهلاتك وإنجازاتك بعناية وسرية تامة.
+          طلب انضمامك إلى نخبة مدربي أكاديمية المستقبل الدولية قيد المراجعة — تُفحص مؤهلاتك وإنجازاتك بعناية وسرية تامة.
           فور الموافقة ستصلك بطاقة الاتفاق الفاخرة بنسبة أرباحك — عبر الجرس وإشعار فوري حتى لو كان التطبيق مغلقاً.
         </p>
         <div className="mx-auto grid max-w-xl gap-3 sm:grid-cols-3">
           {[
             { icon: ShieldCheck, t: 'فحص دقيق', d: 'مؤهلاتك وإنجازاتك وخبراتك' },
-            { icon: ScrollText, t: 'اتفاق ملكي', d: 'نسبة أرباحك تصلك للتوقيع' },
+            { icon: ScrollText, t: 'اتفاق شراكة', d: 'نسبة أرباحك تصلك للتوقيع' },
             { icon: BadgeCheck, t: 'اعتماد رسمي', d: 'اسمك يظهر في «مدربينا»' },
           ].map((c) => (
             <div key={c.t} className="rounded-2xl border border-[#C9A961]/25 bg-white/[0.05] p-4">
@@ -110,7 +110,7 @@ function AgreementCard({ name, agreement, specialization, onRefresh }: { name: s
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'تعذر تنفيذ العملية'); return }
       if (response === 'accepted') {
-        toast.success(data.message || '🏅 تم اعتمادك ملكياً!')
+        toast.success(data.message || 'تم اعتمادك رسمياً!')
         setTimeout(() => window.location.reload(), 1200)
       } else {
         toast.success(data.message || 'أُرسلت ملاحظتك للإدارة')
@@ -133,17 +133,17 @@ function AgreementCard({ name, agreement, specialization, onRefresh }: { name: s
             {declined ? <Sparkles className="h-9 w-9 text-[#E5C77E]" /> : <ScrollText className="h-9 w-9 text-[#E5C77E]" />}
           </div>
           <p className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-[#C9A961]/40 bg-[#C9A961]/10 px-3 py-1 text-[10px] font-bold text-[#E5C77E]">
-            <Crown className="h-3 w-3" /> وثيقة رسمية من قصر الأكاديمية
+            <Crown className="h-3 w-3" /> وثيقة رسمية من أكاديمية المستقبل الدولية
           </p>
           <h2 className="text-xl font-extrabold text-white sm:text-2xl">
-            {declined ? 'عرض جديد في الطريق إليك' : 'اتفاق شراكة الأرباح الملكي'}
+            {declined ? 'عرض جديد في الطريق إليك' : 'اتفاق شراكة الأرباح'}
           </h2>
           <p className="mt-2 text-sm text-white/60">
             أستاذ <span className="font-bold text-[#E5C77E]">{name}</span>
             {specialization ? <span> — {specialization}</span> : null}
             {declined
-              ? <span>، وصلت ملاحظتك للقصر وستصلك نسبة محدّثة فور اعتمادها.</span>
-              : <span>، وافقت الإدارة الملكية على انضمامك! تصفح شروط الشراكة ووقّع بحرية.</span>}
+              ? <span>، وصلت ملاحظتك للإدارة وستصلك نسبة محدّثة فور اعتمادها.</span>
+              : <span>، وافقت الإدارة على انضمامك! تصفح شروط الشراكة ووقّع بحرية — وبعد قبول الطرفين يُغلق الاتفاق نهائياً.</span>}
           </p>
         </div>
 
@@ -153,14 +153,14 @@ function AgreementCard({ name, agreement, specialization, onRefresh }: { name: s
           <div className="relative">
             <p className="mb-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white/70"><Percent className="h-4 w-4 text-[#E5C77E]" /> حصتك من أرباح كل دورة</p>
             <p className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-6xl font-black text-transparent drop-shadow-[0_2px_18px_rgba(201,169,97,0.4)]" dir="ltr">{pct}%</p>
-            <p className="mt-2 text-[11px] leading-relaxed text-white/60">تُحتسب تلقائياً من كل دفعة اشتراك تُعتمد لدوراتك — وتُودع في خزينتك الملكية فوراً</p>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/60">تُحتسب تلقائياً من كل دفعة اشتراك تُعتمد لدوراتك — وتُودع في محفظتك فوراً</p>
           </div>
         </div>
 
         {/* الشروط */}
         {terms && (
           <div className="mx-auto mb-5 max-w-md rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-right">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#E5C77E]"><Landmark className="h-4 w-4" /> بنود الاتفاق الملكي:</p>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#E5C77E]"><Landmark className="h-4 w-4" /> بنود الاتفاق:</p>
             <p className="whitespace-pre-line text-xs leading-relaxed text-white/75">{terms}</p>
           </div>
         )}

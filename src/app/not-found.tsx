@@ -81,7 +81,7 @@ export default function NotFound() {
           ٤٠٤
         </div>
         <h1 style={{ color: '#ffffff', fontSize: '26px', fontWeight: 800, margin: '0 0 10px' }}>
-          هذه الصفحة ليست من قاعات القصر
+          هذه الصفحة غير موجودة في أكاديمية المستقبل الدولية
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', lineHeight: 1.9, margin: '0 0 28px' }}>
           يبدو أنك وصلت إلى ممر مظلم لا يؤدي إلى مكان — لا تقلق، أبواب الأكاديمية الكبرى مفتوحة أمامك.
@@ -102,7 +102,7 @@ export default function NotFound() {
               boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
             }}
           >
-            🏛️ العودة إلى القصر الرئيسي
+            🏛️ العودة إلى الرئيسية
           </Link>
           <Link
             href="/#courses"

@@ -19,7 +19,7 @@ import { supabasePublic } from '@/lib/supabase'
 import {
   MessageSquare, Plus, ArrowRight, Eye, Reply, Pin, Trash2, Ban,
   Newspaper, HelpCircle, ChevronDown, Clock, Loader2, AlertTriangle,
-  Send, Shield, CheckCircle2, Search, X, ThumbsUp, ThumbsDown, Heart, MessageCircle, Sparkles,
+  Send, Shield, CheckCircle2, Search, X, ThumbsUp, ThumbsDown, Heart, MessageCircle, Sparkles, Lock,
 } from 'lucide-react'
 
 // ============================================================================
@@ -107,7 +107,7 @@ function ReactionButtons({ type, targetId, userId, initialLikes, initialDislikes
 // ============================================================================
 // Reusable blog comment component
 // ============================================================================
-function BlogCommentSection({ blogPostId, userId }: { blogPostId: string; userId?: string }) {
+function BlogCommentSection({ blogPostId, userId, readOnly }: { blogPostId: string; userId?: string; readOnly?: boolean }) {
   const [comments, setComments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [commentText, setCommentText] = useState('')
@@ -157,7 +157,7 @@ function BlogCommentSection({ blogPostId, userId }: { blogPostId: string; userId
         <MessageCircle className="w-5 h-5 text-gold" /> التعليقات ({comments.length})
       </h3>
 
-      {userId && (
+      {userId && !readOnly ? (
         <div className="mb-6 bg-muted/30 rounded-lg p-3 border border-border">
           <Textarea
             value={commentText}
@@ -174,7 +174,11 @@ function BlogCommentSection({ blogPostId, userId }: { blogPostId: string; userId
             </Button>
           </div>
         </div>
-      )}
+      ) : userId && readOnly ? (
+        <p className="mb-6 flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/[0.06] px-3 py-2.5 text-[11px] font-bold text-navy/70">
+          <Lock className="w-3.5 h-3.5 text-gold" /> التعليق متاح بعد اكتمال اعتمادك وتوقيع اتفاق الشراكة — المدونة متاحة للقراءة حالياً
+        </p>
+      ) : null}
 
       {loading ? (
         <div className="text-center py-4"><Loader2 className="w-5 h-5 mx-auto animate-spin text-navy" /></div>
@@ -979,7 +983,7 @@ function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
   )
 }
 
-export function SharedBlog() {
+export function SharedBlog({ readOnly }: { readOnly?: boolean }) {
   // Read the current user from the global auth store so we can pass
   // user.id down to the reaction buttons + comment section. Previously
   // this component referenced an undeclared `user` variable which threw
@@ -993,7 +997,7 @@ export function SharedBlog() {
   const [newPostOpen, setNewPostOpen] = useState(false)
 
   // ROYAL v4.2 — who can publish blog topics: trainers, admins & team.
-  const canPublish = user && ['trainer', 'admin', 'team', 'leader', 'founder'].includes(user.role)
+  const canPublish = user && ['trainer', 'admin', 'team', 'leader', 'founder'].includes(user.role) && !readOnly
 
   useEffect(() => {
     fetch('/api/blog').then((r) => r.json()).then((d) => {
@@ -1074,7 +1078,7 @@ export function SharedBlog() {
         </div>
 
         {/* Blog comments section */}
-        <BlogCommentSection blogPostId={viewingPost.id} userId={user?.id} />
+        <BlogCommentSection blogPostId={viewingPost.id} userId={user?.id} readOnly={readOnly} />
       </SectionCard>
     )
   }
@@ -1082,7 +1086,7 @@ export function SharedBlog() {
   return (
     <SectionCard
       title="المدونة"
-      description={`${posts.length} مقال`}
+      description={readOnly ? `${posts.length} مقال — للقراءة فقط` : `${posts.length} مقال`}
       action={canPublish ? (
         <Button size="sm" onClick={() => setNewPostOpen(true)}
           className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl shadow-md">
@@ -1090,6 +1094,15 @@ export function SharedBlog() {
         </Button>
       ) : undefined}
     >
+      {readOnly && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent px-4 py-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-amber-500 text-white shadow"><Lock className="h-4 w-4" /></span>
+          <div>
+            <p className="text-xs font-extrabold text-navy">المدونة متاحة للقراءة فقط حالياً</p>
+            <p className="text-[11px] text-muted-foreground">النشر والتعليق يُفتحان بعد اعتماد ملفك وتوقيع اتفاق الشراكة — تفقد بطاقة الاتفاق في «نظرة عامة»</p>
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="text-center py-12"><Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" /></div>
       ) : posts.length === 0 ? (

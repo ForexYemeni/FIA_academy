@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { hashPassword } from '@/lib/auth-server'
-import { rateLimit, clientIp, tooMany } from '@/lib/api-auth'
+import { rateLimit, clientIp, tooMany, signTokenAsync } from '@/lib/api-auth'
 import { notifyTrainerApplicationReceived } from '@/lib/notifications'
 import { tgTrainerApplication } from '@/lib/telegram'
 
@@ -69,14 +69,35 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
 
-    // إشعارات ملكية (غير قاتلة عند الفشل) — مسار واحد فقط لكل قناة (كان يتكرر مرتين للإدارة)
+    // إشعارات غير قاتلة عند الفشل — مسار واحد فقط لكل قناة
     try { await notifyTrainerApplicationReceived(name, specialization) } catch {}
     try { await tgTrainerApplication(name, email, specialization, country) } catch {}
+
+    // 🔑 تسجيل دخول تلقائي فوري: نُصدر توكن جلسة مع الرد — يدخل لوحته مباشرة
+    const token = await signTokenAsync({
+      sub: created.id,
+      email: created.email,
+      role: 'trainer',
+      name: created.name,
+    })
+    const user = {
+      id: created.id,
+      email: created.email,
+      name: created.name,
+      phone: phone || '',
+      password: '', // لا تُعاد كلمة المرور أبداً
+      role: 'trainer' as const,
+      avatar: avatar || undefined,
+      title,
+      bio,
+    }
 
     return NextResponse.json({
       success: true,
       trainer: { id: created.id, name: created.name, email: created.email },
-      message: 'وصل طلبك الملكي إلى قصر الإدارة — ستُشعَر بالموافقة على بريدك وضمن التطبيق',
+      user,
+      token,
+      message: 'وصل طلبك إلى الإدارة — سجّلنا دخولك تلقائياً وستُشعَر بالموافقة على بريدك وضمن التطبيق',
     })
   } catch (e: any) {
     console.error('register-trainer error:', e?.message)

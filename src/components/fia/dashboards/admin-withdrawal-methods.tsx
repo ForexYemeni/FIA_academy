@@ -1,7 +1,8 @@
 'use client'
 
-// 💱👑 خزنة طرق سحب الأرباح الملكية — كتالوج الدول والعملات (للإدارة)
-// v2 فاخر: حزام ملكي + إحصاءات حية + بحث + فلترة حالة/دولة + تأكيد حذف ملكي
+// 💱 طرق سحب الأرباح — كتالوج الدول والعملات (للإدارة)
+// v3 فاخر: تعديل كامل لكل طريقة + قوائم منسدلة بحثية (LuxCombo)
+// + إحصاءات حية + بحث + فلترة حالة/دولة + تأكيد حذف آمن
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -9,13 +10,15 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { LuxSection, LuxStats, LuxSearch, LuxEmpty, luxInput } from './luxury'
+import { LuxDialog, LuxField, LuxSection, LuxStats, LuxSearch, LuxEmpty, luxInput, LuxCombo } from './luxury'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { cn } from '@/lib/utils'
 import {
   Plus, Trash2, Loader2, Globe2, RefreshCw, Coins, Power, Landmark,
-  Wallet, CheckCircle2, XCircle, Sparkles, Search,
+  Wallet, CheckCircle2, XCircle, Pencil, Search,
 } from 'lucide-react'
 
 interface WMethod {
@@ -30,13 +33,20 @@ interface WMethod {
 
 const COUNTRIES = [
   'اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق',
-  'مصر', 'الأردن', 'فلسطين', 'لبنان', 'السودان', 'ليبيا', 'تونس', 'الجزائر',
-  'المغرب', 'موريتانيا', 'الصومال', 'دولة أخرى', 'عالمي',
+  'مصر', 'الأردن', 'فلسطين', 'لبنان', 'سوريا', 'السودان', 'ليبيا', 'تونس',
+  'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'جزر القمر', 'دولة أخرى', 'عالمي',
 ]
 
-const CURRENCIES = ['ر.ي', '$', 'ر.س', 'د.إ', 'ر.ع', 'د.ق', 'د.ك', 'د.ب', 'د.ع', 'ج.م', 'د.أ', 'د.ل', 'د.ت', 'د.ج', 'د.م', 'أوقية', 'ش.ص', 'USDT']
+const CURRENCIES = [
+  'ر.ي', '$', 'ر.س', 'د.إ', 'ر.ع', 'د.ق', 'د.ك', 'د.ب', 'د.ع', 'ج.م', 'د.أ', '₪',
+  'د.ل', 'ل.ل', 'ل.س', 'ج.س', 'د.ت', 'د.ج', 'د.م', 'أوقية', 'فرنك قمري', 'ش.ص', '€', 'USDT',
+]
 
 type StatusFilter = 'all' | 'on' | 'off'
+
+/* نموذج الإضافة/التعديل المشترك */
+type MethodForm = { country: string; name: string; currency: string; instructions: string; enabled: boolean }
+const EMPTY_FORM: MethodForm = { country: 'اليمن', name: '', currency: 'ر.ي', instructions: '', enabled: true }
 
 export function AdminWithdrawalMethods() {
   const [methods, setMethods] = useState<WMethod[]>([])
@@ -46,7 +56,9 @@ export function AdminWithdrawalMethods() {
   const [statusF, setStatusF] = useState<StatusFilter>('all')
   const [countryF, setCountryF] = useState<string>('الكل')
   const [deleteFor, setDeleteFor] = useState<WMethod | null>(null)
-  const [form, setForm] = useState({ country: 'اليمن', name: '', currency: 'ر.ي', instructions: '' })
+  const [editFor, setEditFor] = useState<WMethod | null>(null)
+  const [addForm, setAddForm] = useState<MethodForm>(EMPTY_FORM)
+  const [editForm, setEditForm] = useState<MethodForm>(EMPTY_FORM)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,18 +73,53 @@ export function AdminWithdrawalMethods() {
 
   useEffect(() => { load() }, [load])
 
+  /* خيارات القوائم المنسدلة الفاخرة */
+  const countryOptions = useMemo(() => COUNTRIES.map((c) => ({
+    value: c, label: c, emoji: c === 'عالمي' ? '🌍' : c === 'اليمن' ? '🏛️' : '📍',
+    hint: c === 'اليمن' ? 'المقر الرئيسي' : c === 'عالمي' ? 'تظهر لكل الدول' : undefined,
+  })), [])
+  const currencyOptions = useMemo(() => CURRENCIES.map((c) => ({ value: c, label: c })), [])
+
+  const openEdit = (m: WMethod) => {
+    setEditForm({
+      country: m.country, name: m.name,
+      currency: m.currency || 'ر.ي',
+      instructions: m.instructions || '',
+      enabled: !!m.enabled,
+    })
+    setEditFor(m)
+  }
+
   const add = async () => {
-    if (!form.country || !form.name.trim()) { toast.error('الدولة واسم الطريقة مطلوبان'); return }
+    if (!addForm.country || !addForm.name.trim()) { toast.error('الدولة واسم الطريقة مطلوبان'); return }
     setBusy(true)
     try {
       const res = await fetch('/api/withdrawal-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(addForm),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'تعذر الإضافة'); return }
-      toast.success('👑 أُضيفت الطريقة إلى الكتالوج الملكي — يراها المدربون في بلدهم فوراً')
-      setForm({ ...form, name: '', instructions: '' })
+      toast.success('أُضيفت الطريقة إلى الكتالوج — يراها المدربون في بلدهم فوراً')
+      setAddForm({ ...addForm, name: '', instructions: '' })
+      load()
+    } catch { toast.error('تعذر الاتصال') }
+    setBusy(false)
+  }
+
+  const saveEdit = async () => {
+    if (!editFor) return
+    if (!editForm.country || !editForm.name.trim()) { toast.error('الدولة واسم الطريقة مطلوبان'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/withdrawal-methods', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editFor.id, ...editForm }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'تعذر حفظ التعديل'); return }
+      toast.success('حُفظت التعديلات — تظهر للمدربين فوراً')
+      setEditFor(null)
       load()
     } catch { toast.error('تعذر الاتصال') }
     setBusy(false)
@@ -85,7 +132,7 @@ export function AdminWithdrawalMethods() {
         body: JSON.stringify({ id: m.id, enabled: !m.enabled }),
       })
       if (!res.ok) { toast.error('تعذر التحديث'); return }
-      toast.success(!m.enabled ? '⚡ فُعّلت الطريقة — ظهرت للمدربين' : '🛑 عُطّلت الطريقة — اختفت عن المدربين')
+      toast.success(!m.enabled ? 'فُعّلت الطريقة — ظهرت للمدربين' : 'عُطّلت الطريقة — اختفت عن المدربين')
       load()
     } catch { toast.error('تعذر الاتصال') }
   }
@@ -100,7 +147,7 @@ export function AdminWithdrawalMethods() {
     setDeleteFor(null)
   }
 
-  /* 🔍 ترشيح ملكي: بحث + حالة + دولة */
+  /* 🔍 ترشيح: بحث + حالة + دولة */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return methods.filter((m) => {
@@ -123,8 +170,8 @@ export function AdminWithdrawalMethods() {
 
   return (
     <LuxSection
-      title="خزنة طرق السحب الملكية — الدول والعملات"
-      subtitle="أضف طرق السحب المتاحة لكل دولة (المقر الرئيسي: اليمن) — يراها المدربون بحسب بلدهم ويضيفون حساباتهم عليها"
+      title="طرق السحب — الدول والعملات"
+      subtitle="أضف وعدّل طرق السحب المتاحة لكل دولة (المقر الرئيسي: اليمن) — يراها المدربون بحسب بلدهم ويضيفون حساباتهم عليها"
       icon={Landmark}
       themeKey="gold"
       count={methods.length}
@@ -157,7 +204,7 @@ export function AdminWithdrawalMethods() {
               ))}
             </div>
           </div>
-          {/* فلتر الدولة الملكي */}
+          {/* فلتر الدولة */}
           <div className="flex flex-wrap items-center gap-1.5">
             <Globe2 className="h-4 w-4 text-gold" />
             {['الكل', ...Array.from(new Set([...methods.map((m) => m.country), 'اليمن']))].map((c) => (
@@ -176,42 +223,38 @@ export function AdminWithdrawalMethods() {
       {loading ? (
         <div className="flex flex-col items-center gap-3 py-14">
           <Loader2 className="h-10 w-10 animate-spin text-gold" />
-          <p className="text-xs font-bold text-muted-foreground">تُفتح خزنة القصر الملكية...</p>
+          <p className="text-xs font-bold text-muted-foreground">جارٍ تحميل طرق السحب...</p>
         </div>
       ) : (
         <>
-          {/* ═══ إضافة طريقة جديدة — لوحة ملكية ═══ */}
+          {/* ═══ إضافة طريقة جديدة ═══ */}
           <Card className="relative mb-6 overflow-hidden border-gold/30 bg-gradient-to-br from-gold/[0.08] via-white to-transparent p-5 shadow-[0_8px_30px_-10px_rgba(212,175,55,0.3)]">
             <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(circle at 90% 20%, #D4AF37 1.2px, transparent 1.2px)', backgroundSize: '16px 16px' }} />
             <p className="relative mb-4 flex items-center gap-2 text-sm font-extrabold text-navy">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-amber-500 text-white shadow"><Plus className="h-4 w-4" /></span>
-              إضافة طريقة سحب جديدة إلى الكتالوج الملكي
+              إضافة طريقة سحب جديدة
             </p>
             <div className="relative grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label className="mb-1 flex items-center gap-1 text-[11px] font-bold text-navy/70"><Globe2 className="h-3 w-3 text-gold" /> الدولة *</Label>
-                <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className={`${luxInput} w-full text-sm`}>
-                  {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <LuxCombo value={addForm.country} onChange={(v) => setAddForm({ ...addForm, country: v })} options={countryOptions} searchPlaceholder="ابحث عن الدولة..." />
               </div>
               <div>
                 <Label className="mb-1 flex items-center gap-1 text-[11px] font-bold text-navy/70"><Landmark className="h-3 w-3 text-gold" /> اسم الطريقة *</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="وسترن يونيون / محفظة / بنك..." className={luxInput} />
+                <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="وسترن يونيون / محفظة / بنك..." className={luxInput} />
               </div>
               <div>
                 <Label className="mb-1 flex items-center gap-1 text-[11px] font-bold text-navy/70"><Coins className="h-3 w-3 text-gold" /> العملة</Label>
-                <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className={`${luxInput} w-full text-sm`} dir="ltr">
-                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <LuxCombo value={addForm.currency} onChange={(v) => setAddForm({ ...addForm, currency: v })} options={currencyOptions} searchPlaceholder="ابحث عن العملة..." />
               </div>
               <div>
-                <Label className="mb-1 flex items-center gap-1 text-[11px] font-bold text-navy/70"><Sparkles className="h-3 w-3 text-gold" /> تعليمات للمدرب</Label>
-                <Input value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="ماذا يكتب في حسابه؟" className={luxInput} />
+                <Label className="mb-1 flex items-center gap-1 text-[11px] font-bold text-navy/70"><CheckCircle2 className="h-3 w-3 text-gold" /> تعليمات للمدرب</Label>
+                <Input value={addForm.instructions} onChange={(e) => setAddForm({ ...addForm, instructions: e.target.value })} placeholder="ماذا يكتب في حسابه؟" className={luxInput} />
               </div>
             </div>
             <Button onClick={add} disabled={busy} className="relative mt-4 overflow-hidden rounded-xl bg-gradient-to-l from-gold to-amber-500 px-7 text-sm font-extrabold text-navy shadow-[0_6px_20px_rgba(212,175,55,0.4)] active:scale-[0.98] disabled:opacity-60">
               <span className="absolute inset-0 lux-shimmer" />
-              {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />} إضافة إلى الكتالوج الملكي
+              {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />} إضافة إلى الكتالوج
             </Button>
           </Card>
 
@@ -219,7 +262,7 @@ export function AdminWithdrawalMethods() {
           {Object.keys(byCountry).length === 0 ? (
             <LuxEmpty
               icon={Landmark}
-              title={methods.length === 0 ? 'الخزنة تنتظر أول طريقة سحب' : 'لا نتائج مطابقة لبحثك'}
+              title={methods.length === 0 ? 'لا توجد طرق سحب بعد' : 'لا نتائج مطابقة لبحثك'}
               hint={methods.length === 0 ? 'أضف طرق السحب لكل دولة — يراها المدربون في لوحتهم ويضيفون حساباتهم عليها ليتدفق أرباحهم' : 'جرّب تعديل البحث أو الفلاتر لعرض المزيد'}
             />
           ) : (
@@ -251,6 +294,10 @@ export function AdminWithdrawalMethods() {
                           {m.instructions && <p className="mt-1 line-clamp-2 pl-8 text-[10px] leading-relaxed text-muted-foreground">{m.instructions}</p>}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                          <button onClick={() => openEdit(m)} title="تعديل الطريقة"
+                            className="rounded-lg bg-sky-50 p-2 text-sky-600 transition-all hover:bg-sky-100 active:scale-90">
+                            <Pencil className="h-4 w-4" />
+                          </button>
                           <button onClick={() => toggle(m)} title={m.enabled ? 'تعطيل — تخفي عن المدربين' : 'تفعيل — تظهر للمدربين'}
                             className={cn('rounded-lg p-2 transition-all active:scale-90',
                               m.enabled ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-50 text-gray-400 hover:bg-slate-100')}>
@@ -274,7 +321,53 @@ export function AdminWithdrawalMethods() {
         </>
       )}
 
-      {/* تأكيد الحذف الملكي */}
+      {/* ═══ حوار تعديل الطريقة ═══ */}
+      <LuxDialog
+        open={!!editFor} onOpenChange={(o) => !o && setEditFor(null)}
+        title={`تعديل طريقة السحب — ${editFor?.name || ''}`}
+        subtitle={`${editFor?.country || ''} • حدّث البيانات وحفظها لتصل للمدربين فوراً`}
+        icon={Pencil}
+        footer={
+          <div className="flex w-full gap-2">
+            <Button variant="outline" onClick={() => setEditFor(null)} className="flex-1 rounded-xl border-navy/20 font-bold text-navy hover:bg-navy/5">تراجع</Button>
+            <Button onClick={saveEdit} disabled={busy}
+              className="relative flex-[2] overflow-hidden rounded-xl bg-gradient-to-l from-gold to-amber-500 font-extrabold text-navy shadow-lg active:scale-[0.98] disabled:opacity-60">
+              <span className="absolute inset-0 lux-shimmer" />
+              {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />} حفظ التعديلات
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <LuxField label="الدولة" icon={Globe2} required>
+              <LuxCombo value={editForm.country} onChange={(v) => setEditForm({ ...editForm, country: v })} options={countryOptions} searchPlaceholder="ابحث عن الدولة..." />
+            </LuxField>
+            <LuxField label="اسم الطريقة" icon={Landmark} required>
+              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="وسترن يونيون / محفظة / بنك..." className={luxInput} />
+            </LuxField>
+            <LuxField label="العملة" icon={Coins}>
+              <LuxCombo value={editForm.currency} onChange={(v) => setEditForm({ ...editForm, currency: v })} options={currencyOptions} searchPlaceholder="ابحث عن العملة..." />
+            </LuxField>
+            <LuxField label="حالة الطريقة" icon={Power} hint="المعطّلة تختفي عن المدربين دون حذف">
+              <div className="flex h-11 items-center gap-3 rounded-xl border border-gold/30 bg-white px-4">
+                <Switch checked={editForm.enabled} onCheckedChange={(v) => setEditForm({ ...editForm, enabled: v })} />
+                <span className={cn('text-xs font-bold', editForm.enabled ? 'text-emerald-600' : 'text-slate-400')}>
+                  {editForm.enabled ? 'مفعّلة — ظاهرة للمدربين' : 'معطّلة — مخفية'}
+                </span>
+              </div>
+            </LuxField>
+          </div>
+          <LuxField label="تعليمات للمدرب" icon={CheckCircle2} hint="ماذا يكتب المدرب في حسابه عند إضافته هذه الطريقة؟">
+            <Textarea value={editForm.instructions} onChange={(e) => setEditForm({ ...editForm, instructions: e.target.value })} rows={3} placeholder="مثال: رقم المحفظة يجب أن يكون باسم صاحب الحساب نفسه" className={luxInput} />
+          </LuxField>
+          <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-[11px] leading-relaxed text-sky-800">
+            <CheckCircle2 className="ml-1 inline h-3.5 w-3.5" /> التعديل يشمل كل شيء: الدولة، الاسم، العملة، التعليمات والحالة — حسابات المدربين المرتبطة بالطريقة تبقى سليمة.
+          </p>
+        </div>
+      </LuxDialog>
+
+      {/* تأكيد الحذف */}
       <ConfirmDialog
         open={!!deleteFor}
         onOpenChange={(o) => !o && setDeleteFor(null)}
