@@ -24,6 +24,9 @@ export interface NavItem {
   id: string
   label: string
   icon: any
+  /** ⚡ v6.7 — عنوان المجموعة الملكية: الأقسام المتجاورة التي تشترك بنفس العنوان
+      تُعرض تحت ترويسة ذهبية مزخرفة واحدة (ترتيب فاخر موحّد لكل الحسابات). */
+  group?: string
 }
 
 interface DashboardShellProps {
@@ -146,32 +149,50 @@ export function DashboardShell({
   const effectiveLabel = derived?.label ?? roleLabel
   const effectiveColor = derived?.color ?? roleColor
 
+  // ⚡ v6.7 — تجميع ملكي مرتّب: الأقسام المتجاورة ذات المجموعة نفسها تُعرض تحت
+  // ترويسة ذهبية مزخرفة واحدة. الترتيب يتبع ترتيب التعريف في كل دور حرفياً،
+  // والأقسام بلا مجموعة تُعرض كما هي (توافق خلفي آمن).
+  const groupedNav = useMemo(() => {
+    const groups: { name: string; items: NavItem[] }[] = []
+    for (const item of nav) {
+      const name = item.group || ''
+      const last = groups[groups.length - 1]
+      if (last && last.name === name) last.items.push(item)
+      else groups.push({ name, items: [item] })
+    }
+    return groups
+  }, [nav])
+
   const Sidebar = (
-    <div className="h-full flex flex-col bg-gradient-to-b from-[#0A1F44] to-[#061229]">
+    <div className="h-full flex flex-col bg-gradient-to-b from-[#0A1F44] to-[#061229] relative">
+      {/* ⚡ v6.7 — هالة ملكية عُلوية خافتة + نقش نقاط راقٍ */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.12),transparent_70%)]" />
+
       {/* Logo header with subtle gradient border */}
-      <div className="p-4 border-b border-gold/20 relative overflow-hidden">
+      <div className="p-4 border-b border-gold/25 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #C9A961 1px, transparent 1px)', backgroundSize: '15px 15px' }} />
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-3">
           <div className="relative">
-            <img src="/fia/logo-fia.png" alt="FIA" className="h-10 w-10 object-cover rounded-xl shadow-md" />
-            <div className="absolute inset-0 rounded-xl ring-1 ring-gold/30" />
+            <img src="/fia/logo-fia.png" alt="FIA" className="h-12 w-12 object-cover rounded-2xl shadow-lg shadow-black/30" />
+            <div className="absolute inset-0 rounded-2xl ring-1 ring-gold/40" />
+            <div className="absolute -inset-0.5 rounded-[20px] bg-gold/20 blur-md -z-10" />
           </div>
           <div>
-            <div className="text-white font-bold text-sm tracking-tight">أكاديمية المستقبل الدولية</div>
-            <div className="text-gold text-xs flex items-center gap-1">
-              <Sparkles className="w-2.5 h-2.5" /> FIA Dashboard
+            <div className="text-white font-bold text-[15px] tracking-tight leading-snug">أكاديمية المستقبل الدولية</div>
+            <div className="text-gold text-xs flex items-center gap-1 mt-0.5">
+              <Sparkles className="w-3 h-3" /> FIA Dashboard
             </div>
           </div>
         </div>
       </div>
 
       {/* User profile section */}
-      <div className="p-4 border-b border-gold/20">
+      <div className="p-4 border-b border-gold/25 relative">
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0">
-            <div className={`relative w-12 h-12 rounded-2xl overflow-hidden border-2 shadow-md bg-navy-light ${
+            <div className={`relative w-14 h-14 rounded-2xl overflow-hidden border-2 shadow-lg bg-navy-light ${
               derived?.label === 'المؤسس'
-                ? 'border-gold shadow-gold/30'
+                ? 'border-gold shadow-gold/40'
                 : derived
                   ? 'border-gold/60'
                   : 'border-gold/40'
@@ -179,89 +200,113 @@ export function DashboardShell({
               {user?.avatar ? (
                 <img src={user.avatar} alt={user.name || 'avatar'} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gold font-bold text-lg">
+                <div className="w-full h-full flex items-center justify-center text-gold font-bold text-xl">
                   {user?.name?.charAt(0) || 'U'}
                 </div>
               )}
               {/* Online indicator */}
-              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-navy-light"></span>
+              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[#0A1F44] shadow-[0_0_8px_rgba(34,197,94,0.7)]"></span>
             </div>
             {derived && (
-              <span className="absolute -top-1 -left-1 z-10 w-5 h-5 rounded-full bg-gold flex items-center justify-center shadow-md ring-2 ring-navy">
+              <span className="absolute -top-1 -left-1 z-10 w-5 h-5 rounded-full bg-gradient-to-br from-gold-light to-amber-600 flex items-center justify-center shadow-md ring-2 ring-[#0A1F44]">
                 <Crown className="w-3 h-3 text-navy" />
               </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-white text-sm font-semibold truncate flex items-center gap-1.5">
+            <div className="text-white text-[15px] font-bold truncate flex items-center gap-1.5">
               {user?.name}
-              {derived?.label === 'المؤسس' && <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" />}
+              {derived?.label === 'المؤسس' && <Crown className="w-4 h-4 text-gold flex-shrink-0" />}
             </div>
-            <div className="text-white/60 text-xs truncate" dir="ltr">{user?.email}</div>
+            <div className="text-white/55 text-xs truncate mt-0.5" dir="ltr">{user?.email}</div>
           </div>
         </div>
-        <Badge className={`mt-3 ${effectiveColor} flex items-center gap-1 w-fit`}>
-          {derived?.label === 'المؤسس' && <Crown className="w-3 h-3" />}
-          {derived?.label === 'قائد' && <Star className="w-3 h-3" />}
+        <Badge className={`mt-3.5 ${effectiveColor} flex items-center gap-1.5 w-fit text-xs px-3 py-1.5 rounded-xl`}>
+          {derived?.label === 'المؤسس' && <Crown className="w-3.5 h-3.5" />}
+          {derived?.label === 'قائد' && <Star className="w-3.5 h-3.5" />}
           {effectiveLabel}
         </Badge>
       </div>
 
-      {/* Navigation — professional buttons with hover effects */}
-      <nav className="flex-1 p-2 overflow-y-auto fia-scroll">
-        {nav.map((item) => {
-          const Icon = item.icon
-          const isActive = active === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                onNavigate(item.id)
-                setMobileOpen(false)
-              }}
-              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 relative ${
-                isActive
-                  ? 'bg-gradient-to-l from-gold/20 to-gold/5 text-gold sidebar-active shadow-sm'
-                  : 'text-white/70 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              {/* Active indicator bar */}
-              {isActive && (
-                <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gold rounded-l-full" />
-              )}
-              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
-              <span className="flex-1 text-right">{item.label}</span>
-              {/* ⚡ v6.6 — العداد الملكي: شارة ذهبية متوهجة تظهر عند وصول إشعار جديد
-                  لهذا القسم، وتنبض ثلاث نبضات راقية ثم تستقر — فاخرة جداً */}
-              {(() => {
-                const c = notifCounts[item.id] || 0
-                if (c <= 0) return null
-                return (
+      {/* ⚡ v6.7 — Navigation ملكية: مجموعات مرتّبة بترويسات ذهبية مزخرفة
+          وأزرار مكبّرة (شريحة أيقونة 40px + نص 15px) بتوهج ذهبي للقسم النشط */}
+      <nav className="flex-1 px-3 pb-2 overflow-y-auto fia-scroll relative">
+        {groupedNav.map((group, gi) => (
+          <div key={group.name || `ungrouped-${gi}`}>
+            {group.name && (
+              <div className="flex items-center gap-2 px-1 pt-4 pb-2 first:pt-3">
+                <span className="w-1.5 h-1.5 rotate-45 bg-gold/60 rounded-[1px] shadow-[0_0_6px_rgba(212,175,55,0.5)] flex-shrink-0" />
+                <span className="text-[10.5px] font-extrabold tracking-[0.15em] text-gold/70 whitespace-nowrap">{group.name}</span>
+                <span className="h-px flex-1 bg-gradient-to-l from-gold/25 via-gold/10 to-transparent" />
+              </div>
+            )}
+            {group.items.map((item) => {
+              const Icon = item.icon
+              const isActive = active === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onNavigate(item.id)
+                    setMobileOpen(false)
+                  }}
+                  className={`group w-full flex items-center gap-3 ps-2 pe-2.5 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-300 mb-1 relative ${
+                    isActive
+                      ? 'bg-gradient-to-l from-gold/25 via-gold/10 to-transparent text-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.25)]'
+                      : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  {/* شريط القسم النشط — إبرة ذهبية متوهجة */}
+                  {isActive && (
+                    <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-9 bg-gradient-to-b from-gold-light via-gold to-amber-600 rounded-l-full shadow-[0_0_14px_rgba(212,175,55,0.65)]" />
+                  )}
+                  {/* شريحة الأيقونة الملكية */}
                   <span
-                    key={`${item.id}:${c}`}
-                    className="fia-nav-count relative ms-auto inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-gradient-to-br from-amber-200 via-gold to-amber-600 text-navy text-[11px] font-black leading-none tabular-nums ring-1 ring-white/50 shadow-[0_0_14px_rgba(212,175,55,0.55),0_2px_6px_rgba(11,22,53,0.35)]"
+                    className={`flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 transition-all duration-300 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-gold-light via-gold to-amber-600 text-navy shadow-[0_4px_16px_rgba(212,175,55,0.5)]'
+                        : 'bg-white/[0.06] text-white/70 ring-1 ring-white/10 group-hover:bg-gold/15 group-hover:text-gold group-hover:ring-gold/35 group-hover:shadow-[0_0_12px_rgba(212,175,55,0.25)]'
+                    }`}
                   >
-                    <span className="fia-count-halo absolute inset-0 rounded-full bg-gold/50" />
-                    <span className="relative drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">{c > 99 ? '99+' : c}</span>
+                    <Icon className="w-5 h-5" strokeWidth={isActive ? 2.4 : 2} />
                   </span>
-                )
-              })()}
-            </button>
-          )
-        })}
+                  <span className="flex-1 text-right leading-tight">{item.label}</span>
+                  {/* ⚡ v6.6 — العداد الملكي: شارة ذهبية متوهجة تظهر عند وصول إشعار جديد
+                      لهذا القسم، وتنبض ثلاث نبضات راقية ثم تستقر — فاخرة جداً */}
+                  {(() => {
+                    const c = notifCounts[item.id] || 0
+                    if (c <= 0) return null
+                    return (
+                      <span
+                        key={`${item.id}:${c}`}
+                        className="fia-nav-count relative ms-auto inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-gradient-to-br from-amber-200 via-gold to-amber-600 text-navy text-xs font-black leading-none tabular-nums ring-1 ring-white/50 shadow-[0_0_14px_rgba(212,175,55,0.55),0_2px_6px_rgba(11,22,53,0.35)]"
+                      >
+                        <span className="fia-count-halo absolute inset-0 rounded-full bg-gold/50" />
+                        <span className="relative drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">{c > 99 ? '99+' : c}</span>
+                      </span>
+                    )
+                  })()}
+                </button>
+              )
+            })}
+            {gi < groupedNav.length - 1 && group.name && groupedNav[gi + 1]?.name && (
+              <div className="mx-3 my-1 h-px bg-white/[0.04]" />
+            )}
+          </div>
+        ))}
       </nav>
 
       {/* Logout button */}
-      <div className="p-3 border-t border-gold/20">
+      <div className="p-3 border-t border-gold/25 relative">
         <Button
           onClick={() => {
             logout()
             toast.success('تم تسجيل الخروج')
           }}
           variant="ghost"
-          className="w-full text-white/70 hover:text-red-400 hover:bg-red-500/10 justify-start rounded-xl"
+          className="w-full text-white/70 hover:text-red-400 hover:bg-red-500/10 justify-start rounded-2xl text-[15px] font-semibold py-3"
         >
-          <LogOut className="w-4 h-4 ml-2" />
+          <LogOut className="w-5 h-5 ml-2" />
           تسجيل الخروج
         </Button>
       </div>
@@ -270,8 +315,8 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-64 bg-navy flex-shrink-0 sticky top-0 h-screen">
+      {/* Desktop Sidebar — ⚡ v6.7 مُكبّرة: 280px لاحتضان الشرائح الذهبية والعدادات */}
+      <aside className="hidden lg:block w-[280px] bg-navy flex-shrink-0 sticky top-0 h-screen">
         {Sidebar}
       </aside>
 
@@ -286,7 +331,7 @@ export function DashboardShell({
             <Menu className="w-5 h-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="bg-navy p-0 w-72">
+        <SheetContent side="right" className="bg-navy p-0 w-[300px] max-w-[88vw]">
           <SheetTitle className="sr-only">القائمة</SheetTitle>
           {Sidebar}
         </SheetContent>

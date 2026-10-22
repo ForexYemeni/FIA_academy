@@ -39,23 +39,29 @@ import { useSpecializationCatalog } from '@/lib/use-specializations'
 import { Landmark } from 'lucide-react'
 import { supabasePublic } from '@/lib/supabase'
 
+// ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 5 ترويسات ذهبية
 const NAV: NavItem[] = [
-  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
-  { id: 'courses', label: 'دوراتي التدريبية', icon: BookOpen },
-  { id: 'students', label: 'متدربوّ', icon: Users },
-  { id: 'followers', label: 'متحف المتابعين', icon: HeartHandshake },
-  { id: 'exams', label: 'الاختبارات', icon: FileText },
-  { id: 'question-bank', label: 'بنك الأسئلة', icon: HelpCircle },
-  { id: 'results', label: 'نتائج المتدربين', icon: TrendingUp },
-  { id: 'earnings', label: 'أرباحي', icon: Wallet },
-  { id: 'withdrawal-accounts', label: 'حسابات السحب', icon: Landmark },
-  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
-  { id: 'blog', label: 'المدونة', icon: Newspaper },
-  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
-  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift },
-  { id: 'profile', label: 'ملفي الشخصي', icon: User },
-  { id: 'notifications', label: 'الإشعارات', icon: Bell },
-  { id: 'settings', label: 'الإعدادات', icon: Settings },
+  // الرئيسية
+  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, group: 'الرئيسية' },
+  // التدريب
+  { id: 'courses', label: 'دوراتي التدريبية', icon: BookOpen, group: 'التدريب' },
+  { id: 'students', label: 'متدربوّ', icon: Users, group: 'التدريب' },
+  { id: 'followers', label: 'متحف المتابعين', icon: HeartHandshake, group: 'التدريب' },
+  { id: 'exams', label: 'الاختبارات', icon: FileText, group: 'التدريب' },
+  { id: 'question-bank', label: 'بنك الأسئلة', icon: HelpCircle, group: 'التدريب' },
+  { id: 'results', label: 'نتائج المتدربين', icon: TrendingUp, group: 'التدريب' },
+  // المالية
+  { id: 'earnings', label: 'أرباحي', icon: Wallet, group: 'المالية' },
+  { id: 'withdrawal-accounts', label: 'حسابات السحب', icon: Landmark, group: 'المالية' },
+  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift, group: 'المالية' },
+  // المجتمع
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare, group: 'المجتمع' },
+  { id: 'blog', label: 'المدونة', icon: Newspaper, group: 'المجتمع' },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle, group: 'المجتمع' },
+  // حسابي
+  { id: 'profile', label: 'ملفي الشخصي', icon: User, group: 'حسابي' },
+  { id: 'notifications', label: 'الإشعارات', icon: Bell, group: 'حسابي' },
+  { id: 'settings', label: 'الإعدادات', icon: Settings, group: 'حسابي' },
 ]
 
 export function TrainerDashboard() {

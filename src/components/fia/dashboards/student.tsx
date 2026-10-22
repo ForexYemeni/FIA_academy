@@ -39,22 +39,29 @@ import { CertificateViewer } from '@/components/fia/certificate-viewer'
 import { ExamRetakeDialog } from '@/components/fia/exam-retake-dialog'
 import { downloadCertificateFile } from '@/lib/certificate-download'
 
+// ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 6 ترويسات ذهبية
 const NAV: NavItem[] = [
-  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
-  { id: 'courses', label: 'دوراتي', icon: BookOpen },
-  { id: 'browse', label: 'استكشاف الدورات', icon: Compass },
-  { id: 'trainers', label: 'المدربون', icon: GraduationCap },
-  { id: 'exams', label: 'اختباراتي', icon: FileText },
-  { id: 'results', label: 'نتائجي', icon: TrendingUp },
-  { id: 'certificates', label: 'شهاداتي', icon: Award },
-  { id: 'payments', label: 'مدفوعاتي', icon: CreditCard },
-  { id: 'forum', label: 'المنتدى', icon: MessageSquare },
-  { id: 'blog', label: 'المدونة', icon: Newspaper },
-  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
-  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift },
-  { id: 'profile', label: 'ملفي الشخصي', icon: User },
-  { id: 'notifications', label: 'الإشعارات', icon: Bell },
-  { id: 'settings', label: 'الإعدادات', icon: Settings },
+  // الرئيسية
+  { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, group: 'الرئيسية' },
+  // التعلّم
+  { id: 'courses', label: 'دوراتي', icon: BookOpen, group: 'التعلّم' },
+  { id: 'browse', label: 'استكشاف الدورات', icon: Compass, group: 'التعلّم' },
+  { id: 'trainers', label: 'المدربون', icon: GraduationCap, group: 'التعلّم' },
+  // التقدّم
+  { id: 'exams', label: 'اختباراتي', icon: FileText, group: 'التقدّم' },
+  { id: 'results', label: 'نتائجي', icon: TrendingUp, group: 'التقدّم' },
+  { id: 'certificates', label: 'شهاداتي', icon: Award, group: 'التقدّم' },
+  // المالية
+  { id: 'payments', label: 'مدفوعاتي', icon: CreditCard, group: 'المالية' },
+  { id: 'affiliate', label: 'برنامج العمولة', icon: Gift, group: 'المالية' },
+  // المجتمع
+  { id: 'forum', label: 'المنتدى', icon: MessageSquare, group: 'المجتمع' },
+  { id: 'blog', label: 'المدونة', icon: Newspaper, group: 'المجتمع' },
+  { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle, group: 'المجتمع' },
+  // حسابي
+  { id: 'profile', label: 'ملفي الشخصي', icon: User, group: 'حسابي' },
+  { id: 'notifications', label: 'الإشعارات', icon: Bell, group: 'حسابي' },
+  { id: 'settings', label: 'الإعدادات', icon: Settings, group: 'حسابي' },
 ]
 
 // Bio may embed structured JSON after a marker (e.g. "===FIA_EXTRA===").
