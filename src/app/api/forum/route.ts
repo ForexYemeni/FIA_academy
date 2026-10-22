@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyForumReplyPosted } from '@/lib/notifications'
+import { assertTrainerCertified } from '@/lib/trainer-gate'
 
 // GET /api/forum?topic_id=... — list posts in a topic (with author profiles)
 export async function GET(req: NextRequest) {
@@ -108,6 +109,12 @@ export async function POST(req: NextRequest) {
     const user_id = g.user.id
     if (!topic_id || !body) {
       return NextResponse.json({ error: 'الموضوع والنص مطلوبان' }, { status: 400 })
+    }
+
+    // 🛡️ بوابة الاعتماد: المدرب غير المعتمد (قبل توقيع الاتفاق) لا يشارك في المنتدى
+    const trainerGate = await assertTrainerCertified(user_id, 'forum')
+    if (!trainerGate.ok) {
+      return NextResponse.json({ error: trainerGate.message }, { status: 403 })
     }
 
     // Check ban status

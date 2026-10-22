@@ -45,7 +45,7 @@ export default function RegisterPage() {
       if (!res.ok) { toast.error(data.error || 'فشل إنشاء الحساب'); return }
       setAuth(data.user, data.token)
       try { localStorage.removeItem('fia_ref_code'); localStorage.removeItem('fia_ref_id') } catch {}
-      toast.success(`👑 أهلاً بك في القصر يا ${data.user.name}`)
+      toast.success(`👑 أهلاً بك في الأكاديمية يا ${data.user.name}`)
       // الموقع تطبيق صفحة واحدة — لوحات التحكم تُعرض في الرئيسية (كان /dashboard مساراً غير موجود → 404)
       window.location.href = '/'
     } catch { toast.error('حدث خطأ غير متوقع') }

@@ -258,7 +258,7 @@ export async function notifyPasswordResetRequested(
     `طلب "${name}" استعادة كلمة مروره. البريد: ${email}${phone ? ` — الهاتف: ${phone}` : ''}. مُعرّف الحساب: ${requesterId}. أصدر كلمة مرور جديدة من إدارة المستخدمين وتواصل معه.`,
     '/#users')
   await send(requesterId, 'password_reset', 'استلمنا طلب استعادة كلمة المرور ✅',
-    `وصل طلبك إلى قصر الأكاديمية يا ${name}. ستصدر كلمة مرور جديدة إليك من الإدارة في أقرب وقت — إن كان الأمر عاجلاً تواصل معنا عبر «تواصل معنا».`, '/')
+    `وصل طلبك إلى الأكاديمية يا ${name}. ستصدر كلمة مرور جديدة إليك من الإدارة في أقرب وقت — إن كان الأمر عاجلاً تواصل معنا عبر «تواصل معنا».`, '/')
 }
 
 // === REVIEW EVENTS ===
@@ -463,16 +463,16 @@ export async function notifyAdmins(type: string, title: string, body?: string, l
 // ROYAL TRAINER PIPELINE — إشعارات منظومة المدربين الملكية
 // =========================================================================
 
-/** للإدارة: وصل طلب انضمام مدرب جديد (تسجيل ذاتي) — يفتح قصر الموافقات مباشرة. */
+/** للإدارة: وصل طلب انضمام مدرب جديد (تسجيل ذاتي) — يفتح طلبات المدربين مباشرة. */
 export async function notifyTrainerApplicationReceived(name: string, specialty?: string | null) {
   await notifyAdmins('trainer_application', '🎓 طلب انضمام مدرب جديد',
-    `${name}${specialty ? ' — ' + specialty : ''} بانتظار موافقتكم الملكية`, '/#trainer-applications')
+    `${name}${specialty ? ' — ' + specialty : ''} بانتظار موافقتكم`, '/#trainer-applications')
 }
 
 /** للمدرب: وافقت الإدارة مبدئياً + عرض نسبة الربح (يتطلب قبوله). */
 export async function notifyTrainerApplicationApproved(trainerUserId: string, percentage: number, terms?: string | null) {
-  await send(trainerUserId, 'trainer_agreement', '👑 وافقت الإدارة على طلبك الملكي!',
-    `تهانينا! وافقت الإدارة مبدئياً على انضمامك، وتُعرض عليك نسبة أرباح ${percentage}% من دوراتك${terms ? ' — ' + terms : ''}. افتح لوحتك لقراءة الاتفاق الفاخر وقبوله.`, '/#overview')
+  await send(trainerUserId, 'trainer_agreement', '👑 وافقت الإدارة على طلبك!',
+    `تهانينا! وافقت الإدارة مبدئياً على انضمامك، وتُعرض عليك نسبة أرباح ${percentage}% من دوراتك${terms ? ' — ' + terms : ''}. افتح لوحتك لقراءة الاتفاق وقبوله.`, '/#overview')
 }
 
 /** للمدرب: رفض الطلب مع السبب. */
@@ -483,7 +483,7 @@ export async function notifyTrainerApplicationRejected(trainerUserId: string, re
 
 /** للمدرب: الاعتماد النهائي — أصبح معتمداً ويظهر في مدربينا. */
 export async function notifyTrainerCertified(trainerUserId: string, name: string) {
-  await send(trainerUserId, 'trainer_certified', '🏅 أنت الآن مدرب معتمد ملكياً!',
+  await send(trainerUserId, 'trainer_certified', '🏅 أنت الآن مدرب معتمد!',
     `أهلاً بك رسمياً ${name} — وُقّع الاتفاق، وأصبح اسمك يظهر في نخبة مدربي الأكاديمية، وحقوقك ولوحتك مفعّلة بالكامل.`, '/#overview')
 }
 

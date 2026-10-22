@@ -7,6 +7,7 @@ import {
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
   GraduationCap, Crown, Calendar, Clock, TrendingUp,
   Phone, Briefcase, Sparkles, Award, KeyRound, Save, HeartHandshake, Wallet, Search, UserCheck,
+  ShieldCheck, ScrollText,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -240,9 +241,9 @@ export function TrainerDashboard() {
       onRefresh={refreshTrainerProfile}
     />
   )
-  // أقفال مهيبة على التبويبات المقفلة في القائمة الجانبية
+  // أقفال مهيبة على التبويبات المقفلة في القائمة الجانبية — المنتدى مغلق تماماً قبل الاتفاق
   const navForDisplay = gated
-    ? NAV.map((n) => POWER_TABS.includes(n.id) ? { ...n, label: `🔒 ${n.label}` } : n)
+    ? NAV.map((n) => (POWER_TABS.includes(n.id) || n.id === 'forum') ? { ...n, label: `🔒 ${n.label}` } : n)
     : NAV
 
   return (
@@ -274,8 +275,8 @@ export function TrainerDashboard() {
       {active === 'question-bank' && (gated ? gateElement : <TrainerQuestionBank courses={courses} />)}
       {active === 'results' && (gated ? gateElement : <TrainerResultsCenter user={user} courses={courses} />)}
       {active === 'earnings' && (gated ? gateElement : <TrainerEarnings user={user} />)}
-      {active === 'forum' && <SharedForumRoyal user={user} />}
-      {active === 'blog' && <SharedBlog />}
+      {active === 'forum' && (gated ? <ForumLockPanel /> : <SharedForumRoyal user={user} />)}
+      {active === 'blog' && <SharedBlog readOnly={gated} />}
       {active === 'faqs' && <SharedFAQ />}
       {active === 'affiliate' && (
         <SectionCard title="برنامج العمولة" description="شارك أصدقاءك واكسب عمولة">
@@ -1005,7 +1006,7 @@ function TrainerStudents({ students, courses }: any) {
         toast.error(data.error || 'فشل البث')
         return
       }
-      toast.success(`📣 وصل نداؤك الملكي إلى ${data.delivered} طالباً`)
+      toast.success(`📣 وصل نداؤك إلى ${data.delivered} طالباً`)
       setBroadcastOpen(false)
       setBcTitle('')
       setBcMessage('')
@@ -1310,7 +1311,7 @@ function TrainerStudents({ students, courses }: any) {
               <Textarea
                 value={bcMessage}
                 onChange={(e) => setBcMessage(e.target.value)}
-                placeholder="اكتب نداءك الملكي لطلابك…"
+                placeholder="اكتب نداءك لطلابك…"
                 rows={4}
                 className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                 maxLength={800}
@@ -1323,9 +1324,9 @@ function TrainerStudents({ students, courses }: any) {
               className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
             >
               {bcLoading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
-              {bcLoading ? 'جاري بث النداء...' : 'أرسل النداء الملكي'}
+              {bcLoading ? 'جاري بث النداء...' : 'أرسل النداء'}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center">يصل الإشعار لطلاب التسجيلات المؤكدة والمجانية فقط — بحد 8 رسائل في الساعة حفاظاً على هدوء القصر</p>
+            <p className="text-[10px] text-muted-foreground text-center">يصل الإشعار لطلاب التسجيلات المؤكدة والمجانية فقط — بحد 8 رسائل في الساعة حفاظاً على استقرار المنظومة</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -2094,6 +2095,45 @@ function TrainerSettings() {
           <Button variant="outline" className="rounded-xl border-gold/30 text-navy hover:bg-gold/10">
             <KeyRound className="w-4 h-4 ml-1" /> تغيير كلمة المرور
           </Button>
+        </div>
+      </div>
+    </SectionCard>
+  )
+}
+
+// ═══════════════ قسم المنتدى مغلق قبل الاعتماد ═══════════════
+// المدرب غير المعتمد (بانتظار الموافقة/التوقيع/مرفوض) لا يدخل المنتدى
+// — والخادم يمنع فعلياً أي موضوع أو رد أو تفاعل (بوابة trainer-gate)
+function ForumLockPanel() {
+  return (
+    <SectionCard title="المنتدى" description="قسم تفاعلي لأعضاء الأكاديمية">
+      <div className="relative overflow-hidden rounded-3xl border border-gold/30 bg-gradient-to-br from-[#0A1F44] via-[#12294f] to-[#0A1F44] p-8 text-center shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
+        <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 15% 30%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 85% 70%, white 1px, transparent 1px)', backgroundSize: '26px 26px, 20px 20px' }} />
+        <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-gold/15 blur-3xl" />
+        <div className="relative">
+          <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full border-2 border-gold/50 bg-gradient-to-br from-gold/20 to-transparent shadow-[0_0_50px_rgba(212,175,55,0.3)]">
+            <Lock className="h-11 w-11 text-[#E5C77E]" />
+          </div>
+          <h2 className="mb-2 text-2xl font-extrabold text-white">
+            قسم المنتدى <span className="bg-gradient-to-l from-gold to-[#E5C77E] bg-clip-text text-transparent">مغلق حالياً</span>
+          </h2>
+          <p className="mx-auto mb-7 max-w-md text-sm leading-relaxed text-white/65">
+            يُفتح المنتدى للمشاركة والتفاعل بعد اعتماد ملفك وتوقيع اتفاق نسبة الأرباح —
+            تابع حالة طلبك في «نظرة عامة»، وفور التوقيع يُفتح القسم تلقائياً.
+          </p>
+          <div className="mx-auto grid max-w-xl gap-3 sm:grid-cols-3">
+            {[
+              { icon: ShieldCheck, t: 'موافقة الإدارة', d: 'فحص ملفك ومؤهلاتك' },
+              { icon: ScrollText, t: 'توقيع الاتفاق', d: 'نسبة أرباحك من الدورات' },
+              { icon: MessageSquare, t: 'منتدى مفتوح', d: 'مشاركة وتفاعل كاملان' },
+            ].map((c) => (
+              <div key={c.t} className="rounded-2xl border border-gold/25 bg-white/[0.05] p-4">
+                <c.icon className="mx-auto mb-2 h-6 w-6 text-[#E5C77E]" />
+                <p className="text-xs font-bold text-white">{c.t}</p>
+                <p className="mt-1 text-[10px] leading-relaxed text-white/55">{c.d}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </SectionCard>

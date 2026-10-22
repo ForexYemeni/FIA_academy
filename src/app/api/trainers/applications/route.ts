@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 /**
  * 👑 GET /api/trainers/applications — طلبات المدربين للإدارة
  * يعيد: pending (بانتظار الموافقة) + agreement_pending (بانتظار توقيع المدرب)
- * + rejected حديثة + إحصاءات.
+ * + certified (المتفق معهم — اتفاق موقّع ومغلق) + rejected حديثة + إحصاءات.
  */
 export async function GET(req: NextRequest) {
   const g = await guardAdmin(req); if (!g.ok) return g.res
@@ -17,17 +17,23 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('trainers')
       .select('id, name, email, phone, title, specialization, bio, avatar, country, years_experience, courses_count, qualifications, achievements, experiences, status, agreement, rejected_reason, created_via, created_at, reviewed_at, certified_at, profit_percentage')
-      .in('status', ['pending', 'agreement_pending', 'rejected'])
+      .in('status', ['pending', 'agreement_pending', 'approved', 'rejected'])
       .order('created_at', { ascending: false })
     if (error) throw error
     const rows = data || []
+    // المتفق معهم: الأحدث اعتماداً أولاً — وبحد 60 لعرض مريح
+    const certified = rows.filter((r: any) => r.status === 'approved')
+      .sort((a: any, b: any) => new Date(b.certified_at || b.updated_at || 0).getTime() - new Date(a.certified_at || a.updated_at || 0).getTime())
+      .slice(0, 60)
     return NextResponse.json({
       applications: rows.filter((r: any) => r.status === 'pending'),
       awaiting_signature: rows.filter((r: any) => r.status === 'agreement_pending'),
+      certified,
       rejected: rows.filter((r: any) => r.status === 'rejected').slice(0, 30),
       stats: {
         pending: rows.filter((r: any) => r.status === 'pending').length,
         awaiting_signature: rows.filter((r: any) => r.status === 'agreement_pending').length,
+        certified: rows.filter((r: any) => r.status === 'approved').length,
       },
     })
   } catch (e: any) {
@@ -54,9 +60,17 @@ export async function POST(req: NextRequest) {
 
   const { data: trainer } = await supabaseAdmin
     .from('trainers')
-    .select('id, name, email, status, agreement, profit_percentage')
+    .select('id, name, email, status, agreement, profit_percentage, certified_at')
     .eq('id', id).maybeSingle()
   if (!trainer) return NextResponse.json({ error: 'المدرب غير موجود' }, { status: 404 })
+
+  // 🔒 القفل النهائي: الاتفاق الذي وافق عليه الطرفان يُغلق تماماً —
+  // لا عرض جديد ولا تعديل نسبة ولا رفض بعد الاعتماد والتوقيع.
+  if ((trainer as any).status === 'approved') {
+    return NextResponse.json({
+      error: `الاتفاق مع ${trainer.name} موقّع من الطرفين ومغلق تماماً (${(trainer as any).profit_percentage ?? 0}%) — لا يمكن تعديل النسبة أو الشروط أو رفض الطلب بعد الاعتماد`,
+    }, { status: 409 })
+  }
 
   const now = new Date().toISOString()
 
@@ -97,7 +111,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: action === 'approve'
-          ? `وُقّعت الموافقة المبدئية — وصل الاتفاق الفاخر إلى ${trainer.name} بنسبة ${percentage}%`
+          ? `وُقّعت الموافقة المبدئية — وصل اتفاق النسبة إلى ${trainer.name} بنسبة ${percentage}%`
           : `حُدّث العرض إلى ${percentage}% — أُرسل إشعار جديد إلى ${trainer.name}`,
       })
     }

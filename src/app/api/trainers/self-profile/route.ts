@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * كان الحفظ القديم ينادي PUT /api/trainers المحمي للإدارة فكان يفشل 403 —
  * هذا المسار يمنح المدرب ملفه هو فقط دون تمس أي حقل حساس.
  */
-const ALLOWED = ['phone', 'title', 'specialization', 'bio'] as const
+const ALLOWED = ['phone', 'title', 'specialization', 'bio', 'avatar'] as const
 
 export async function PUT(req: NextRequest) {
   const g = await guardAuth(req)
@@ -39,7 +39,7 @@ export async function PUT(req: NextRequest) {
       .from('trainers')
       .update(patch)
       .eq('id', user.id)
-      .select('id, name, phone, title, specialization, bio')
+      .select('id, name, phone, title, specialization, bio, avatar')
       .single()
     if (error) throw error
 

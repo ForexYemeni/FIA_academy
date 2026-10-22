@@ -1,6 +1,8 @@
 'use client'
 
-// 👑👑👑 التسجيل الملكي الفاخر للمدربين — رحلة أربع خطوات من الألف إلى الياء 👑👑👑
+// 👑👑👑 إنشاء حساب مدرب — أكاديمية المستقبل الدولية 👑👑👑
+// الترتيب الجديد (v6.2): بيانات الدخول أولاً → الملف المهني → المؤهلات →
+// المراجعة والإرسال → تسجيل دخول تلقائي فوري → إضافة الصورة الشخصية (وهو الآن مسجّل)
 
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -8,16 +10,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { useAuth } from '@/lib/auth-store'
 import {
   Crown, GraduationCap, User, Briefcase, Target, CalendarDays, Globe2, Camera,
   FileText, Award, Trophy, Star, ShieldCheck, CheckCircle2, ArrowLeft, ArrowRight,
   Sparkles, Loader2, Lock, Trash2, Plus, BadgeCheck, ScrollText, PartyPopper,
+  Mail, Phone,
 } from 'lucide-react'
 
 const COUNTRIES = [
   'اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق',
   'مصر', 'الأردن', 'فلسطين', 'لبنان', 'سوريا', 'السودان', 'ليبيا', 'تونس',
-  'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'جيبوتي', 'جزر القمر', 'دولة أخرى',
+  'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'جزر القمر', 'دولة أخرى',
 ]
 
 const inputCls =
@@ -31,37 +35,43 @@ type Achievement = { title: string; description: string; year: string }
 type Experience = { position: string; organization: string; period: string; description: string }
 
 const STEPS = [
-  { id: 1, label: 'الهوية الملكية', icon: User },
-  { id: 2, label: 'الملف الاحترافي', icon: FileText },
-  { id: 3, label: 'بيانات الدخول', icon: Lock },
-  { id: 4, label: 'المراجعة والتتويج', icon: Crown },
+  { id: 1, label: 'الحساب', icon: Lock },
+  { id: 2, label: 'الملف المهني', icon: Briefcase },
+  { id: 3, label: 'المؤهلات', icon: Award },
+  { id: 4, label: 'المراجعة والإرسال', icon: CheckCircle2 },
 ]
 
 export function TrainerRegistration() {
+  const setAuth = useAuth((s) => s.setAuth)
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  // الخطوة الأخيرة بعد التسجيل: إضافة الصورة الشخصية (الحساب مسجّل دخوله الآن)
+  const [photoStage, setPhotoStage] = useState<{ name: string } | null>(null)
   const [done, setDone] = useState<{ name: string } | null>(null)
-  const [avatarUploading, setAvatarUploading] = useState(false)
 
-  // Step 1 — الهوية
+  // Step 1 — الحساب وبيانات الدخول (أولاً كما يليق بالرحلة)
   const [name, setName] = useState('')
-  const [title, setTitle] = useState('')
-  const [specialization, setSpecialization] = useState('')
-  const [years, setYears] = useState('')
-  const [country, setCountry] = useState('اليمن')
-
-  // Step 2 — الملف الاحترافي
-  const [avatar, setAvatar] = useState('')
-  const [bio, setBio] = useState('')
-  const [quals, setQuals] = useState<Qual[]>([{ title: '', institution: '', year: '' }])
-  const [achs, setAchs] = useState<Achievement[]>([{ title: '', description: '', year: '' }])
-  const [exps, setExps] = useState<Experience[]>([{ position: '', organization: '', period: '', description: '' }])
-
-  // Step 3 — بيانات الدخول
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+
+  // Step 2 — الملف المهني
+  const [title, setTitle] = useState('')
+  const [specialization, setSpecialization] = useState('')
+  const [years, setYears] = useState('')
+  const [country, setCountry] = useState('اليمن')
+  const [bio, setBio] = useState('')
+
+  // Step 3 — المؤهلات والإنجازات والخبرات
+  const [quals, setQuals] = useState<Qual[]>([{ title: '', institution: '', year: '' }])
+  const [achs, setAchs] = useState<Achievement[]>([{ title: '', description: '', year: '' }])
+  const [exps, setExps] = useState<Experience[]>([{ position: '', organization: '', period: '', description: '' }])
+
+  // الصورة الشخصية — بعد التسجيل التلقائي (الرفع يحتاج جلسة موقّعة)
+  const [avatar, setAvatar] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarSaving, setAvatarSaving] = useState(false)
 
   const activeQuals = useMemo(() => quals.filter((q) => q.title.trim()), [quals])
   const activeAchs = useMemo(() => achs.filter((a) => a.title.trim()), [achs])
@@ -70,17 +80,17 @@ export function TrainerRegistration() {
   const validateStep = (s: number): string | null => {
     if (s === 1) {
       if (name.trim().length < 3) return 'اكتب اسمك الكامل (3 أحرف على الأقل)'
-      if (!title.trim()) return 'المسمى الوظيفي مطلوب'
-      if (!specialization.trim()) return 'التخصص مطلوب'
-    }
-    if (s === 2) {
-      if (bio.trim().length < 20) return 'اكتب نبذة مهنية وافية (20 حرفاً على الأقل)'
-      if (activeQuals.length === 0) return 'أضف مؤهلاً علمياً واحداً على الأقل (العنوان)'
-    }
-    if (s === 3) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'بريد إلكتروني غير صالح'
       if (password.length < 6) return 'كلمة المرور 6 أحرف على الأقل'
       if (password !== confirm) return 'كلمتا المرور غير متطابقتين'
+    }
+    if (s === 2) {
+      if (!title.trim()) return 'المسمى الوظيفي مطلوب'
+      if (!specialization.trim()) return 'التخصص مطلوب'
+      if (bio.trim().length < 20) return 'اكتب نبذة مهنية وافية (20 حرفاً على الأقل)'
+    }
+    if (s === 3) {
+      if (activeQuals.length === 0) return 'أضف مؤهلاً علمياً واحداً على الأقل (العنوان)'
     }
     return null
   }
@@ -92,7 +102,7 @@ export function TrainerRegistration() {
   }
   const prev = () => setStep((s) => Math.max(1, s - 1))
 
-  const uploadAvatar = async (file: File) => {
+  const uploadAvatar = async (file: File): Promise<string | null> => {
     setAvatarUploading(true)
     try {
       const fd = new FormData()
@@ -100,10 +110,32 @@ export function TrainerRegistration() {
       fd.append('kind', 'trainer-avatar')
       const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
       const data = await res.json()
-      if (data?.url) { setAvatar(data.url); toast.success('🏛️ صورة الملك رُفعت بأبهى ظلال') }
-      else toast.error(data?.error || 'تعذر رفع الصورة')
-    } catch { toast.error('تعذر رفع الصورة') }
-    setAvatarUploading(false)
+      if (data?.url) { toast.success('رُفعت صورتك بنجاح'); return data.url }
+      toast.error(data?.error || 'تعذر رفع الصورة')
+      return null
+    } catch { toast.error('تعذر رفع الصورة'); return null }
+    finally { setAvatarUploading(false) }
+  }
+
+  const pickPhoto = async (file: File) => {
+    const url = await uploadAvatar(file)
+    if (url) setAvatar(url)
+  }
+
+  const saveAvatar = async () => {
+    if (!avatar) return
+    setAvatarSaving(true)
+    try {
+      const res = await fetch('/api/trainers/self-profile', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error(d?.error || 'تعذر حفظ الصورة'); return }
+      toast.success('صورتك الشخصية صارت جزءاً من ملفك')
+      setPhotoStage(null)
+      setDone((d) => d || { name: name.trim() })
+    } catch { toast.error('تعذر الاتصال') }
+    setAvatarSaving(false)
   }
 
   const submit = async () => {
@@ -119,7 +151,7 @@ export function TrainerRegistration() {
         body: JSON.stringify({
           name: name.trim(), email: email.trim().toLowerCase(), password,
           phone: phone.trim(), title: title.trim(), specialization: specialization.trim(),
-          bio: bio.trim(), country, avatar: avatar || null,
+          bio: bio.trim(), country,
           years_experience: Number(years) || 0,
           qualifications: activeQuals,
           achievements: activeAchs,
@@ -128,12 +160,80 @@ export function TrainerRegistration() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data?.error || 'تعذر إرسال الطلب'); return }
-      setDone({ name: name.trim() })
+      // 🔑 تسجيل الدخول التلقائي — الحساب جاهز والجلسة موقّعة فوراً
+      if (data?.token && data?.user) {
+        setAuth(data.user, data.token)
+      }
+      toast.success('أُنشئ حسابك وسجّلنا دخولك تلقائياً')
+      // الخطوة الأخيرة: الصورة الشخصية (الآن الرفع يعمل لأنه مسجّل)
+      setPhotoStage({ name: name.trim() })
     } catch { toast.error('تعذر الاتصال — أعد المحاولة') }
     setSubmitting(false)
   }
 
-  // ================= شاشة التتويج =================
+  const finishToDashboard = () => { window.location.href = '/' }
+
+  // ================= الخطوة الأخيرة: الصورة الشخصية (بعد الدخول التلقائي) =================
+  if (photoStage) {
+    return (
+      <div className="fia-lux-fadeup relative overflow-hidden rounded-3xl border border-[#C9A961]/40 bg-gradient-to-br from-[#0A1F44] via-[#12294f] to-[#0A1F44] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 30%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 85% 70%, white 1px, transparent 1px)', backgroundSize: '26px 26px, 20px 20px' }} />
+        <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-[#C9A961]/20 blur-3xl" />
+        <div className="relative">
+          <div className="mx-auto mb-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold text-emerald-300">
+            <CheckCircle2 className="h-3.5 w-3.5" /> تم إنشاء الحساب وتسجيل الدخول تلقائياً
+          </div>
+          <h2 className="mb-2 text-2xl font-extrabold text-white sm:text-3xl">
+            خطوة أخيرة يا أستاذ <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">{photoStage.name}</span>
+          </h2>
+          <p className="mx-auto mb-7 max-w-md text-sm leading-relaxed text-white/70">
+            أضف صورتك الشخصية الآن — تظهر في بطاقتك ضمن «مدربينا» وفي ملفك المهني، ويمكنك تغييرها لاحقاً من ملفك.
+          </p>
+
+          <div className="mx-auto mb-7 flex max-w-md flex-col items-center gap-4 rounded-2xl border border-[#C9A961]/25 bg-white/[0.05] p-6">
+            <div className="relative">
+              {avatar ? (
+                <img src={avatar} alt="صورة المدرب" className="h-28 w-28 rounded-full border-4 border-[#C9A961]/50 object-cover shadow-[0_0_30px_rgba(201,169,97,0.3)]" />
+              ) : (
+                <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-dashed border-[#C9A961]/40 bg-white/5 text-[#C9A961]/60">
+                  <Camera className="h-10 w-10" />
+                </div>
+              )}
+              {avatarUploading && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60"><Loader2 className="h-8 w-8 animate-spin text-[#E5C77E]" /></div>
+              )}
+            </div>
+            <p className="text-[11px] leading-relaxed text-white/55">صورة واضحة بتأطير مناسب — يُفضّل أن يكون وجهك في المنتصف بخلفية بسيطة</p>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#C9A961]/40 bg-[#C9A961]/10 px-5 py-2.5 text-xs font-bold text-[#E5C77E] transition-all hover:bg-[#C9A961]/20 active:scale-95">
+              <Camera className="h-4 w-4" /> {avatar ? 'تغيير الصورة' : 'اختر صورتك'}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickPhoto(f) }} />
+            </label>
+          </div>
+
+          <div className="mx-auto flex max-w-md items-center justify-center gap-3">
+            <Button
+              onClick={finishToDashboard}
+              variant="outline"
+              className="h-12 flex-1 rounded-xl border-white/15 bg-white/5 text-sm font-bold text-white hover:bg-white/10 active:scale-[0.98]"
+            >
+              لاحقاً — أدخل لوحتي
+            </Button>
+            {avatar && (
+              <Button
+                onClick={saveAvatar} disabled={avatarSaving}
+                className="relative h-12 flex-1 overflow-hidden rounded-xl bg-gradient-to-l from-[#C9A961] to-[#E5C77E] text-sm font-extrabold text-[#0A1F44] shadow-[0_8px_24px_rgba(201,169,97,0.35)] active:scale-[0.98] disabled:opacity-60"
+              >
+                <span className="absolute inset-0 lux-shimmer" />
+                {avatarSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-5 w-5" />} حفظ الصورة
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ================= شاشة الإتمام =================
   if (done) {
     return (
       <div className="fia-lux-fadeup relative overflow-hidden rounded-3xl border border-[#C9A961]/40 bg-gradient-to-br from-[#0A1F44] via-[#12294f] to-[#0A1F44] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
@@ -145,16 +245,16 @@ export function TrainerRegistration() {
             <PartyPopper className="h-11 w-11 text-[#E5C77E]" />
           </div>
           <h2 className="mb-2 text-2xl font-extrabold text-white sm:text-3xl">
-            وصل طلبك <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">قصر الإدارة</span>
+            حسابك جاهز في <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">أكاديمية المستقبل الدولية</span>
           </h2>
           <p className="mx-auto mb-6 max-w-md text-sm leading-relaxed text-white/70">
-            يا أستاذ <span className="font-bold text-[#E5C77E]">{done.name}</span>، طلب الانضمام إلى نخبة المدربين قيد المراجعة الملكية الآن.
-            فور موافقة الإدارة ستصل بطاقة الاتفاق الفاخرة بنسبة أرباحك لتصفحها وقبولها — وتُعرَف حينها رسمياً كمدرب معتمد يظهر اسمه في «مدربينا».
+            يا أستاذ <span className="font-bold text-[#E5C77E]">{done.name}</span>، طلب الانضمام إلى نخبة المدربين قيد المراجعة الآن.
+            فور موافقة الإدارة ستصل بطاقة الاتفاق بنسبة أرباحك لتصفحها وقبولها — وتُعرَف حينها رسمياً كمدرب معتمد يظهر اسمه في «مدربينا».
           </p>
           <div className="mx-auto mb-7 grid max-w-lg gap-3 sm:grid-cols-3">
             {[
-              { icon: ShieldCheck, t: 'مراجعة ملكية', d: 'الإدارة تفحص ملفك بالكامل' },
-              { icon: ScrollText, t: 'اتفاق فاخر', d: 'نسبة أرباحك تصل لقبولها' },
+              { icon: ShieldCheck, t: 'مراجعة دقيقة', d: 'الإدارة تفحص ملفك بالكامل' },
+              { icon: ScrollText, t: 'اتفاق النسبة', d: 'نسبة أرباحك تصل لقبولها' },
               { icon: BadgeCheck, t: 'اعتماد رسمي', d: 'اسمك في نخبة المدربين' },
             ].map((c) => (
               <div key={c.t} className="rounded-2xl border border-[#C9A961]/25 bg-white/[0.05] p-4">
@@ -165,10 +265,10 @@ export function TrainerRegistration() {
             ))}
           </div>
           <Button
-            onClick={() => { window.location.href = '/' }}
+            onClick={finishToDashboard}
             className="relative h-12 overflow-hidden rounded-xl bg-gradient-to-l from-[#C9A961] to-[#E5C77E] px-8 text-sm font-extrabold text-[#0A1F44] shadow-[0_8px_24px_rgba(201,169,97,0.35)] active:scale-[0.98]"
           >
-            <span className="absolute inset-0 lux-shimmer" /> العودة إلى الأكاديمية
+            <span className="absolute inset-0 lux-shimmer" /> الدخول إلى لوحتي
           </Button>
         </div>
       </div>
@@ -178,7 +278,7 @@ export function TrainerRegistration() {
   // ================= الرحلة =================
   return (
     <div className="fia-lux-fadeup relative overflow-hidden rounded-3xl border border-[#C9A961]/40 bg-gradient-to-br from-[#0A1F44] via-[#12294f] to-[#0A1F44] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-      {/* الترويسة الملكية */}
+      {/* الترويسة */}
       <div className="relative overflow-hidden px-6 pb-5 pt-7 text-center">
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)', backgroundSize: '24px 24px, 18px 18px' }} />
         <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-[#C9A961]/15 blur-2xl" />
@@ -189,7 +289,7 @@ export function TrainerRegistration() {
           <h2 className="text-xl font-extrabold text-white sm:text-2xl">
             سجّل كمدرب في <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">الأكاديمية</span>
           </h2>
-          <p className="mt-1 text-xs text-white/60">ملف احترافي متكامل — واتفاق أرباح ملكي — واعتماد رسمي</p>
+          <p className="mt-1 text-xs text-white/60">حسابك أولاً — ثم ملفك المهني — ثم تسجيل دخول تلقائي وصورتك الشخصية</p>
         </div>
       </div>
 
@@ -219,15 +319,45 @@ export function TrainerRegistration() {
       </div>
 
       <div className="space-y-4 px-5 pb-6">
-        {/* ============ الخطوة 1: الهوية ============ */}
+        {/* ============ الخطوة 1: الحساب وبيانات الدخول ============ */}
         {step === 1 && (
           <div className="fia-lux-fadeup space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Label className={labelCls}>الاسم الكامل *</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="أ. محمد أحمد محمد صالح" className={inputCls} />
-                <p className="mt-1 flex items-center gap-1 text-[10px] text-white/45"><Lock className="h-3 w-3 text-[#C9A961]" /> الاسم يُثبَّت نهائياً بعد التسجيل ولا يمكن تعديله — اكتبه بعناية</p>
+            <div className="rounded-2xl border border-[#C9A961]/25 bg-white/[0.04] p-4">
+              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Lock className="h-4 w-4 text-[#E5C77E]" /> بيانات حسابك — البريد والرقم وكلمة المرور</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Label className={labelCls}><User className="ml-1 inline h-3.5 w-3.5" /> الاسم الكامل *</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="أ. محمد أحمد محمد صالح" className={inputCls} />
+                  <p className="mt-1 flex items-center gap-1 text-[10px] text-white/45"><Lock className="h-3 w-3 text-[#C9A961]" /> الاسم يُثبَّت نهائياً بعد التسجيل ولا يمكن تعديله — اكتبه بعناية</p>
+                </div>
+                <div>
+                  <Label className={labelCls}><Mail className="ml-1 inline h-3.5 w-3.5" /> البريد الإلكتروني *</Label>
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" dir="ltr" placeholder="trainer@fia.academy" className={inputCls} autoComplete="email" />
+                </div>
+                <div>
+                  <Label className={labelCls}><Phone className="ml-1 inline h-3.5 w-3.5" /> رقم الهاتف (واتساب)</Label>
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" inputMode="tel" placeholder="+967 7XX XXX XXX" className={inputCls} autoComplete="tel" />
+                </div>
+                <div>
+                  <Label className={labelCls}><Lock className="ml-1 inline h-3.5 w-3.5" /> كلمة المرور *</Label>
+                  <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" dir="ltr" placeholder="••••••••" className={inputCls} autoComplete="new-password" />
+                </div>
+                <div>
+                  <Label className={labelCls}><Lock className="ml-1 inline h-3.5 w-3.5" /> تأكيد كلمة المرور *</Label>
+                  <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" dir="ltr" placeholder="••••••••" className={inputCls} autoComplete="new-password" />
+                </div>
               </div>
+              <p className="mt-3 rounded-xl border border-[#C9A961]/20 bg-[#C9A961]/[0.07] px-3 py-2 text-[11px] leading-relaxed text-white/60">
+                🔑 بعد إكمال الملف تُسجَّل دخولك تلقائياً — بلا أي خطوة إضافية — وتضيف صورتك الشخصية مباشرة.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ============ الخطوة 2: الملف المهني ============ */}
+        {step === 2 && (
+          <div className="fia-lux-fadeup space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label className={labelCls}><Briefcase className="ml-1 inline h-3.5 w-3.5" /> المسمى الوظيفي *</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="استشاري / أستاذ مساعد / مدرب معتمد..." className={inputCls} />
@@ -248,44 +378,17 @@ export function TrainerRegistration() {
                 <p className="mt-1 text-[10px] text-white/45">تظهر طرق سحب الأرباح المتاحة بحسب بلدك</p>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* ============ الخطوة 2: الملف الاحترافي ============ */}
-        {step === 2 && (
-          <div className="fia-lux-fadeup space-y-5">
-            {/* الصورة الملكية */}
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#C9A961]/25 bg-white/[0.04] p-5 sm:flex-row sm:text-right">
-              <div className="relative">
-                {avatar ? (
-                  <img src={avatar} alt="صورة المدرب" className="h-24 w-24 rounded-full border-4 border-[#C9A961]/50 object-cover shadow-[0_0_30px_rgba(201,169,97,0.3)]" />
-                ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-dashed border-[#C9A961]/40 bg-white/5 text-[#C9A961]/60">
-                    <Camera className="h-8 w-8" />
-                  </div>
-                )}
-                {avatarUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60"><Loader2 className="h-7 w-7 animate-spin text-[#E5C77E]" /></div>
-                )}
-              </div>
-              <div className="flex-1 text-center sm:text-right">
-                <p className="text-sm font-bold text-white">صورتك المهنية 👑</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-white/55">صورة واضحة بلائقة تليق بملف ملكي — تظهر في بطاقتك ضمن «مدربينا»</p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#C9A961]/40 bg-[#C9A961]/10 px-4 py-2 text-xs font-bold text-[#E5C77E] transition-all hover:bg-[#C9A961]/20 active:scale-95">
-                  <Camera className="h-4 w-4" /> اختر صورة
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f) }} />
-                </label>
-              </div>
-            </div>
-
-            {/* النبذة */}
             <div>
               <Label className={labelCls}><FileText className="ml-1 inline h-3.5 w-3.5" /> النبذة المهنية *</Label>
               <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="اكتب نبذة تلهم المتدربين: رحلتك، فلسفتك في التدريب، ما يميزك..." className={areaCls} rows={4} />
               <p className="mt-1 text-[10px] text-white/45">{bio.length} حرف — 20 على الأقل</p>
             </div>
+          </div>
+        )}
 
-            {/* المؤهلات */}
+        {/* ============ الخطوة 3: المؤهلات والإنجازات والخبرات ============ */}
+        {step === 3 && (
+          <div className="fia-lux-fadeup space-y-4">
             <DynListSection
               title="المؤهلات العلمية" icon={Award} accent="from-emerald-500/20"
               items={quals} onItems={setQuals}
@@ -299,7 +402,6 @@ export function TrainerRegistration() {
               emptyRow={{ title: '', institution: '', year: '' }}
             />
 
-            {/* الإنجازات */}
             <DynListSection
               title="الإنجازات والجوائز" icon={Trophy} accent="from-amber-500/20"
               items={achs} onItems={setAchs}
@@ -313,7 +415,6 @@ export function TrainerRegistration() {
               emptyRow={{ title: '', description: '', year: '' }}
             />
 
-            {/* الخبرات */}
             <DynListSection
               title="الخبرات العملية" icon={Star} accent="from-sky-500/20"
               items={exps} onItems={setExps}
@@ -330,40 +431,15 @@ export function TrainerRegistration() {
           </div>
         )}
 
-        {/* ============ الخطوة 3: بيانات الدخول ============ */}
-        {step === 3 && (
-          <div className="fia-lux-fadeup space-y-4">
-            <div className="rounded-2xl border border-[#C9A961]/25 bg-white/[0.04] p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Lock className="h-4 w-4 text-[#E5C77E]" /> مفاتيح دخولك الملكية</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <Label className={labelCls}>البريد الإلكتروني *</Label>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" dir="ltr" placeholder="trainer@fia.academy" className={inputCls} autoComplete="email" />
-                </div>
-                <div>
-                  <Label className={labelCls}>رقم الهاتف (واتساب)</Label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" inputMode="tel" placeholder="+967 7XX XXX XXX" className={inputCls} autoComplete="tel" />
-                </div>
-                <div>
-                  <Label className={labelCls}>كلمة المرور *</Label>
-                  <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" dir="ltr" placeholder="••••••••" className={inputCls} autoComplete="new-password" />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label className={labelCls}>تأكيد كلمة المرور *</Label>
-                  <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" dir="ltr" placeholder="••••••••" className={inputCls} autoComplete="new-password" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============ الخطوة 4: المراجعة الملكية ============ */}
+        {/* ============ الخطوة 4: المراجعة والإرسال ============ */}
         {step === 4 && (
           <div className="fia-lux-fadeup space-y-4">
             <div className="rounded-2xl border border-[#C9A961]/30 bg-gradient-to-br from-[#C9A961]/10 to-transparent p-5">
-              <p className="mb-4 flex items-center gap-2 text-sm font-extrabold text-[#E5C77E]"><Crown className="h-5 w-5" /> افحص ملفك الملكي قبل التتويج</p>
+              <p className="mb-4 flex items-center gap-2 text-sm font-extrabold text-[#E5C77E]"><Crown className="h-5 w-5" /> راجع بياناتك قبل إنشاء الحساب</p>
               <div className="space-y-3 text-xs">
                 <ReviewRow label="الاسم" value={name} />
+                <ReviewRow label="البريد" value={email} ltr />
+                {phone && <ReviewRow label="الهاتف" value={phone} ltr />}
                 <ReviewRow label="المسمى الوظيفي" value={title} />
                 <ReviewRow label="التخصص" value={specialization} />
                 {Number(years) > 0 && <ReviewRow label="سنوات الخبرة" value={`${years} سنة`} />}
@@ -372,15 +448,13 @@ export function TrainerRegistration() {
                 <ReviewRow label="المؤهلات" value={activeQuals.map((q) => `${q.title}${q.institution ? ' — ' + q.institution : ''}`).join(' | ')} />
                 {activeAchs.length > 0 && <ReviewRow label="الإنجازات" value={activeAchs.map((a) => a.title).join(' | ')} />}
                 {activeExps.length > 0 && <ReviewRow label="الخبرات" value={activeExps.map((x) => `${x.position}${x.organization ? ' في ' + x.organization : ''}`).join(' | ')} />}
-                <ReviewRow label="البريد" value={email} ltr />
-                {phone && <ReviewRow label="الهاتف" value={phone} ltr />}
               </div>
             </div>
             <div className="rounded-2xl border border-[#C9A961]/25 bg-white/[0.04] p-4 text-[11px] leading-relaxed text-white/60">
               <p className="mb-2 flex items-center gap-1.5 font-bold text-[#E5C77E]"><Sparkles className="h-4 w-4" /> كيف تسير الأمور بعد الإرسال؟</p>
-              <p>1️⃣ تفحص الإدارة ملفك الملكي بعناية وسرية — ثم توافق أو ترفض مع إشعار رسمي لك.</p>
-              <p>2️⃣ عند الموافقة تصلك بطاقة الاتفاق الفاخرة بنسبة أرباحك من الدورات — تقبلها أو ترفضها بحرية كاملة، ويمكنك التفاوض.</p>
-              <p>3️⃣ بعد التوقيع تُعتمد رسمياً — يظهر اسمك في «مدربينا» وتُفتح لوحتك الملكية كاملة.</p>
+              <p>1️⃣ يُنشأ حسابك وتُسجَّل دخولك تلقائياً — ثم تضيف صورتك الشخصية مباشرة.</p>
+              <p>2️⃣ تفحص الإدارة ملفك بعناية وسرية — ثم توافق أو ترفض مع إشعار رسمي لك.</p>
+              <p>3️⃣ عند الموافقة تصلك بطاقة الاتفاق بنسبة أرباحك من الدورات — تقبلها أو تفاوض بحرية كاملة، وبعد توقيعك يُغلق الاتفاق نهائياً وتُفتح لك لوحتك كاملة.</p>
             </div>
           </div>
         )}
@@ -398,7 +472,7 @@ export function TrainerRegistration() {
             </Button>
           ) : (
             <Button onClick={submit} disabled={submitting} className="relative h-11 flex-1 overflow-hidden rounded-xl bg-gradient-to-l from-[#C9A961] to-[#E5C77E] text-sm font-extrabold text-[#0A1F44] shadow-[0_8px_24px_rgba(201,169,97,0.4)] active:scale-[0.98] disabled:opacity-60">
-              {submitting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جاري رفع الطلب الملكي...</> : <><Crown className="ml-2 h-4 w-4" /> أرسل الطلب إلى القصر 👑</>}
+              {submitting ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ إنشاء حسابك...</> : <><Crown className="ml-2 h-4 w-4" /> إنشاء الحساب وتسجيل الدخول</>}
             </Button>
           )}
         </div>

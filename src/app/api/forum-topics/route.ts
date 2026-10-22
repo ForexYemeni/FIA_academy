@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyForumTopicCreated, notifyForumReplyPosted } from '@/lib/notifications'
+import { assertTrainerCertified } from '@/lib/trainer-gate'
 
 // Batch-fetch profiles for a list of user IDs
 async function fetchProfiles(userIds: string[]): Promise<Record<string, any>> {
@@ -114,6 +115,12 @@ export async function POST(req: NextRequest) {
     const user_id = g.user.id
     if (!category_id || !title) {
       return NextResponse.json({ error: 'الفئة والعنوان مطلوبان' }, { status: 400 })
+    }
+
+    // 🛡️ بوابة الاعتماد: المدرب غير المعتمد (قبل توقيع الاتفاق) لا ينشئ مواضيع
+    const trainerGate = await assertTrainerCertified(user_id, 'forum')
+    if (!trainerGate.ok) {
+      return NextResponse.json({ error: trainerGate.message }, { status: 403 })
     }
 
     // Check ban status — banned users can't create topics

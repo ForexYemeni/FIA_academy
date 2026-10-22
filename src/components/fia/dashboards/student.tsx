@@ -2927,7 +2927,7 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         title: profile.title,
         bio: joinBio(profile.bio, user?.bio),
       })
-      toast.success('تم حفظ ملفك الشخصي في قصر الأكاديمية بنجاح 👑')
+      toast.success('تم حفظ ملفك الشخصي بنجاح')
     } catch {
       toast.error('خطأ في الاتصال — لم يتم الحفظ')
     } finally {

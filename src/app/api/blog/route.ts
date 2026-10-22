@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardStaff, guardAdmin, getAuthUser } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { assertTrainerCertified } from '@/lib/trainer-gate'
 
 // Generate a URL-friendly ASCII slug from a title — strips Arabic and other
 // non-ASCII characters entirely (URL encoding of Arabic is fragile across
@@ -102,6 +103,11 @@ export async function POST(req: NextRequest) {
     if (!canPublish) {
       return NextResponse.json({ error: 'غير مصرّح — النشر متاح للإدارة والمدربين فقط' }, { status: 403 })
     }
+    // 🛡️ بوابة الاعتماد: المدرب غير المعتمد (قبل توقيع الاتفاق) يقرأ المدونة فقط — لا نشر
+    const blogGate = await assertTrainerCertified(author_id, 'blog')
+    if (!blogGate.ok) {
+      return NextResponse.json({ error: blogGate.message }, { status: 403 })
+    }
     // Auto-generate a unique slug if not provided
     let slug = slugify(title)
     if (!slug) slug = 'post-' + Date.now()
@@ -152,6 +158,11 @@ export async function PUT(req: NextRequest) {
       const { data: post } = await supabaseAdmin.from('blog_posts').select('author_id').eq('id', id).maybeSingle()
       if (post?.author_id && post.author_id !== g.user.id) {
         return NextResponse.json({ error: 'غير مصرح — يمكنك تعديل مقالاتك فقط' }, { status: 403 })
+      }
+      // 🛡️ بوابة الاعتماد: المدرب غير المعتمد لا يعدّل المقالات
+      const putGate = await assertTrainerCertified(g.user.id, 'blog')
+      if (!putGate.ok) {
+        return NextResponse.json({ error: putGate.message }, { status: 403 })
       }
     }
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
+import { assertTrainerCertified } from '@/lib/trainer-gate'
 
 // POST /api/forum/react
 // Body: { user_id, topic_id?, post_id?, reaction: 'like' | 'dislike' }
@@ -15,6 +16,12 @@ export async function POST(req: NextRequest) {
     }
     if (reaction !== 'like' && reaction !== 'dislike') {
       return NextResponse.json({ error: 'reaction must be like or dislike' }, { status: 400 })
+    }
+
+    // 🛡️ بوابة الاعتماد: المدرب غير المعتمد (قبل توقيع الاتفاق) لا يتفاعل في المنتدى
+    const trainerGate = await assertTrainerCertified(user_id, 'forum')
+    if (!trainerGate.ok) {
+      return NextResponse.json({ error: trainerGate.message }, { status: 403 })
     }
 
     // Check if the user already has a reaction
