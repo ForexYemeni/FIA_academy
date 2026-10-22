@@ -24,6 +24,36 @@ import { isRoyalCourse } from '@/lib/royal-guard'
 
 const MODULES_SEPARATOR = '\n\n===FIA_MODULES===\n'
 
+/**
+ * 👑 البوابة الملكية للمدربين — لا دورات قبل الاعتماد والاتفاق
+ * المدرب المسجل ذاتياً (pending / agreement_pending / rejected) ممنوع
+ * من إنشاء أو تعديل أو حذف الدورات حتى توافق الإدارة ويوقّع اتفاق
+ * نسبة الأرباح (status='approved'). الإدارة تمر دائماً.
+ */
+async function assertTrainerCertified(trainerId: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('trainers')
+      .select('status, name')
+      .eq('id', trainerId)
+      .maybeSingle()
+    // لا صف مدرب أصلاً؟ (مدرب قديم بلا حالة) — نسمح كما كان
+    if (!data) return { ok: true }
+    const status = String((data as any).status || '')
+    if (status === 'approved' || status === '') return { ok: true }
+    if (status === 'pending') {
+      return { ok: false, message: '👑 قصرك ما زال بانتظار موافقة الإدارة — لا يمكن إنشاء الدورات قبل اعتمادك ملكياً وتوقيع اتفاق نسبة الأرباح' }
+    }
+    if (status === 'agreement_pending') {
+      return { ok: false, message: '📜 وافقت الإدارة مبدئياً! وقّع اتفاق النسبة المُعروض في لوحتك (نظرة عامة) — وبعد التوقيع تُفتح لك قاعات الدورات فوراً' }
+    }
+    return { ok: false, message: '🏛️ لا يمكن إدارة الدورات الآن — تواصل مع الإدارة بخصوص حالة عضويتك' }
+  } catch {
+    // فشل فحص الحالة (شبكة/قاعدة) — نمنع احتياطاً حمايةً للنظام الملكي
+    return { ok: false, message: 'تعذر التحقق من حالة عضويتك — أعد المحاولة' }
+  }
+}
+
 function parseCourseContent(description: string | null | undefined): { description: string; modules: any[] } {
   if (!description) return { description: '', modules: [] }
   const idx = description.indexOf(MODULES_SEPARATOR)
@@ -131,6 +161,11 @@ export async function POST(req: NextRequest) {
     // 🛡️ إنشاء الدورات: إدارة أو مدرب — لم يكن محمياً إطلاقاً!
     const g = await guardStaff(req)
     if (!g.ok) return g.res
+    // 👑 البوابة الملكية: المدرب لا ينشئ دورات إلا بعد اعتماده وتوقيع اتفاق النسبة
+    if (g.user.role !== 'admin') {
+      const gate = await assertTrainerCertified(g.user.id)
+      if (!gate.ok) return NextResponse.json({ error: gate.message }, { status: 403 })
+    }
     let body = await req.json()
     // المدرب ينشئ دورته باسمه هو حصراً
     if (g.user.role !== 'admin') body.trainer_id = g.user.id
@@ -197,6 +232,11 @@ export async function PUT(req: NextRequest) {
     // 🛡️ تعديل الدورات: إدارة أو مدرب الدورة نفسها
     const g = await guardStaff(req)
     if (!g.ok) return g.res
+    // 👑 البوابة الملكية: مدرب غير معتمد لا يعدّل دورات
+    if (g.user.role !== 'admin') {
+      const gate = await assertTrainerCertified(g.user.id)
+      if (!gate.ok) return NextResponse.json({ error: gate.message }, { status: 403 })
+    }
     const { id, description, ...otherUpdates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
@@ -341,6 +381,11 @@ export async function DELETE(req: NextRequest) {
     // 🛡️ حذف الدورات: إدارة أو مدرب الدورة نفسها — كان يحذف أي دورة أي زائر!
     const g = await guardStaff(req)
     if (!g.ok) return g.res
+    // 👑 البوابة الملكية: مدرب غير معتمد لا يحذف دورات
+    if (g.user.role !== 'admin') {
+      const gate = await assertTrainerCertified(g.user.id)
+      if (!gate.ok) return NextResponse.json({ error: gate.message }, { status: 403 })
+    }
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
