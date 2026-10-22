@@ -1698,3 +1698,21 @@ Stage Summary:
 - رابط النسخة: https://github.com/ForexYemeni/FIA_academy/releases/tag/v5.6-full-backup
 - كلمة المرور: لدى المالك فقط (لم تُكتب في أي ملف داخل النسخة ولا في هذا السجل).
 - النسخة تكفي أي وكيل ذكاء اصطناعي لبناء/تعديل/استعادة كل شيء من الألف إلى الياء.
+
+---
+Task ID: v60-royal-trainer-throne
+Agent: main (Z.ai)
+Task: المنظومة الملكية الكاملة للمدربين — تسجيل ذاتي فاخر + موافقة الإدارة + اتفاق نسبة الأرباح + الاعتماد + حسابات السحب حسب الدولة + قفل الاسم
+
+Work Log:
+- Migration 021: أعمدة trainers الجديدة (status/created_via/country/qualifications/achievements/experiences/agreement/rejected_reason/reviewed_at/certified_at) + جدولا trainer_withdrawal_accounts وwithdrawal_methods + بذرة 12 طريقة (اليمن المقر + عالمي + 6 دول).
+- APIs جديدة: /api/auth/register-trainer (حد 5/ساعة + فحص تكرار بالجدولين) | /api/trainers/applications (GET/POST للإدارة: approve/reject/reoffer بسجل تاريخ الاتفاق) | /api/trainers/agreement (قبول → معتمد/رفض → تفاوض) | /api/trainer/withdrawal-accounts (CRUD) | /api/withdrawal-methods (عام يرى المفعلة/إدارة ترى الكل) | /api/trainers/self-profile (إصلاح 403 قديم لملف المدرب الذاتي).
+- تعديلات خادمية: GET /api/trainers القائمة العامة = المعتمدون فقط (؟id= يبقى للصاحب والإدارة) + PUT توسيع القائمة البيضاء (qualifications/achievements/experiences/country/status/agreement) | /api/profile أُزيل الاسم نهائياً مع رد 403 ملكي.
+- إشعارات: 6 مساعدين في notifications.ts (وصول طلب للإدارة، موافقة+نسبة للمدرب، رفض، اعتماد، رفض نسبة للإدارة، عرض محدث) + 5 تلجرام في telegram.ts — جرس + FCM + قناة تلجرام.
+- واجهات: صفحة /register (جنسيتان) + trainer-registration.tsx (معالج 4 خطوات بصورة تلجرام ورفع مؤهلات/إنجازات/خبرات ديناميكية ومراجعة ملكية) | admin-trainer-applications.tsx (قصر الموافقات: بطاقات+ملف كامل+حوار موافقة بنسبة وقوالب+حوار رفض بسبب+عرض محدث) | trainer-royal-gate.tsx (بانتظار المراجعة/بطاقة الاتفاق الذهبية بنسبة ضخمة/شاشة رفض) | trainer-withdrawal-accounts.tsx | admin-withdrawal-methods.tsx | توسيع TrainerDialogRoyal (دولة+حالة+3 محررات قوائم) | شارة معتمد ذهبية في public-site + شارات حالة في بطاقات الإدارة.
+- قفل الاسم: طالب (حقل معطل+ملاحظة) + مدرب (كان مقفلاً) + خادماً في /api/profile وself-profile — أي محاولة تُرد 403.
+- تحقق إنتاجي كامل: /register 200 ✓ | تسجيل مدرب اختباري حقيقي success ✓ | المعلّق مخفي عن العامة ✓ | /applications و/agreement بدون توكن 401 ✓ | الكتالوج 12 طريقة حية ✓ | حُذف المدرب الاختباري بعد الفحص.
+
+Stage Summary:
+- Deploy dc6b542 (v6.0) على Vercel — نجاح. APK v2.7 لا يحتاج تحديثاً (كل شيء خادمي).
+- رحلة المدرب الكاملة: /register?type=trainer → 4 خطوات → قصر الإدارة يوافق+يعرض النسبة → إشعار فوري → المدرب يوقّع في لوحته → معتمد بشارة ذهبية في «مدربينا» → يضيف حسابات سحبه حسب بلده → أرباحه تتدفق بالنسبة المتفق عليها.
