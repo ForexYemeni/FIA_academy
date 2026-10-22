@@ -12,6 +12,8 @@ import {
   Users2, Search, BadgeCheck, Crown,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+import { LuxCombo } from './luxury'
+import { useSpecializationCatalog } from '@/lib/use-specializations'
 import { useAuth } from '@/lib/auth-store'
 import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
@@ -130,7 +132,7 @@ export function StudentDashboard() {
   const [certificates, setCertificates] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
-  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', bio: splitBio(user?.bio || '') })
+  const [profile, setProfile] = useState({ name: user?.name || '', phone: user?.phone || '', title: user?.title || '', specialization: (user as any)?.specialization || '', bio: splitBio(user?.bio || '') })
 
   const loadEnrollments = () => {
     if (!user?.id) return
@@ -2899,6 +2901,14 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
 })
 
 const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser }: any) {
+  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة للمسمى الوظيفي والتخصص
+  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
+  const titleOpts = catTitles.length ? catTitles : [
+    { value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' },
+  ]
+  const specOpts = catSpecs.length ? catSpecs : [
+    { value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' },
+  ]
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
@@ -2913,6 +2923,7 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         body: JSON.stringify({
           phone: profile.phone,
           title: profile.title,
+          specialization: profile.specialization || '',
           bio: joinBio(profile.bio, user?.bio),
         }),
       })
@@ -2925,6 +2936,7 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         name: profile.name,
         phone: profile.phone,
         title: profile.title,
+        specialization: profile.specialization || '',
         bio: joinBio(profile.bio, user?.bio),
       })
       toast.success('تم حفظ ملفك الشخصي بنجاح')
@@ -2983,9 +2995,15 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
           </div>
           <div>
             <Label className="text-navy flex items-center gap-1.5 mb-1.5">
-              <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
+              <Briefcase className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
             </Label>
-            <Input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+            <LuxCombo value={profile.title} onChange={(v) => setProfile({ ...profile, title: v })} options={titleOpts} title="اختر المسمى الوظيفي" icon={Briefcase} searchPlaceholder="مدرب، أخصائي، محاضر..." placeholder="— اختر المسمى —" />
+          </div>
+          <div>
+            <Label className="text-navy flex items-center gap-1.5 mb-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-gold" /> التخصص
+            </Label>
+            <LuxCombo value={profile.specialization || ''} onChange={(v) => setProfile({ ...profile, specialization: v })} options={specOpts} title="اختر التخصص من الكتالوج العالمي" icon={BookOpen} searchPlaceholder="ابحث في التخصصات العالمية..." placeholder="— اختر التخصص —" />
           </div>
         </div>
         <div>

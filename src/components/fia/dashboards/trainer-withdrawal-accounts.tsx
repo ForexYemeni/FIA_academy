@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
 import { SectionCard } from './shell'
 import { LuxCombo } from './luxury'
+import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import {
   Landmark, Plus, Trash2, Loader2, Globe2, Wallet, Copy, Star, Coins, Info,
 } from 'lucide-react'
@@ -51,6 +52,9 @@ export function TrainerWithdrawalAccounts() {
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ country: 'اليمن', method_name: '', account_name: '', account_number: '', extra_info: '', is_default: false })
+  // 🔐 تأكيد الحذف بكلمة المرور
+  const [deleteFor, setDeleteFor] = useState<WAccount | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -103,13 +107,20 @@ export function TrainerWithdrawalAccounts() {
     setBusy(false)
   }
 
-  const removeAccount = async (id: string) => {
+  const removeAccount = async (id: string, password: string) => {
+    setDeleting(true)
     try {
-      const res = await fetch(`/api/trainer/withdrawal-accounts?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) { toast.error('تعذر الحذف'); return }
-      toast.success('حُذف الحساب')
+      const res = await fetch(`/api/trainer/withdrawal-accounts?id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-confirm-password': password },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(data.error || 'تعذر الحذف'); return }
+      toast.success('حُذف الحساب بتأكيد كلمة المرور')
+      setDeleteFor(null)
       load()
     } catch { toast.error('تعذر الاتصال') }
+    setDeleting(false)
   }
 
   return (
@@ -152,7 +163,7 @@ export function TrainerWithdrawalAccounts() {
                         <p className="flex items-center gap-1 text-[10px] text-muted-foreground"><Globe2 className="h-3 w-3" /> {a.country}{a.currency ? ` • ${a.currency}` : ''}</p>
                       </div>
                     </div>
-                    <button onClick={() => removeAccount(a.id)} className="rounded-lg p-1.5 text-red-500/70 transition-all hover:bg-red-50 hover:text-red-600 active:scale-90" title="حذف الحساب">
+                    <button onClick={() => setDeleteFor(a)} className="rounded-lg p-1.5 text-red-500/70 transition-all hover:bg-red-50 hover:text-red-600 active:scale-90" title="حذف الحساب — يتطلب تأكيد كلمة المرور">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -229,6 +240,18 @@ export function TrainerWithdrawalAccounts() {
           )}
         </>
       )}
+
+      {/* 🔐 حوار تأكيد الحذف بكلمة المرور — لا يُحذف حساب بلا تحقق */}
+      <PasswordConfirmDialog
+        open={!!deleteFor}
+        onOpenChange={(o) => !o && setDeleteFor(null)}
+        title="تأكيد حذف حساب السحب"
+        message={`سيتم حذف «${deleteFor?.method_name || ''}» (${deleteFor?.country || ''}) من حساباتك نهائياً. أدخل كلمة المرور الخاصة بك للمتابعة.`}
+        itemName={deleteFor?.method_name}
+        confirmLabel="حذف الحساب"
+        loading={deleting}
+        onConfirm={(password) => removeAccount(deleteFor!.id, password)}
+      />
     </SectionCard>
   )
 }

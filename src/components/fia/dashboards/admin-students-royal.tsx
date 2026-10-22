@@ -510,29 +510,13 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
           <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
             <div>
               <Label className="text-navy font-medium mb-1.5 block">المتدرب</Label>
-              <select
-                value={enrollUserId}
-                onChange={(e) => setEnrollUserId(e.target.value)}
-                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
-              >
-                <option value="">— اختر المتدرب —</option>
-                {items.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} {s.phone ? `— ${s.phone}` : ''}</option>
-                ))}
-              </select>
+              <LuxSelect value={enrollUserId} onChange={setEnrollUserId} title="اختر المتدرب" icon={UserPlus}
+                options={[{ value: '', label: '— اختر المتدرب —', emoji: '🎓' }, ...items.map((s: any) => ({ value: s.id, label: `${s.name}${s.phone ? ` — ${s.phone}` : ''}`, emoji: '🧑‍🎓' }))]} />
             </div>
             <div>
               <Label className="text-navy font-medium mb-1.5 block">الدورة</Label>
-              <select
-                value={enrollCourseId}
-                onChange={(e) => setEnrollCourseId(e.target.value)}
-                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
-              >
-                <option value="">— اختر الدورة —</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
+              <LuxSelect value={enrollCourseId} onChange={setEnrollCourseId} title="اختر الدورة" icon={BookOpen}
+                options={[{ value: '', label: '— اختر الدورة —', emoji: '📚' }, ...courses.map((c: any) => ({ value: c.id, label: c.title, emoji: '📖' }))]} />
             </div>
             <Button
               onClick={handleManualEnroll}

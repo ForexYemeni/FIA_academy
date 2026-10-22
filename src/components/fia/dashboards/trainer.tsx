@@ -7,7 +7,7 @@ import {
   HelpCircle, UserPlus, X, AlertTriangle, MessageSquare, Newspaper, Gift,
   GraduationCap, Crown, Calendar, Clock, TrendingUp,
   Phone, Briefcase, Sparkles, Award, KeyRound, Save, HeartHandshake, Wallet, Search, UserCheck,
-  ShieldCheck, ScrollText,
+  ShieldCheck, ScrollText, Coins, Send,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -34,6 +34,8 @@ import { TrainerEarnings } from './trainer-earnings'
 import { TrainerFollowersMuseum } from './trainer-followers'
 import { TrainerRoyalGate, TrainerStatus } from './trainer-royal-gate'
 import { TrainerWithdrawalAccounts } from './trainer-withdrawal-accounts'
+import { LuxCombo, LuxSelect } from './luxury'
+import { useSpecializationCatalog } from '@/lib/use-specializations'
 import { Landmark } from 'lucide-react'
 import { supabasePublic } from '@/lib/supabase'
 
@@ -103,6 +105,10 @@ export function TrainerDashboard() {
     bio: user?.bio || '',
     avatar: user?.avatar || '',
   })
+  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة للمسمى الوظيفي والتخصص (تُبنى داخل TrainerProfile أيضاً)
+  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
+  const titleOpts = catTitles.length ? catTitles : [{ value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' }]
+  const specOpts = catSpecs.length ? catSpecs : [{ value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' }]
 
   // 👑 حالة المنظومة الملكية: pending → agreement_pending → approved / rejected
   const [trainerStatus, setTrainerStatus] = useState<TrainerStatus | null>(null)
@@ -857,26 +863,20 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>المستوى</Label>
-              <select
-                value={form.level}
-                onChange={(e) => setForm({ ...form, level: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
-              >
-                <option value="مبتدئ">مبتدئ</option>
-                <option value="متوسط">متوسط</option>
-                <option value="متقدم">متقدم</option>
-              </select>
+              <LuxSelect value={form.level} onChange={(v) => setForm({ ...form, level: v })} title="مستوى الدورة" icon={BookOpen}
+                options={[
+                  { value: 'مبتدئ', label: 'مبتدئ', emoji: '🌱' },
+                  { value: 'متوسط', label: 'متوسط', emoji: '📈' },
+                  { value: 'متقدم', label: 'متقدم', emoji: '🏆' },
+                ]} />
             </div>
             <div>
               <Label>السعر</Label>
-              <select
-                value={form.price_type}
-                onChange={(e) => setForm({ ...form, price_type: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-input rounded-md bg-background"
-              >
-                <option value="مجانية">مجانية</option>
-                <option value="مدفوعة">مدفوعة</option>
-              </select>
+              <LuxSelect value={form.price_type} onChange={(v) => setForm({ ...form, price_type: v })} title="نوع الدورة" icon={Coins}
+                options={[
+                  { value: 'مجانية', label: 'مجانية', emoji: '🎁' },
+                  { value: 'مدفوعة', label: 'مدفوعة', emoji: '💳' },
+                ]} />
             </div>
           </div>
           {form.price_type === 'مدفوعة' && (
@@ -1283,18 +1283,11 @@ function TrainerStudents({ students, courses }: any) {
           <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
             <div>
               <Label className="text-navy font-medium mb-1.5 block">النطاق المستهدف</Label>
-              <select
-                value={broadcastCourse}
-                onChange={(e) => setBroadcastCourse(e.target.value)}
-                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
-              >
-                <option value="all">📣 جميع طلاب دوراتي ({courseRosters.reduce((a: number, c: any) => a + c.students_count, 0)})</option>
-                {courseRosters.filter((c: any) => c.students_count > 0).map((c: any) => (
-                  <option key={c.course_id} value={c.course_id}>
-                    {c.course_title} — {c.students_count} طالب
-                  </option>
-                ))}
-              </select>
+              <LuxSelect value={broadcastCourse} onChange={setBroadcastCourse} title="النطاق المستهدف للرسالة" icon={Send}
+                options={[
+                  { value: 'all', label: `جميع طلاب دوراتي (${courseRosters.reduce((a: number, c: any) => a + c.students_count, 0)})`, emoji: '📣' },
+                  ...courseRosters.filter((c: any) => c.students_count > 0).map((c: any) => ({ value: c.course_id, label: `${c.course_title} — ${c.students_count} طالب`, emoji: '📖' })),
+                ]} />
             </div>
             <div>
               <Label className="text-navy font-medium mb-1.5 block">عنوان الرسالة</Label>
@@ -1496,6 +1489,10 @@ function TrainerExams({ courses }: { courses: any[] }) {
 }
 
 function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile }: any) {
+  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة للمسمى الوظيفي والتخصص
+  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
+  const titleOpts = catTitles.length ? catTitles : [{ value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' }]
+  const specOpts = catSpecs.length ? catSpecs : [{ value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' }]
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
@@ -1604,10 +1601,14 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
                 <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-gold" /> التخصص
                 </Label>
-                <Input
+                <LuxCombo
                   value={profile.specialization}
-                  onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
-                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                  onChange={(v) => setProfile({ ...profile, specialization: v })}
+                  options={specOpts}
+                  title="اختر التخصص من الكتالوج"
+                  icon={Briefcase}
+                  searchPlaceholder="ابحث في التخصصات العالمية..."
+                  placeholder="— اختر التخصص —"
                 />
               </div>
               <div>
@@ -1637,10 +1638,14 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <Award className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
               </Label>
-              <Input
+              <LuxCombo
                 value={profile.title}
-                onChange={(e) => setProfile({ ...profile, title: e.target.value })}
-                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                onChange={(v) => setProfile({ ...profile, title: v })}
+                options={titleOpts}
+                title="اختر المسمى الوظيفي"
+                icon={Award}
+                searchPlaceholder="مدرب، استشاري، أخصائي، محاضر..."
+                placeholder="— اختر المسمى —"
               />
             </div>
           </div>

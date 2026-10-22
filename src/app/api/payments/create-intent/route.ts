@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       if (affiliate_code) {
-        try { await recordAffiliateReferral(affiliate_code, user_id, course_id, payment?.id || null, 0, 0) } catch {}
+        try { await recordAffiliateReferral(affiliate_code, user_id, course_id, null, 0, 0) } catch {}
       }
       try {
         await supabaseAdmin.from('notifications').insert({
@@ -186,15 +186,20 @@ export async function POST(req: NextRequest) {
       paymentUrl = data?.url || null
     }
 
-    return NextResponse.json({
-      intent_id: payment?.id,
-      amount: finalAmount,
-      currency: course.currency || 'ر.ي',
-      original_amount: course.price,
-      discount,
-      status: paymentUrl ? 'pending' : 'manual',
-      redirect_url: paymentUrl || `/?payment=pending`,
-    })
+      if (affiliate_code && payment?.id) {
+        // 💰 الإحالة المدفوعة تُسجّل الآن أيضاً — عمولتها تُحتسب عند اعتماد الدفعة
+        try { await recordAffiliateReferral(affiliate_code, user_id, course_id, payment.id, 0, 0) } catch {}
+      }
+
+      return NextResponse.json({
+        intent_id: payment?.id,
+        amount: finalAmount,
+        currency: course.currency || 'ر.ي',
+        original_amount: course.price,
+        discount,
+        status: paymentUrl ? 'pending' : 'manual',
+        redirect_url: paymentUrl || `/?payment=pending`,
+      })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -220,7 +225,9 @@ async function recordAffiliateReferral(
     affiliate_id: affiliate.id,
     student_id: studentId, course_id: courseId, payment_id: paymentId,
     amount, commission,
-    status: commission > 0 ? 'معلق' : 'مكتمل',
+    // الإحالات المرتبطة بدفعة حقيقية تبقى «معلق» حتى تعتمد الإدارة الدفعة
+    // فتُحتسب العمولة الفعلية وتُضاف للرصيد (creditAffiliateCommission)
+    status: paymentId ? 'معلق' : 'مكتمل',
   }).then(() => null).catch(() => null)
 
   const { data: current } = await supabaseAdmin

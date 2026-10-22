@@ -44,8 +44,9 @@ export async function PUT(req: NextRequest) {
     if (error) throw error
 
     // 🪞 مزامنة المرآة في public.users (نفس المعرف) — لتصلح الجداول المرتبطة بها
+    //    (specialization أصبح عموداً حقيقياً في users منذ الترحيل 026)
     const mirrorPatch: Record<string, string> = {}
-    for (const f of ['phone', 'title', 'bio', 'avatar']) if (patch[f] !== undefined) mirrorPatch[f] = patch[f]
+    for (const f of ['phone', 'title', 'specialization', 'bio', 'avatar']) if (patch[f] !== undefined) mirrorPatch[f] = patch[f]
     if (Object.keys(mirrorPatch).length > 0) {
       try { await supabaseAdmin.from('users').update(mirrorPatch).eq('id', user.id) } catch {}
     }

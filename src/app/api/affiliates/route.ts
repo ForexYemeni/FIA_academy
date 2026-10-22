@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin, guardAuth, getAuthUser } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { notifyAffiliateRegistered } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
   try {
@@ -66,9 +67,40 @@ function genUniqueCode(name: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => ({}))
+
+    // 🤝 الانضمام الذاتي — أي مستخدم مسجّل يفعّل حسابه في برنامج العمولة بنفسه
+    // (كان 403 للإدارة فقط — عطل كسر زر «انضم إلى البرنامج» في لوحات المتدرب والمدرب)
+    if (body.self_join) {
+      const g = await guardAuth(req)
+      if (!g.ok) return g.res
+      const u = g.user!
+      const name = String(body.name || u.name || '').trim()
+      const email = String(body.email || u.email || '').trim()
+      if (!name || !email) return NextResponse.json({ error: 'الاسم والبريد مطلوبان' }, { status: 400 })
+      const { data: existing } = await supabaseAdmin.from('affiliates').select('id').eq('user_id', u.id).maybeSingle()
+      if (existing) return NextResponse.json({ error: 'أنت مسجّل مسبقاً في برنامج العمولة' }, { status: 409 })
+      const { data: created, error: insErr } = await supabaseAdmin
+        .from('affiliates')
+        .insert({
+          name, email, phone: body.phone || (u as any).phone || null,
+          unique_code: body.unique_code || genUniqueCode(name),
+          commission_percent: body.commission_percent ?? 10,
+          status: 'نشط',
+          user_id: u.id,
+        })
+        .select()
+        .single()
+      if (insErr) {
+        if (insErr.message?.includes('duplicate')) return NextResponse.json({ error: 'الكود مستخدم بالفعل — أعد المحاولة' }, { status: 400 })
+        throw insErr
+      }
+      notifyAffiliateRegistered(name, email).catch(() => {})
+      return NextResponse.json(created, { status: 201 })
+    }
+
     const ga = await guardAdmin(req)
     if (!ga.ok) return ga.res
-    const body = await req.json()
     if (!body.name || !body.email) {
       return NextResponse.json({ error: 'الاسم والبريد مطلوبان' }, { status: 400 })
     }

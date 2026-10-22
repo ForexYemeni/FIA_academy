@@ -13,6 +13,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { LuxSelect } from './dashboards/luxury'
 import {
   Plus, Edit, Trash2, Save, Loader2, X, Crown, Star, Award, User,
   Phone, Mail, Briefcase, Eye, Target, Trophy, Linkedin, Twitter, Plus as PlusIcon, FileUp, PenTool,
@@ -555,11 +556,12 @@ function TeamMemberDialog({ open, onOpenChange, editing, defaultRole, onSave }: 
               <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                 <Star className="w-3.5 h-3.5 text-gold" /> الدور
               </Label>
-              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2.5 border border-gold/30 rounded-xl bg-white text-sm focus:border-gold focus:ring-gold/30 focus:outline-none">
-                <option value="founder">المؤسس</option>
-                <option value="leader">قائد</option>
-                <option value="team">فريق</option>
-              </select>
+              <LuxSelect value={role} onChange={setRole} title="دور العضو في الفريق" icon={Star}
+                options={[
+                  { value: 'founder', label: 'المؤسس', emoji: '👑' },
+                  { value: 'leader', label: 'قائد', emoji: '🎖️' },
+                  { value: 'team', label: 'فريق', emoji: '👥' },
+                ]} />
             </div>
           </div>
           <div>
