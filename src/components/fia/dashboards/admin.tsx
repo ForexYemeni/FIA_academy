@@ -29,6 +29,7 @@ import { TeamEditor } from '@/components/fia/team-editor'
 import { CourseContentManager } from '@/components/fia/course-content-manager'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
+import { RoyalGuideBanner } from '@/components/fia/royal-guide-banner'
 import {
   AdminCoupons, AdminAffiliates, AdminExamQuestions, AdminReviews,
   AdminForum, AdminBlog, AdminContact, AdminFaqs,
@@ -456,6 +457,13 @@ function AdminOverview() {
           </div>
         </div>
       </div>
+
+      {/* 🎓 الدليل الملكي — دورة إتقان إدارة الأكاديمية (سرية للإدارة فقط) */}
+      <RoyalGuideBanner
+        slug="fia-admin-guide"
+        title="دورة إتقان إدارة أكاديمية المستقبل الدولية"
+        subtitle="دليلك الملكي السرّي من الألف إلى الياء — كل أسرار لوحة الإدارة، درساً درساً. لا يراه أحد غيرك."
+      />
 
       {/* ⚡ Magical StatCards — 4 cards with gradient + glow + scale on hover */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">

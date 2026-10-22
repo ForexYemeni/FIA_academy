@@ -95,6 +95,8 @@ export default async function Page({ params }: Props) {
     .select('*')
     .eq('slug', slug)
     .neq('status', 'مسودة')
+    // 🛡️ دورات الإدارة السرية لا تُفتح من الرابط العام أبداً
+    .neq('visibility', 'admin_only')
     .maybeSingle()
 
   if (!course) {

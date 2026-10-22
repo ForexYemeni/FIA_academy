@@ -1,4 +1,4 @@
-// Run SQL migration 018 (royal rescue shield) directly via PostgreSQL pooler
+// Run SQL migration 019 (royal visibility) directly via PostgreSQL pooler
 import pg from 'pg'
 import fs from 'fs'
 import path from 'path'
@@ -30,7 +30,7 @@ async function apply(pool, sqlPath) {
   const statements = sql.split(';')
     .map((s) => s.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n').trim())
     .filter((s) => s.length > 0)
-  console.log('Running', statements.length, 'statements from 018...')
+  console.log('Running', statements.length, 'statements from 019...')
   for (const stmt of statements) {
     try {
       await pool.query(stmt)
@@ -43,7 +43,7 @@ async function apply(pool, sqlPath) {
 }
 
 async function main() {
-  const sqlPath = path.join(__dirname, '..', 'supabase', 'migrations', '018_danger_zone_snapshots.sql')
+  const sqlPath = path.join(__dirname, '..', 'supabase', 'migrations', '019_royal_visibility.sql')
   for (const [name, conf] of [['POOLER', CONF], ['DIRECT', DIRECT_CONF]]) {
     const pool = new Pool(conf)
     try {
