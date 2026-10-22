@@ -2,15 +2,16 @@
 
 // ============================================================================
 // TRAINER EARNINGS ROYAL — «أرباحي» — خزينة متعددة العملات
-// محفظة فاخرة للمدرب: الرصيد بكل عملة على حدة (دولار، ريال يمني، سعودي…)،
-// نسبة الأرباح من كل دورة، طريقة الاستلام (محلي أو عملات رقمية)، وطلبات
-// سحب تُرسل بالعملة نفسها التي رُبح بها — مع لقطات شاشة من الإدارة.
+// محفظة المدرب: الرصيد بكل عملة على حدة (دولار، ريال يمني، سعودي…)،
+// نسبة الأرباح من كل دورة، وطلبات سحب تُرسل بالعملة نفسها التي رُبح بها.
+// طريقة الاستلام تُستدعى حصراً من «حسابات السحب» التي أضافها المدرب بنفسه —
+// وإذا لم يضف حساباً يُوجَّه إلى القسم لإضافة طريقة قبل أي طلب سحب.
 // ============================================================================
 import { useEffect, useState, useCallback } from 'react'
 import {
   Wallet, TrendingUp, BadgePercent, Landmark, Bitcoin, CheckCircle2,
   Clock, XCircle, Image as ImageIcon, Send, Loader2, Sparkles, Crown, Coins,
-  ArrowDownToLine, Users, BookOpen, Eye, Banknote, Gem, ChevronDown,
+  ArrowDownToLine, Users, BookOpen, Eye, Gem, ChevronDown, Globe2, Copy, Star,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,11 +21,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { SectionCard } from './shell'
+import { LuxCombo } from './luxury'
 import { supabasePublic } from '@/lib/supabase'
 import { fmtMoney, currencyInfo } from '@/lib/currency'
 
-const LOCAL_METHODS = ['محفظة جيب', 'محفظة الكريمي', 'محفظة موبايل موني', 'حساب بنكي', 'الدفع عند المقابلة']
-const CRYPTO_METHODS = ['USDT (TRC20)', 'USDT (ERC20)', 'Binance Pay', 'Bitcoin (BTC)', 'Ethereum (ETH)']
+/** حساب سحب مضاف من المدرب في قسم «حسابات السحب» */
+interface WAccount {
+  id: string
+  country: string
+  method_name: string
+  currency: string | null
+  account_name: string
+  account_number: string | null
+  extra_info: string | null
+  is_default: boolean
+}
+
+/** نفس استنتاج نوع الطريقة الذي يطبقه الخادم — لأيقونة العرض */
+const isCryptoMethod = (name?: string | null, currency?: string | null) =>
+  /(usdt|bitcoin|btc|ethereum|\beth\b|binance|tron|tether|عملات\s*رقمية)/i.test(`${name || ''} ${currency || ''}`)
 
 function StatusChip({ status }: { status: string }) {
   if (status === 'مكتمل')
@@ -68,17 +83,13 @@ function MoneyLines({ byCur, pick, tone = 'navy' }: { byCur: Record<string, any>
 export function TrainerEarnings({ user }: { user: any }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
-
-  // payout method form
-  const [pmType, setPmType] = useState<'محلي' | 'عملات رقمية'>('محلي')
-  const [pmName, setPmName] = useState('')
-  const [pmAccount, setPmAccount] = useState('')
-  const [savingPm, setSavingPm] = useState(false)
+  const [accounts, setAccounts] = useState<WAccount[]>([])
 
   // withdrawal dialog
   const [wdOpen, setWdOpen] = useState(false)
   const [wdAmount, setWdAmount] = useState('')
   const [wdCurrency, setWdCurrency] = useState('')
+  const [wdAccountId, setWdAccountId] = useState('')
   const [wdSubmitting, setWdSubmitting] = useState(false)
 
   // screenshot viewer
@@ -87,24 +98,24 @@ export function TrainerEarnings({ user }: { user: any }) {
   const load = useCallback(async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`/api/trainer-earnings?trainer_id=${user.id}`)
-      const d = await res.json()
-      if (d && !d.error) {
-        setData(d)
-        setPmType(d.profile?.payment_method_type === 'عملات رقمية' ? 'عملات رقمية' : 'محلي')
-        setPmName(d.profile?.payment_method_name || '')
-        setPmAccount(d.profile?.payment_account || '')
-      }
+      const [eRes, aRes] = await Promise.all([
+        fetch(`/api/trainer-earnings?trainer_id=${user.id}`),
+        fetch('/api/trainer/withdrawal-accounts'),
+      ])
+      const d = await eRes.json().catch(() => null)
+      const a = await aRes.json().catch(() => null)
+      if (d && !d.error) setData(d)
+      if (Array.isArray(a)) setAccounts(a)
     } catch {}
     finally { setLoading(false) }
   }, [user?.id])
 
   useEffect(() => { load() }, [load])
 
-  // ⚡ REAL-TIME: new earnings + withdrawal decisions appear instantly
+  // ⚡ REAL-TIME: new earnings + withdrawal decisions + account changes appear instantly
   useEffect(() => {
     if (!user?.id) return
-    let ch1: any, ch2: any
+    let ch1: any, ch2: any, ch3: any
     try {
       ch1 = supabasePublic.channel(`trainer-earnings:${user.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_earnings' }, (payload: any) => {
@@ -118,25 +129,20 @@ export function TrainerEarnings({ user }: { user: any }) {
       ch2 = supabasePublic.channel(`trainer-withdrawals:${user.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_requests' }, () => load())
         .subscribe()
+      ch3 = supabasePublic.channel(`trainer-accounts:${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trainer_withdrawal_accounts' }, () => load())
+        .subscribe()
     } catch {}
     return () => {
       try { supabasePublic.removeChannel(ch1) } catch {}
       try { supabasePublic.removeChannel(ch2) } catch {}
+      try { supabasePublic.removeChannel(ch3) } catch {}
     }
   }, [user?.id, load])
 
-  const savePayoutMethod = async () => {
-    if (!pmName.trim() || !pmAccount.trim()) { toast.error('أدخل اسم الطريقة وبيانات الحساب'); return }
-    setSavingPm(true)
-    try {
-      const res = await fetch('/api/trainers', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, payment_method_type: pmType, payment_method_name: pmName.trim(), payment_account: pmAccount.trim() }),
-      })
-      if (res.ok) { toast.success('✨ تم حفظ طريقة استلام الأرباح'); load() }
-      else { const d = await res.json().catch(() => ({})); toast.error(d.error || 'فشل الحفظ') }
-    } catch { toast.error('خطأ في الاتصال') }
-    finally { setSavingPm(false) }
+  /** التحويل إلى قسم «حسابات السحب» داخل لوحة المدرب نفسها */
+  const goAccounts = () => {
+    try { window.location.hash = 'withdrawal-accounts' } catch {}
   }
 
   // ---- Multi-currency helpers ----
@@ -150,10 +156,20 @@ export function TrainerEarnings({ user }: { user: any }) {
   const wdTotals = byCur[wdCur] || { total_earned: 0, available: 0, withdrawn: 0, pending_withdrawals: 0 }
   const wdAvailable = wdTotals.available - wdTotals.pending_withdrawals
 
+  // 💳 حسابات الاستلام — تُستدعى من «حسابات السحب» مباشرة
+  const wdAccount = accounts.find((a) => a.id === wdAccountId) || accounts[0] || null
+  const accountOptions = accounts.map((a) => ({
+    value: a.id,
+    label: a.method_name,
+    hint: `${a.country}${a.account_name ? ' • ' + a.account_name : ''}`,
+    meta: a.currency || undefined,
+  }))
+
   const openWithdrawDialog = () => {
     const firstWithBalance = curEntries.find((c: any) => c.available > 0)?.currency || data?.primary_currency || 'ر.ي'
     setWdCurrency(firstWithBalance)
     setWdAmount('')
+    setWdAccountId(accounts[0]?.id || '')
     setWdOpen(true)
   }
 
@@ -161,11 +177,12 @@ export function TrainerEarnings({ user }: { user: any }) {
     const amount = parseInt(wdAmount) || 0
     if (amount <= 0) { toast.error('أدخل مبلغاً صحيحاً'); return }
     if (amount > wdAvailable) { toast.error(`المبلغ يتجاوز رصيدك المتاح بعملة ${wdCur} (${fmtMoney(wdAvailable, wdCur)})`); return }
+    if (!wdAccount) { toast.error('أضف حساب سحب أولاً من قسم «حسابات السحب»'); goAccounts(); return }
     setWdSubmitting(true)
     try {
       const res = await fetch('/api/trainer-earnings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trainer_id: user.id, amount, currency: wdCur }),
+        body: JSON.stringify({ trainer_id: user.id, amount, currency: wdCur, account_id: wdAccount.id }),
       })
       const d = await res.json()
       if (res.ok) {
@@ -184,7 +201,6 @@ export function TrainerEarnings({ user }: { user: any }) {
   const earnings = data?.earnings || []
   const withdrawals = data?.withdrawals || []
   const courses = data?.courses || []
-  const suggestions = pmType === 'محلي' ? LOCAL_METHODS : CRYPTO_METHODS
 
   return (
     <div className="space-y-6">
@@ -319,49 +335,64 @@ export function TrainerEarnings({ user }: { user: any }) {
         )}
       </SectionCard>
 
-      {/* ── طريقة استلام الأرباح ── */}
+      {/* ── طريقة استلام الأرباح — تُستدعى من «حسابات السحب» ── */}
       <SectionCard
         title="طريقة استلام الأرباح"
-        description="حدد كيف تريد استلام مستحقاتك — محلياً أو عبر العملات الرقمية"
+        description="تُصرف أرباحك إلى حساباتك المضافة في قسم «حسابات السحب» — أضف حساباً واحداً على الأقل لتصل أرباحك"
       >
-        {/* Type toggle */}
-        <div className="flex items-center gap-1 bg-gold/5 border border-gold/20 rounded-xl p-1 w-fit mb-4">
-          <button type="button" onClick={() => { setPmType('محلي'); if (!LOCAL_METHODS.includes(pmName)) setPmName('') }}
-            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${pmType === 'محلي' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
-            <Landmark className="w-3.5 h-3.5" /> محلي
-          </button>
-          <button type="button" onClick={() => { setPmType('عملات رقمية'); if (!CRYPTO_METHODS.includes(pmName)) setPmName('') }}
-            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${pmType === 'عملات رقمية' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
-            <Bitcoin className="w-3.5 h-3.5" /> عملات رقمية
-          </button>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
-          <div>
-            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-              {pmType === 'محلي' ? <Banknote className="w-3.5 h-3.5 text-gold" /> : <Coins className="w-3.5 h-3.5 text-gold" />} اسم الطريقة
-            </Label>
-            <Input value={pmName} onChange={(e) => setPmName(e.target.value)} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" placeholder={pmType === 'محلي' ? 'مثال: محفظة جيب' : 'مثال: USDT (TRC20)'} />
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {suggestions.map((s) => (
-                <button key={s} type="button" onClick={() => setPmName(s)}
-                  className="text-[10px] font-bold rounded-full border border-gold/25 bg-white hover:bg-gold/10 hover:border-gold/50 text-navy px-2.5 py-0.5 transition-colors">
-                  {s}
-                </button>
+        {accounts.length === 0 ? (
+          <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-l from-amber-500/[0.08] to-transparent p-5 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-gold/25 to-amber-500/15 border border-gold/40 flex items-center justify-center">
+              <Landmark className="w-6 h-6 text-[#8a6d1d]" />
+            </div>
+            <p className="text-sm font-bold text-navy">لا يوجد حساب سحب مضاف بعد</p>
+            <p className="text-[11px] text-muted-foreground mt-1 mb-4">أضف طريقة استلامك — محفظة، حوالة بنكية أو عملات رقمية — من قسم «حسابات السحب» ثم عد هنا لطلب سحب أرباحك</p>
+            <Button onClick={goAccounts} className="relative overflow-hidden bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl shadow-md active:scale-[0.97] transition-all">
+              <span className="absolute inset-0 lux-shimmer" />
+              <Landmark className="w-4 h-4 ml-1 relative" /> الانتقال إلى حسابات السحب لإضافة طريقة
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {accounts.map((a) => (
+                <div key={a.id} className="relative overflow-hidden rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.06] to-transparent p-3.5 hover:border-gold/50 transition-colors">
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-gold to-amber-500 opacity-70" />
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-navy to-navy-light border border-gold/30 flex items-center justify-center flex-shrink-0">
+                      {isCryptoMethod(a.method_name, a.currency) ? <Bitcoin className="w-5 h-5 text-gold" /> : <Landmark className="w-5 h-5 text-gold" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-navy flex items-center gap-1.5 truncate">
+                        {a.method_name}
+                        {a.is_default && <Star className="w-3.5 h-3.5 fill-gold text-gold flex-shrink-0" />}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                        <Globe2 className="w-3 h-3" /> {a.country}
+                        {a.currency && <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[9px] font-black text-[#8a6d1d]" dir="ltr">{a.currency}</span>}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    <p className="flex justify-between gap-2"><span className="text-muted-foreground">صاحب الحساب:</span><span className="font-bold text-navy truncate">{a.account_name}</span></p>
+                    {a.account_number && (
+                      <p className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">الرقم / العنوان:</span>
+                        <button onClick={() => { navigator.clipboard?.writeText(a.account_number || '').catch(() => {}); toast.success('نُسخ رقم الحساب') }}
+                          className="flex items-center gap-1 font-mono font-bold text-navy hover:text-[#8a6d1d] transition-colors" dir="ltr">
+                          {a.account_number} <Copy className="w-3 h-3 flex-shrink-0" />
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-          <div>
-            <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-              <Wallet className="w-3.5 h-3.5 text-gold" /> {pmType === 'محلي' ? 'رقم المحفظة / الحساب' : 'عنوان المحفظة الرقمية'}
-            </Label>
-            <Input value={pmAccount} onChange={(e) => setPmAccount(e.target.value)} dir="ltr" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 font-bold" placeholder={pmType === 'محلي' ? '7XXXXXXXX' : 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'} />
-            <p className="text-[10px] text-muted-foreground mt-2">تظهر للإدارة فقط عند معالجة طلبات السحب — محفوظة بأمان</p>
-          </div>
-        </div>
-        <Button onClick={savePayoutMethod} disabled={savingPm} className="mt-4 bg-gradient-to-l from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all">
-          {savingPm ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 ml-1" />}
-          حفظ طريقة الاستلام
-        </Button>
+            <Button variant="outline" onClick={goAccounts} className="mt-3 w-full rounded-xl border-gold/40 hover:bg-gold/10 text-navy text-xs font-bold">
+              <Landmark className="w-4 h-4 ml-1" /> إدارة حسابات السحب — إضافة أو حذف حساب
+            </Button>
+          </>
+        )}
       </SectionCard>
 
       {/* ── سجل طلبات السحب ── */}
@@ -385,7 +416,7 @@ export function TrainerEarnings({ user }: { user: any }) {
                       {fmtMoney(w.amount, w.currency)}
                       <CurrencyPill currency={w.currency} size="xs" />
                     </p>
-                    <p className="text-[10px] text-muted-foreground">{w.method_name || w.method_type} • <span dir="ltr">{w.account}</span></p>
+                    <p className="text-[10px] text-muted-foreground">{w.method_name || w.method_type}{w.account_owner ? ` — ${w.account_owner}` : ''} • <span dir="ltr">{w.account}</span>{w.account_country ? ` • ${w.account_country}` : ''}</p>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(w.created_at).toLocaleString('ar-EG')}</p>
                   </div>
                   <StatusChip status={w.status} />
@@ -482,6 +513,25 @@ export function TrainerEarnings({ user }: { user: any }) {
                 </div>
               )}
             </div>
+            {/* 💳 حساب الاستلام — يُستدعى حصراً من «حسابات السحب» المضافة */}
+            {accounts.length === 0 ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4 text-center">
+                <Landmark className="w-8 h-8 mx-auto mb-2 text-amber-600/70" />
+                <p className="text-sm font-bold text-navy">لا يوجد حساب سحب مضاف بعد</p>
+                <p className="text-[11px] text-muted-foreground mt-1 mb-3">أضف حسابك أولاً في قسم «حسابات السحب» ثم عد لطلب سحب أرباحك</p>
+                <Button onClick={() => { setWdOpen(false); goAccounts() }} size="sm" className="bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold rounded-xl">
+                  <Landmark className="w-4 h-4 ml-1" /> الانتقال إلى حسابات السحب
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs font-extrabold text-navy flex items-center gap-1.5 mb-2">
+                  <Landmark className="w-3.5 h-3.5 text-gold" /> حساب استلام الأرباح — من حساباتك المضافة
+                </Label>
+                <LuxCombo value={wdAccount?.id || ''} onChange={(v) => setWdAccountId(v)} options={accountOptions} searchPlaceholder="ابحث في حساباتك..." />
+                <p className="mt-1.5 text-[10px] text-muted-foreground">تظهر بيانات الحساب للإدارة فقط عند معالجة الطلب — محفوظة بأمان</p>
+              </div>
+            )}
             <div className="relative overflow-hidden rounded-xl bg-gradient-to-l from-navy via-navy-light to-navy p-4 text-white border border-gold/30">
               <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }} />
               <div className="relative flex items-center justify-between">
@@ -502,17 +552,23 @@ export function TrainerEarnings({ user }: { user: any }) {
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center gap-2.5">
-              {pmType === 'محلي' ? <Landmark className="w-4 h-4 text-gold flex-shrink-0" /> : <Bitcoin className="w-4 h-4 text-gold flex-shrink-0" />}
-              <div className="text-[11px] text-muted-foreground leading-relaxed">
-                يُحوَّل <b className="text-navy" dir="ltr">{fmtMoney(parseInt(wdAmount) || 0, wdCur)}</b> إلى: <b className="text-navy">{pmName || 'طريقة الدفع المسجلة'}</b>
-                {pmAccount && <> — <span dir="ltr" className="text-navy font-bold">{pmAccount}</span></>}
+            {wdAccount && (
+              <div className="rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-start gap-2.5">
+                {isCryptoMethod(wdAccount.method_name, wdAccount.currency) ? <Bitcoin className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" /> : <Landmark className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />}
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  {'\u064a\u064f\u062d\u0648\u0651\u064e\u0644'} <b className="text-navy" dir="ltr">{fmtMoney(parseInt(wdAmount) || 0, wdCur)}</b> إلى: <b className="text-navy">{wdAccount.method_name}</b>
+                  {wdAccount.account_number && <> — <span dir="ltr" className="text-navy font-bold">{wdAccount.account_number}</span></>}
+                  {wdAccount.account_name && <> باسم <b className="text-navy">{wdAccount.account_name}</b></>}
+                  {wdAccount.currency && wdAccount.currency !== wdCur && (
+                    <p className="mt-1 text-amber-600">ملاحظة: عملة الحساب ({wdAccount.currency}) تختلف عن عملة السحب ({wdCur}) — الإدارة ستنسّق التحويل عند المعالجة</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWdOpen(false)}>إلغاء</Button>
-            <Button onClick={submitWithdrawal} disabled={wdSubmitting || wdAvailable <= 0} className="bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
+            <Button onClick={submitWithdrawal} disabled={wdSubmitting || wdAvailable <= 0 || accounts.length === 0 || !wdAccount} className="bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
               {wdSubmitting ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Send className="w-4 h-4 ml-1" />}
               إرسال الطلب للإدارة
             </Button>
