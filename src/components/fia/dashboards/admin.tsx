@@ -10,7 +10,7 @@ import {
   Loader2, FileUp, Clock, RefreshCw, AlertTriangle,
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
-  Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound,
+  Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { useAuth } from '@/lib/auth-store'
@@ -40,6 +40,7 @@ import { AdminCertificatesRoyal } from './admin-certificates-royal'
 import { AdminExamQuestionsRoyal } from './admin-questions-royal'
 import { AdminAffiliatesRoyal } from './admin-affiliates-royal'
 import { AdminForumRoyal } from './admin-forum-royal'
+import { AdminTrainerEarningsRoyal } from './admin-trainer-earnings-royal'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxCombo, LuxEmpty,
   LuxBadge, LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput, luxTheme,
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { id: 'exam-questions', label: 'بنك الأسئلة', icon: HelpCircle },
   { id: 'students', label: 'المتدربون', icon: Users },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
+  { id: 'trainer-earnings', label: 'أرباح المدربين', icon: Wallet },
   { id: 'payment-methods', label: 'طرق الدفع', icon: DollarSign },
   { id: 'coupons', label: 'كوبونات الخصم', icon: Gift },
   { id: 'affiliates', label: 'المسوّقون', icon: Users },
@@ -132,6 +134,7 @@ export function AdminDashboard() {
       {active === 'exam-questions' && <AdminExamQuestionsRoyal />}
       {active === 'students' && <AdminStudentsRoyal />}
       {active === 'payments' && <AdminPayments />}
+      {active === 'trainer-earnings' && <AdminTrainerEarningsRoyal />}
       {active === 'payment-methods' && <AdminPaymentMethods />}
       {active === 'coupons' && <AdminCoupons />}
       {active === 'affiliates' && <AdminAffiliatesRoyal />}

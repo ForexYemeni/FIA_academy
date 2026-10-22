@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react'
 import {
   GraduationCap, Plus, Edit, Trash2, Mail, Phone, Lock, Eye, EyeOff, User,
   Award, Briefcase, FileText, Crown, Loader2, CheckCircle2, Users, Sparkles,
-  CalendarClock, BadgeCheck, Upload, X,
+  CalendarClock, BadgeCheck, Upload, X, BadgePercent, Landmark, Bitcoin, Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -201,10 +201,20 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                     <div className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{t.specialization}</div>
                   )}
                   {/* Info chips */}
-                  <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                  <div className="flex items-center justify-center flex-wrap gap-1.5 pt-0.5">
                     {years > 0 && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-500/10 border border-blue-500/25 rounded-full px-2 py-0.5">
                         <CalendarClock className="w-3 h-3" /> {years} سنة خبرة
+                      </span>
+                    )}
+                    {(Number(t.profit_percentage) || 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6d1d] bg-gold/15 border border-gold/40 rounded-full px-2 py-0.5">
+                        <BadgePercent className="w-3 h-3" /> {Number(t.profit_percentage)}% أرباح
+                      </span>
+                    )}
+                    {t.payment_method_name && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
+                        {t.payment_method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />} {t.payment_method_name}
                       </span>
                     )}
                   </div>
@@ -247,18 +257,21 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
 })
 
 // ============================================================================
-// TRAINER DIALOG — professional 2-column royal form with luxury dropdowns
+// TRAINER DIALOG — ROYAL PROFILE-STYLE (مثل الملف الشخصي في حساب المدرب تماماً)
+// بطاقة بطل كحلية بنقاط ذهبية + بطاقات حقول فاخرة + نظام الأرباح وطريقة الاستلام
 // ============================================================================
 function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 }
+    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '' }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   useEffect(() => {
-    setForm(initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0 })
+    setForm(initial
+      ? { profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', ...initial }
+      : { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '' })
   }, [initial])
 
   const handleAvatarUpload = async (file: File) => {
@@ -315,7 +328,10 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
       const res = await fetch('/api/trainers', {
         method: initial ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(initial ? { id: initial.id, ...form } : form),
+        body: JSON.stringify({
+          ...(initial ? { id: initial.id, ...form } : form),
+          profit_percentage: Number(form.profit_percentage) || 0,
+        }),
       })
       if (res.ok) {
         toast.success(initial ? 'تم تحديث بيانات المدرب' : 'تمت إضافة المدرب بنجاح')
@@ -326,12 +342,18 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
     } catch { toast.error('خطأ') } finally { setSaving(false) }
   }
 
+  const pct = Number(form.profit_percentage) || 0
+  const PCT_PRESETS = [10, 20, 25, 30, 40, 50]
+  const PM_SUGGESTIONS = form.payment_method_type === 'عملات رقمية'
+    ? ['USDT (TRC20)', 'USDT (ERC20)', 'Binance Pay', 'Bitcoin (BTC)', 'Ethereum (ETH)']
+    : ['محفظة جيب', 'محفظة الكريمي', 'محفظة موبايل موني', 'حساب بنكي', 'الدفع عند المقابلة']
+
   return (
     <LuxDialog
       open={open}
       onOpenChange={onOpenChange}
       title={initial ? 'تعديل المدرب' : 'إضافة مدرب جديد'}
-      subtitle={initial ? 'تحديث بيانات المدرب الاحترافية' : 'سجّل عضو هيئة تدريس جديد في الأكاديمية'}
+      subtitle={initial ? 'تحديث الملف الشخصي الفاخر للمدرب' : 'سجّل عضو هيئة تدريس جديد في الأكاديمية'}
       icon={GraduationCap}
       gradient="from-[#061024] via-navy to-[#1d2b52]"
       maxWidth="sm:max-w-2xl"
@@ -340,23 +362,28 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           onCancel={() => onOpenChange(false)}
           onSave={save}
           saving={saving}
-          saveLabel={initial ? 'تحديث البيانات' : 'إضافة المدرب'}
+          saveLabel={initial ? 'تحديث الملف' : 'إضافة المدرب'}
           icon={CheckCircle2}
           gradient="from-gold to-amber-500"
           text="text-navy"
         />
       }
     >
-      {/* ── Section 1: الهوية ─────────────────────────────────────── */}
-      <FormSectionTitle icon={User} label="الهوية الشخصية" />
-      <div className="flex items-center gap-4">
-        <div className="relative flex-shrink-0">
-          <div className="absolute inset-0 bg-gold/40 blur-md rounded-full" />
-          <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-gold/50 shadow-lg bg-navy-light">
+      {/* ── بطاقة البطل: الصورة الرسمية (نمط الملف الشخصي في حساب المدرب) ── */}
+      <div className="relative flex flex-col items-center gap-3 p-6 rounded-2xl border border-gold/30 bg-gradient-to-br from-navy via-navy-light to-navy overflow-hidden">
+        <div className="absolute inset-0 opacity-25" style={{
+          backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 18px 18px',
+        }} />
+        <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-gold/10 rounded-full blur-2xl" />
+        <div className="relative">
+          <div className="absolute inset-0 bg-gold/40 blur-lg rounded-full" />
+          <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-gold/60 shadow-xl bg-navy-light">
             {form.avatar ? (
               <img src={form.avatar} alt="صورة المدرب" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-3xl bg-gradient-to-br from-navy to-navy-light">
+              <div className="w-full h-full flex items-center justify-center text-gold font-extrabold text-3xl bg-gradient-to-br from-gold/25 to-amber-600/25">
                 {form.name?.charAt(0) || '؟'}
               </div>
             )}
@@ -366,29 +393,40 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
             onClick={() => document.getElementById('trainer-avatar-royal')?.click()}
             disabled={uploadingAvatar}
             className="absolute -bottom-1.5 -left-1.5 w-8 h-8 rounded-full bg-gradient-to-br from-gold to-amber-500 text-navy flex items-center justify-center shadow-md border-2 border-white disabled:opacity-50 hover:scale-110 transition-transform"
-            title="رفع صورة"
+            title="رفع صورة المدرب الرسمية"
             type="button"
           >
             {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
           </button>
         </div>
-        <div className="flex-1 space-y-3">
-          <LuxField label="اسم المدرب" icon={User} required>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم الكامل للمدرب" className={luxInput} />
-          </LuxField>
-          <LuxField label="سنوات الخبرة" icon={Briefcase}>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setForm({ ...form, years_experience: Math.max(0, (parseInt(form.years_experience) || 0) - 1) })}
-                className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm transition-colors">−</button>
-              <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} dir="ltr" className={luxInput + ' text-center font-bold'} placeholder="0" />
-              <button type="button" onClick={() => setForm({ ...form, years_experience: (parseInt(form.years_experience) || 0) + 1 })}
-                className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm transition-colors">+</button>
-            </div>
-          </LuxField>
+        <div className="relative text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/15 border border-gold/30 mb-1">
+            <Sparkles className="w-3 h-3 text-gold" />
+            <span className="text-[10px] font-bold text-gold">صورة المدرب الرسمية</span>
+          </div>
+          <p className="text-xs font-extrabold text-white">{form.name || 'اسم المدرب يظهر هنا'}</p>
+          <p className="text-[9px] text-white/60">{form.title || 'المسمى المهني'}{form.specialization ? ` • ${form.specialization}` : ''}</p>
         </div>
       </div>
 
-      {/* ── Section 2: البيانات المهنية — القوائم المنسدلة السحرية (نمط قسم الدورات) ── */}
+      {/* ── الهوية الشخصية ── */}
+      <FormSectionTitle icon={User} label="الهوية الشخصية" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <LuxField label="اسم المدرب" icon={User} required>
+          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم الكامل للمدرب" className={luxInput} />
+        </LuxField>
+        <LuxField label="سنوات الخبرة" icon={Briefcase}>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setForm({ ...form, years_experience: Math.max(0, (parseInt(form.years_experience) || 0) - 1) })}
+              className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm transition-colors">−</button>
+            <Input type="number" value={form.years_experience || ''} onChange={(e) => setForm({ ...form, years_experience: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })} dir="ltr" className={luxInput + ' text-center font-bold'} placeholder="0" />
+            <button type="button" onClick={() => setForm({ ...form, years_experience: (parseInt(form.years_experience) || 0) + 1 })}
+              className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm transition-colors">+</button>
+          </div>
+        </LuxField>
+      </div>
+
+      {/* ── البيانات المهنية ── */}
       <FormSectionTitle icon={Award} label="البيانات المهنية" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <LuxPicker
@@ -411,7 +449,75 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         />
       </div>
 
-      {/* ── Section 3: بيانات الحساب ──────────────────────────────── */}
+      {/* ── 💰 نظام الأرباح — نسبته من كل دورة على كل متدرب ── */}
+      <FormSectionTitle icon={Crown} label="نظام الأرباح — نسبته من كل دورة" />
+      <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-4 space-y-3">
+        <LuxField label="نسبة الربح من كل اشتراك (%)" icon={BadgePercent} hint="تُضاف أرباحه تلقائياً لمحفظته بعد موافقتك على دفع أي متدرب">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setForm({ ...form, profit_percentage: Math.max(0, pct - 5) })}
+              className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm">−</button>
+            <Input type="number" min={0} max={100} value={form.profit_percentage || ''} onChange={(e) => setForm({ ...form, profit_percentage: e.target.value === '' ? 0 : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })} dir="ltr" className={luxInput + ' text-center font-extrabold text-lg'} placeholder="0" />
+            <button type="button" onClick={() => setForm({ ...form, profit_percentage: Math.min(100, pct + 5) })}
+              className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm">+</button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {PCT_PRESETS.map((p) => (
+              <button key={p} type="button" onClick={() => setForm({ ...form, profit_percentage: p })}
+                className={`text-[10px] font-extrabold rounded-full border px-2.5 py-1 transition-colors ${pct === p ? 'bg-gradient-to-l from-navy to-navy-light text-gold border-navy shadow' : 'border-gold/25 bg-white hover:bg-gold/10 text-navy'}`}>
+                {p}%
+              </button>
+            ))}
+          </div>
+        </LuxField>
+        {/* Live preview — يظهر للمدرب كم نسبته */}
+        <div className="rounded-xl bg-gradient-to-l from-navy to-navy-light p-3.5 text-white border border-gold/40 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }} />
+          <div className="relative flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gold/20 border border-gold/40 flex items-center justify-center flex-shrink-0">
+              <BadgePercent className="w-5 h-5 text-gold" />
+            </div>
+            <div className="text-[11px] leading-relaxed">
+              {pct > 0 ? (
+                <>من كل اشتراك بقيمة <b className="text-gold">100 ر.ي</b> تُضاف له <b className="text-gold text-sm" dir="ltr">{pct} ر.ي</b> تلقائياً إلى «أرباحي» بعد تأكيد الدفع</>
+              ) : (
+                <span className="text-gold/80">النسبة 0% — لن تُسجل أرباح للمدرب حتى تحدد نسبته</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 🏦 طريقة استلام الأرباح ── */}
+      <FormSectionTitle icon={Landmark} label="طريقة استلام الأرباح" />
+      <div className="rounded-xl border border-gold/25 bg-white p-4 space-y-3">
+        <div className="flex items-center gap-1 bg-gold/5 border border-gold/20 rounded-xl p-1 w-fit">
+          <button type="button" onClick={() => setForm({ ...form, payment_method_type: 'محلي', payment_method_name: '' })}
+            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${form.payment_method_type !== 'عملات رقمية' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
+            <Landmark className="w-3.5 h-3.5" /> محلي
+          </button>
+          <button type="button" onClick={() => setForm({ ...form, payment_method_type: 'عملات رقمية', payment_method_name: '' })}
+            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${form.payment_method_type === 'عملات رقمية' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
+            <Bitcoin className="w-3.5 h-3.5" /> عملات رقمية
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <LuxField label="اسم الطريقة">
+            <Input value={form.payment_method_name || ''} onChange={(e) => setForm({ ...form, payment_method_name: e.target.value })} className={luxInput} placeholder={form.payment_method_type === 'عملات رقمية' ? 'USDT (TRC20)' : 'محفظة جيب'} />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {PM_SUGGESTIONS.map((s) => (
+                <button key={s} type="button" onClick={() => setForm({ ...form, payment_method_name: s })}
+                  className="text-[9px] font-bold rounded-full border border-gold/25 bg-white hover:bg-gold/10 hover:border-gold/50 text-navy px-2 py-0.5 transition-colors">{s}</button>
+              ))}
+            </div>
+          </LuxField>
+          <LuxField label={form.payment_method_type === 'عملات رقمية' ? 'عنوان المحفظة الرقمية' : 'رقم المحفظة / الحساب'}>
+            <Input value={form.payment_account || ''} onChange={(e) => setForm({ ...form, payment_account: e.target.value })} dir="ltr" className={luxInput + ' font-bold'} placeholder={form.payment_method_type === 'عملات رقمية' ? 'TXXXX...' : '7XXXXXXXX'} />
+          </LuxField>
+        </div>
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> يستطيع المدرب تعديل طريقة الاستلام من قسم «أرباحي» في لوحته</p>
+      </div>
+
+      {/* ── بيانات الحساب والتواصل ── */}
       <FormSectionTitle icon={Lock} label="بيانات الحساب والتواصل" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <LuxField label="البريد الإلكتروني" icon={Mail} required>
@@ -432,13 +538,13 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           <div className="w-full rounded-xl border border-gold/25 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-gold flex-shrink-0" />
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              كلمة المرور تُستخدم لدخول المدرب إلى لوحته الخاصة وإدارة دوراته ومتدربيه.
+              كلمة المرور تُستخدم لدخول المدرب إلى لوحته الخاصة وإدارة دوراته ومتدربيه وأرباحه.
             </p>
           </div>
         </div>
       </div>
 
-      {/* ── Section 4: النبذة ─────────────────────────────────────── */}
+      {/* ── النبذة ── */}
       <FormSectionTitle icon={FileText} label="النبذة التعريفية الكاملة" />
       <textarea
         value={form.bio || ''}

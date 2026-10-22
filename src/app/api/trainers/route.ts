@@ -197,6 +197,11 @@ export async function POST(req: NextRequest) {
         phone: body.phone || null,
         courses_count: body.courses_count || 0,
         years_experience: body.years_experience || 0,
+        // Earnings system — profit share per course per student + payout method
+        profit_percentage: typeof body.profit_percentage === 'number' ? body.profit_percentage : 0,
+        payment_method_type: body.payment_method_type || 'محلي',
+        payment_method_name: body.payment_method_name || null,
+        payment_account: body.payment_account || null,
       })
       .select()
       .single()
@@ -220,7 +225,7 @@ export async function PUT(req: NextRequest) {
     // Bio is stored as plain string now — no encoding.
     // We only update fields that are explicitly provided.
     const patch: any = {}
-    for (const key of ['name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count']) {
+    for (const key of ['name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count', 'profit_percentage', 'payment_method_type', 'payment_method_name', 'payment_account']) {
       if (updates[key] !== undefined) patch[key] = updates[key]
     }
     // Password update is optional — only set if provided and non-empty

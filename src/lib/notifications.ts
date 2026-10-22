@@ -390,3 +390,31 @@ export async function resolveTrainerUserId(trainerRef: string | null | undefined
   } catch {}
   return null
 }
+
+// === TRAINER EARNINGS (أرباح المدرب) ===
+
+/** A trainer earned money because the admin approved a student payment. */
+export async function notifyTrainerNewEarning(trainerUserId: string, amount: number, currency: string, courseTitle: string, percentage: number) {
+  await send(trainerUserId, 'earning', '💰 أرباح جديدة في محفظتك',
+    `تمت موافقة الإدارة على دفعة متدرب جديد في دورة "${courseTitle}" — أُضيفت إليك ${amount.toLocaleString('en-US')} ${currency} (${percentage}% من قيمة الاشتراك).`, '/#earnings')
+}
+
+/** The admin approved a withdrawal request — money sent + screenshot proof. */
+export async function notifyWithdrawalApproved(trainerUserId: string, amount: number, currency: string, hasScreenshot: boolean) {
+  await send(trainerUserId, 'withdrawal', '✅ تمت الموافقة على سحب أرباحك',
+    `وافقت الإدارة على طلب سحبك بمبلغ ${amount.toLocaleString('en-US')} ${currency}${hasScreenshot ? ' وأرفقت لقطة شاشة لإثبات التحويل — تجدها في قسم «أرباحي»' : ''}.`, '/#earnings')
+}
+
+/** The admin rejected a withdrawal request. */
+export async function notifyWithdrawalRejected(trainerUserId: string, amount: number, currency: string, reason?: string | null) {
+  await send(trainerUserId, 'withdrawal', '❌ تم رفض طلب سحب الأرباح',
+    `رُفض طلب سحبك بمبلغ ${amount.toLocaleString('en-US')} ${currency}${reason ? ` — السبب: ${reason}` : ''}. المبلغ عاد إلى رصيدك المتاح.`, '/#earnings')
+}
+
+/** Notify all admin accounts (used for withdrawal requests etc.). */
+export async function notifyAdmins(type: string, title: string, body?: string, link?: string) {
+  try {
+    const ids = await getAdminIds()
+    await sendToMany(ids, type, title, body, link)
+  } catch {}
+}

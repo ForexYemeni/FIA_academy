@@ -19,7 +19,7 @@ import { supabasePublic } from '@/lib/supabase'
 import {
   MessageSquare, Plus, ArrowRight, Eye, Reply, Pin, Trash2, Ban,
   Newspaper, HelpCircle, ChevronDown, Clock, Loader2, AlertTriangle,
-  Send, Shield, CheckCircle2, Search, X, ThumbsUp, ThumbsDown, Heart, MessageCircle,
+  Send, Shield, CheckCircle2, Search, X, ThumbsUp, ThumbsDown, Heart, MessageCircle, Sparkles,
 } from 'lucide-react'
 
 // ============================================================================
@@ -738,7 +738,8 @@ function BlogAuthorChip({ author, compact }: { author?: any; compact?: boolean }
   )
 }
 
-// ROYAL new-post dialog — trainers/admins publish topics that carry their name
+// ROYAL new-post dialog — trainers/admins publish topics that carry their name.
+// v4.3 — نفس محرر الإدارة تماماً: رفع صورة الغلاف (وليس رابطاً) + معاينة حية.
 function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
   const [title, setTitle] = useState('')
   const [excerpt, setExcerpt] = useState('')
@@ -746,6 +747,67 @@ function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
   const [tags, setTags] = useState('')
   const [cover, setCover] = useState('')
   const [saving, setSaving] = useState(false)
+  // Cover image source: 'upload' (default — like the admin editor) or 'url'
+  const [coverMode, setCoverMode] = useState<'upload' | 'url'>('upload')
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [preview, setPreview] = useState(false)
+
+  const reset = () => { setTitle(''); setExcerpt(''); setBody(''); setTags(''); setCover(''); setCoverMode('upload'); setPreview(false) }
+
+  // Client-side cover compression — identical to the admin editor (fast on
+  // slow mobile connections, keeps uploads under 1MB).
+  const compressCoverImage = (file: File, maxW = 1600, maxH = 900, quality = 0.82): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          let { width, height } = img
+          const scale = Math.min(maxW / width, maxH / height, 1)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, width, height)
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { reject(new Error('فشل ضغط الصورة')); return }
+              resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+            },
+            'image/jpeg',
+            quality
+          )
+        }
+        img.onerror = () => reject(new Error('فشل تحميل الصورة'))
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('فشل قراءة الملف'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleCoverUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('الرجاء اختيار صورة (JPG / PNG / WebP)'); return }
+    if (file.size > 10 * 1024 * 1024) { toast.error('حجم الصورة كبير جداً (حد أقصى 10 ميجابايت)'); return }
+    setUploadingCover(true)
+    try {
+      const compressed = await compressCoverImage(file)
+      const fd = new FormData()
+      fd.append('file', compressed)
+      fd.append('folder', 'blog-covers')
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'فشل رفع الصورة'); return }
+      setCover(data.url)
+      toast.success('تم رفع صورة الغلاف')
+    } catch (e: any) {
+      toast.error(e?.message || 'خطأ في رفع الصورة')
+    } finally {
+      setUploadingCover(false)
+    }
+  }
 
   const save = async () => {
     if (!title.trim() || !body.trim()) { toast.error('العنوان والمحتوى مطلوبان'); return }
@@ -759,53 +821,155 @@ function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'فشل النشر'); return }
       toast.success('📜 تم نشر موضوعك — اسمك يتألق الآن على المقال')
-      setTitle(''); setExcerpt(''); setBody(''); setTags(''); setCover('')
+      reset()
       onCreated?.(data)
       onOpenChange(false)
     } finally { setSaving(false) }
   }
 
   const rid = blogAuthorIdentity(user)
+  const inputCls = 'rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Newspaper className="w-5 h-5 text-gold" /> موضوع جديد في المدونة {rid.label === 'مدرب معتمد' ? '— باسمك كمدرب معتمد' : ''}
-          </DialogTitle>
-        </DialogHeader>
-        {/* Live author preview — the name shines */}
-        <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center justify-between gap-3">
-          <BlogAuthorChip author={user} />
-          <span className="text-[10px] text-muted-foreground font-bold">سيظهر اسمك بهذه الهيبة على الموضوع</span>
-        </div>
-        <div className="space-y-3 py-2">
-          <div>
-            <Label>العنوان *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" placeholder="عنوان فاخر يلخص موضوعك" />
-          </div>
-          <div>
-            <Label>مقتطف قصير</Label>
-            <Input value={excerpt} onChange={(e) => setExcerpt(e.target.value)} className="mt-1" placeholder="سطران يلخصان الفكرة — يظهران في البطاقة" />
-          </div>
-          <div>
-            <Label>المحتوى *</Label>
-            <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={9} className="mt-1" placeholder="اكتب موضوعك بالتفصيل..." />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>وسوم (فاصلة بينها)</Label>
-              <Input value={tags} onChange={(e) => setTags(e.target.value)} className="mt-1" placeholder="تدريب, طب" />
+      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 border-0">
+        {/* Royal header — same as the admin editor */}
+        <div className="relative bg-gradient-to-br from-purple-700 via-purple-800 to-fuchsia-800 p-5 pb-6">
+          <div className="absolute inset-0 opacity-25" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px, 18px 18px',
+          }} />
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl" />
+          <div className="relative flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-gold/20 border border-gold/30 flex items-center justify-center flex-shrink-0">
+                <Newspaper className="w-5 h-5 text-gold" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-gold text-lg font-bold flex items-center gap-2 truncate">
+                  <Sparkles className="w-4 h-4 text-gold flex-shrink-0" /> موضوع جديد في المدونة {rid.label === 'مدرب معتمد' ? '— باسمك كمدرب معتمد' : ''}
+                </DialogTitle>
+                <p className="text-xs text-gold/70 mt-0.5">محرر المدونة الملكي</p>
+              </div>
             </div>
-            <div>
-              <Label>رابط صورة الغلاف</Label>
-              <Input value={cover} onChange={(e) => setCover(e.target.value)} className="mt-1" placeholder="https://..." dir="ltr" />
+            <div className="flex items-center gap-1 bg-gold/10 border border-gold/20 rounded-xl p-1 flex-shrink-0">
+              <button
+                onClick={() => setPreview(false)}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${!preview ? 'bg-gradient-to-r from-navy to-navy-light text-gold shadow' : 'text-gold/70 hover:text-gold'}`}
+              >تحرير</button>
+              <button
+                onClick={() => setPreview(true)}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${preview ? 'bg-gradient-to-r from-navy to-navy-light text-gold shadow' : 'text-gold/70 hover:text-gold'}`}
+              >معاينة</button>
             </div>
           </div>
         </div>
-        <DialogFooter>
+
+        {preview ? (
+          /* Live preview — exactly what readers will see */
+          <div className="overflow-y-auto p-5 max-h-[70vh] lux-scrollbar">
+            {/* Author hero */}
+            <div className="relative overflow-hidden rounded-xl border-2 border-gold/30 bg-gradient-to-l from-gold/[0.09] via-amber-50/40 to-transparent p-3.5 mb-5 flex items-center justify-between gap-3">
+              <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 25% 40%, #D4AF37 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+              <div className="relative"><BlogAuthorChip author={user} /></div>
+              <span className="relative text-[9px] font-extrabold rounded-full px-2.5 py-1 border bg-gold/15 text-[#8a6d1d] border-gold/45">✍ كاتب الموضوع</span>
+            </div>
+            <article>
+              {cover && (
+                <div className="aspect-video rounded-xl overflow-hidden shadow-md mb-4 border border-gold/20">
+                  <img src={cover} alt={title} className="w-full h-full object-cover" />
+                </div>
+              )}
+              {tags && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {tags.split(',').map((t, i) => (
+                    <Badge key={i} variant="outline" className="text-xs border-gold/30 text-gold">{t.trim()}</Badge>
+                  ))}
+                </div>
+              )}
+              <h1 className="text-2xl font-bold text-navy mb-3 flex items-center gap-2"><Sparkles className="w-5 h-5 text-gold" />{title || 'العنوان غير مكتوب'}</h1>
+              {excerpt && (
+                <p className="text-base text-navy/80 leading-relaxed mb-4 border-r-4 border-gold pr-3">{excerpt}</p>
+              )}
+              <div className="text-navy/90 leading-loose whitespace-pre-wrap">
+                {body || 'المحتوى فارغ'}
+              </div>
+            </article>
+          </div>
+        ) : (
+          <div className="space-y-4 p-5 overflow-y-auto max-h-[70vh] lux-scrollbar">
+            {/* Live author preview — the name shines */}
+            <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-3 flex items-center justify-between gap-3">
+              <BlogAuthorChip author={user} />
+              <span className="text-[10px] text-muted-foreground font-bold">سيظهر اسمك بهذه الهيبة على الموضوع</span>
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Newspaper className="w-3.5 h-3.5 text-gold" /> العنوان *</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="عنوان فاخر يلخص موضوعك" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3.5 h-3.5 text-gold" /> مقتطف قصير (يظهر في البطاقة)</Label>
+              <Textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={2} className={inputCls} placeholder="سطران يلخصان الفكرة" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><MessageSquare className="w-3.5 h-3.5 text-gold" /> المحتوى *</Label>
+              <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className={inputCls + ' leading-relaxed'} placeholder="اكتب موضوعك بالتفصيل... استخدم أسطراً فارغة لفصل الفقرات." />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">وسوم (فاصلة بينها)</Label>
+              <Input value={tags} onChange={(e) => setTags(e.target.value)} className={inputCls} placeholder="تدريب, طب" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">صورة الغلاف</Label>
+              {/* Mode toggle — upload (default, identical to admin) vs URL */}
+              <div className="flex items-center gap-1 bg-gold/5 border border-gold/20 rounded-xl p-1 mt-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setCoverMode('upload')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all ${coverMode === 'upload' ? 'bg-gradient-to-r from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}
+                >
+                  <span className="inline-flex items-center gap-1.5"><span className="text-[10px]">📤</span> رفع صورة</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverMode('url')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all ${coverMode === 'url' ? 'bg-gradient-to-r from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}
+                >
+                  <span className="inline-flex items-center gap-1.5"><span className="text-[10px]">🔗</span> رابط (متقدم)</span>
+                </button>
+              </div>
+              {coverMode === 'upload' ? (
+                <div className="mt-2.5">
+                  {cover ? (
+                    <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/40 shadow-md w-fit">
+                      <img src={cover} alt="غلاف الموضوع" className="max-h-44 object-cover" />
+                      <div className="absolute top-2 left-2 flex gap-1.5">
+                        <label className="cursor-pointer">
+                          <span className="w-7 h-7 rounded-full bg-white/90 text-navy flex items-center justify-center shadow text-xs font-bold hover:bg-white transition-colors">✎</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }} />
+                        </label>
+                        <button type="button" onClick={() => setCover('')} className="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center shadow text-xs font-bold hover:bg-rose-600 transition-colors">✕</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <div className="rounded-xl border-2 border-dashed border-gold/40 bg-gold/[0.04] p-6 text-center hover:bg-gold/[0.08] transition-colors">
+                        {uploadingCover ? <Loader2 className="w-7 h-7 mx-auto text-gold animate-spin" /> : <span className="text-2xl block mb-1.5">🖼️</span>}
+                        <p className="text-xs font-bold text-navy">{uploadingCover ? 'جاري الرفع والضغط...' : 'اضغط لاختيار صورة الغلاف من جهازك'}</p>
+                        <p className="text-[9px] text-muted-foreground mt-1">JPG / PNG / WebP — تُضغط تلقائياً للسرعة القصوى</p>
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }} />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <Input value={cover} onChange={(e) => setCover(e.target.value)} className={'mt-2.5 ' + inputCls} placeholder="https://..." dir="ltr" />
+              )}
+            </div>
+          </div>
+        )}
+        <DialogFooter className="border-t border-border/60 p-3 bg-muted/10">
           <Button variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
-          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold">
+          <Button onClick={save} disabled={saving} className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-extrabold shadow-md">
             {saving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Newspaper className="w-4 h-4 ml-1" />}
             نشر الموضوع
           </Button>

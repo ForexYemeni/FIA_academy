@@ -3,6 +3,72 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { notifyPaymentApproved, notifyPaymentRejected } from '@/lib/notifications'
 import { tgPaymentApproved, tgPaymentRejected as tgReject } from '@/lib/telegram'
 
+// ===========================================================================
+// ROYAL EARNINGS ACCRUAL — when the admin approves a student's payment,
+// the course trainer's profit percentage is credited to his wallet
+// (trainer_earnings) automatically + he gets a luxury notification.
+// Guards: enrollment payments only (no retakes / cert requests / free),
+// unique per payment_id, and unique per student+course pair.
+// ===========================================================================
+async function accrueTrainerEarning(payment: any): Promise<void> {
+  try {
+    const ref: string = payment.reference || ''
+    // Only real enrollment payments
+    if (ref.startsWith('RETAKE:') || ref.startsWith('__CERT_REQUEST__')) return
+    if (payment.method === 'certificate_request' || payment.method === 'free') return
+    const amount = Number(payment.amount) || 0
+    if (amount <= 0 || !payment.course_id) return
+
+    // Idempotency: this exact payment already credited?
+    const { data: existing } = await supabaseAdmin
+      .from('trainer_earnings').select('id').eq('payment_id', payment.id).limit(1)
+    if (existing && existing.length > 0) return
+
+    // Per-student guard: this student already credited for this course
+    // (duplicate payment rows for the same user+course must not double-pay)
+    const { data: dupStudent } = await supabaseAdmin
+      .from('trainer_earnings').select('id').eq('student_id', payment.user_id).eq('course_id', payment.course_id).limit(1)
+    if (dupStudent && dupStudent.length > 0) return
+
+    // Course → trainer profile → profit percentage
+    const { data: course } = await supabaseAdmin
+      .from('courses').select('id, title, trainer_id').eq('id', payment.course_id).maybeSingle()
+    if (!course?.trainer_id) return
+
+    const { resolveTrainerProfileId, resolveTrainerUserId, notifyTrainerNewEarning } = await import('@/lib/notifications')
+    const profileId = (await resolveTrainerProfileId(course.trainer_id)) || course.trainer_id
+    const { data: trainer } = await supabaseAdmin
+      .from('trainers').select('id, name, profit_percentage').eq('id', profileId).maybeSingle()
+    const pct = Number(trainer?.profit_percentage || 0)
+    if (!trainer || pct <= 0) return
+
+    const share = Math.round(amount * pct / 100)
+    if (share <= 0) return
+
+    const { error: insErr } = await supabaseAdmin
+      .from('trainer_earnings')
+      .insert({
+        trainer_id: profileId,
+        payment_id: payment.id,
+        course_id: payment.course_id,
+        student_id: payment.user_id,
+        amount: share,
+        percentage: pct,
+        currency: payment.currency || 'ر.ي',
+        status: 'متاح',
+      })
+    if (insErr) return
+
+    // Luxury notification to the trainer (non-fatal)
+    try {
+      const trainerUserId = (await resolveTrainerUserId(profileId)) || profileId
+      await notifyTrainerNewEarning(trainerUserId, share, payment.currency || 'ر.ي', course.title || 'دورة', pct)
+    } catch {}
+  } catch {
+    // Never break the approval flow because of earnings
+  }
+}
+
 // GET /api/payments — admin: list all PAID payments only.
 // Free enrollments (amount=0, method='free') are tracked in the
 // enrollments system, NOT in payments — so we filter them out here
@@ -93,6 +159,13 @@ export async function PUT(req: NextRequest) {
       } catch {}
     }
 
+    // 2.5) ROYAL EARNINGS — accrue the trainer's profit share automatically.
+    // Only for PAID ENROLLMENT payments (not retakes, not cert requests,
+    // not free enrollments). Idempotent: unique payment_id + per-student guard.
+    if (status === 'مكتمل' && updated?.course_id && updated?.user_id) {
+      accrueTrainerEarning(updated).catch(() => {})
+    }
+
     // 3) Send notification to the student about the decision
     if (updated?.user_id) {
       try {
@@ -104,7 +177,9 @@ export async function PUT(req: NextRequest) {
         } else if (isRejected) {
           // Include rejection reason in the notification
           try {
-            const courseTitle = await getCourseTitle(updated.course_id)
+            const { data: courseRow } = await supabaseAdmin
+              .from('courses').select('title').eq('id', updated.course_id).maybeSingle()
+            const courseTitle = courseRow?.title || 'دورة'
             await supabaseAdmin.from('notifications').insert({
               user_id: updated.user_id,
               type: 'payment',
