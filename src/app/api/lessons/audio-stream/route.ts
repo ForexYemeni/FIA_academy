@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { getAuthUser } from '@/lib/api-auth'
+import { getAuthUser, getAuthUserBySub, verifyMediaToken } from '@/lib/api-auth'
+import { getBotToken, resolveAudioLesson, isAudioLesson, checkAudioAccess } from '@/lib/lesson-access'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -8,59 +8,14 @@ export const maxDuration = 60
 // ═══════════════════════════════════════════════════════════════
 // 🛡️ بوابة بث الدروس الصوتية الملكية — الحماية أولاً
 // ───────────────────────────────────────────────────────────────
-// 1) تُحلّل هوية الطالب/المدرب/الإدارة من الجلسة.
+// 1) تُحلّل هوية الطالب/المدرب/الإدارة من الجلسة — إما من الترويسة
+//    (Authorization) أو من رمز البث الإعلامي mt الذي يصدره
+//    /api/lessons/audio-token (لأن عنصر <audio> لا يرسل ترويسات).
 // 2) تتحقق من صلاحية الوصول للدرس: الإدارة، أو المدرب المالك،
 //    أو متدرب دفع مكتمل، أو درس معاينة مجاني — وإلا 403.
 // 3) تسحب الملف من تيليجرام بالتوكن داخل الخادم فقط (لا يغادر
 //    التوكن أبداً) وتبثه مع دعم Range للتقديم/الإرجاع الفوري.
 // ═══════════════════════════════════════════════════════════════
-
-const MODULES_SEPARATOR = '\n\n===FIA_MODULES===\n'
-
-async function getBotToken(): Promise<string> {
-  try {
-    const { data } = await supabaseAdmin
-      .from('site_settings')
-      .select('telegram_bot_token')
-      .limit(1)
-      .maybeSingle()
-    return data?.telegram_bot_token || ''
-  } catch {
-    return ''
-  }
-}
-
-function parseCourseContent(description: string | null): { modules: any[] } {
-  if (!description) return { modules: [] }
-  const idx = description.indexOf(MODULES_SEPARATOR)
-  if (idx === -1) return { modules: [] }
-  try {
-    const modules = JSON.parse(description.substring(idx + MODULES_SEPARATOR.length))
-    if (Array.isArray(modules)) return { modules }
-  } catch {}
-  return { modules: [] }
-}
-
-interface ResolvedLesson {
-  course: any
-  lesson: any
-}
-
-async function resolveAudioLesson(lessonId: string, courseId?: string | null): Promise<ResolvedLesson | null> {
-  // نحلّل الدرس من JSON محتوى الدورة — مع course_id نتخطى المسح الكامل
-  const { data: courses } = courseId
-    ? await supabaseAdmin.from('courses').select('id, description, trainer_id').eq('id', courseId).limit(1)
-    : await supabaseAdmin.from('courses').select('id, description, trainer_id')
-  if (!courses) return null
-  for (const course of courses) {
-    const { modules } = parseCourseContent(course.description)
-    for (const m of modules) {
-      const lesson = (m.lessons || []).find((l: any) => l.id === lessonId)
-      if (lesson) return { course, lesson }
-    }
-  }
-  return null
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -76,40 +31,34 @@ export async function GET(req: NextRequest) {
     }
     const { course, lesson } = resolved
 
-    if ((lesson.lesson_type || lesson.type) !== 'audio' || !lesson.audio_file_id) {
+    if (!isAudioLesson(lesson)) {
       return NextResponse.json({ error: 'هذا الدرس ليس درساً صوتياً' }, { status: 404 })
     }
 
-    // ═══ بوابة الصلاحيات ═══
-    const authUser = await getAuthUser(req)
-    let allowed = false
-    if (authUser?.role === 'admin') {
-      allowed = true
-    } else if (authUser?.role === 'trainer' && course.trainer_id) {
-      if (course.trainer_id === authUser.id) {
-        allowed = true
-      } else {
-        const { data: tRow } = await supabaseAdmin
-          .from('trainers').select('email, id').eq('id', course.trainer_id).maybeSingle()
-        allowed = !!(tRow && (tRow.email === authUser.email || tRow.id === authUser.id))
+    // ═══ بوابة الهوية ═══
+    // المسار 1: الترويسة (طلب fetch عادي عبر جسر المصادقة).
+    // المسار 2: رمز البث mt — يصدر من /api/lessons/audio-token بعد فحص
+    //   الصلاحيات، ومرتبط بدرس واحد وحساب واحد وينتهي خلال 15 دقيقة.
+    //   الرمز يحمل الهوية فقط — فحص الصلاحيات يعاد هنا كاملاً كل مرة.
+    let authUser = await getAuthUser(req)
+    if (!authUser) {
+      const mt = req.nextUrl.searchParams.get('mt')
+      if (mt) {
+        const payload = await verifyMediaToken(mt)
+        // الرمز مرتبط بالدرس نفسه — لا إعادة استخدام لرمز درس آخر
+        if (payload && payload.lid === lessonId) {
+          authUser = await getAuthUserBySub(payload.sub)
+        }
       }
     }
-    if (!allowed && authUser) {
-      const { data: enr } = await supabaseAdmin
-        .from('payments')
-        .select('id')
-        .eq('user_id', authUser.id)
-        .eq('course_id', course.id)
-        .eq('status', 'مكتمل')
-        .limit(1)
-      allowed = !!(enr && enr.length > 0)
-    }
-    if (!allowed && lesson.is_preview) {
-      // درس معاينة مجاني — متاح للزوار كما هو مسموح لبقية الأنواع
-      allowed = true
-    }
+
+    // ═══ بوابة الصلاحيات (تعاد كاملة في كل الطلبات مهما كان مسار الهوية) ═══
+    const allowed = await checkAudioAccess(authUser, course, lesson)
     if (!allowed) {
-      return NextResponse.json({ error: 'هذا الدرس متاح للمسجلين في الدورة فقط' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'هذا الدرس متاح للمسجلين في الدورة فقط' },
+        { status: 403 }
+      )
     }
 
     // ═══ البث من تيليجرام — التوكن داخل الخادم حصراً ═══
