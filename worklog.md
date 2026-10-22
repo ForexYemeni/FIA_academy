@@ -1607,3 +1607,27 @@ Stage Summary:
 - Deploy: commit 6871697 pushed → Vercel ينشر تلقائياً
 - الملفات: student, exam client, admin, admin-extended, admin-questions-royal, trainer-questions, trainer, courses/[slug], verify/client, chat-widget, notifications-bell (CSS فقط), shared-community, certificate/share URLs, blog API + BlogPostDialog, telegram-file, telegram-publish, upload/image, upload/avatar, about, login-modal, landing-auth + ترحيل 017 + scripts/backup-db.mjs + scripts/migrate-v47.mjs
 - APK v2.7 لا يحتاج تحديثاً (كل التغييرات من جهة الخادم)
+
+---
+Task ID: v4.8-royal-shield
+Agent: main (Z.ai)
+Task: v2.7-only GitHub backup + direct links + /download first-open fix + danger-zone answer & royal rescue shield
+
+Work Log:
+- Confirmed danger-zone semantics: wipes delete ROWS only (tables survive); full wipe keeps founder + team members + site_settings; section 'courses' cascades 10 tables; 'students' also wipes all payments.
+- sw.js: cache v5→v6 (purges stale caches that showed the old ugly /download page first) + /download is now NEVER cached (always fresh network render). Push/vibrate handlers untouched.
+- Migration 018 applied live: danger_zone_snapshots (id, kind, section, label, tables, counts, data JSONB, row_total, created_by, created_at; RLS on, service-role only).
+- src/lib/danger-snapshot.ts: DZ_SECTION_TABLES (matches wipe logic exactly), DZ_FULL_TABLES, createDangerSnapshot (paged fetch 1000/chunk), listDangerSnapshots, restoreDangerSnapshot (upsert onConflict id, 200/chunk, parent-first order).
+- Both wipe routes now snapshot BEFORE wiping; responses carry snapshot_id; Telegram audit includes rescue-shield id; full-wipe route now also sends Telegram audit (was silent).
+- New /api/admin/danger-zone/snapshots: GET archive (12 latest, metadata only) + POST royal restore (password-gated from UI).
+- admin.tsx AdminAccount: 🛡️ أرشيف الإنقاذ الملكي panel inside Danger Zone (list, refresh, per-snapshot استعادة with PasswordConfirmDialog), green shield note in full-wipe dialog, updated texts/toasts.
+- telegram.ts: tgDangerZoneWiped(+snapshotId) additive param + new tgDangerZoneRestored.
+- Live test PASS: 28 reviews → snapshot → wipe → restore → 28 identical; test snapshot cleaned.
+- tsc: zero errors in touched files.
+- Backup rebuilt v2.7-ONLY: /home/z/my-project/FIA-Academy-v2.7-BACKUP-2026-10-22 (APK+checksums, APK-SOURCE, APK-SIGNING jks, fresh DATABASE dump 45 tables/988 rows, WEBSITE-SOURCE w/o node_modules & old APKs, 00-اقرأني-أولاً.md).
+- GitHub release v2.7-backup on ForexYemeni/FIA_academy: FIA-Academy-v2.7.apk (3.25MB) + FIA-Academy-v2.7-FULL-BACKUP-SECURE.zip (28.9MB, password FIA-2.7-CmLApdUJ3jufLdxQ stored at /home/z/my-project/.v27-backup-password). Direct links verified HTTP 200 public.
+
+Stage Summary:
+- Deployed via push 1695bc2 (Vercel auto). No APK update needed (all server-side).
+- Danger zone answer delivered: tables are NEVER lost, only rows; now fully reversible via royal rescue archive.
+- Direct links: https://github.com/ForexYemeni/FIA_academy/releases/download/v2.7-backup/FIA-Academy-v2.7.apk و .../FIA-Academy-v2.7-FULL-BACKUP-SECURE.zip
