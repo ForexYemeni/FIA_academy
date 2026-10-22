@@ -168,6 +168,11 @@ export async function POST(req: NextRequest) {
       content: body.content || null,
       video_url: body.video_url || null,
       pdf_url: body.pdf_url || null,
+      // 🎙️ الدرس الصوتي — file_id الدائم في تيليجرام (قاعدة البيانات المجانية)
+      audio_file_id: body.audio_file_id || null,
+      audio_duration: body.audio_duration || null,
+      audio_mime: body.audio_mime || null,
+      audio_size: body.audio_size || null,
       duration_minutes: body.duration_minutes || 0,
       position: body.position ?? modules[modIdx].lessons.length,
       is_preview: body.is_preview || false,

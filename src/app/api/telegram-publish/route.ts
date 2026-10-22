@@ -94,6 +94,7 @@ function parseCourseContent(
 function translateLessonType(type: unknown): string {
   const t = String(type || 'text').toLowerCase()
   if (t === 'video' || t === 'فيديو') return 'فيديو'
+  if (t === 'audio' || t === 'صوتي') return 'صوتي 🎙️'
   if (t === 'text' || t === 'نص') return 'نص'
   if (t === 'exam' || t === 'اختبار') return 'اختبار'
   if (t === 'pdf') return 'PDF'

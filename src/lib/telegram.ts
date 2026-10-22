@@ -165,7 +165,7 @@ export async function tgModuleCreated(courseId: string, moduleTitle: string, byU
 export async function tgLessonCreated(courseId: string, lessonTitle: string, lessonType: string, byUserId?: string) {
   const courseTitle = await getCourseTitle(courseId)
   const by = byUserId ? await getUserName(byUserId) : 'النظام'
-  const typeAr = lessonType === 'video' ? '🎬 فيديو' : lessonType === 'pdf' ? '📄 PDF' : lessonType === 'exam' ? '📝 اختبار' : '📖 نص'
+  const typeAr = lessonType === 'video' ? '🎬 فيديو' : lessonType === 'pdf' ? '📄 PDF' : lessonType === 'exam' ? '📝 اختبار' : lessonType === 'audio' ? '🎙️ صوتي' : '📖 نص'
   const msg =
     header(typeAr.split(' ')[0], 'درس جديد في دورة') +
     `\n📋 الدورة: <b>${escapeHtml(courseTitle)}</b>` +

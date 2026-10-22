@@ -10,22 +10,27 @@ import {
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy, Loader2,
-  Sparkles, Lock,
+  Sparkles, Lock, Mic,
 } from 'lucide-react'
 import { toast } from 'sonner'
 // ⚡ CustomPdfViewer is a separate component (extracted for clarity)
 // that uses pdf.js to render PDFs inside the app without Google Docs
 // Viewer. It handles its own pdfjs import + worker setup.
 import { CustomPdfViewer } from '@/components/fia/custom-pdf-viewer'
+import { LuxAudioPlayer } from '@/components/fia/lux-audio-player'
 
 interface Lesson {
   id: string
   module_id?: string
   title: string
-  lesson_type: 'video' | 'text' | 'exam' | 'pdf'
+  lesson_type: 'video' | 'text' | 'exam' | 'pdf' | 'audio'
   content?: string
   video_url?: string
   pdf_url?: string
+  audio_file_id?: string | null
+  audio_duration?: number | null
+  audio_mime?: string | null
+  audio_size?: number | null
   duration_minutes?: number
   position?: number
   is_preview?: boolean
@@ -43,6 +48,9 @@ interface LessonPreviewModalProps {
   onOpenChange: (o: boolean) => void
   lesson: Lesson | null
   modules?: Module[]
+  // 🎙️ معرّف الدورة — لبناء رابط البث المحمي للدرس الصوتي (اختياري:
+  // البوابة تحلّل الدورة من الدرس تلقائياً عند غيابه)
+  courseId?: string
   // ⚡ Set of completed lesson IDs — used to disable the Next button
   // when the next lesson is locked (sequential progression enforced
   // inside the modal too).
@@ -57,12 +65,13 @@ interface LessonPreviewModalProps {
 
 const LESSON_TYPES = {
   video: { label: 'فيديو', icon: Video, color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+  audio: { label: 'صوتي', icon: Mic, color: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
   text: { label: 'نص', icon: FileText, color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
   exam: { label: 'اختبار', icon: HelpCircle, color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
   pdf: { label: 'PDF', icon: FileUp, color: 'bg-green-500/15 text-green-600 border-green-500/30' },
 }
 
-export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], completedLessons, onLessonComplete, onNavigate }: LessonPreviewModalProps) {
+export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], courseId, completedLessons, onLessonComplete, onNavigate }: LessonPreviewModalProps) {
   // ⚡ Track whether we've already fired onLessonComplete for THIS
   // lesson. We reset when lesson.id changes. This prevents double-firing
   // when the video onEnded event fires multiple times.
@@ -171,6 +180,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
               <div className="mb-3 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-white border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                 {lesson.lesson_type === 'video' && 'شاهد الفيديو حتى النهاية ليُكتمل الدرس تلقائياً. (إذا تعذّر تحميل الفيديو، سيظهر زر "تخطّي الدرس" خلال 15 ثانية)'}
+                {lesson.lesson_type === 'audio' && 'استمع إلى الدرس حتى النهاية ليُكتمل تلقائياً — يمكنك تغيير سرعة التشغيل والتقديم بحرية.'}
                 {lesson.lesson_type === 'text' && 'اقرأ المحتوى حتى آخره ليُكتمل الدرس تلقائياً (المحتوى القصير يُكمل خلال 3 ثوانٍ).'}
                 {lesson.lesson_type === 'pdf' && 'مرّر لقراءة الملف كاملاً. يُكمل الدرس تلقائياً عند الوصول للصفحة الأخيرة.'}
                 {lesson.lesson_type === 'exam' && 'أجب على الأسئلة واجتاز الاختبار (60% على الأقل) ليُكتمل الدرس تلقائياً. (إذا لم يوجد أسئلة، سيُكمل الدرس تلقائياً)'}
@@ -244,6 +254,13 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {/* Render the lesson based on type — each component fires
                 onComplete when the student actually finishes viewing. */}
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'audio' && (
+              <LuxAudioPlayer
+                src={`/api/lessons/audio-stream?lesson_id=${encodeURIComponent(lesson.id)}${courseId ? `&course_id=${encodeURIComponent(courseId)}` : ''}`}
+                title={lesson.title}
+                onComplete={fireComplete}
+              />
+            )}
             {lesson.lesson_type === 'text' && <TextContent content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
