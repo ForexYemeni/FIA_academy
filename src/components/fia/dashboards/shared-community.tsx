@@ -196,7 +196,7 @@ function BlogCommentSection({ blogPostId, userId }: { blogPostId: string; userId
                       <Clock className="w-2.5 h-2.5 inline" /> {new Date(c.created_at).toLocaleDateString('ar-EG')}
                     </span>
                     {c.user_id === userId && (
-                      <button onClick={() => handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-500/10 p-1 rounded transition-opacity" title="حذف">
+                      <button onClick={() => handleDelete(c.id)} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-red-500 hover:bg-red-500/10 p-1 rounded transition-opacity" title="حذف">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     )}

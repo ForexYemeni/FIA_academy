@@ -1106,7 +1106,7 @@ function AdminExams() {
                             const isCorrect = q.correct_answer === opt || q.correct_answer === idx || q.correct_answer === String(idx)
                             return (
                               <div key={idx} className={`text-xs flex items-center gap-1.5 ${isCorrect ? 'text-emerald-600 font-bold' : 'text-muted-foreground'}`}>
-                                {isCorrect ? <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> : <span className="w-3 h-3 flex-shrink-0 text-center text-[10px]">{String.fromCharCode(1571 + idx)}</span>}
+                                {isCorrect ? <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> : <span className="w-3 h-3 flex-shrink-0 text-center text-[10px]">{(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}</span>}
                                 <span className="line-clamp-1">{opt}</span>
                               </div>
                             )
@@ -2351,7 +2351,7 @@ function PaymentMethodDialog({ open, onOpenChange, editing, onSaved }: any) {
     const isOpen = dropdownOpen === label
 
     return (
-      <div>
+      <div className="relative">
         {label && <Label className="text-xs font-bold text-navy mb-1.5 block">{label}</Label>}
         <button type="button" onClick={() => setDropdownOpen(isOpen ? null : label)}
           className="w-full h-11 px-3 text-sm border border-navy/10 bg-white/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold/30 cursor-pointer transition-all hover:border-gold/40 hover:bg-white shadow-sm flex items-center justify-between gap-2">

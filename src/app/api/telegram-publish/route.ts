@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import crypto from 'crypto'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -388,6 +389,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'إعدادات تيليجرام غير مُهيأة' }, { status: 500 })
       }
 
+      // ⚡ ROYAL PUBLISH-ONCE: same lesson (course + title + type) is announced
+      // EXACTLY once — re-saving it never spams the channel again.
+      const eventKey = `lesson:${course_id}:${lesson_type || 'درس'}:${lesson_title}`
+      try {
+        const { data: alreadySent } = await supabaseAdmin
+          .from('telegram_publish_log')
+          .select('message_ids')
+          .eq('event_key', eventKey)
+          .maybeSingle()
+        if (alreadySent) {
+          const prevIds = Array.isArray(alreadySent.message_ids) ? alreadySent.message_ids : []
+          return NextResponse.json({ success: true, deduped: true, message_id: prevIds[prevIds.length - 1] ?? null })
+        }
+      } catch {}
+
       // Fetch course title for context
       const { data: course } = await supabaseAdmin
         .from('courses')
@@ -396,7 +412,18 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       const courseTitle = course?.title || 'دورة'
-      const message = `📚 ${escapeHtml(lesson_type)} جديد في دورة: <b>${escapeHtml(courseTitle)}</b>\n\n📖 العنوان: <b>${escapeHtml(lesson_title)}</b>\n\n✅ سجل الآن في منصة FIA\n🔗 ${REGISTRATION_LINK}`
+      const message = [
+        '━━━━━━━━━━━━━━━━━━',
+        `👑 أكاديمية المستقبل الدولية`,
+        '━━━━━━━━━━━━━━━━━━',
+        `✨ ${escapeHtml(lesson_type)} جديد انضم إلى المكتبة`,
+        '',
+        `📖 <b>${escapeHtml(lesson_title)}</b>`,
+        `🎓 ضمن دورة: <b>${escapeHtml(courseTitle)}</b>`,
+        '━━━━━━━━━━━━━━━━━━',
+        `✅ سجّل الآن وابدأ رحلتك نحو الاحتراف`,
+        `🔗 ${REGISTRATION_LINK}`,
+      ].join('\n')
 
       const sendRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
@@ -412,6 +439,13 @@ export async function POST(req: NextRequest) {
       if (!sendData.ok) {
         return NextResponse.json({ error: sendData.description || 'فشل الإرسال' }, { status: 500 })
       }
+      // Record the successful send — guarantees no duplicates; failures are
+      // NEVER recorded so the announcement can be retried later (no loss).
+      try {
+        await supabaseAdmin
+          .from('telegram_publish_log')
+          .upsert({ event_key: eventKey, message_ids: [sendData.result?.message_id].filter(Boolean), status: 'sent' }, { onConflict: 'event_key' })
+      } catch {}
       return NextResponse.json({ success: true, message_id: sendData.result.message_id })
     }
 
@@ -430,6 +464,28 @@ export async function POST(req: NextRequest) {
     if (!course) {
       return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
     }
+
+    // ⚡ ROYAL PUBLISH-ONCE for courses: fingerprint the published content —
+    // saving the same state twice never spams the channel; ANY real change
+    // (price, title, outline…) announces fresh (no loss of information).
+    const contentFingerprint = [
+      course.title, course.short_description, course.level, course.price_type,
+      course.price, course.currency, course.duration_hours,
+      course.modules_count, course.lessons_count, course.cover, course.trainer_id,
+      (course.description || '').length,
+    ].join('|')
+    const contentHash = crypto.createHash('sha1').update(contentFingerprint).digest('hex').slice(0, 16)
+    const courseEventKey = `course:${course_id}:${finalAction}`
+    try {
+      const { data: alreadySent } = await supabaseAdmin
+        .from('telegram_publish_log')
+        .select('id, content_hash')
+        .eq('event_key', courseEventKey)
+        .maybeSingle()
+      if (alreadySent && alreadySent.content_hash === contentHash) {
+        return NextResponse.json({ success: true, deduped: true })
+      }
+    } catch {}
 
     // 2) Fetch the trainer (only public profile fields — no phone / email)
     let trainer: TrainerRow | null = null
@@ -513,6 +569,17 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Record the successful publish — identical content is never re-sent,
+    // failed publishes are never recorded (retriable → no loss).
+    try {
+      await supabaseAdmin
+        .from('telegram_publish_log')
+        .upsert(
+          { event_key: courseEventKey, content_hash: contentHash, message_ids: messageIds, status: 'sent' },
+          { onConflict: 'event_key' }
+        )
+    } catch {}
 
     return NextResponse.json({
       success: true,

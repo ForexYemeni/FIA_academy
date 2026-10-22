@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Shield, Search, Loader2, ArrowRight, Sparkles, XCircle, CheckCircle2 } from 'lucide-react'
+import { Shield, Search, Loader2, ArrowRight, Sparkles, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function VerifySearchForm() {
@@ -101,27 +101,30 @@ export default function VerifySearchForm() {
         </Card>
       )}
 
-      {/* ⚡ Magical found state (emerald gradient) */}
-      {found && (
-        <Card className="relative p-6 border-emerald-500/40 bg-emerald-500/5 overflow-hidden">
-          <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-emerald-500 via-teal-400 to-emerald-500 opacity-70" />
-          <div className="absolute -top-8 -right-8 w-32 h-32 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
+      {/* ⚡ Royal status-aware found state — صالحة / ملغاة / أخرى */}
+      {found && (() => {
+        const isValid = found.status === 'صالحة' || !found.status
+        const isRevoked = found.status === 'ملغاة'
+        return (
+        <Card className={`relative p-6 overflow-hidden ${isValid ? 'border-emerald-500/40 bg-emerald-500/5' : isRevoked ? 'border-rose-500/40 bg-rose-500/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+          <div className={`absolute top-0 right-0 left-0 h-1 bg-gradient-to-l opacity-70 ${isValid ? 'from-emerald-500 via-teal-400 to-emerald-500' : isRevoked ? 'from-rose-500 via-red-400 to-rose-500' : 'from-amber-500 via-orange-400 to-amber-500'}`} />
+          <div className={`absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl pointer-events-none ${isValid ? 'bg-emerald-500/15' : isRevoked ? 'bg-rose-500/15' : 'bg-amber-500/15'}`} />
           <div className="relative flex items-center gap-3 mb-4">
             <div className="relative flex-shrink-0">
-              <div className="absolute inset-0 bg-emerald-500/20 rounded-2xl blur-md animate-pulse" />
-              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md border border-white/30">
-                <CheckCircle2 className="w-6 h-6 text-white" />
+              <div className={`absolute inset-0 rounded-2xl blur-md animate-pulse ${isValid ? 'bg-emerald-500/20' : isRevoked ? 'bg-rose-500/20' : 'bg-amber-500/20'}`} />
+              <div className={`relative w-12 h-12 rounded-2xl flex items-center justify-center shadow-md border border-white/30 ${isValid ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : isRevoked ? 'bg-gradient-to-br from-rose-500 to-red-600' : 'bg-gradient-to-br from-amber-500 to-orange-600'}`}>
+                {isValid ? <CheckCircle2 className="w-6 h-6 text-white" /> : isRevoked ? <XCircle className="w-6 h-6 text-white" /> : <AlertTriangle className="w-6 h-6 text-white" />}
               </div>
             </div>
             <div>
               <h4 className="font-bold text-navy flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-600" />
-                شهادة صالحة ✓
+                <Sparkles className={`w-4 h-4 ${isValid ? 'text-emerald-600' : isRevoked ? 'text-rose-600' : 'text-amber-600'}`} />
+                {isValid ? 'شهادة صالحة ✓' : isRevoked ? 'شهادة ملغاة' : `حالة الشهادة: ${found.status}`}
               </h4>
-              <p className="text-xs text-muted-foreground">تم العثور على الشهادة — اضغط لعرضها كاملة</p>
+              <p className="text-xs text-muted-foreground">{isValid ? 'تم العثور على الشهادة — اضغط لعرضها كاملة' : isRevoked ? 'هذه الشهادة أُلغيت من الإدارة — لا تُعتبر معتمدة' : 'تم العثور على الشهادة — تحقق من حالتها مع الإدارة'}</p>
             </div>
           </div>
-          <div className="relative grid grid-cols-2 gap-3 text-sm mb-4 p-3 bg-white/50 rounded-xl border border-emerald-500/20">
+          <div className={`relative grid grid-cols-2 gap-3 text-sm mb-4 p-3 bg-white/50 rounded-xl border ${isValid ? 'border-emerald-500/20' : isRevoked ? 'border-rose-500/20' : 'border-amber-500/20'}`}>
             <div>
               <div className="text-[10px] text-muted-foreground uppercase">المتدرب</div>
               <div className="font-bold text-navy">{found.student_name}</div>
@@ -131,14 +134,17 @@ export default function VerifySearchForm() {
               <div className="font-bold text-navy truncate">{found.course_title}</div>
             </div>
           </div>
+          {isValid && (
           <a
             href={`/verify/${found.certificate_number}`}
             className="relative inline-flex items-center gap-2 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold px-6 py-3 rounded-xl font-bold text-sm w-full justify-center shadow-md active:scale-[0.97] transition-all"
           >
             عرض الشهادة كاملة <ArrowRight className="w-4 h-4" />
           </a>
+          )}
         </Card>
-      )}
+        )
+      })()}
     </div>
   )
 }

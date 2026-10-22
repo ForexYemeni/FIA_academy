@@ -102,15 +102,32 @@ export async function POST(req: NextRequest) {
     let url: string | null = null
     const { token, channelId } = await getBotSettings()
 
-    // Try Telegram first
-    if (token && channelId) {
-      const tgResult = await uploadViaTelegram(file, token, channelId)
-      if (tgResult.url) {
-        url = tgResult.url
-      } else {
-        console.warn('Avatar Telegram upload failed:', tgResult.error)
+    // ⚡ ROYAL UPLOAD-ONCE — same avatar image is never re-sent to Telegram
+    try {
+      const contentHash = crypto.createHash('sha1').update(Buffer.from(await file.arrayBuffer())).digest('hex')
+      const { data: cached } = await supabaseAdmin
+        .from('telegram_upload_cache')
+        .select('url')
+        .eq('content_hash', contentHash)
+        .maybeSingle()
+      if (cached?.url) {
+        return NextResponse.json({ url: cached.url, method: 'telegram', deduped: true })
       }
-    }
+      // Try Telegram first
+      if (token && channelId) {
+        const tgResult = await uploadViaTelegram(file, token, channelId)
+        if (tgResult.url) {
+          url = tgResult.url
+          try {
+            await supabaseAdmin
+              .from('telegram_upload_cache')
+              .upsert({ content_hash: contentHash, url, kind: 'avatar' }, { onConflict: 'content_hash' })
+          } catch {}
+        } else {
+          console.warn('Avatar Telegram upload failed:', tgResult.error)
+        }
+      }
+    } catch {}
 
     // Fallback to data URI
     if (!url) {

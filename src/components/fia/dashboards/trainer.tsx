@@ -1323,9 +1323,14 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
                 </Label>
                 <Input
                   value={profile.name}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                  disabled
+                  readOnly
+                  className="rounded-xl border-gold/20 bg-gray-50/80 text-muted-foreground cursor-not-allowed select-none"
                 />
+                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-gold" />
+                  الاسم مقفل — يُعدّل من إدارة الأكاديمية فقط (لضمان صحة الشهادات)
+                </p>
               </div>
               <div>
                 <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">

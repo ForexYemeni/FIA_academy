@@ -29,6 +29,30 @@ async function getBotSettings() {
   return { token: data.telegram_bot_token || '', channelId: data.telegram_channel_id || '' }
 }
 
+// ⚡ ROYAL UPLOAD-ONCE: every unique file (by content hash) is uploaded to
+// Telegram EXACTLY ONCE — re-uploading the same video/PDF/image instantly
+// returns the stored URL without sending a new message to the channel.
+async function findCachedUpload(hash: string): Promise<string | null> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('telegram_upload_cache')
+      .select('url')
+      .eq('content_hash', hash)
+      .maybeSingle()
+    return data?.url || null
+  } catch {
+    return null
+  }
+}
+
+async function cacheUpload(hash: string, url: string, fileId: string | null, kind: string) {
+  try {
+    await supabaseAdmin
+      .from('telegram_upload_cache')
+      .upsert({ content_hash: hash, url, file_id: fileId, kind }, { onConflict: 'content_hash' })
+  } catch {}
+}
+
 // Upload via Telegram Bot API — supports photos, videos, documents (PDFs)
 async function uploadViaTelegram(file: File, botToken: string, channelId: string): Promise<{ url: string | null; error?: string }> {
   if (!botToken || !channelId) {
@@ -161,11 +185,21 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // ⚡ ROYAL UPLOAD-ONCE — dedup by content hash before any Telegram call
+    const buf = Buffer.from(await file.arrayBuffer())
+    const contentHash = crypto.createHash('sha1').update(buf).digest('hex')
+    const kind = isImage ? 'image' : isVideo ? 'video' : 'pdf'
+    const cachedUrl = await findCachedUpload(contentHash)
+    if (cachedUrl) {
+      return NextResponse.json({ url: cachedUrl, folder, method: 'telegram', deduped: true })
+    }
+
     // Try Telegram first
     const { token, channelId } = await getBotSettings()
     if (token && channelId) {
       const result = await uploadViaTelegram(file, token, channelId)
       if (result.url) {
+        await cacheUpload(contentHash, result.url, null, kind)
         return NextResponse.json({ url: result.url, folder, method: 'telegram' })
       }
       // Telegram failed — fall through to local storage

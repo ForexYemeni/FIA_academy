@@ -208,7 +208,7 @@ export function AdminExamQuestionsRoyal() {
                               }`}>
                                 <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-extrabold flex-shrink-0 ${
                                   isCorrect ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
-                                }`}>{String.fromCharCode(1571 + idx)}</span>
+                                }`}>{(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}</span>
                                 <span className="line-clamp-1">{o}</span>
                                 {isCorrect && <CheckCircle2 className="w-3 h-3 ml-auto flex-shrink-0" />}
                               </div>
@@ -622,11 +622,11 @@ export function ExamQuestionDialogRoyal({ open, onOpenChange, initial, courseId,
                   }`}
                   title="تحديد كإجابة صحيحة"
                 >
-                  {String.fromCharCode(1571 + idx)}
+                  {(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}
                 </button>
                 <Input value={opt} onChange={(e) => {
                   const newOpts = [...form.options]; newOpts[idx] = e.target.value; setForm({ ...form, options: newOpts })
-                }} placeholder={`نص الخيار ${String.fromCharCode(1571 + idx)}`} className="border-0 shadow-none focus-visible:ring-0 font-medium" />
+                }} placeholder={`نص الخيار ${(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}`} className="border-0 shadow-none focus-visible:ring-0 font-medium" />
                 {form.correct_answer === idx && <LuxBadge tone="green">الصحيحة</LuxBadge>}
                 {form.options.length > 2 && (
                   <button type="button" onClick={() => setForm({ ...form, options: form.options.filter((_: any, i: number) => i !== idx) })}

@@ -17,6 +17,10 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<'search' | 'chat'>('search')
   const [conversations, setConversations] = useState<any[]>([])
+  // ⚡ Live ref so realtime handlers always read the freshest conversations
+  // (fixes the ReferenceError: activeConv is not defined crash)
+  const conversationsRef = useRef<any[]>([])
+  useEffect(() => { conversationsRef.current = conversations }, [conversations])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [draft, setDraft] = useState('')
@@ -149,10 +153,11 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
               // known recipient/conversation data so the name shows.
               const msg = payload.new
               if (!msg.sender) {
+                const conv = conversationsRef.current.find((c: any) => c.id === activeConvId)
                 msg.sender = recipient
                   ? { user_id: recipient.id, name: recipient.name, avatar: recipient.avatar, role: recipient.role }
-                  : (activeConv?.other
-                    ? { user_id: activeConv.other.user_id || activeConv.other_id, name: activeConv.other.name, avatar: activeConv.other.avatar, role: activeConv.other.role }
+                  : (conv?.other
+                    ? { user_id: conv.other.user_id || conv.other_id, name: conv.other.name, avatar: conv.other.avatar, role: conv.other.role }
                     : null)
               }
               return [...prev, msg]
@@ -418,7 +423,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                             {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         </button>
-                        <button onClick={(e) => requestDelete(c.id, c.other?.name || 'مستخدم', e)} className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" title="حذف المحادثة">
+                        <button onClick={(e) => requestDelete(c.id, c.other?.name || 'مستخدم', e)} className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" title="حذف المحادثة">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>

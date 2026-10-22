@@ -598,7 +598,7 @@ export function AdminExamQuestions() {
                         <div className="text-xs text-muted-foreground space-y-1 mb-2">
                           {Array.isArray(q.options) && q.options.map((o: any, idx: number) => (
                             <div key={idx} className={q.correct_answer === idx ? 'text-emerald-600 font-bold' : ''}>
-                              {String.fromCharCode(65 + idx)}) {o}
+                              {(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}) {o}
                               {q.correct_answer === idx && <CheckCircle2 className="w-3 h-3 inline mr-2" />}
                             </div>
                           ))}
@@ -754,11 +754,11 @@ function ExamQuestionDialog({ open, onOpenChange, initial, courseId, onSaved }: 
                       onClick={() => setForm({ ...form, correct_answer: idx })}
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${form.correct_answer === idx ? 'bg-emerald-500 text-white shadow-md scale-105' : 'bg-gradient-to-br from-white to-gold/5 border border-gold/30 text-muted-foreground'}`}
                     >
-                      {String.fromCharCode(65 + idx)}
+                      {(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}
                     </button>
                     <Input value={opt} onChange={(e) => {
                       const newOpts = [...form.options]; newOpts[idx] = e.target.value; setForm({ ...form, options: newOpts })
-                    }} dir="rtl" placeholder={`الخيار ${String.fromCharCode(65 + idx)}`} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                    }} dir="rtl" placeholder={`الخيار ${(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}`} className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
                     {form.options.length > 2 && (
                       <button onClick={() => setForm({ ...form, options: form.options.filter((_: any, i: number) => i !== idx) })}>
                         <X className="w-4 h-4 text-rose-500" />
@@ -1795,7 +1795,15 @@ function BlogPostDialog({ open, onOpenChange, initial, onSaved }: any) {
     if (!form.title || !form.body) { toast.error('العنوان والمحتوى مطلوبان'); return }
     setSaving(true)
     try {
-      const res = await fetch('/api/blog', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : form) })
+      // 🔒 Attach the logged-in admin identity so the royal gate accepts the publish
+      let authorId = form.author_id
+      if (!authorId) {
+        try {
+          const stored = localStorage.getItem('fia-auth')
+          authorId = stored ? (JSON.parse(stored)?.state?.user?.id || null) : null
+        } catch {}
+      }
+      const res = await fetch('/api/blog', { method: initial ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(initial ? { id: initial.id, ...form } : { ...form, author_id: authorId }) })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         toast.success(initial ? 'تم التحديث ✓' : 'تم النشر ✓')
@@ -2106,7 +2114,7 @@ export function AdminContact() {
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(m) }}
                     title="حذف الرسالة"
-                    className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-lg border border-rose-500/30 bg-white hover:bg-rose-500/10 flex items-center justify-center text-rose-500"
+                    className="absolute top-2 left-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity w-7 h-7 rounded-lg border border-rose-500/30 bg-white hover:bg-rose-500/10 flex items-center justify-center text-rose-500"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

@@ -164,7 +164,11 @@ export function LandingAuth({ onLoginClick }: { onLoginClick: () => void }) {
             {mode === 'register' && (
               <div>
                 <Label htmlFor="name" className="text-xs font-medium text-white/75 sm:text-sm">الاسم الكامل</Label>
-                <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: محمد أحمد" className={inputCls} autoComplete="name" />
+                <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: محمد أحمد محمد صالح" className={inputCls} autoComplete="name" />
+                <p className="text-[10px] text-white/55 mt-1.5 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-[#C9A961]" />
+                  ملاحظة: يُفضّل كتابة الاسم الرباعي — فهو الذي يظهر على شهادتك الرسمية
+                </p>
               </div>
             )}
             <div>

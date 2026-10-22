@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,11 +21,25 @@ export default function AboutClient({ settings, founder, team }: { settings: any
   const teamText = settings.about_team?.trim() ||
     'فريق أكاديمية المستقبل الدولية نخبة من الاستشاريين والأخصائيين والمعتمدين في مختلف التخصصات الطبية والصحية، يجمعهم الإيمان بأهمية التعليم المستمر وأثره المباشر على جودة الرعاية الصحية وحياة المرضى.'
 
+  // ✅ REAL stats — fetched live from the academy database (no fabricated numbers)
+  const [realStats, setRealStats] = useState<{ courses: number; trainers: number; certs: number; reviews: number } | null>(null)
+  useEffect(() => {
+    const num = (d: any) => (Array.isArray(d) ? d.length : 0)
+    Promise.all([
+      fetch('/api/courses').then((r) => r.json()).catch(() => []),
+      fetch('/api/trainers').then((r) => r.json()).catch(() => []),
+      fetch('/api/certificates').then((r) => r.json()).catch(() => []),
+      fetch('/api/reviews').then((r) => r.json()).catch(() => []),
+    ]).then(([c, t, certs, revs]) => {
+      setRealStats({ courses: num(c), trainers: num(t), certs: num(certs), reviews: num(revs) })
+    })
+  }, [])
+
   const stats = [
-    { icon: GraduationCap, value: '500+', label: 'متدرب خرّيج' },
-    { icon: BookOpen, value: '20+', label: 'دورة معتمدة' },
-    { icon: Award, value: '15+', label: 'مدرب معتمد' },
-    { icon: Shield, value: '5+', label: 'اعتمادات رسمية' },
+    { icon: GraduationCap, value: realStats ? `${realStats.certs}` : '…', label: 'شهادة معتمدة صادرة' },
+    { icon: BookOpen, value: realStats ? `${realStats.courses}` : '…', label: 'دورة تدريبية' },
+    { icon: Award, value: realStats ? `${realStats.trainers}` : '…', label: 'مدرب معتمد' },
+    { icon: Shield, value: realStats ? `${realStats.reviews}` : '…', label: 'تقييم من المتدربين' },
   ]
 
   return (

@@ -356,7 +356,7 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
                 const userAnswer = answers[q.id]
                 let userDisplay = 'لم تُجب'
                 if (q.question_type === 'mcq' && typeof userAnswer === 'number' && q.options) {
-                  userDisplay = String.fromCharCode(65 + userAnswer) + ') ' + (q.options[userAnswer] || '—')
+                  userDisplay = (['أ','ب','ج','د','هـ','و'])[userAnswer] + ') ' + (q.options[userAnswer] || '—')
                 } else if (q.question_type === 'truefalse') {
                   userDisplay = userAnswer === true ? 'صح' : userAnswer === false ? 'خطأ' : 'لم تُجب'
                 } else {
@@ -517,7 +517,7 @@ export default function ExamRunnerClient({ attempt, questions, course, studentNa
                         <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
                           userAnswer === idx ? 'bg-gradient-to-br from-gold to-amber-500 text-navy shadow-md' : 'bg-navy/5 text-gold'
                         }`}>
-                          {String.fromCharCode(65 + idx)}
+                          {(['أ','ب','ج','د','هـ','و'])[idx]}
                         </div>
                         <span className="text-sm text-navy flex-1 font-medium">{opt}</span>
                       </button>
