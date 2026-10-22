@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAdmin, guardAuth, getAuthUser } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code')
     const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ قائمة كل المسوقين للإدارة فقط — بالكود علني (تتبع الزائر)، وبالمستخدم لنفسه
+    if (!code) {
+      const au = await getAuthUser(req)
+      const isAdmin = au?.role === 'admin'
+      if (!isAdmin) {
+        if (!au) {
+          return NextResponse.json({ error: 'يجب تسجيل الدخول' }, { status: 401 })
+        }
+        if (!userId) {
+          return NextResponse.json({ error: 'غير مصرح — قائمة المسوقين للإدارة فقط' }, { status: 403 })
+        }
+        if (userId !== au.id) {
+          return NextResponse.json({ error: 'غير مصرح — يمكنك عرض إحالاتك فقط' }, { status: 403 })
+        }
+      }
+    }
     if (code) {
       // Look up a single affiliate by their unique_code (public view)
       const { data, error } = await supabaseAdmin
@@ -49,6 +66,8 @@ function genUniqueCode(name: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const ga = await guardAdmin(req)
+    if (!ga.ok) return ga.res
     const body = await req.json()
     if (!body.name || !body.email) {
       return NextResponse.json({ error: 'الاسم والبريد مطلوبان' }, { status: 400 })
@@ -81,6 +100,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const ga = await guardAdmin(req)
+    if (!ga.ok) return ga.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const { data, error } = await supabaseAdmin
@@ -98,6 +119,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const ga = await guardAdmin(req)
+    if (!ga.ok) return ga.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('affiliates').delete().eq('id', id)
     if (error) throw error

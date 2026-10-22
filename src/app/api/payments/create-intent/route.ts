@@ -1,25 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth, getJwtSecret } from '@/lib/api-auth'
+
+/** توقيع الويبهوك الملكي — HMAC للدفع بالسر الملكي، لا يُقبض أي وبهوك بلا توقيع */
+export async function webhookKey(paymentId: string): Promise<string> {
+  const secret = await getJwtSecret()
+  return crypto.createHmac('sha256', secret).update(`fia-webhook:${paymentId}`).digest('hex').substring(0, 32)
+}
 
 // POST /api/payments/create-intent
 // Body: { course_id, user_id, coupon_code?, affiliate_code? }
 // Returns: { intent_id, amount, currency, status: 'free' | 'pending' | 'manual', redirect_url }
 export async function POST(req: NextRequest) {
   try {
-    const { course_id, user_id, coupon_code, affiliate_code } = await req.json()
-    if (!course_id || !user_id) {
-      return NextResponse.json({ error: 'course_id + user_id required' }, { status: 400 })
+  const g = await guardAuth(req); if (!g.ok) return g.res
+    const body = await req.json()
+    const course_id = body.course_id
+    const user_id = g.user.id // 🛡️ الهوية من التوقيع — لا يُقبل user_id من الجسم
+    const coupon_code = body.coupon_code
+    const affiliate_code = body.affiliate_code
+    if (!course_id) {
+      return NextResponse.json({ error: 'course_id مطلوب' }, { status: 400 })
     }
 
-    // Fetch the course to get the price
+    // Fetch the course to get the price — من الخادم حصراً (لا يُقبل سعر من العميل)
     const { data: course } = await supabaseAdmin
       .from('courses')
-      .select('id, title, price, currency, price_type')
+      .select('id, title, price, currency, price_type, offer_price, offer_ends_at')
       .eq('id', course_id)
       .maybeSingle()
     if (!course) return NextResponse.json({ error: 'الدورة غير موجودة' }, { status: 404 })
 
     let finalAmount = course.price || 0
+    // سعر العرض الرسمي — إن كان ساري المدة (مطابق للوحة الطالب)
+    const offerActive = course.offer_price != null && course.offer_price !== undefined &&
+      (!course.offer_ends_at || new Date(course.offer_ends_at).getTime() > Date.now())
+    if (offerActive && Number(course.offer_price) < finalAmount) {
+      finalAmount = Number(course.offer_price)
+    }
     let discount = 0
 
     // Apply coupon if provided
@@ -112,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     if (gateway === 'moyasar' && process.env.MOYASAR_SECRET_KEY) {
       const base = process.env.NEXT_PUBLIC_APP_URL || 'https://fiaacademy.vercel.app'
-      const callback = `${base}/api/payments/webhook?payment_id=${payment?.id}`
+      const callback = `${base}/api/payments/webhook?payment_id=${payment?.id}&key=${await webhookKey(String(payment?.id || ''))}`
       // Use Moyasar's REST API — server-side Basic auth with secret key.
       const auth = Buffer.from(`${process.env.MOYASAR_SECRET_KEY}:`).toString('base64')
       const res = await fetch('https://api.moyasar.com/v1/invoices', {
@@ -145,7 +164,7 @@ export async function POST(req: NextRequest) {
           'line_items[0][price_data][currency]': (course.currency || 'USD').toLowerCase(),
           'line_items[0][price_data][unit_amount]': String(Math.round(finalAmount * 100)),
           'line_items[0][price_data][product_data][name]': course.title,
-          'success_url': `${base}/api/payments/webhook?payment_id=${payment?.id}&status=success`,
+          'success_url': `${base}/api/payments/webhook?payment_id=${payment?.id}&status=success&key=${await webhookKey(String(payment?.id || ''))}`,
           'cancel_url': `${base}/checkout/${course_id}?canceled=1`,
           'metadata[payment_id]': payment?.id || '',
           'metadata[user_id]': user_id,

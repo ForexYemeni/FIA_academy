@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET /api/blog/comments?blog_post_id=... — list comments with author profiles
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest) {
 // POST — create a comment
 export async function POST(req: NextRequest) {
   try {
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { blog_post_id, user_id, body, parent_id } = await req.json()
     if (!blog_post_id || !user_id || !body) {
       return NextResponse.json({ error: 'blog_post_id + user_id + body required' }, { status: 400 })
@@ -55,7 +58,16 @@ export async function POST(req: NextRequest) {
 // DELETE — delete a comment
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف التعليق: كاتبه أو الإدارة فقط
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
+    if (g.user.role !== 'admin') {
+      const { data: cm } = await supabaseAdmin.from('blog_comments').select('user_id').eq('id', id).maybeSingle()
+      if (cm?.user_id && cm.user_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك حذف تعليقاتك فقط' }, { status: 403 })
+      }
+    }
     const { error } = await supabaseAdmin.from('blog_comments').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

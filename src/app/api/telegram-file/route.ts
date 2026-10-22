@@ -102,9 +102,11 @@ export async function GET(req: NextRequest) {
     }
 
     const filePath = fileData.result.file_path
-    const directUrl = `https://api.telegram.org/file/bot${token}/${filePath}`
+    // 🛡️ الروابط الملكية الآمنة: بروكسي بث داخلي بلا توكن — كان الرابط يضمّن
+    //    `bot<TOKEN>/...` فيكشف توكن البوت لكل طالب يفتح درساً!
+    const safeUrl = `/api/telegram-file/stream?file_id=${encodeURIComponent(resolvedFileId)}`
 
-    return NextResponse.json({ url: directUrl, file_id: resolvedFileId })
+    return NextResponse.json({ url: safeUrl, file_id: resolvedFileId })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

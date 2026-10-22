@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgLessonCreated } from '@/lib/telegram'
 import { notifyFollowersNewLesson, resolveTrainerProfileId } from '@/lib/notifications'
+import { guardAdmin, guardStaff, guardAuth, getAuthUser } from '@/lib/api-auth'
 
 // Lessons are stored inside modules (which are stored as JSON in the course's description field).
 // The /api/modules endpoint handles the full course content. This endpoint provides
@@ -29,7 +30,7 @@ function parseCourseContent(description: string | null): { description: string; 
 async function fetchCourse(courseId: string): Promise<any> {
   const { data } = await supabaseAdmin
     .from('courses')
-    .select('description')
+    .select('description, trainer_id')
     .eq('id', courseId)
     .maybeSingle()
   return data
@@ -89,6 +90,46 @@ export async function GET(req: NextRequest) {
         }
       })
     }
+
+    // ⚡ فرز ملكي حسب الترتيب — كان حقل «الترتيب» بلا أثر في العرض
+    lessons.sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
+
+    // 🛡️ بوابة المحتوى: الكامل للمسجلين/الإدارة/المدرب المالك — معاينة لغيرهم
+    const authUser = await getAuthUser(req)
+    let fullAccess = authUser?.role === 'admin'
+    if (!fullAccess && authUser) {
+      if (authUser.role === 'trainer' && course.trainer_id) {
+        if (course.trainer_id === authUser.id) {
+          fullAccess = true
+        } else {
+          const { data: tRow } = await supabaseAdmin
+            .from('trainers').select('email, id').eq('id', course.trainer_id).maybeSingle()
+          fullAccess = tRow?.email === authUser.email || tRow?.id === authUser.id
+        }
+      }
+      if (!fullAccess) {
+        const { data: enr } = await supabaseAdmin
+          .from('payments')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('course_id', courseId)
+          .eq('status', 'مكتمل')
+          .limit(1)
+        fullAccess = !!(enr && enr.length > 0)
+      }
+    }
+    if (!fullAccess) {
+      lessons = lessons.map((l: any) => ({
+        id: l.id,
+        module_id: l.module_id,
+        title: l.title,
+        lesson_type: l.lesson_type || l.type,
+        duration_minutes: l.duration_minutes,
+        position: l.position,
+        is_preview: !!l.is_preview,
+      }))
+    }
+
     return NextResponse.json(lessons)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -97,6 +138,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardStaff(req); if (!g.ok) return g.res
     const body = await req.json()
     if (!body.module_id || !body.title) {
       return NextResponse.json({ error: 'module_id و title مطلوبان' }, { status: 400 })
@@ -158,6 +200,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+  const g = await guardStaff(req); if (!g.ok) return g.res
     const { id, module_id, course_id, ...updates } = await req.json()
     if (!id || !module_id) {
       return NextResponse.json({ error: 'id و module_id مطلوبان' }, { status: 400 })
@@ -192,6 +235,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+  const g = await guardStaff(req); if (!g.ok) return g.res
     const { id, module_id, course_id } = await req.json()
     if (!id || !module_id) {
       return NextResponse.json({ error: 'id و module_id مطلوبان' }, { status: 400 })

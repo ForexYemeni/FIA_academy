@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // POST /api/notifications/test
 // Body: { user_id }
@@ -18,6 +19,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const body = await req.json().catch(() => ({}))
     const userId = body?.user_id
     if (!userId) {

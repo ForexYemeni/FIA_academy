@@ -3,6 +3,7 @@ import { Cairo } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -134,6 +135,7 @@ export default function RootLayout({
       <body
         className={`${cairo.variable} font-sans antialiased bg-background text-foreground`}
       >
+        <ApiAuthBridge />
         {children}
         <Toaster />
         <SonnerToaster position="top-center" richColors />

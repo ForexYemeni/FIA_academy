@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
+import { guardAdmin, guardStaff, guardAuth, getAuthUser } from '@/lib/api-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -55,7 +56,8 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
       if (!fileData.ok) {
         return { url: null, error: fileData.description || 'getFile failed' }
       }
-      return { url: `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}` }
+      // 🛡️ رابط ملكي آمن عبر البروكسي — التوكن لا يغادر الخادم
+      return { url: `/api/telegram-file/stream?path=${encodeURIComponent(fileData.result.file_path)}` }
     } finally {
       clearTimeout(timeout)
     }
@@ -84,9 +86,15 @@ async function uploadAsDataUri(file: File): Promise<{ url: string | null; error?
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const formData = await req.formData()
     const file = formData.get('file') as File
     const userId = formData.get('user_id') as string
+    // 🛡️ لا أحد يغيّر صورة غيره — نفسه فقط أو الإدارة
+    const au = await getAuthUser(req)
+    if (!au || (au.id !== userId && au.role !== 'admin')) {
+      return NextResponse.json({ error: 'غير مصرح — يمكنك تعديل صورتك أنت فقط' }, { status: 403 })
+    }
     const role = formData.get('role') as string
 
     if (!file) {

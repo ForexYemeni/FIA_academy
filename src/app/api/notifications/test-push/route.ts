@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/onesignal'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 /**
  * POST /api/notifications/test-push
@@ -18,6 +19,7 @@ import { sendPushNotification } from '@/lib/onesignal'
  */
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const body = await req.json().catch(() => ({}))
     const userId = body?.user_id
     if (!userId) {

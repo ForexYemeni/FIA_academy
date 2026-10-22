@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // POST /api/certificates/issue
 // Body: { user_id, course_id } — issues a certificate if the user has
 // completed all lessons + passed the exam. Returns the certificate record.
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { user_id, course_id } = await req.json()
     if (!user_id || !course_id) {
       return NextResponse.json({ error: 'user_id + course_id required' }, { status: 400 })

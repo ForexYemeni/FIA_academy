@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 export async function GET() {
   try {
@@ -17,6 +18,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { question, answer, category, display_order } = await req.json()
     if (!question || !answer) {
       return NextResponse.json({ error: 'السؤال والإجابة مطلوبان' }, { status: 400 })
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const { data, error } = await supabaseAdmin
@@ -58,6 +61,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const { id } = await req.json()
     const { error } = await supabaseAdmin.from('faqs').delete().eq('id', id)
     if (error) throw error

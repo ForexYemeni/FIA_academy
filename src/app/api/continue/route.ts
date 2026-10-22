@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // GET /api/continue?user_id=...
 // Returns the user's in-progress courses, sorted by last_accessed_at desc,
 // with the lesson they last touched so the UI can resume from there.
 export async function GET(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const userId = req.nextUrl.searchParams.get('user_id')
     if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
 

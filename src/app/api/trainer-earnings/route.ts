@@ -7,6 +7,7 @@ import {
   notifyWithdrawalApproved,
   notifyWithdrawalRejected,
 } from '@/lib/notifications'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 
 // ===========================================================================
 // TRAINER EARNINGS ROYAL — محفظة أرباح المدربين متعددة العملات
@@ -26,10 +27,12 @@ function newTotals(): CurrencyTotals {
   return { total_earned: 0, available: 0, withdrawn: 0, pending_withdrawals: 0 }
 }
 
-/** إجماليات المحفظة مجمعة حسب العملة — كل عملة خزينة مستقلة تماماً */
+/** إجماليات المحفظة مجمعة حسب العملة — كل عملة خزينة مستقلة تماماً
+ *  💰 السحب الجزئي: available = Σ(amount − consumed_amount) للصفوف المتاحة —
+ *  فلا يضيع أي باقٍ عند سحب مبلغ لا يطابق الصفوف حرفياً */
 async function getTotalsByCurrency(trainerId: string): Promise<Record<string, CurrencyTotals>> {
   const [earn, wd] = await Promise.all([
-    supabaseAdmin.from('trainer_earnings').select('amount, status, currency').eq('trainer_id', trainerId),
+    supabaseAdmin.from('trainer_earnings').select('amount, status, currency, consumed_amount').eq('trainer_id', trainerId),
     supabaseAdmin.from('withdrawal_requests').select('amount, currency').eq('trainer_id', trainerId).eq('status', 'قيد الانتظار'),
   ])
   const out: Record<string, CurrencyTotals> = {}
@@ -39,10 +42,14 @@ async function getTotalsByCurrency(trainerId: string): Promise<Record<string, Cu
     return out[key]
   }
   for (const r of (earn.data || []) as any[]) {
+    // الأرباح الملغاة (عن دفعة أُلغيت) لا تُحتسب في الخزينة إطلاقاً
+    if (r.status === 'ملغي') continue
     const b = bucket(r.currency)
-    b.total_earned += Number(r.amount) || 0
-    if (r.status === 'متاح') b.available += Number(r.amount) || 0
-    if (r.status === 'مسحوب') b.withdrawn += Number(r.amount) || 0
+    const amount = Number(r.amount) || 0
+    const consumed = Number(r.consumed_amount || 0)
+    b.total_earned += amount
+    if (r.status === 'متاح') b.available += Math.max(0, amount - consumed)
+    if (r.status === 'مسحوب') b.withdrawn += amount
   }
   for (const r of (wd.data || []) as any[]) {
     bucket(r.currency).pending_withdrawals += Number(r.amount) || 0
@@ -86,12 +93,15 @@ export async function GET(req: NextRequest) {
 
     // ---------- ADMIN OVERVIEW ----------
     if (sp.get('admin') === '1') {
+      // 🛡️ نظرة الإدارة (كل المحافظ وأرقام الاستلام) للإدارة فقط!
+      const ga = await guardAdmin(req)
+      if (!ga.ok) return ga.res
       const [earn, wds, trainers] = await Promise.all([
         supabaseAdmin.from('trainer_earnings').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('withdrawal_requests').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('trainers').select('id, name, avatar, title, specialization, profit_percentage, payment_method_type, payment_method_name, payment_account'),
       ])
-      const tMap = new Map((trainers.data || []).map((t: any) => [t.id, t]))
+      const tMap = new Map<string, any>((trainers.data || []).map((t: any) => [t.id, t] as [string, any]))
 
       // Per-trainer summary — مجمعة حسب العملة + حقول مسطحة للعملة الأساسية
       const summary: any[] = []
@@ -152,8 +162,17 @@ export async function GET(req: NextRequest) {
     }
 
     // ---------- TRAINER WALLET VIEW ----------
+    // 🛡️ كل مدرب يرى محفظته هو فقط — الإدارة ترى أي محفظة
+    const ga2 = await guardAuth(req)
+    if (!ga2.ok) return ga2.res
     const trainerId = sp.get('trainer_id')
     if (!trainerId) return NextResponse.json({ error: 'trainer_id required' }, { status: 400 })
+    if (ga2.user.role !== 'admin') {
+      const selfProfile = (await resolveTrainerProfileId(ga2.user.id)) || ga2.user.id
+      if (selfProfile !== trainerId && ga2.user.id !== trainerId) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك عرض محفظتك فقط' }, { status: 403 })
+      }
+    }
 
     const profileId = (await resolveTrainerProfileId(trainerId)) || trainerId
     const profileRes: any = await supabaseAdmin.from('trainers').select('id, name, profit_percentage, payment_method_type, payment_method_name, payment_account').eq('id', profileId).maybeSingle()
@@ -202,14 +221,16 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — trainer creates a withdrawal request IN A SPECIFIC CURRENCY
+// POST — المدرب ينشئ طلب سحب بعملة محددة — لحسابه هو فقط
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ الهوية من التوقيع — لا يمكن لطالب أن يسحب أرباح مدرب!
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const body = await req.json()
-    const trainerId = body.trainer_id
+    const trainerId = g.user.id
     const amount = parseInt(body.amount) || 0
     const currency = (body.currency || '').trim() || 'ر.ي'
-    if (!trainerId) return NextResponse.json({ error: 'trainer_id required' }, { status: 400 })
     if (amount <= 0) return NextResponse.json({ error: 'أدخل مبلغاً صحيحاً للسحب' }, { status: 400 })
 
     const profileId = (await resolveTrainerProfileId(trainerId)) || trainerId
@@ -252,7 +273,13 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      // 🛡️ فهرس فريد جزئي: طلب معلق واحد لكل مدرب بكل عملة — يمنع سباق الإنشاء
+      if ((error as any).code === '23505' || /duplicate key|unique/i.test(error.message || '')) {
+        return NextResponse.json({ error: 'لديك طلب سحب قيد المراجعة بالفعل بهذه العملة — انتظر معالجته' }, { status: 409 })
+      }
+      throw error
+    }
 
     // Notify admins (non-fatal)
     try {
@@ -268,9 +295,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT — admin approves / rejects a withdrawal request
+// PUT — الإدارة فقط توافق / ترفض طلب سحب — بمطالبة ذرّية ضد سباق الموافقة
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ كانت الموافقة على السحب متاحة لأي زائر — مع أرقام محافظ الجميع!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id, status, screenshot_url, admin_note } = await req.json()
     if (!id || !status) return NextResponse.json({ error: 'id and status required' }, { status: 400 })
     if (!['مكتمل', 'ملغي'].includes(status)) {
@@ -285,35 +315,52 @@ export async function PUT(req: NextRequest) {
       .from('withdrawal_requests').select('*').eq('id', id).maybeSingle()
     if (fetchErr) throw fetchErr
     if (!request) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
-    if (request.status !== 'قيد الانتظار') {
-      return NextResponse.json({ error: 'تمت معالجة هذا الطلب مسبقاً' }, { status: 400 })
-    }
 
-    const { data: updated, error } = await supabaseAdmin
+    // ⚡ المطالبة الذرّية: من يغيّر الحالة من «قيد الانتظار» أولاً يفوز —
+    // الضغطة الثانية تعود فارغة فلا يُستهلك الصفوف مرتين أبداً
+    const claim = await supabaseAdmin
       .from('withdrawal_requests')
       .update({ status, screenshot_url: screenshot_url || null, admin_note: admin_note || null, processed_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('status', 'قيد الانتظار')
       .select()
       .single()
-    if (error) throw error
+    if (claim.error || !claim.data) {
+      return NextResponse.json({ error: 'تمت معالجة هذا الطلب مسبقاً' }, { status: 409 })
+    }
+    const updated = claim.data
 
     if (status === 'مكتمل') {
-      // FIFO بالعملة نفسها: mark the OLDEST 'متاح' rows OF THE SAME CURRENCY as 'مسحوب' until the amount is covered
+      // ⚡ FIFO جزئي عادل بعملة الطلب نفسها: نستهلك الصفوف الأقدم أولاً —
+      // الصف يُمسح كاملاً فقط إذا استُهلك بالكامل، وإلا يبقى متاحاً بباقيه
       const { data: avail } = await supabaseAdmin
-        .from('trainer_earnings').select('id, amount')
+        .from('trainer_earnings').select('id, amount, consumed_amount')
         .eq('trainer_id', request.trainer_id)
         .eq('status', 'متاح')
         .eq('currency', request.currency || 'ر.ي')
         .order('created_at', { ascending: true })
       let remaining = request.amount || 0
-      const consumed: string[] = []
+      const fullConsumed: string[] = []
       for (const row of avail || []) {
         if (remaining <= 0) break
-        consumed.push(row.id)
-        remaining -= row.amount || 0
+        const rowAmount = Number(row.amount) || 0
+        const rowConsumed = Number(row.consumed_amount || 0)
+        const rowFree = Math.max(0, rowAmount - rowConsumed)
+        if (rowFree <= 0) continue
+        const take = Math.min(rowFree, remaining)
+        const newConsumed = rowConsumed + take
+        remaining -= take
+        if (newConsumed >= rowAmount) {
+          fullConsumed.push(row.id)
+          await supabaseAdmin.from('trainer_earnings')
+            .update({ status: 'مسحوب', consumed_amount: rowAmount }).eq('id', row.id)
+        } else {
+          await supabaseAdmin.from('trainer_earnings')
+            .update({ consumed_amount: newConsumed }).eq('id', row.id)
+        }
       }
-      if (consumed.length) {
-        await supabaseAdmin.from('trainer_earnings').update({ status: 'مسحوب' }).in('id', consumed)
+      if (fullConsumed.length) {
+        await supabaseAdmin.from('trainer_earnings').update({ status: 'مسحوب' }).in('id', fullConsumed).neq('status', 'مسحوب')
       }
     }
 

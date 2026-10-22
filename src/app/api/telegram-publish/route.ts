@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import crypto from 'crypto'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -370,6 +371,7 @@ async function sendPhotoWithCaption(
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const body = await req.json().catch(() => null)
     const { course_id, action, lesson_title, lesson_type } = (body || {}) as {
       course_id?: string

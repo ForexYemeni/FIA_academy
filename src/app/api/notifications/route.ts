@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET /api/notifications?user_id=...&unread=1 — list user's notifications
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+    // 🛡️ كل مستخدم يقرأ إشعاراته هو فقط — الهوية من التوقيع
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const userId = g.user.id
     const unreadOnly = req.nextUrl.searchParams.get('unread') === '1'
     if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
 
@@ -27,6 +31,9 @@ export async function GET(req: NextRequest) {
 // POST — create a notification (used internally by other routes)
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ إنشاء/إرسال إشعارات للإدارة فقط — كانت تصلح للتصيد باسم الأكاديمية!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { user_id, type, title, body, link } = await req.json()
     if (!user_id || !type || !title) {
       return NextResponse.json({ error: 'user_id, type, title required' }, { status: 400 })
@@ -75,7 +82,13 @@ export async function POST(req: NextRequest) {
 // PUT — mark notifications as read (?ids=... or all unread for user)
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعليم المقروء لإشعاراتك أنت فقط
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { user_id, ids } = await req.json()
+    if (user_id && user_id !== g.user.id) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+    }
     const now = new Date().toISOString()
     let query = supabaseAdmin.from('notifications').update({ read_at: now })
     if (ids && Array.isArray(ids) && ids.length > 0) {
@@ -96,6 +109,9 @@ export async function PUT(req: NextRequest) {
 // DELETE — delete a single notification by id
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف الإشعار: صاحبه أو الإدارة فقط
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const { error } = await supabaseAdmin.from('notifications').delete().eq('id', id)

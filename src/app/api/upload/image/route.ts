@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { promises as fs } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -54,7 +55,7 @@ async function cacheUpload(hash: string, url: string, fileId: string | null, kin
 }
 
 // Upload via Telegram Bot API — supports photos, videos, documents (PDFs)
-async function uploadViaTelegram(file: File, botToken: string, channelId: string): Promise<{ url: string | null; error?: string }> {
+async function uploadViaTelegram(file: File, botToken: string, channelId: string): Promise<{ url: string | null; error?: string; file_id?: string | null }> {
   if (!botToken || !channelId) {
     return { url: null, error: 'إعدادات تيليجرام غير مُهيأة' }
   }
@@ -112,7 +113,8 @@ async function uploadViaTelegram(file: File, botToken: string, channelId: string
       return { url: null, error: fileData.description || 'getFile failed' }
     }
     const filePath = fileData.result.file_path
-    return { url: `https://api.telegram.org/file/bot${botToken}/${filePath}` }
+    // 🛡️ رابط ملكي آمن عبر البروكسي — التوكن لا يغادر الخادم أبداً
+    return { url: `/api/telegram-file/stream?path=${encodeURIComponent(filePath)}`, file_id: fileId }
   } catch (e: any) {
     if (e.name === 'AbortError') {
       return { url: null, error: 'انتهت مهلة الرفع (أكثر من 55 ثانية)' }
@@ -159,6 +161,7 @@ async function uploadLocally(file: File, folder: string): Promise<{ url: string;
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const formData = await req.formData()
     const file = formData.get('file') as File
     const folder = (formData.get('folder') as string) || 'images'

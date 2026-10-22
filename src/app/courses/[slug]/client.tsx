@@ -60,8 +60,26 @@ export default function CourseDetailClient({ course }: CourseDetailClientProps) 
         if (!r.ok) throw new Error('failed')
         return r.json()
       })
-      .then(() => setEnrolled(true))
-      .catch(() => {})
+      .then((d) => {
+        setEnrolled(true)
+        // ⚡ نجاح واضح + دعوة ملكية لفتح الدورة — كان الزر يصمت تماماً
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.success('🎉 تم تسجيلك في الدورة بنجاح!', {
+              description: 'الدورة الآن داخل لوحتك — ابدأ التعلم من «دوراتي»',
+              action: { label: 'افتح لوحتي', onClick: () => { window.location.href = '/#courses' } },
+              duration: 8000,
+            })
+          })
+        }
+      })
+      .catch(() => {
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.error('تعذر إتمام التسجيل — حاول مرة أخرى')
+          })
+        }
+      })
       .finally(() => setEnrollLoading(false))
   }
 

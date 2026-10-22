@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin } from '@/lib/api-auth'
+import { hashPassword } from '@/lib/auth-server'
 
 export async function GET(req: NextRequest) {
   try {
+    // 🛡️ قوائم المستخدمين للإدارة فقط — كانت تسرّب أرقام وبريد الجميع
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const role = req.nextUrl.searchParams.get('role') || 'student'
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '0') || 0
     const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0') || 0
@@ -49,15 +54,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ إنشاء حسابات للإدارة فقط — كانت تسمح لأي زائر بإنشاء حساب إدارة!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const body = await req.json()
+    if (!body.password) return NextResponse.json({ error: 'كلمة المرور مطلوبة' }, { status: 400 })
     const { data, error } = await supabaseAdmin
       .from('users')
       .insert({
         name: body.name,
         email: body.email,
-        password: body.password,
+        password: await hashPassword(String(body.password)),
         phone: body.phone || null,
-        role: body.role || 'student',
+        role: body.role === 'admin' ? 'admin' : (body.role || 'student'),
         title: body.title || null,
         bio: body.bio || null,
         avatar: body.avatar || null,
@@ -74,8 +83,20 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل المستخدمين للإدارة فقط — كانت تسمح بترقية أي حساب إلى إدارة!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
-    if (!updates.password) delete updates.password
+    // قائمة حقول بيضاء — لا حقول عشوائية
+    const allowed = ['name', 'email', 'password', 'phone', 'role', 'title', 'bio', 'avatar']
+    for (const k of Object.keys(updates)) {
+      if (!allowed.includes(k)) delete updates[k]
+    }
+    if (updates.password) {
+      updates.password = await hashPassword(String(updates.password))
+    } else {
+      delete updates.password
+    }
     const { data, error } = await supabaseAdmin
       .from('users')
       .update(updates)
@@ -92,8 +113,14 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف الحسابات للإدارة فقط — كان يحذف أي حساب لمُرسل الطلب!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    if (id === g.user.id) {
+      return NextResponse.json({ error: 'لا يمكنك حذف حسابك من هنا — استخدم منطقة الخطر' }, { status: 400 })
+    }
 
     // Before deleting, store the user's ID in a "force_logout" table
     // so the auth store can check and force-logout the deleted user

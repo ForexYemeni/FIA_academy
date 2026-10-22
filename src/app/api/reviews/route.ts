@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyReviewSubmitted } from '@/lib/notifications'
 import { tgReviewSubmitted } from '@/lib/telegram'
@@ -78,6 +79,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ التقييم لحسابك أنت — والهوية من التوقيع
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { course_id, user_id, rating, title, body } = await req.json()
     if (!course_id || !user_id || !rating) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })

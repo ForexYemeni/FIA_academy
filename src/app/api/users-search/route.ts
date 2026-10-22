@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
@@ -15,6 +16,7 @@ const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 // The link between the two tables is the email address.
 export async function GET(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const q = req.nextUrl.searchParams.get('q') || ''
     const role = req.nextUrl.searchParams.get('role') // filter role
     if (!q || q.length < 2) return NextResponse.json([])

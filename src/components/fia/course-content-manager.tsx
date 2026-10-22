@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/auth-store'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +50,8 @@ const LESSON_TYPES = [
 ]
 
 export function CourseContentManager({ courseId }: { courseId: string }) {
+  const authUser = useAuth((st: any) => st.user)
+  const isAdminUser = authUser?.role === 'admin'
   const [modules, setModules] = useState<Module[]>([])
   const [lessonsByModule, setLessonsByModule] = useState<Record<string, Lesson[]>>({})
   const [loading, setLoading] = useState(true)
@@ -339,7 +342,26 @@ WHERE NOT EXISTS (SELECT 1 FROM team_members WHERE role = 'founder');`
   }
 
   // ===== Database setup needed =====
-  if (needsSetup) {
+  // 🛡️ لوحة SQL هذه أداة إدارة خالصة — تُخفى عن المدربين كلياً (كانت تكشف رابط المشروع!)
+  if (needsSetup && !isAdminUser) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-8 text-center bg-gold/5 border-2 border-gold/30">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-navy flex items-center justify-center mb-4">
+            <Database className="w-8 h-8 text-gold" />
+          </div>
+          <h3 className="font-bold text-navy text-lg mb-2">محتوى الدورة غير مهيأ بعد</h3>
+          <p className="text-sm text-muted-foreground mb-2 max-w-md mx-auto">
+            جداول الوحدات والدروس تحتاج تهيئة أولية من إدارة الأكاديمية.
+          </p>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            تواصل مع الإدارة لتفعيل إدارة المحتوى. يمكنك متابعة بقية مهامك من الأقسام الأخرى.
+          </p>
+        </Card>
+      </div>
+    )
+  }
+  if (needsSetup && isAdminUser) {
     return (
       <div className="space-y-4">
         <Card className="p-8 text-center bg-amber-50 border-2 border-amber-300">

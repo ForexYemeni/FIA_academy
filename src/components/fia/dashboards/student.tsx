@@ -228,7 +228,9 @@ export function StudentDashboard() {
     let channel: any
     try {
       channel = supabasePublic
-        .channel(`payments-realtime-student:${user.id}`)
+        // ⚡ قناة مستقلة عن قناة التوستات — كان الاشتراكان على نفس الاسم
+        //   فيتنافسان ويظهر إشعار مزدوج عند وصول أي دفعة
+        .channel(`payments-state-student:${user.id}`)
         .on('postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
           (payload: any) => {

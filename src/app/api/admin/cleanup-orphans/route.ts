@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgCleanupOrphans } from '@/lib/telegram'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // POST /api/admin/cleanup-orphans
 // Body: { user_id?: string }
@@ -167,8 +168,9 @@ async function previewOrphans() {
   return preview
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const preview = await previewOrphans()
     const total = preview.reduce((sum, p) => sum + p.count, 0)
     return NextResponse.json({ preview, total_orphans: total })
@@ -179,6 +181,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAdmin(req); if (!g.ok) return g.res
     const body = await req.json().catch(() => ({}))
     const userId = body?.user_id as string | undefined
 

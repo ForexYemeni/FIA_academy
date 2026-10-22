@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyForumReplyPosted } from '@/lib/notifications'
 
@@ -100,9 +101,13 @@ export async function GET(req: NextRequest) {
 // POST — create a post. Checks if the user is banned first.
 export async function POST(req: NextRequest) {
   try {
-    const { topic_id, user_id, body } = await req.json()
-    if (!topic_id || !user_id || !body) {
-      return NextResponse.json({ error: 'الموضوع والمستخدم والنص مطلوبة' }, { status: 400 })
+    // 🛡️ المشاركة لحسابك أنت — والهوية من التوقيع
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const { topic_id, body } = await req.json()
+    const user_id = g.user.id
+    if (!topic_id || !body) {
+      return NextResponse.json({ error: 'الموضوع والنص مطلوبان' }, { status: 400 })
     }
 
     // Check ban status
@@ -150,8 +155,17 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل الرد: كاتبه أو الإدارة
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    if (g.user.role !== 'admin') {
+      const { data: post } = await supabaseAdmin.from('forum_posts').select('user_id').eq('id', id).maybeSingle()
+      if (post?.user_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك تعديل ردودك فقط' }, { status: 403 })
+      }
+    }
     const { data, error } = await supabaseAdmin
       .from('forum_posts')
       .update(updates)
@@ -167,7 +181,16 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف الرد: كاتبه أو الإدارة
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
+    if (g.user.role !== 'admin') {
+      const { data: post } = await supabaseAdmin.from('forum_posts').select('user_id').eq('id', id).maybeSingle()
+      if (post?.user_id !== g.user.id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك حذف ردودك فقط' }, { status: 403 })
+      }
+    }
     const { error } = await supabaseAdmin.from('forum_posts').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

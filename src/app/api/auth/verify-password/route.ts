@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyPassword, hashPassword } from '@/lib/auth-server'
+import { guardAuth, rateLimit, clientIp, tooMany } from '@/lib/api-auth'
 
 // POST /api/auth/verify-password
 // Body: { user_id, password }
@@ -17,7 +18,15 @@ import { verifyPassword, hashPassword } from '@/lib/auth-server'
 // rehash it to bcrypt so future verifications are secure.
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ لا تخمين لكلمات الغير: يجب أن تكون أنت صاحب الحساب + حد محاولات
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const rl = rateLimit(`vpass:${clientIp(req)}`, 10, 5 * 60 * 1000)
+    if (!rl.ok) return tooMany(rl.retryAfterSec)
     const { user_id, password } = await req.json()
+    if (user_id !== g.user.id && g.user.role !== 'admin') {
+      return NextResponse.json({ valid: false, message: 'غير مصرح — تحقق من كلمة مرورك أنت فقط' }, { status: 403 })
+    }
     if (!user_id || !password) {
       return NextResponse.json({ valid: false, message: 'user_id و password مطلوبان' }, { status: 400 })
     }

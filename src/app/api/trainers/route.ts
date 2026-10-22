@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, getAuthUser } from '@/lib/api-auth'
+import { hashPassword } from '@/lib/auth-server'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
@@ -153,6 +155,9 @@ async function notifyTelegramNewTrainer(trainer: any): Promise<void> {
 
 export async function GET(req: NextRequest) {
   try {
+    // 🛡️ الحسابات المالية (أرقام المحافظ) للإدارة فقط — العام يرى الاسم والتعريف
+    const adminUser = await getAuthUser(req)
+    const isAdmin = adminUser?.role === 'admin'
     const id = req.nextUrl.searchParams.get('id')
     let query = supabaseAdmin.from('trainers').select('*')
     if (id) query = query.eq('id', id)
@@ -162,11 +167,16 @@ export async function GET(req: NextRequest) {
 
     const safe = (data || [])
       .filter((t: any) => !t.password || !t.password.startsWith(TEAM_MARKER_PREFIX))
-      .map(({ password, ...rest }: any) => {
+      .map((t: any) => {
+        const { password, ...rest } = t
         const { bio, extra } = decodeBio(rest.bio)
-        // Merge legacy encoded qualifications/achievements into a single professional bio
         const mergedBio = mergeLegacyBio(bio, extra)
-        return { ...rest, bio: mergedBio }
+        const base: any = { ...rest, bio: mergedBio, is_team_member: false }
+        if (!isAdmin) {
+          delete base.payment_account
+          delete base.payment_method_name
+        }
+        return base
       })
     // For single-id queries, return a single object; otherwise return array
     if (id) {
@@ -180,10 +190,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 🛡️ إنشاء المدربين للإدارة فقط — كان أي زائر ينشئ مدرباً بكلمة مرور يختارها!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const body = await req.json()
 
-    // Store bio as a plain string — no more encoding.
-    // (qualifications and achievements are now part of the unified bio text)
     const { data, error } = await supabaseAdmin
       .from('trainers')
       .insert({
@@ -193,7 +204,7 @@ export async function POST(req: NextRequest) {
         bio: body.bio || null,
         avatar: body.avatar || null,
         email: body.email,
-        password: body.password,
+        password: await hashPassword(String(body.password || '')),
         phone: body.phone || null,
         courses_count: body.courses_count || 0,
         years_experience: body.years_experience || 0,
@@ -220,6 +231,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ تعديل المدربين (وأسهم الأرباح ومحافظهم) للإدارة فقط!
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     // Bio is stored as plain string now — no encoding.
@@ -228,8 +242,8 @@ export async function PUT(req: NextRequest) {
     for (const key of ['name', 'title', 'specialization', 'bio', 'avatar', 'phone', 'years_experience', 'courses_count', 'profit_percentage', 'payment_method_type', 'payment_method_name', 'payment_account']) {
       if (updates[key] !== undefined) patch[key] = updates[key]
     }
-    // Password update is optional — only set if provided and non-empty
-    if (updates.password) patch.password = updates.password
+    // Password update is optional — hashed always
+    if (updates.password) patch.password = await hashPassword(String(updates.password))
 
     const { data, error } = await supabaseAdmin
       .from('trainers')
@@ -247,7 +261,37 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ حذف المدربين للإدارة فقط + حماية الأرصدة — لا حذف لمدرب له رصيد أو سحبات
+    const g = await guardAdmin(req)
+    if (!g.ok) return g.res
     const { id } = await req.json()
+
+    // 💰 حماية الخزينة: مدرب له رصيد متاح أو طلب سحب معلق لا يُحذف
+    const { data: rows } = await supabaseAdmin
+      .from('trainer_earnings')
+      .select('amount, consumed_amount, status, currency')
+      .eq('trainer_id', id)
+    const available = (rows || [])
+      .filter((r: any) => r.status === 'متاح')
+      .reduce((s: number, r: any) => s + Math.max(0, Number(r.amount || 0) - Number(r.consumed_amount || 0)), 0)
+    if (available > 0) {
+      return NextResponse.json(
+        { error: `لا يمكن حذف المدرب — لديه رصيد أرباح غير مصروف (${available}). صرف الرصيد أو صفّره أولاً.` },
+        { status: 409 }
+      )
+    }
+    const { data: pend } = await supabaseAdmin
+      .from('withdrawal_requests').select('id').eq('trainer_id', id).eq('status', 'قيد الانتظار')
+    if (pend && pend.length > 0) {
+      return NextResponse.json(
+        { error: 'لا يمكن حذف المدرب — لديه طلب سحب معلق. عالج الطلب أولاً.' },
+        { status: 409 }
+      )
+    }
+
+    // فصل دوراته عنه بدل تركها معلقة
+    try { await supabaseAdmin.from('courses').update({ trainer_id: null }).eq('trainer_id', id) } catch {}
+
     const { error } = await supabaseAdmin.from('trainers').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ success: true })

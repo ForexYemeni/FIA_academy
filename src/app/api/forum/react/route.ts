@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // POST /api/forum/react
 // Body: { user_id, topic_id?, post_id?, reaction: 'like' | 'dislike' }
@@ -7,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 // If the user has a different reaction, switch it.
 export async function POST(req: NextRequest) {
   try {
+  const g = await guardAuth(req); if (!g.ok) return g.res
     const { user_id, topic_id, post_id, reaction } = await req.json()
     if (!user_id || !reaction || (!topic_id && !post_id)) {
       return NextResponse.json({ error: 'user_id + reaction + (topic_id or post_id) required' }, { status: 400 })

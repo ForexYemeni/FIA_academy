@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyPaymentRequest } from '@/lib/notifications'
+import { guardAdmin, guardStaff, guardAuth } from '@/lib/api-auth'
 
 // ============================================================================
 // EXAM RETAKE API — paid retake requests for the royal exam system
@@ -19,7 +20,9 @@ import { notifyPaymentRequest } from '@/lib/notifications'
 // GET — list retake payment rows
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('user_id')
+  const g = await guardAuth(req); if (!g.ok) return g.res
+    // 🛡️ بيانات إعادات المحاولة لصاحبها فقط (الهوية من التوقيع)
+    const userId = g.user.role === 'admin' ? req.nextUrl.searchParams.get('user_id') : g.user.id
     const courseId = req.nextUrl.searchParams.get('course_id')
     if (!userId) {
       return NextResponse.json({ error: 'user_id required' }, { status: 400 })
@@ -43,7 +46,11 @@ export async function GET(req: NextRequest) {
 // POST — create a retake payment request
 export async function POST(req: NextRequest) {
   try {
-    const { user_id, course_id, method, reference, proof_url } = await req.json()
+  const g = await guardAuth(req); if (!g.ok) return g.res
+    const gp = await guardAuth(req)
+    if (!gp.ok) return gp.res
+    const { course_id, method, reference, proof_url } = await req.json()
+    const user_id = gp.user.id
     if (!user_id || !course_id || !proof_url) {
       return NextResponse.json({ error: 'user_id و course_id وإثبات الدفع مطلوبة' }, { status: 400 })
     }

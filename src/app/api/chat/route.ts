@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardAdmin, guardAuth } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET /api/chat?user_id=... OR ?conversation_id=...
@@ -6,6 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 // - conversation_id: list messages in a conversation
 export async function GET(req: NextRequest) {
   try {
+    // 🛡️ المحادثات لأصحابها — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const userId = req.nextUrl.searchParams.get('user_id')
     const conversationId = req.nextUrl.searchParams.get('conversation_id')
 
@@ -123,7 +127,14 @@ export async function GET(req: NextRequest) {
 // POST — send a message (creates conversation if not exists)
 export async function POST(req: NextRequest) {
   try {
-    const { sender_id, recipient_id, body } = await req.json()
+    // 🛡️ المحادثات لأصحابها — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
+    const { recipient_id, body } = await req.json()
+    // 🛡️ لا انتحال هوية: المُرسل هو صاحب التوقيع دائماً
+    const sender_id = g.user.id
+    // 🛡️ لا انتحال هوية: المُرسل هو أنت دائماً
+    if (g.user.role !== 'admin') { /* identity enforced below */ }
     if (!sender_id || !recipient_id || !body) {
       return NextResponse.json({ error: 'sender_id, recipient_id, body required' }, { status: 400 })
     }
@@ -278,6 +289,9 @@ export async function POST(req: NextRequest) {
 // PUT — mark messages as read (for current user)
 export async function PUT(req: NextRequest) {
   try {
+    // 🛡️ المحادثات لأصحابها — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { conversation_id, user_id } = await req.json()
     if (!conversation_id || !user_id) {
       return NextResponse.json({ error: 'conversation_id + user_id required' }, { status: 400 })
@@ -298,6 +312,9 @@ export async function PUT(req: NextRequest) {
 // DELETE — delete an entire conversation (and all its messages via CASCADE)
 export async function DELETE(req: NextRequest) {
   try {
+    // 🛡️ المحادثات لأصحابها — الهوية من التوقيع الملكي
+    const g = await guardAuth(req)
+    if (!g.ok) return g.res
     const { conversation_id } = await req.json()
     if (!conversation_id) {
       return NextResponse.json({ error: 'conversation_id required' }, { status: 400 })

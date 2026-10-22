@@ -57,7 +57,12 @@ export function AdminAffiliatesRoyal() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await fetch('/api/affiliates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      const res = await fetch('/api/affiliates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget.id }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
       toast.success('تم حذف المسوّق')
       setDeleteTarget(null)
       load()

@@ -77,7 +77,7 @@ function AuthorChip({ author, size = 'md' }: { author: any; size?: 'sm' | 'md' }
           <span className={`w-1 h-1 rounded-full ${rid.dot}`} /> {rid.label}
         </span>
       </div>
-    </div>
+</div>
   )
 }
 
@@ -247,10 +247,30 @@ export function AdminForumRoyal() {
     loadTopics()
   }
 
+  // 🛡️ حذف موضوع بلا تأكيد كان يمحو نقاشاً كاملاً بنقرة واحدة — الآن حوار تأكيد ملكي مستقل
+  const [topicDeleteTarget, setTopicDeleteTarget] = useState<any | null>(null)
+  const [topicDeleting, setTopicDeleting] = useState(false)
   const deleteTopic = async (t: any) => {
-    await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
-    toast.success('تم حذف الموضوع')
-    loadTopics()
+    setTopicDeleteTarget(t)
+  }
+  const confirmDeleteTopic = async () => {
+    if (!topicDeleteTarget) return
+    setTopicDeleting(true)
+    try {
+      const res = await fetch('/api/forum-topics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: topicDeleteTarget.id }) })
+      if (res.ok) {
+        toast.success('تم حذف الموضوع')
+        setTopicDeleteTarget(null)
+        loadTopics()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشل الحذف')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setTopicDeleting(false)
+    }
   }
 
   // Filters for topic list
@@ -525,6 +545,21 @@ export function AdminForumRoyal() {
             variant="danger"
             onConfirm={handleDeleteCat}
             loading={deleting}
+          />
+
+          {/* 🛡️ حوار تأكيد حذف الموضوع — مستقل عن حوار الفئات */}
+          <ConfirmDialog
+            open={!!topicDeleteTarget}
+            onOpenChange={(o) => { if (!o && !topicDeleting) setTopicDeleteTarget(null) }}
+            title="تأكيد حذف الموضوع"
+            message="سيُحذف الموضوع وكل ردوده نهائياً. هذه العملية لا يمكن التراجع عنها."
+            itemLabel="الموضوع:"
+            itemName={topicDeleteTarget?.title}
+            confirmLabel="حذف نهائي"
+            cancelLabel="إلغاء"
+            variant="danger"
+            onConfirm={confirmDeleteTopic}
+            loading={topicDeleting}
           />
         </>
       ) : (
