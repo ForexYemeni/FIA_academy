@@ -939,7 +939,11 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                 </div>
                 رفع ملف PDF
               </Label>
-              <input type="file" accept=".pdf,application/pdf,application/octet-stream,application/x-pdf" className="hidden" id="pdf-upload"
+              {/* accept="application/pdf" وحيداً — الامتدادات وoctet-stream كانت تُمرَّر
+                  حرفياً إلى منتقي APK فتنهار الفلترة وتُظهر الصور. النوع الوحيد النظيف
+                  يجعل APK 2.7.2 يفتح واجهة المستندات النظامية مباشرة على ملفات PDF،
+                  ويبقى تحقق جافاسكربت الصارم حارساً ثانياً قبل الرفع. */}
+              <input type="file" accept="application/pdf" className="hidden" id="pdf-upload"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }} />
               <Button variant="outline" className="w-full bg-white/80 border-green-200/40 hover:border-green-400 hover:bg-green-50 rounded-xl" disabled={savingPdf}
                 onClick={() => document.getElementById('pdf-upload')?.click()}>

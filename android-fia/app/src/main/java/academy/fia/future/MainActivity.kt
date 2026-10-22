@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -795,76 +796,111 @@ class MainActivity : AppCompatActivity() {
         webView.isLongClickable = false
         webView.isHapticFeedbackEnabled = false
 
-        // === FIX 1: PROPER FILE PICKER ===
-        // Previous APK used setType("*/*") for ALL file pick requests,
-        // which meant the system showed the gallery for everything —
-        // even when the user wanted to upload a PDF. The accept
-        // attribute was passed but ignored.
+        // === ROYAL FILE PICKER v2.7.2 — RADICAL FIX ===
+        // v2.7.1 passed the accept attribute (extensions like ".pdf" and the
+        // catch-all "application/octet-stream") VERBATIM into
+        // EXTRA_MIME_TYPES — invalid entries collapsed the system filter and
+        // the device's media/gallery picker hijacked the request, showing
+        // images/videos even for PDF and audio uploads.
         //
-        // Fix: Use the accept attribute to set the proper MIME filter.
-        // When accept has multiple types, use EXTRA_MIME_TYPES array.
-        // Use Intent.ACTION_GET_CONTENT with category OPENABLE so
-        // the system shows real file managers — not just the gallery.
+        // The radical fix:
+        //   1) Resolve accept tokens into VALID MIME types only (extensions
+        //      are converted via MimeTypeMap; invalid tokens are dropped;
+        //      the octet-stream poison is removed when better types exist).
+        //   2) Pick the narrowest common family (pdf / audio / video / image)
+        //      with a royal Arabic title.
+        //   3) PDF + audio + documents launch ACTION_OPEN_DOCUMENT — the
+        //      SYSTEM documents UI with strict filtering that can NEVER be
+        //      hijacked by a gallery/media picker: PDF requests show PDFs,
+        //      audio requests show audio. Images/video keep the GET_CONTENT
+        //      chooser so the Camera shortcut remains available.
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
                 fileChooserParams: FileChooserParams?
             ): Boolean {
-                // Cancel any pending callback (the user might have
-                // tapped twice in quick succession)
+                // Cancel any pending callback (the user might have tapped
+                // twice in quick succession)
                 pendingFileCallback?.onReceiveValue(null)
                 pendingFileCallback = filePathCallback
 
-                // Extract accept types from the params. We respect the
-                // ACTUAL accept attribute here — this is the fix.
-                val acceptTypes = fileChooserParams?.acceptTypes ?: arrayOf("*/*")
-                pendingFileAccept = if (acceptTypes.isNotEmpty()) {
-                    // Pick the first non-empty accept type. If multiple
-                    // are specified, we use EXTRA_MIME_TYPES below.
-                    val first = acceptTypes.firstOrNull { it.isNotEmpty() } ?: "*/*"
-                    first
-                } else "*/*"
+                // (1) accept → valid MIME types only
+                val rawTypes = fileChooserParams?.acceptTypes?.filter { it.isNotBlank() } ?: emptyList()
+                val mimeTypeMap = MimeTypeMap.getSingleton()
+                val mimes = LinkedHashSet<String>()
+                for (raw in rawTypes) {
+                    val t = raw.trim().lowercase()
+                    when {
+                        t.contains("/") -> mimes.add(t)
+                        t.startsWith(".") -> mimeTypeMap.getMimeTypeFromExtension(t.removePrefix("."))?.let { mimes.add(it) }
+                    }
+                }
+                if (mimes.size > 1) mimes.remove("application/octet-stream")
+                if (mimes.isEmpty()) mimes.add("*/*")
 
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                // (2) narrowest common family + royal title
+                val allowMultiple = fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE
+                val allPdf = mimes.all { it == "application/pdf" || it == "application/x-pdf" }
+                val allAudio = mimes.all { it.startsWith("audio/") }
+                val allVideo = mimes.all { it.startsWith("video/") }
+                val allImage = mimes.all { it.startsWith("image/") }
+                pendingFileAccept = mimes.first()
+
+                val baseType: String
+                val pickerTitle: String
+                when {
+                    allPdf -> { baseType = "application/pdf"; pickerTitle = "اختر ملف PDF" }
+                    allAudio -> { baseType = "audio/*"; pickerTitle = "اختر ملفاً صوتياً" }
+                    allVideo -> { baseType = "video/*"; pickerTitle = "اختر فيديو" }
+                    allImage -> { baseType = "image/*"; pickerTitle = "اختر صورة" }
+                    else -> { baseType = "*/*"; pickerTitle = "اختر ملفاً" }
+                }
+
+                val extraMimes = mimes.filter { it != baseType && it != "*/*" }.toTypedArray()
+
+                fun buildGetContent(): Intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*" // base type, will filter via EXTRA_MIME_TYPES
-                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+                    type = baseType
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
+                    if (extraMimes.isNotEmpty()) putExtra(Intent.EXTRA_MIME_TYPES, extraMimes)
                 }
 
-                // If accept has multiple types, use EXTRA_MIME_TYPES
-                // (only the first type is set via setType; the rest go
-                // into the extra). Filter out empty strings — the web
-                // sometimes passes them.
-                val nonEmptyTypes = acceptTypes.filter { it.isNotEmpty() }.toTypedArray()
-                if (nonEmptyTypes.size > 1) {
-                    intent.putExtra(Intent.EXTRA_MIME_TYPES, nonEmptyTypes)
-                } else if (nonEmptyTypes.size == 1) {
-                    // Single type — set via setType for the strictest
-                    // filtering. The system file picker then shows
-                    // only apps that handle this MIME type.
-                    intent.type = nonEmptyTypes[0]
+                fun buildChooser(): Intent {
+                    val chooser = Intent.createChooser(buildGetContent(), pickerTitle)
+                    if (allImage) {
+                        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(Intent(MediaStore.ACTION_IMAGE_CAPTURE)))
+                    } else if (allVideo) {
+                        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(Intent(MediaStore.ACTION_VIDEO_CAPTURE)))
+                    }
+                    return chooser
                 }
 
-                // For image-only accept, we ALSO add the camera capture
-                // intent so the chooser shows "Camera" alongside the
-                // gallery / file managers. This matches the standard
-                // behavior users expect from `<input accept=image/*>`.
-                val chooser: Intent
-                if (pendingFileAccept.startsWith("image/")) {
-                    val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                    chooser = Intent.createChooser(intent, "اختر صورة")
-                    chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
-                } else if (pendingFileAccept.startsWith("video/")) {
-                    val cameraIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
-                    chooser = Intent.createChooser(intent, "اختر فيديو")
-                    chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
+                // (3) strict system documents UI for PDF/audio, chooser for media
+                val launchIntent: Intent = if (allImage || allVideo) {
+                    buildChooser()
                 } else {
-                    chooser = Intent.createChooser(intent, "اختر ملف")
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = baseType
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
+                        if (extraMimes.isNotEmpty()) putExtra(Intent.EXTRA_MIME_TYPES, extraMimes)
+                    }
                 }
 
                 try {
-                    filePickerLauncher.launch(chooser)
+                    filePickerLauncher.launch(launchIntent)
+                } catch (e: ActivityNotFoundException) {
+                    // OPEN_DOCUMENT missing on this device (rare) — the
+                    // classic chooser still respects the strict MIME filter.
+                    try {
+                        filePickerLauncher.launch(buildChooser())
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "File picker failed to launch", e2)
+                        pendingFileCallback?.onReceiveValue(null)
+                        pendingFileCallback = null
+                        return false
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "File picker failed to launch", e)
                     pendingFileCallback?.onReceiveValue(null)
