@@ -7,11 +7,13 @@ export const dynamic = 'force-dynamic'
 /**
  * 👑 PUT /api/trainers/self-profile — المدرب يحدّث ملفه المهني هو بنفسه
  * 🔒 الاسم مغلّق ملكياً نهائياً (يُحدد عند التسجيل ويُعدّل من الإدارة فقط).
- * مسموح فقط: الهاتف + المسمى الوظيفي + التخصص + النبذة.
+ * 🔒 v6.6 (طلب صاحب المنصة): المسمى الوظيفي + التخصص مغلّقان في ملف المدرب
+ *    تماماً — يراهما لكن لا يعدّلهما؛ التعديل من حساب الإدارة فقط
+ *    (من «المدربون» → تعديل المدرب). مسموح للمدرب: الهاتف + النبذة + الصورة.
  * كان الحفظ القديم ينادي PUT /api/trainers المحمي للإدارة فكان يفشل 403 —
  * هذا المسار يمنح المدرب ملفه هو فقط دون تمس أي حقل حساس.
  */
-const ALLOWED = ['phone', 'title', 'specialization', 'bio', 'avatar'] as const
+const ALLOWED = ['phone', 'bio', 'avatar'] as const
 
 export async function PUT(req: NextRequest) {
   const g = await guardAuth(req)
@@ -24,6 +26,12 @@ export async function PUT(req: NextRequest) {
   if (typeof body?.name === 'string' && body.name.trim() && body.name !== user.name) {
     return NextResponse.json({ error: '🔒 الاسم مغلّق ملكياً — يُحدد مرة واحدة ولا يُعدّل إلا من إدارة الأكاديمية' }, { status: 403 })
   }
+
+  // 🔒 v6.6 — المسمى الوظيفي/التخصص مغلّقان: يُشطرمان صامتاً من أي طلب
+  //    (حقلان رسميان يوثّقهما الأكاديمي — للإدارة وحدها حق التعديل من
+  //    «المدربون» → تعديل المدرب). لا يمرّ تغييرهما عبر هذا المسار إطلاقاً.
+  delete body?.title
+  delete body?.specialization
 
   const patch: Record<string, string> = {}
   for (const field of ALLOWED) {
@@ -46,7 +54,7 @@ export async function PUT(req: NextRequest) {
     // 🪞 مزامنة المرآة في public.users (نفس المعرف) — لتصلح الجداول المرتبطة بها
     //    (specialization أصبح عموداً حقيقياً في users منذ الترحيل 026)
     const mirrorPatch: Record<string, string> = {}
-    for (const f of ['phone', 'title', 'specialization', 'bio', 'avatar']) if (patch[f] !== undefined) mirrorPatch[f] = patch[f]
+    for (const f of ['phone', 'bio', 'avatar']) if (patch[f] !== undefined) mirrorPatch[f] = patch[f]
     if (Object.keys(mirrorPatch).length > 0) {
       try { await supabaseAdmin.from('users').update(mirrorPatch).eq('id', user.id) } catch {}
     }
