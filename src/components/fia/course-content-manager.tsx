@@ -902,7 +902,11 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
               <p className="text-[11px] text-amber-600/80 leading-relaxed">
                 يُخزّن الصوت مجاناً للأبد في أرشيف تيليجرام الخاص بالأكاديمية، ويُبث محمياً عبر الموقع فقط للمسجلين في الدورة — حد أقصى 19 ميجابايت ≈ ساعة صوت واضح.
               </p>
-              <input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus" className="hidden" id="audio-upload"
+              {/* accept="audio/*" فقط — الامتدادات المختلطة (.mp3 ...) تُمرَّر حرفياً إلى
+                  EXTRA_MIME_TYPES في onShowFileChooser داخل APK 2.7 فتنهار القائمة
+                  ويعود الهدف إلى النوع العام فيفتح معرض الصور. نوع MIME وحيد يجعل
+                  الـ APK يضبط النوع الصوتي مباشرة فيفتح منتقي الصوتيات. */}
+              <input type="file" accept="audio/*" className="hidden" id="audio-upload"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAudioUpload(f); e.target.value = '' }} />
               <Button variant="outline" className="w-full bg-white/80 border-amber-300/50 hover:border-amber-500 hover:bg-amber-50 rounded-xl" disabled={uploadingAudio}
                 onClick={() => document.getElementById('audio-upload')?.click()}>
