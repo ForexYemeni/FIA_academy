@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { hashPassword } from '@/lib/auth-server'
 import { rateLimit, clientIp, tooMany } from '@/lib/api-auth'
-import { notifyAdmins, notifyTrainerApplicationReceived } from '@/lib/notifications'
+import { notifyTrainerApplicationReceived } from '@/lib/notifications'
 import { tgTrainerApplication } from '@/lib/telegram'
 
 export const dynamic = 'force-dynamic'
@@ -69,11 +69,7 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
 
-    // إشعارات ملكية (غير قاتلة عند الفشل)
-    try {
-      await notifyAdmins('trainer_application', '🎓 طلب انضمام مدرب جديد',
-        `${name}${specialization ? ' — ' + specialization : ''} بانتظار موافقتكم الملكية`, '/dashboard')
-    } catch {}
+    // إشعارات ملكية (غير قاتلة عند الفشل) — مسار واحد فقط لكل قناة (كان يتكرر مرتين للإدارة)
     try { await notifyTrainerApplicationReceived(name, specialization) } catch {}
     try { await tgTrainerApplication(name, email, specialization, country) } catch {}
 
