@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,8 +18,10 @@ interface CourseDetailClientProps {
 
 export default function CourseDetailClient({ course }: CourseDetailClientProps) {
   const user = useAuth((s) => s.user)
+  const router = useRouter()
   const [modules, setModules] = useState<any[]>([])
   const [enrolled, setEnrolled] = useState(false)
+  const [enrollLoading, setEnrollLoading] = useState(false)
 
   useEffect(() => {
     fetch(`/api/modules?course_id=${course.id}`)
@@ -42,13 +45,24 @@ export default function CourseDetailClient({ course }: CourseDetailClientProps) 
       window.location.href = '/'
       return
     }
+    // 🔒 ROYAL GATE: paid courses MUST go through checkout — no free bypass
+    if (!isFree) {
+      router.push(`/checkout/${course.id}`)
+      return
+    }
+    setEnrollLoading(true)
     fetch('/api/enrollments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.id, course_id: course.id }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('failed')
+        return r.json()
+      })
       .then(() => setEnrolled(true))
+      .catch(() => {})
+      .finally(() => setEnrollLoading(false))
   }
 
   const isFree = course.price_type === 'مجانية' || course.price === 0
@@ -139,8 +153,8 @@ export default function CourseDetailClient({ course }: CourseDetailClientProps) 
                   )}
                 </div>
                 {!enrolled ? (
-                  <Button onClick={handleEnroll} size="lg" className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-bold rounded-xl shadow-xl active:scale-[0.97] transition-all px-8">
-                    <Sparkles className="w-5 h-5 ml-2" /> اشترك الآن
+                  <Button onClick={handleEnroll} disabled={enrollLoading} size="lg" className="bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-bold rounded-xl shadow-xl active:scale-[0.97] transition-all px-8 disabled:opacity-60">
+                    <Sparkles className="w-5 h-5 ml-2" /> {enrollLoading ? 'جاري التسجيل...' : isFree ? 'اشترك الآن' : 'اشترك الآن — إتمام الدفع'}
                   </Button>
                 ) : (
                   <Button size="lg" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl shadow-xl px-8">

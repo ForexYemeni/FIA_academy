@@ -33,40 +33,53 @@ export async function GET(req: NextRequest) {
       // Direct file_id provided
       resolvedFileId = fileId
     } else if (channelId && messageId) {
-      // Telegram message link: need to get the message and extract file_id
-      // Use getChat + forwardMessage or copyMessage to get the video file_id
-      // Actually, we use the bot's getChat + getMessages (not available in Bot API)
-      // Better approach: use the bot to copy the message to itself and get the file_id
+      // ⚡ ROYAL DEDUP: the resolved file_id is cached per (channel, message).
+      // Previously EVERY preview/open forwarded the message to the channel again
+      // — flooding it with duplicates. Now: cache hit → zero Telegram calls;
+      // cache miss → forward ONCE, grab the file_id, delete the temporary
+      // forward so the channel stays pristine, and cache it forever.
+      const cacheKey = `msg:${channelId}:${messageId}`
+      try {
+        const { data: cached } = await supabaseAdmin
+          .from('telegram_file_cache')
+          .select('file_id')
+          .eq('cache_key', cacheKey)
+          .maybeSingle()
+        if (cached?.file_id) {
+          resolvedFileId = cached.file_id
+        }
+      } catch {}
 
-      // Try forwardMessage to the bot itself (or to the same channel)
-      // Actually, the simplest: use copyMessage to copy to the bot's chat
-      // But bots can't message themselves. Let's use the channel approach.
+      if (!resolvedFileId) {
+        const fwdRes = await fetch(
+          `https://api.telegram.org/bot${token}/forwardMessage?chat_id=${channelId}&from_chat_id=${channelId}&message_id=${messageId}`
+        )
+        const fwdData = await fwdRes.json()
 
-      // The bot has access to the channel (it's a member). We can use
-      // the Telegram Bot API to forward the message to the channel itself
-      // (which doesn't create a duplicate) and get the file_id from the response.
+        if (!fwdData.ok) {
+          return NextResponse.json({
+            error: 'فشل في جلب الرسالة من تيليجرام: ' + (fwdData.description || '')
+          }, { status: 500 })
+        }
 
-      // Actually, the best approach: use getChat to verify, then
-      // use the message_id with the Bot API's "forwardMessage" to the same channel
-      // The forwardMessage response will contain the video with file_id
-
-      const fwdRes = await fetch(
-        `https://api.telegram.org/bot${token}/forwardMessage?chat_id=${channelId}&from_chat_id=${channelId}&message_id=${messageId}`
-      )
-      const fwdData = await fwdRes.json()
-
-      if (!fwdData.ok) {
-        return NextResponse.json({
-          error: 'فشل في جلب الرسالة من تيليجرام: ' + (fwdData.description || '')
-        }, { status: 500 })
-      }
-
-      // Extract video file_id from the forwarded message
-      const video = fwdData.result?.video || fwdData.result?.document
-      if (video && video.file_id) {
-        resolvedFileId = video.file_id
-      } else {
-        return NextResponse.json({ error: 'الرسالة لا تحتوي على فيديو' }, { status: 400 })
+        // Extract video file_id from the forwarded message
+        const video = fwdData.result?.video || fwdData.result?.document
+        if (video && video.file_id) {
+          resolvedFileId = video.file_id
+          // Persist the resolution forever — never forward this message again
+          try {
+            await supabaseAdmin
+              .from('telegram_file_cache')
+              .upsert({ cache_key: cacheKey, file_id: resolvedFileId }, { onConflict: 'cache_key' })
+          } catch {}
+          // Delete the temporary forward so the channel shows no duplicates
+          const fwdMessageId = fwdData.result?.message_id
+          if (fwdMessageId) {
+            fetch(`https://api.telegram.org/bot${token}/deleteMessage?chat_id=${channelId}&message_id=${fwdMessageId}`).catch(() => {})
+          }
+        } else {
+          return NextResponse.json({ error: 'الرسالة لا تحتوي على فيديو' }, { status: 400 })
+        }
       }
     } else {
       return NextResponse.json({ error: 'file_id أو (channel_id + message_id) مطلوب' }, { status: 400 })

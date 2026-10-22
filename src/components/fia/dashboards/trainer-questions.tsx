@@ -194,7 +194,7 @@ export function TrainerQuestionBank({ courses }: { courses: any[] }) {
                               }`}>
                                 <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-extrabold flex-shrink-0 ${
                                   isCorrect ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
-                                }`}>{String.fromCharCode(1571 + idx)}</span>
+                                }`}>{(['أ','ب','ج','د','هـ','و','ز','ح','ط'])[idx]}</span>
                                 <span className="line-clamp-1">{o}</span>
                                 {isCorrect && <CheckCircle2 className="w-3 h-3 ml-auto flex-shrink-0" />}
                               </div>

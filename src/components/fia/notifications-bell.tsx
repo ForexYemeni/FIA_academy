@@ -871,7 +871,7 @@ export function NotificationsBell() {
                       <button
                         type="button"
                         onClick={(e) => deleteNotification(e, n)}
-                        className="absolute top-2 left-2 w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-opacity flex items-center justify-center"
+                        className="absolute top-2 left-2 w-6 h-6 rounded-md opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-red-500/10 transition-opacity flex items-center justify-center"
                         title="حذف"
                       >
                         <Trash2 className="w-3 h-3 text-red-500" />

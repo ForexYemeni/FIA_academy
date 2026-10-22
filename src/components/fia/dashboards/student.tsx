@@ -160,7 +160,7 @@ export function StudentDashboard() {
     ;(window as any).__FIA_refreshActiveView = () => {
       loadEnrollments()
       loadPayments()
-      fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     }
     ;(window as any).__FIA_showToast = (msg: string) => {
@@ -176,7 +176,7 @@ export function StudentDashboard() {
       // Refresh all relevant data INSTANTLY when a native notification arrives
       loadEnrollments()
       loadPayments()
-      fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+      fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
       // ⚡ Note: We DON'T show a toast here — the notifications-bell component
       // already shows a toast + browser notification when the corresponding
@@ -196,7 +196,7 @@ export function StudentDashboard() {
 
   useEffect(() => {
     fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/certificates').then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
     loadPayments()
     loadEnrollments()
   }, [user?.id])
@@ -509,8 +509,8 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
       {/* ⚡ Magical StatCards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
         <StatCard icon={BookOpen} label="الدورات المسجّلة" value={enrollments?.length || 0} color="navy" />
-        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed').length || 0} color="green" />
-        <StatCard icon={Clock} label="ساعات التعلّم" value={24} color="gold" />
+        <StatCard icon={CheckCircle2} label="دورات مكتملة" value={enrollments?.filter((e:any)=>e.status==='completed'||e.status==='مكتمل').length || 0} color="green" />
+        <StatCard icon={TrendingUp} label="معدل التقدم" value={`${enrollments?.length ? Math.round(enrollments.reduce((s:number, e:any)=>s+(e.progress||0), 0)/enrollments.length) : 0}%`} color="gold" />
         <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
       </div>
 
@@ -760,6 +760,12 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [payDialog, setPayDialog] = useState<{ course: any; open: boolean } | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
+  // ⚡ Royal countdown heartbeat — the limited-time offer timer ticks every 30s
+  const [offerNow, setOfferNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setOfferNow(Date.now()), 30000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     fetch('/api/payment-methods').then((r) => r.json()).then((d) => setPaymentMethods(Array.isArray(d) ? d.filter((p:any)=>p.enabled) : [])).catch(() => {})
@@ -1054,7 +1060,7 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
                     c.offer_duration_unit === 'days' ? 86400000 :
                     c.offer_duration_unit === 'weeks' ? 604800000 : 2592000000
                   const expiry = start + dur * unitMs
-                  remainingMs = expiry - Date.now()
+                  remainingMs = expiry - offerNow
                   if (remainingMs <= 0) expired = true
                 }
                 if (expired) return null
@@ -1649,6 +1655,15 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
           <div>
             <Label className="text-navy font-bold">اختر طريقة الدفع</Label>
             <div className="grid grid-cols-1 gap-2 mt-2">
+              {(!methods || methods.length === 0) && (
+                <div className="p-5 rounded-2xl border-2 border-dashed border-gold/30 bg-gradient-to-br from-gold/5 to-amber-50/30 text-center space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-gold/20 to-amber-100/50 flex items-center justify-center">
+                    <CreditCard className="w-6 h-6 text-gold" />
+                  </div>
+                  <p className="text-sm font-bold text-navy">لا توجد طرق دفع مفعّلة حالياً</p>
+                  <p className="text-xs text-muted-foreground">تُضاف طرق الدفع قريباً — تواصل مع إدارة الأكاديمية لإتمام الاشتراك</p>
+                </div>
+              )}
               {methods.map((m: any) => {
                 const isCrypto = m.payment_category === 'crypto'
                 return (
@@ -1770,6 +1785,16 @@ function PaymentDialog({ course, methods, open, onOpenChange, onPay, loading, us
               )}
             </div>
           )}
+
+          {/* ⚡ Royal transfer reference — helps admin verify faster */}
+          <div>
+            <Label className="text-navy font-bold text-sm">رقم الحوالة / المرجع (إن وجد)</Label>
+            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="مثال: 881234567" dir="ltr" className="mt-1.5 h-11 rounded-xl font-mono text-sm border-gold/25 focus:border-gold focus:ring-gold/25" />
+            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-gold" />
+              كتابة رقم الحوالة تُسرّع تأكيد دفعتك من الإدارة
+            </p>
+          </div>
 
           {/* ⚡ Upload proof — professional card */}
           <div>
@@ -2532,7 +2557,7 @@ function Certificates({ certificates }: any) {
 
   const handleShare = (cert: any, e: React.MouseEvent) => {
     e.stopPropagation()
-    const url = `https://fiaacademy.vercel.app/?verify=${encodeURIComponent(cert.certificate_number)}#verify`
+    const url = `${(typeof window !== 'undefined' ? window.location.origin : 'https://fiaacademy.vercel.app')}/verify/${cert.certificate_number}`
     if (navigator.share) {
       navigator.share({
         title: 'شهادة معتمدة - أكاديمية المستقبل الدولية',

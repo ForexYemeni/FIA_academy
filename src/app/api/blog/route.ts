@@ -88,6 +88,15 @@ export async function POST(req: NextRequest) {
     if (!title || !body) {
       return NextResponse.json({ error: 'العنوان والمحتوى مطلوبان' }, { status: 400 })
     }
+    // 🔒 ROYAL GATE: only admins and trainers may publish blog posts.
+    // The author must exist and carry an elevated role — no anonymous publishing.
+    const author = await resolveAuthor(author_id || null)
+    const canPublish = !!author && (
+      author.role === 'admin' || author.role === 'trainer' || !!author.team_role
+    )
+    if (!canPublish) {
+      return NextResponse.json({ error: 'غير مصرّح — النشر متاح للإدارة والمدربين فقط' }, { status: 403 })
+    }
     // Auto-generate a unique slug if not provided
     let slug = slugify(title)
     if (!slug) slug = 'post-' + Date.now()

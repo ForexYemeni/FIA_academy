@@ -163,9 +163,13 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                     id="reg-name"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="مثال: محمد أحمد"
+                    placeholder="مثال: محمد أحمد محمد صالح"
                     className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
                   />
+                  <p className="text-[10px] text-amber-700 mt-1.5 flex items-center gap-1 font-medium">
+                    <Sparkles className="w-3 h-3 text-gold" />
+                    ملاحظة: يُفضّل كتابة الاسم الرباعي — فهو الذي يظهر على شهادتك الرسمية
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="reg-email" className="flex items-center gap-1.5 mb-1.5 text-navy font-medium">
