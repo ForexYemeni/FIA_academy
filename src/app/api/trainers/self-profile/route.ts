@@ -43,6 +43,13 @@ export async function PUT(req: NextRequest) {
       .single()
     if (error) throw error
 
+    // 🪞 مزامنة المرآة في public.users (نفس المعرف) — لتصلح الجداول المرتبطة بها
+    const mirrorPatch: Record<string, string> = {}
+    for (const f of ['phone', 'title', 'bio', 'avatar']) if (patch[f] !== undefined) mirrorPatch[f] = patch[f]
+    if (Object.keys(mirrorPatch).length > 0) {
+      try { await supabaseAdmin.from('users').update(mirrorPatch).eq('id', user.id) } catch {}
+    }
+
     return NextResponse.json({ success: true, profile: data })
   } catch (e: any) {
     console.error('trainer self-profile error:', e?.message)

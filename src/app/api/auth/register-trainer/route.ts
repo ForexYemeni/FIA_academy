@@ -69,6 +69,22 @@ export async function POST(req: NextRequest) {
       .single()
     if (error) throw error
 
+    // 🪞 مرآة الهوية: صف بنفس المعرف في public.users — ثمانية جداول تشغيلية
+    // (المنتدى، المواضيع، الإشعارات، المحادثة، التقييمات...) لها مفتاح أجنبي
+    // إلى public.users — بلا المرآة تفشل مشاركته وإشعاراته بصمت.
+    // بريد فريد مشتق عند أي تعارض (لا يمنع التسجيل — الدخول عبر trainers).
+    try {
+      const { data: duUser } = await supabaseAdmin.from('users').select('id').eq('email', email).maybeSingle()
+      const mirrorEmail = duUser ? `trainer.${created.id.slice(0, 8)}@fia-mirror.local` : email
+      await supabaseAdmin.from('users').insert({
+        id: created.id, email: mirrorEmail, name, phone: phone || null,
+        password: hashed, role: 'trainer', avatar: avatar || null,
+        title: title || null, bio: bio || null,
+      })
+    } catch (mirrorErr: any) {
+      console.error('trainer user-mirror error (غير قاتل):', mirrorErr?.message)
+    }
+
     // إشعارات غير قاتلة عند الفشل — مسار واحد فقط لكل قناة
     try { await notifyTrainerApplicationReceived(name, specialization) } catch {}
     try { await tgTrainerApplication(name, email, specialization, country) } catch {}
