@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
 import { DZ_SECTION_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
 import { guardDangerZone } from '@/lib/api-auth'
+import { getRoyalScope, royalNotInFilter } from '@/lib/royal-guard'
 
 // POST /api/admin/danger-zone
 // Body: { section, user_id, password }
@@ -19,6 +20,11 @@ export async function POST(req: NextRequest) {
     const guard = await guardDangerZone(req, user_id, password)
     if (!guard.ok) return guard.res
     const adminId = guard.user.id
+
+    // 👑 الخاتم الملكي: هويات الدورتين المحميتين — لا تُحذف أبداً في أي قسم
+    const royal = await getRoyalScope(true)
+    const royalCoursesNot = royalNotInFilter(royal.courseIds)
+    const royalModulesNot = royalNotInFilter(royal.moduleIds)
 
     // 🛡️ الدرع الملكي: التقاط نسخة إنقاذ كاملة قبل أي محو — فلا يُفقد شيء أبداً
     let snapshotId: string | null = null
@@ -40,18 +46,41 @@ export async function POST(req: NextRequest) {
             // — we delete by it. But we can't filter by course_id
             // without knowing the value, so we just wipe everything
             // in these tables (since we're also wiping all courses).
-            await supabaseAdmin.from(t).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+            let del = supabaseAdmin.from(t).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+            // 👑 الخاتم الملكي: بنك أسئلة الدورتين المحميتين لا يُمس
+            if (t === 'exam_questions' && royalCoursesNot) del = del.not('course_id', 'in', royalCoursesNot)
+            await del
           } catch {}
         }
-        const { data: cd } = await supabaseAdmin.from('courses').select('id')
-        count = cd?.length || 0
-        await supabaseAdmin.from('courses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        // 👑 الخاتم الملكي: وحدات ودروس الدورتين المحميتين لا تُمس
+        try {
+          let mDel = supabaseAdmin.from('course_modules').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+          if (royalCoursesNot) mDel = mDel.not('course_id', 'in', royalCoursesNot)
+          await mDel
+        } catch {}
+        try {
+          let lDel = supabaseAdmin.from('course_lessons').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+          if (royalModulesNot) lDel = lDel.not('module_id', 'in', royalModulesNot)
+          await lDel
+        } catch {}
+        {
+          // 👑 الخاتم الملكي: صفّا الدورتين المحميتين يبقيان — يُحذف غيرهما فقط
+          let cDel = supabaseAdmin.from('courses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+          if (royalCoursesNot) cDel = cDel.not('id', 'in', royalCoursesNot)
+          const { data: cdAll } = await supabaseAdmin.from('courses').select('id')
+          count = Math.max(0, (cdAll?.length || 0) - royal.courseIds.length)
+          await cDel
+        }
         label = 'الدورات'
         break
 
       case 'trainers':
         const { data: td } = await supabaseAdmin.from('trainers').select('id')
         count = td?.length || 0
+        // 👑 الخاتم الملكي: تحرير الدورتين المحميتين من أي trainer_id ميت قبل مسح المدربين
+        if (royal.has) {
+          try { await supabaseAdmin.from('courses').update({ trainer_id: null }).in('id', royal.courseIds) } catch {}
+        }
         await supabaseAdmin.from('trainers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
         label = 'المدربون'
         break

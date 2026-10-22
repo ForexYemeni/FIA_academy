@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { tgCourseCreated, tgCourseUpdated, tgCourseDeleted } from '@/lib/telegram'
 import { notifyFollowersNewCourse, resolveTrainerProfileId } from '@/lib/notifications'
 import { guardAdmin, guardStaff, getAuthUser } from '@/lib/api-auth'
+import { isRoyalCourse } from '@/lib/royal-guard'
 
 // Modules and lessons are stored INLINE in the course's `description`
 // field, after a `===FIA_MODULES===` separator. This is a legacy format
@@ -342,6 +343,16 @@ export async function DELETE(req: NextRequest) {
     if (!g.ok) return g.res
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    // 👑 الخاتم الملكي: الدورتان الدستوريتان (إتقان إدارة الأكاديمية + دليل
+    //    المتدربين والمدربين) لا تُحذفان من هنا — ولا من أي مكان. إذا رغبتَ
+    //    بإخفائهما استخدم الإخفاء من إدارة الدورات بدلاً من الحذف.
+    if (await isRoyalCourse(id)) {
+      return NextResponse.json(
+        { error: '👑 هذه الدورة محمية بالخاتم الملكي — دستور الأكاديمية الذي لا يُحذف. استخدم «الإخفاء» من إدارة الدورات إن أردت إبعادها عن الأنظار.' },
+        { status: 403 }
+      )
+    }
 
     if (g.user.role !== 'admin') {
       const { data: courseRow } = await supabaseAdmin

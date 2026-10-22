@@ -3,6 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
 import { DZ_FULL_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
 import { guardDangerZone } from '@/lib/api-auth'
+import {
+  ROYAL_SLUG_ADMIN_GUIDE,
+  ROYAL_SLUG_USER_GUIDE,
+  getRoyalScope,
+  royalNotInFilter,
+} from '@/lib/royal-guard'
 
 // ===== Danger Zone endpoint =====
 // Accepts a POST with { userId, password } and, after verifying the admin's
@@ -33,9 +39,17 @@ export async function POST(req: NextRequest) {
       snapshotRows = snap.rowTotal
     }
 
+    // 👑 الخاتم الملكي: جلب هويات الدورتين المحميتين الأبديتين قبل المحو —
+    //    دورة إتقان إدارة الأكاديمية + الدليل التعليمي للمتدربين والمدربين
+    //    لا تُحذف أبداً (أمر ملكي) — تظل باقية بعد أي محو بكل محتواها.
+    const royal = await getRoyalScope(true)
+    const royalCoursesNot = royalNotInFilter(royal.courseIds)
+    const royalModulesNot = royalNotInFilter(royal.moduleIds)
+
     // 3. Wipe the data — كل الجداول الموعودة في الحوار، بالترتيب الملكي.
     //    (trainers تُدار بحذف دقيق يُبقي أعضاء الفريق — users: يُحفظ
-    //    المؤسس والإدارة. site_settings لا تُمس أبداً.)
+    //    المؤسس والإدارة. site_settings لا تُمس أبداً. الدورتان الملكيتان
+    //    ووحداتها ودروسها وبنك أسئلتها محميان بالخاتم — لا يُمسّان أبداً.)
     const results: Record<string, { ok: boolean; error?: string; count?: number }> = {}
 
     for (const table of DZ_FULL_TABLES) {
@@ -44,6 +58,12 @@ export async function POST(req: NextRequest) {
       try {
         let del = supabaseAdmin.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
         if (table === 'users') del = del.neq('role', 'admin')
+        // 👑 الخاتم الملكي — استبعاد صفوف الدورتين المحميتين من المحو:
+        if (royalCoursesNot) {
+          if (table === 'courses') del = del.not('id', 'in', royalCoursesNot)
+          if (table === 'course_modules' || table === 'exam_questions') del = del.not('course_id', 'in', royalCoursesNot)
+        }
+        if (royalModulesNot && table === 'course_lessons') del = del.not('module_id', 'in', royalModulesNot)
         const res = await del
         results[table] = res.error ? { ok: false, error: res.error.message } : { ok: true }
       } catch (e: any) {
@@ -72,6 +92,60 @@ export async function POST(req: NextRequest) {
     }
 
     // site_settings is intentionally NOT touched — it must survive the wipe.
+
+    // 👑 الخاتم الملكي — بعد المحو: تحرير الدورتين المحميتين من أي trainer_id
+    //    ميت (مدربوها المحميون بتعليمهم الفريق قد يكونون قد مُسوا) ثم إعادة
+    //    إحكام التسجيل الملكي: الإدارة الناجية ← دورة الإتقان، وأعضاء
+    //    الفريق الناجون ← دليل المتدربين والمدربين. فتبقى الدورتان
+    //    جاهزتين للفريق فور عودته إلى أكاديمية حديثة الإنشاء.
+    try {
+      if (royal.has) {
+        await supabaseAdmin.from('courses').update({ trainer_id: null }).in('id', royal.courseIds)
+
+        const bySlug = new Map<string, string>()
+        const { data: royalRows } = await supabaseAdmin
+          .from('courses').select('id, slug').in('slug', [ROYAL_SLUG_ADMIN_GUIDE, ROYAL_SLUG_USER_GUIDE])
+        for (const r of (royalRows || []) as any[]) bySlug.set(r.slug, r.id)
+        const adminGuideId = bySlug.get(ROYAL_SLUG_ADMIN_GUIDE)
+        const userGuideId = bySlug.get(ROYAL_SLUG_USER_GUIDE)
+
+        const [adminsRes, teamRes] = await Promise.all([
+          supabaseAdmin.from('users').select('id').eq('role', 'admin'),
+          supabaseAdmin.from('trainers').select('id, password'),
+        ])
+        const TEAM_MARKER_PREFIX_LOCAL = '__TEAM_MEMBER__:'
+        const admins = (adminsRes.data || []).map((u: any) => u.id).filter(Boolean)
+        const teamTrainers = ((teamRes.data || []) as any[])
+          .filter((t) => t.password && String(t.password).startsWith(TEAM_MARKER_PREFIX_LOCAL))
+          .map((t) => t.id)
+
+        const { data: existingEnrollments } = await supabaseAdmin
+          .from('payments').select('user_id, course_id').in('course_id', royal.courseIds)
+        const enrolled = new Set(((existingEnrollments || []) as any[]).map((p) => `${p.user_id}::${p.course_id}`))
+
+        const reEnroll: { user_id: string; course_id: string }[] = []
+        for (const uid of admins) {
+          if (adminGuideId && !enrolled.has(`${uid}::${adminGuideId}`)) reEnroll.push({ user_id: uid, course_id: adminGuideId })
+        }
+        for (const tid of teamTrainers) {
+          if (userGuideId && !enrolled.has(`${tid}::${userGuideId}`)) reEnroll.push({ user_id: tid, course_id: userGuideId })
+        }
+        if (reEnroll.length > 0) {
+          await supabaseAdmin.from('payments').insert(
+            reEnroll.map((r) => ({
+              amount: 0,
+              currency: 'ر.ي',
+              method: 'تسجيل مجاني ملكي — دليل الأكاديمية',
+              status: 'مكتمل',
+              reference: 'GUIDE-FREE',
+              date: new Date().toISOString(),
+              user_id: r.user_id,
+              course_id: r.course_id,
+            }))
+          )
+        }
+      }
+    } catch {}
 
     // Report any failures so the admin can see what went wrong.
     const failures = Object.entries(results).filter(([, v]) => !v.ok)
