@@ -31,6 +31,9 @@ import { TrainerQuestionBank } from './trainer-questions'
 import { TrainerResultsCenter } from './trainer-results'
 import { TrainerEarnings } from './trainer-earnings'
 import { TrainerFollowersMuseum } from './trainer-followers'
+import { TrainerRoyalGate, TrainerStatus } from './trainer-royal-gate'
+import { TrainerWithdrawalAccounts } from './trainer-withdrawal-accounts'
+import { Landmark } from 'lucide-react'
 import { supabasePublic } from '@/lib/supabase'
 
 const NAV: NavItem[] = [
@@ -42,6 +45,7 @@ const NAV: NavItem[] = [
   { id: 'question-bank', label: 'بنك الأسئلة', icon: HelpCircle },
   { id: 'results', label: 'نتائج المتدربين', icon: TrendingUp },
   { id: 'earnings', label: 'أرباحي', icon: Wallet },
+  { id: 'withdrawal-accounts', label: 'حسابات السحب', icon: Landmark },
   { id: 'forum', label: 'المنتدى', icon: MessageSquare },
   { id: 'blog', label: 'المدونة', icon: Newspaper },
   { id: 'faqs', label: 'الأسئلة الشائعة', icon: HelpCircle },
@@ -99,6 +103,11 @@ export function TrainerDashboard() {
     avatar: user?.avatar || '',
   })
 
+  // 👑 حالة المنظومة الملكية: pending → agreement_pending → approved / rejected
+  const [trainerStatus, setTrainerStatus] = useState<TrainerStatus | null>(null)
+  const [trainerAgreement, setTrainerAgreement] = useState<any | null>(null)
+  const [trainerRejectedReason, setTrainerRejectedReason] = useState<string | null>(null)
+
   const refreshTrainerProfile = useCallback(async () => {
     if (!user?.id) return
     try {
@@ -113,6 +122,10 @@ export function TrainerDashboard() {
           bio: data.bio || '',
           avatar: data.avatar || '',
         })
+        // 👑 بوابات المنظومة الملكية — الحالة والاتفاق
+        if (data.status) setTrainerStatus(data.status as TrainerStatus)
+        setTrainerAgreement(data.agreement || null)
+        setTrainerRejectedReason(data.rejected_reason || null)
         // Keep auth-store in sync too so other parts of the dashboard reflect
         // any admin-side edits.
         updateUser({
@@ -220,7 +233,21 @@ export function TrainerDashboard() {
       roleLabel="مدرب"
       roleColor="bg-green-500/15 text-green-600 border-green-500/30"
     >
-      {active === 'overview' && <TrainerOverview user={user} courses={courses} students={myStudents} onOpenMuseum={() => setActive('followers')} />}
+      {active === 'overview' && (
+        trainerStatus && trainerStatus !== 'approved' ? (
+          <TrainerRoyalGate
+            status={trainerStatus}
+            name={user?.name || profile.name}
+            agreement={trainerAgreement}
+            rejectedReason={trainerRejectedReason}
+            specialization={profile.specialization}
+            onRefresh={refreshTrainerProfile}
+          />
+        ) : (
+          <TrainerOverview user={user} courses={courses} students={myStudents} onOpenMuseum={() => setActive('followers')} />
+        )
+      )}
+      {active === 'withdrawal-accounts' && <TrainerWithdrawalAccounts />}
       {active === 'courses' && <TrainerCourses courses={courses} onAdd={() => { setEditing(null); setIsDialogOpen(true) }} onEdit={(c) => { setEditing(c); setIsDialogOpen(true) }} onRefresh={loadCourses} onManageContent={navigateToContent} />}
       {active === 'content' && contentCourseId && (
         <div className="space-y-4">
@@ -1462,12 +1489,12 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
   const save = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/trainers', {
+      // 👑 الحفظ الملكي الآمن: مسار مخصص للمدرب — يعدّل ملفه المهني هو فقط
+      //    (الهاتف/المسمى/التخصص/النبذة) — الاسم مغلّف ملكياً وللإدارة وحدها.
+      const res = await fetch('/api/trainers/self-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: user.id,
-          name: profile.name,
           phone: profile.phone,
           title: profile.title,
           specialization: profile.specialization,
@@ -1482,10 +1509,9 @@ function TrainerProfile({ profile, setProfile, user, updateUser, refreshProfile 
       // Sync local auth-store with the saved DB record so other components
       // (overview header, etc.) reflect the new values immediately.
       updateUser({
-        name: data.name,
-        phone: data.phone,
-        title: data.title,
-        bio: data.bio,
+        phone: data.profile?.phone ?? profile.phone,
+        title: data.profile?.title ?? profile.title,
+        bio: data.profile?.bio ?? profile.bio,
       })
       toast.success('تم تحديث الملف الشخصي بنجاح')
     } catch {

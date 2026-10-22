@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import {
   Shield, Award, Users, Clock, BookOpen, GraduationCap, Stethoscope,
-  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X, Building2,
+  HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X, Building2, BadgeCheck,
 } from 'lucide-react'
 
 type Course = {
@@ -304,6 +304,10 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
                           {t.name?.charAt(0)}
                         </div>
                       )}
+                      {/* شارة الاعتماد الملكية — المدربون المعتمدون فقط يصلون هنا */}
+                      <span className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-gold to-amber-500 shadow-lg" title="مدرب معتمد رسمياً من الأكاديمية">
+                        <BadgeCheck className="h-4 w-4 text-navy" />
+                      </span>
                     </div>
                     <h3 className="font-bold text-navy text-lg">{t.name}</h3>
                     <p className="text-gold text-sm font-semibold mb-2">{t.title}</p>

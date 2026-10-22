@@ -418,3 +418,57 @@ export async function tgDangerZoneRestored(rowTotal: number, byUserId?: string) 
     `\n\n✅ تم إرجاع البيانات من أرشيف الإنقاذ بنجاح.`
   await sendTelegramMessage(msg)
 }
+
+// =========================================================================
+// ROYAL TRAINER PIPELINE — تسجيل المدرب الذاتي + الموافقة + الاتفاق + الاعتماد
+// =========================================================================
+
+export async function tgTrainerApplication(name: string, email: string, specialty?: string | null, country?: string | null) {
+  const msg =
+    header('🎓', 'طلب انضمام مدرب جديد — تسجيل ذاتي') +
+    line('👤 الاسم', name) +
+    line('💼 التخصص', specialty || '—') +
+    line('🌍 الدولة', country || '—') +
+    line('📧 البريد', email) +
+    `\n\n⏳ بانتظار الموافقة الملكية في لوحة الإدارة → طلبات المدربين.`
+  await sendTelegramMessage(msg)
+}
+
+export async function tgTrainerApplicationApproved(name: string, percentage: number, byUserId?: string) {
+  const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
+  const msg =
+    header('🤝', 'موافقة مبدئية على مدرب') +
+    line('👤 الاسم', name) +
+    line('💰 نسبة الأرباح المعروضة', percentage + '%') +
+    line('✨ وافقت', by) +
+    `\n\n📜 الآن يصل الاتفاق الفاخر للمدرب ليقبل النسبة أو يرفضها.`
+  await sendTelegramMessage(msg)
+}
+
+export async function tgTrainerApplicationRejected(name: string, reason?: string | null, byUserId?: string) {
+  const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
+  const msg =
+    header('🚫', 'رفض طلب انضمام مدرب') +
+    line('👤 الاسم', name) +
+    line('📝 السبب', reason || '—') +
+    line('✨ رفض', by)
+  await sendTelegramMessage(msg)
+}
+
+export async function tgTrainerCertified(name: string, percentage: number) {
+  const msg =
+    header('🏅', 'اعتماد مدرب ملكياً') +
+    line('👤 الاسم', name) +
+    line('🤝 نسبة الأرباح المتفق عليها', percentage + '%') +
+    line('👑 الحالة', 'معتمد — يظهر الآن في نخبة مدربي الأكاديمية')
+  await sendTelegramMessage(msg)
+}
+
+export async function tgTrainerAgreementDeclined(name: string, note?: string | null) {
+  const msg =
+    header('⚖️', 'رفض مدرب نسبة الربح المعروضة') +
+    line('👤 الاسم', name) +
+    line('📝 ملاحظته', note || '—') +
+    `\n\n💡 يمكنك مراجعة العرض وإعادة تقديمه من: لوحة الإدارة → طلبات المدربين.`
+  await sendTelegramMessage(msg)
+}

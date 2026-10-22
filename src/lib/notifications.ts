@@ -458,3 +458,43 @@ export async function notifyAdmins(type: string, title: string, body?: string, l
     await sendToMany(ids, type, title, body, link)
   } catch {}
 }
+
+// =========================================================================
+// ROYAL TRAINER PIPELINE — إشعارات منظومة المدربين الملكية
+// =========================================================================
+
+/** للإدارة: وصل طلب انضمام مدرب جديد (تسجيل ذاتي). */
+export async function notifyTrainerApplicationReceived(name: string, specialty?: string | null) {
+  await notifyAdmins('trainer_application', '🎓 طلب انضمام مدرب جديد',
+    `${name}${specialty ? ' — ' + specialty : ''} بانتظار موافقتكم الملكية`, '/dashboard')
+}
+
+/** للمدرب: وافقت الإدارة مبدئياً + عرض نسبة الربح (يتطلب قبوله). */
+export async function notifyTrainerApplicationApproved(trainerUserId: string, percentage: number, terms?: string | null) {
+  await send(trainerUserId, 'trainer_agreement', '👑 وافقت الإدارة على طلبك الملكي!',
+    `تهانينا! وافقت الإدارة مبدئياً على انضمامك، وتُعرض عليك نسبة أرباح ${percentage}% من دوراتك${terms ? ' — ' + terms : ''}. افتح لوحتك لقراءة الاتفاق الفاخر وقبوله.`, '/dashboard')
+}
+
+/** للمدرب: رفض الطلب مع السبب. */
+export async function notifyTrainerApplicationRejected(trainerUserId: string, reason?: string | null) {
+  await send(trainerUserId, 'trainer_rejected', 'بخصوص طلب انضمامك إلى الأكاديمية',
+    reason ? `لم تكتمل الموافقة على طلبك هذه المرة — ${reason}` : 'لم تكتمل الموافقة على طلبك هذه المرة. يمكنك التواصل مع الإدارة لمعرفة التفاصيل.', '/dashboard')
+}
+
+/** للمدرب: الاعتماد النهائي — أصبح معتمداً ويظهر في مدربينا. */
+export async function notifyTrainerCertified(trainerUserId: string, name: string) {
+  await send(trainerUserId, 'trainer_certified', '🏅 أنت الآن مدرب معتمد ملكياً!',
+    `أهلاً بك رسمياً ${name} — وُقّع الاتفاق، وأصبح اسمك يظهر في نخبة مدربي الأكاديمية، وحقوقك ولوحتك مفعّلة بالكامل.`, '/dashboard')
+}
+
+/** للإدارة: المدرب رفض النسبة المعروضة (لإعادة التفاوض). */
+export async function notifyTrainerAgreementDeclined(trainerName: string, note?: string | null) {
+  await notifyAdmins('trainer_agreement', '⚖️ رفض مدرب نسبة الربح المعروضة',
+    `${trainerName}${note ? ' — ملاحظته: ' + note : ''}. يمكنك تعديل العرض وإعادة تقديمه من طلبات المدربين.`, '/dashboard')
+}
+
+/** للمدرب: عرض محدّث بنسبة جديدة بعد التفاوض. */
+export async function notifyTrainerAgreementRevised(trainerUserId: string, percentage: number) {
+  await send(trainerUserId, 'trainer_agreement', '📜 عرض اتفاق محدّث',
+    `راجعت الإدارة العرض وحدّثت نسبة الأرباح إلى ${percentage}%. تفحّص الاتفاق الجديد في لوحتك ووقّعه.`, '/dashboard')
+}

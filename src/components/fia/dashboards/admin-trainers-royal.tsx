@@ -10,6 +10,7 @@ import {
   GraduationCap, Plus, Edit, Trash2, Mail, Phone, Lock, Eye, EyeOff, User,
   Award, Briefcase, FileText, Crown, Loader2, CheckCircle2, Users, Sparkles,
   CalendarClock, BadgeCheck, Upload, X, BadgePercent, Landmark, Bitcoin, Wallet, HeartHandshake,
+  Trophy, Star, Globe2, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -202,6 +203,13 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                       <LuxBadge tone="gold" className="bg-gold/25 border-gold/50">👑 فريق</LuxBadge>
                     </div>
                   )}
+                  {!isTeamMember && t.status && t.status !== 'approved' && (
+                    <div className="absolute top-2.5 left-2.5 z-10">
+                      <LuxBadge tone="gold" className={t.status === 'pending' ? 'bg-amber-400/20 border-amber-400/50 text-amber-800' : t.status === 'agreement_pending' ? 'bg-sky-400/20 border-sky-400/50 text-sky-800' : 'bg-rose-400/20 border-rose-400/50 text-rose-800'}>
+                        {t.status === 'pending' ? '⏳ بانتظار الموافقة' : t.status === 'agreement_pending' ? '📜 بانتظار التوقيع' : '🚫 مرفوض'}
+                      </LuxBadge>
+                    </div>
+                  )}
                   <div className="relative flex justify-center -mb-7">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gold/50 blur-md rounded-full scale-90" />
@@ -294,7 +302,7 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
 // ============================================================================
 function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '' }
+    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [] }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
@@ -302,8 +310,8 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
 
   useEffect(() => {
     setForm(initial
-      ? { profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', ...initial }
-      : { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '' })
+      ? { profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [], ...initial }
+      : { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [] })
   }, [initial])
 
   const handleAvatarUpload = async (file: File) => {
@@ -479,6 +487,19 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           placeholder="— اختر التخصص —"
           options={SPECIALIZATIONS.map((s) => ({ value: s, label: s, emoji: '🩺' }))}
         />
+        <LuxField label="بلد الإقامة" icon={Globe2} hint="تظهر طرق سحب الأرباح المتاحة بحسب بلده">
+          <select value={form.country || 'اليمن'} onChange={(e) => setForm({ ...form, country: e.target.value })} className={luxInput + ' text-sm'}>
+            {['اليمن', 'السعودية', 'الإمارات', 'عُمان', 'قطر', 'الكويت', 'البحرين', 'العراق', 'مصر', 'الأردن', 'فلسطين', 'لبنان', 'السودان', 'ليبيا', 'تونس', 'الجزائر', 'المغرب', 'موريتانيا', 'الصومال', 'دولة أخرى'].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </LuxField>
+        <LuxField label="حالة الاعتماد الملكية" icon={ShieldCheck} hint="فقط للمنظومة الجديدة: معتمد يظهر في «مدربينا» — المعلّق/المرفوض لا يظهران">
+          <select value={form.status || 'approved'} onChange={(e) => setForm({ ...form, status: e.target.value })} className={luxInput + ' text-sm'}>
+            <option value="approved">معتمد ✅ (يظهر للعامة)</option>
+            <option value="agreement_pending">بانتظار توقيع الاتفاق 📜</option>
+            <option value="pending">بانتظار موافقة الإدارة ⏳</option>
+            <option value="rejected">مرفوض 🚫</option>
+          </select>
+        </LuxField>
       </div>
 
       {/* ── 💰 نظام الأرباح — نسبته من كل دورة على كل متدرب ── */}
@@ -588,7 +609,97 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> استخدم الأسطر الفارغة لفصل الفقرات والعناوين</span>
         <span className="font-bold tabular-nums">{(form.bio || '').length} حرف</span>
       </div>
+
+      {/* ── 👑 الملف الاحترافي المنظّم: مؤهلات + إنجازات + خبرات ── */}
+      <FormSectionTitle icon={Award} label="الملف الاحترافي المنظّم (مؤهلات / إنجازات / خبرات)" />
+      <div className="space-y-3">
+        {/* المؤهلات */}
+        <ListEditor
+          icon={Award} title="المؤهلات العلمية" accent="emerald"
+          items={form.qualifications || []}
+          onChange={(items) => setForm({ ...form, qualifications: items })}
+          newRow={{ title: '', institution: '', year: '' }}
+          fields={[
+            { key: 'title', placeholder: 'الدرجة / المؤهل' },
+            { key: 'institution', placeholder: 'الجهة المانحة' },
+            { key: 'year', placeholder: 'السنة', ltr: true },
+          ]}
+          preview={(q: any) => `${q.title || '—'}${q.institution ? ' — ' + q.institution : ''}${q.year ? ` (${q.year})` : ''}`}
+        />
+        {/* الإنجازات */}
+        <ListEditor
+          icon={Trophy} title="الإنجازات والجوائز" accent="amber"
+          items={form.achievements || []}
+          onChange={(items) => setForm({ ...form, achievements: items })}
+          newRow={{ title: '', description: '', year: '' }}
+          fields={[
+            { key: 'title', placeholder: 'الإنجاز' },
+            { key: 'description', placeholder: 'وصف مختصر' },
+            { key: 'year', placeholder: 'السنة', ltr: true },
+          ]}
+          preview={(x: any) => `${x.title || '—'}${x.description ? ' — ' + x.description : ''}${x.year ? ` (${x.year})` : ''}`}
+        />
+        {/* الخبرات */}
+        <ListEditor
+          icon={Star} title="الخبرات العملية" accent="sky"
+          items={form.experiences || []}
+          onChange={(items) => setForm({ ...form, experiences: items })}
+          newRow={{ position: '', organization: '', period: '', description: '' }}
+          fields={[
+            { key: 'position', placeholder: 'المنصب' },
+            { key: 'organization', placeholder: 'الجهة' },
+            { key: 'period', placeholder: 'الفترة' },
+            { key: 'description', placeholder: 'أبرز المهام' },
+          ]}
+          preview={(x: any) => `${x.position || '—'}${x.organization ? ' في ' + x.organization : ''}${x.period ? ` (${x.period})` : ''}`}
+        />
+      </div>
     </LuxDialog>
+  )
+}
+
+/* محرر قائمة فاخر — صفوف ديناميكية بمعاينة حية */
+function ListEditor({ icon: Icon, title, accent, items, onChange, newRow, fields, preview }: any) {
+  return (
+    <div className="rounded-xl border border-gold/25 bg-white p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 text-xs font-extrabold text-navy">
+          <span className={`w-6 h-6 rounded-lg bg-gradient-to-br ${accent}-100 to-transparent flex items-center justify-center border border-gold/20`}>
+            <Icon className="w-3.5 h-3.5 text-gold" />
+          </span>
+          {title} <span className="text-[10px] font-bold text-muted-foreground">({items.length})</span>
+        </p>
+        <button type="button" onClick={() => onChange([...items, { ...newRow }])}
+          className="flex items-center gap-1 rounded-lg border border-gold/35 bg-gold/10 px-2.5 py-1 text-[10px] font-extrabold text-navy transition-colors hover:bg-gold/20">
+          <Plus className="w-3 h-3" /> إضافة
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-gold/25 bg-gold/[0.03] p-2.5 text-center text-[10px] text-muted-foreground">لا عناصر — أضف أول صف</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((it: any, idx: number) => (
+            <div key={idx} className="relative rounded-lg border border-gold/15 bg-gold/[0.02] p-2.5">
+              <div className={`grid gap-1.5 ${fields.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : fields.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {fields.map((f: any) => (
+                  <Input key={f.key} value={it[f.key] || ''} dir={f.ltr ? 'ltr' : undefined}
+                    onChange={(e) => { const next = [...items]; next[idx] = { ...it, [f.key]: e.target.value }; onChange(next) }}
+                    placeholder={f.placeholder}
+                    className="h-9 border-gold/20 text-xs focus:border-gold focus:ring-gold/20" />
+                ))}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <p className="truncate text-[9px] text-muted-foreground">👁 {preview(it)}</p>
+                <button type="button" onClick={() => onChange(items.filter((_: any, i: number) => i !== idx))}
+                  className="rounded-md p-1 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

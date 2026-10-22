@@ -262,6 +262,12 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                   {loading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
                   {loading ? 'جاري المعالجة...' : 'إنشاء الحساب'}
                 </Button>
+                <a
+                  href="/register?type=trainer"
+                  className="group flex items-center justify-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-2.5 text-xs font-bold text-gold transition-all hover:bg-gold/10 active:scale-[0.98]"
+                >
+                  👑 تريد الانضمام مدرباً إلى النخبة؟ سجّل كمدرب بملفك الاحترافي الكامل
+                </a>
               </TabsContent>
             </Tabs>
           </div>

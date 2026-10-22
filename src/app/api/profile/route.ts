@@ -4,12 +4,12 @@ import { guardAuth } from '@/lib/api-auth'
 
 /**
  * 👑 /api/profile — الملف الشخصي الذاتي الملكي
- * PUT: يحدّث المستخدم ملفه هو بنفسه (اسم/هاتف/تخصص/نبذة) — دون تمس
+ * PUT: يحدّث المستخدم ملفه هو بنفسه (هاتف/تخصص/نبذة) — دون تمس
  * أي حقل حساس (الدور/البريد/كلمة المرور/الأفاتار عبر مساراتها الخاصة).
- * كان زر «حفظ التغييرات» في لوحة الطالب يحفظ في المتصفح فقط ويظهر
- * نجاحاً زائفاً — الآن الحفظ حقيقي في قاعدة البيانات ويبقى عبر الأجهزة.
+ * 🔒 الاسم مغلّق نهائياً (طلب المالك): يُحدد مرة واحدة عند التسجيل ولا يُعدَّل
+ * أبداً من أي حساب متدرب أو مدرب — أمر تعديل الاسم يُتجاهل ويُردّ برسالة ملكية.
  */
-const ALLOWED_FIELDS = ['name', 'phone', 'title', 'bio'] as const
+const ALLOWED_FIELDS = ['phone', 'title', 'bio'] as const
 
 export async function PUT(req: NextRequest) {
   try {
@@ -25,12 +25,11 @@ export async function PUT(req: NextRequest) {
       }
     }
     if (Object.keys(updates).length === 0) {
+      // محاولة تعديل الاسم وحده → رد ملكي واضح
+      if (typeof body?.name === 'string' && body.name.trim()) {
+        return NextResponse.json({ error: '🔒 الاسم مغلّق ملكياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله' }, { status: 403 })
+      }
       return NextResponse.json({ error: 'لا توجد حقول صالحة للتحديث' }, { status: 400 })
-    }
-
-    // الاسم الملكي لا يكون فارغاً
-    if ('name' in updates && !updates.name) {
-      return NextResponse.json({ error: 'الاسم لا يمكن أن يكون فارغاً' }, { status: 400 })
     }
 
     const { data, error } = await supabaseAdmin
