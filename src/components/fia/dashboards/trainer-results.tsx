@@ -362,8 +362,8 @@ export function TrainerResultsCenter({ user, courses }: { user: any; courses: an
                           }`}
                           disabled={!examPassed}
                           title={examPassed ? 'الموافقة على الطلب' : 'لا يمكن الموافقة قبل اجتياز المتدرب لاختبار الدورة'}
-                          onClick={() => handleRequestAction(r.id, 'trainer_approve', `وافق المدرب — نتيجة الاختبار ${best.score}%`)}>
-                          <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة (نتيجة الاختبار {best.score}%)
+                          onClick={() => handleRequestAction(r.id, 'trainer_approve', best ? `وافق المدرب — نتيجة الاختبار ${best.score}%` : 'وافق المدرب')}>
+                          <CheckCircle2 className="w-3.5 h-3.5 ml-1" /> موافقة{best ? ` (نتيجة الاختبار ${best.score}%)` : ''}
                         </Button>
                         <Button size="sm" variant="outline" className="border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs rounded-lg"
                           onClick={() => handleRequestAction(r.id, 'reject', examPassed ? 'مرفوض من المدرب' : 'لم يجتز اختبار الدورة بعد')}>

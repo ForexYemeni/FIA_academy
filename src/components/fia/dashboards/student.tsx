@@ -12,8 +12,8 @@ import {
   Users2, Search, BadgeCheck, Crown,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
-import { LuxCombo } from './luxury'
-import { useSpecializationCatalog } from '@/lib/use-specializations'
+// 🔒 v6.4: LuxCombo + كتالوج التخصصات حُذفا من هنا — المسمى الوظيفي والتخصص
+// مغلّقان على المتدرب ويُعدَّلان من الإدارة فقط (قسم المتدربين)
 import { useAuth } from '@/lib/auth-store'
 import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
@@ -396,7 +396,7 @@ export function StudentDashboard() {
           {active === 'overview' && <Overview user={user} courses={courses} certificates={certificates} enrollments={enrollments} onViewCourse={(c) => {
             // === SAFETY CHECK: never open a paid course the student hasn't paid for ===
             const enr = enrollments.find((e:any)=>e.course_id===c.id)
-            const isFree = c.price_type === 'مجانية' || c.price === 0
+            const isFree = c.price_type === 'مجانية' || !Number(c.price)
             if (!enr) {
               // Not enrolled at all — route to BrowseCourses with this course
               // pre-selected so the user can enroll/pay in one click.
@@ -472,7 +472,7 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
   // - Enrolled (free/confirmed/completed) -> can open
   const getCourseAccess = (c: any) => {
     const enr = enrollments?.find((e: any) => e.course_id === c.id)
-    const isFree = c.price_type === 'مجانية' || c.price === 0
+    const isFree = c.price_type === 'مجانية' || !Number(c.price)
     if (enr) {
       if (enr.payment_status === 'pending') {
         return { canOpen: false, reason: 'بانتظار تأكيد الدفع', enrollment: enr }
@@ -564,7 +564,7 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
           {courses.slice(0, 3).map((c: any) => {
             const access = getCourseAccess(c)
-            const isFree = c.price_type === 'مجانية' || c.price === 0
+            const isFree = c.price_type === 'مجانية' || !Number(c.price)
             // Decide button label + action based on access state
             let btnLabel = 'عرض الدورة'
             let btnAction: () => void = () => onViewCourse?.(c)
@@ -678,7 +678,7 @@ const MyCourses = React.memo(function MyCourses({ courses, enrollments, onContin
           {enrolled.map((c: any) => {
             const isCompleted = c.enrollment.payment_status === 'completed' || c.enrollment.status === 'completed' || c.enrollment.status === 'مكتمل'
             const isPending = c.enrollment.payment_status === 'pending'
-            const isFree = c.price_type === 'مجانية' || c.price === 0
+            const isFree = c.price_type === 'مجانية' || !Number(c.price)
             const pct = c.enrollment.progress || 0
             return (
               <Card key={c.id} className="fia-course-card p-0 overflow-hidden cursor-default border border-gold/20">
@@ -824,7 +824,7 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
   // - Enrolled + free/confirmed/completed → can open
   const getAccess = (c: any) => {
     const enr = enrollments?.find((e: any) => e.course_id === c.id)
-    const isFree = c.price_type === 'مجانية' || c.price === 0
+    const isFree = c.price_type === 'مجانية' || !Number(c.price)
     if (!enr) {
       return { state: isFree ? 'free-not-enrolled' : 'paid-not-enrolled', enrollment: null }
     }
@@ -911,7 +911,7 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
   // - If paid + not enrolled          → open the payment dialog (course opens AFTER admin approval)
   const handleCardClick = (c: any) => {
     const enr = enrollments?.find((e: any) => e.course_id === c.id)
-    const isFree = c.price_type === 'مجانية' || c.price === 0
+    const isFree = c.price_type === 'مجانية' || !Number(c.price)
     if (enr) {
       // SAFETY: even if enrolled, don't open if payment is pending
       if (enr.payment_status === 'pending') {
@@ -1043,7 +1043,7 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 fia-stagger">
               {featuredCourses.map((c: any) => {
-                const isFree = c.price_type === 'مجانية' || c.price === 0
+                const isFree = c.price_type === 'مجانية' || !Number(c.price)
                 const offerPrice = Number(c.offer_price) || 0
                 const displayPrice = offerPrice > 0 ? offerPrice : (Number(c.price) || 0)
                 const originalPrice = Number(c.original_price) || 0
@@ -1190,7 +1190,7 @@ const BrowseCourses = React.memo(function BrowseCourses({ courses, enrollments, 
           const enr = enrollments?.find((e: any) => e.course_id === c.id)
           const isPendingPayment = enr?.payment_status === 'pending'
           const isOpenable = enr && !isPendingPayment
-          const isFree = c.price_type === 'مجانية' || c.price === 0
+          const isFree = c.price_type === 'مجانية' || !Number(c.price)
           const isPaidNotEnrolled = !enr && !isFree
           // === Offer price logic ===
           const originalPriceField = Number(c.original_price) || 0
@@ -2901,14 +2901,9 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
 })
 
 const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser }: any) {
-  // 🎓 الكتالوج المهني الموحد — قوائم فاخرة للمسمى الوظيفي والتخصص
-  const { titles: catTitles, specializations: catSpecs } = useSpecializationCatalog()
-  const titleOpts = catTitles.length ? catTitles : [
-    { value: 'مدرب', label: 'مدرب', emoji: '🎓' }, { value: 'استشاري', label: 'استشاري', emoji: '🩺' }, { value: 'أخصائي', label: 'أخصائي', emoji: '📊' }, { value: 'محاضر', label: 'محاضر', emoji: '🎤' }, { value: 'مدرس معتمد', label: 'مدرس معتمد', emoji: '✅' }, { value: 'مدرس', label: 'مدرس', emoji: '📘' },
-  ]
-  const specOpts = catSpecs.length ? catSpecs : [
-    { value: 'إدارة الأعمال', label: 'إدارة الأعمال', emoji: '💼' }, { value: 'التسويق الرقمي', label: 'التسويق الرقمي', emoji: '📱' }, { value: 'التعليم الطبي', label: 'التعليم الطبي', emoji: '📖' },
-  ]
+  // 🔒 v6.4 (طلب صاحب المنصة): المسمى الوظيفي والتخصص مغلّقان على المتدرب
+  // بعد التسجيل — لا يُعدّلهما إلا حساب الإدارة حصراً (تُحدّث من قسم المتدربين
+  // في لوحة الإدارة). القفل خادمي أيضاً في PUT /api/profile.
   const [loading, setLoading] = useState(false)
 
   const save = async () => {
@@ -2997,13 +2992,19 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
             <Label className="text-navy flex items-center gap-1.5 mb-1.5">
               <Briefcase className="w-3.5 h-3.5 text-gold" /> المسمى الوظيفي
             </Label>
-            <LuxCombo value={profile.title} onChange={(v) => setProfile({ ...profile, title: v })} options={titleOpts} title="اختر المسمى الوظيفي" icon={Briefcase} searchPlaceholder="مدرب، أخصائي، محاضر..." placeholder="— اختر المسمى —" />
+            <Input value={profile.title || ''} disabled readOnly placeholder="— لم تحدده الإدارة بعد —" className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
+            <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+              🔒 مغلّق بعد التسجيل — يُحدَّد ويُعدَّل من حساب الإدارة حصراً
+            </p>
           </div>
           <div>
             <Label className="text-navy flex items-center gap-1.5 mb-1.5">
               <BookOpen className="w-3.5 h-3.5 text-gold" /> التخصص
             </Label>
-            <LuxCombo value={profile.specialization || ''} onChange={(v) => setProfile({ ...profile, specialization: v })} options={specOpts} title="اختر التخصص من الكتالوج العالمي" icon={BookOpen} searchPlaceholder="ابحث في التخصصات العالمية..." placeholder="— اختر التخصص —" />
+            <Input value={profile.specialization || ''} disabled readOnly placeholder="— لم تحدده الإدارة بعد —" className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
+            <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+              🔒 مغلّق بعد التسجيل — يُحدَّد ويُعدَّل من حساب الإدارة حصراً
+            </p>
           </div>
         </div>
         <div>
@@ -3233,7 +3234,7 @@ const SettingsTab = React.memo(function SettingsTab({ user, updateUser }: any) {
   const [showNewPwd, setShowNewPwd] = useState(false)
   const [pwdLoading, setPwdLoading] = useState(false)
 
-  // Phone change state — uses /api/students PUT
+  // Phone change state — uses /api/profile PUT (self-service)
   const [phone, setPhone] = useState(user?.phone || '')
   const [phoneLoading, setPhoneLoading] = useState(false)
 
@@ -3360,10 +3361,12 @@ const SettingsTab = React.memo(function SettingsTab({ user, updateUser }: any) {
     }
     setPhoneLoading(true)
     try {
-      const res = await fetch('/api/students', {
+      // 🛡️ v6.4: عبر /api/profile الذاتي — كان يستدعي /api/students الإداري
+      // فأرجع 403 لكل متدرب منذ درع v5.0 وتعذّر تغيير الهاتف نهائياً
+      const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, phone }),
+        body: JSON.stringify({ phone }),
       })
       const data = await res.json()
       if (!res.ok) {

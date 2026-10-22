@@ -1688,10 +1688,14 @@ const AdminPayments = React.memo(function AdminPayments() {
     return true
   })
 
-  // Extract proof URL from reference field (format: "JB-123 | PROOF: https://...")
+  // Extract proof URL from reference field (format: "JB-123 | PROOF: <url>")
+  // 🛡️ v6.4: القديم كان يقبل https فقط — بينما كل الرفع الجديد يعيد الآن
+  // رابطاً نسبياً (/api/telegram-file/stream?path=...) أو data URI عند تعذر
+  // تيليجرام، فكانت الإدارة ترى «لا يوجد إثبات دفع مرفق» رغم أن الإثبات
+  // محفوظ فعلاً في الحقل! الآن نطابق أي قيمة غير فراغ ولا │.
   const extractProofUrl = (ref: string) => {
     if (!ref) return null
-    const match = ref.match(/PROOF:\s*(https?:\/\/[^\s|]+)/i)
+    const match = String(ref).match(/PROOF:\s*([^\s|]+)/i)
     return match ? match[1] : null
   }
 
