@@ -217,7 +217,7 @@ export function AdminTrainerEarningsRoyal() {
                   </p>
                   <div className="mt-1 space-y-0.5">
                     <LuxRow icon={w.method_type === 'عملات رقمية' ? Bitcoin : Landmark}>
-                      {w.method_name || '—'} • <span dir="ltr" className="font-bold">{w.account}</span>
+                      {w.method_name || '—'}{w.account_owner ? ` — ${w.account_owner}` : ''} • <span dir="ltr" className="font-bold">{w.account}</span>{w.account_country ? ` • ${w.account_country}` : ''}
                     </LuxRow>
                     <p className="text-[9px] text-muted-foreground">طلب بتاريخ {new Date(w.created_at).toLocaleString('ar-EG')}</p>
                   </div>
@@ -267,11 +267,15 @@ export function AdminTrainerEarningsRoyal() {
                       </p>
                       <p className="text-[10px] text-muted-foreground truncate">{t.title || 'مدرب'} {t.students_paid > 0 && `• ${t.students_paid} دفعة متدربين`}</p>
                     </div>
-                    {t.payment_method_name && (
+                    {t.withdrawal_accounts?.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 flex-shrink-0">
+                        <Landmark className="w-3 h-3" /> {t.withdrawal_accounts[0].method_name}{t.withdrawal_accounts.length > 1 ? ` +${t.withdrawal_accounts.length - 1}` : ''}
+                      </span>
+                    ) : t.payment_method_name ? (
                       <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 flex-shrink-0">
                         {t.payment_method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />} {t.payment_method_name}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   {/* 4 mini numbers — لكل عملة صفها الفاخر */}
                   <div className="grid grid-cols-4 gap-2 mb-3">
@@ -372,7 +376,7 @@ export function AdminTrainerEarningsRoyal() {
                 <p className="text-sm font-extrabold">{approveTarget?.trainer_name}</p>
                 <p className="text-[11px] text-white/70 mt-0.5 flex items-center gap-1">
                   {approveTarget?.method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />}
-                  {approveTarget?.method_name} — <span dir="ltr" className="font-bold text-gold">{approveTarget?.account}</span>
+                  {approveTarget?.method_name}{approveTarget?.account_owner ? ` — ${approveTarget.account_owner}` : ''} — <span dir="ltr" className="font-bold text-gold">{approveTarget?.account}</span>{approveTarget?.account_country ? ` • ${approveTarget.account_country}` : ''}
                 </p>
                 <p className="text-2xl font-extrabold mt-2" dir="ltr">{fmtMoney(approveTarget?.amount, approveTarget?.currency)}</p>
               </div>

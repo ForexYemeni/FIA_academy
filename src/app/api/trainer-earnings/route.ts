@@ -96,12 +96,19 @@ export async function GET(req: NextRequest) {
       // 🛡️ نظرة الإدارة (كل المحافظ وأرقام الاستلام) للإدارة فقط!
       const ga = await guardAdmin(req)
       if (!ga.ok) return ga.res
-      const [earn, wds, trainers] = await Promise.all([
+      const [earn, wds, trainers, wAccs] = await Promise.all([
         supabaseAdmin.from('trainer_earnings').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('withdrawal_requests').select('*').order('created_at', { ascending: false }),
         supabaseAdmin.from('trainers').select('id, name, avatar, title, specialization, profit_percentage, payment_method_type, payment_method_name, payment_account'),
+        supabaseAdmin.from('trainer_withdrawal_accounts').select('trainer_id, country, method_name, currency, account_name, account_number, is_default').order('is_default', { ascending: false }).order('created_at', { ascending: false }),
       ])
       const tMap = new Map<string, any>((trainers.data || []).map((t: any) => [t.id, t] as [string, any]))
+      // حسابات السحب الحقيقية لكل مدرب — من قسم «حسابات السحب» الذي يديره بنفسه
+      const accsByTrainer = new Map<string, any[]>()
+      for (const a of (wAccs.data || []) as any[]) {
+        if (!accsByTrainer.has(a.trainer_id)) accsByTrainer.set(a.trainer_id, [])
+        accsByTrainer.get(a.trainer_id)!.push(a)
+      }
 
       // Per-trainer summary — مجمعة حسب العملة + حقول مسطحة للعملة الأساسية
       const summary: any[] = []
@@ -133,6 +140,8 @@ export async function GET(req: NextRequest) {
           payment_method_type: t.payment_method_type || 'محلي',
           payment_method_name: t.payment_method_name,
           payment_account: t.payment_account,
+          // حسابات السحب المضافة من المدرب (البديل الرسمي للحقول القديمة)
+          withdrawal_accounts: accsByTrainer.get(t.id) || [],
           // حقول مسطحة (العملة الأساسية) — للتوافق
           currency: pCur,
           total_earned: pt.total_earned,
@@ -235,11 +244,31 @@ export async function POST(req: NextRequest) {
 
     const profileId = (await resolveTrainerProfileId(trainerId)) || trainerId
     const { data: profile } = await supabaseAdmin
-      .from('trainers').select('name, payment_method_type, payment_method_name, payment_account, profit_percentage').eq('id', profileId).maybeSingle()
+      .from('trainers').select('name, profit_percentage').eq('id', profileId).maybeSingle()
 
-    if (!profile?.payment_method_name || !profile?.payment_account) {
-      return NextResponse.json({ error: 'أضف طريقة استلام الأرباح أولاً من بطاقة «طريقة استلام الأرباح»' }, { status: 400 })
+    // 💳 بوابة حسابات السحب: طريقة الاستلام تُؤخذ حصراً من «حسابات السحب» التي
+    // أضافها المدرب بنفسه (نفس القسم الذي تديره) — بلا حساب مضاف لا سحب إطلاقاً.
+    // نبحث بمعرّفي المدرب (حساب المستخدم + ملف المدرب) تغطيةً لكل حالات الهوية.
+    const { data: wAccounts } = await supabaseAdmin
+      .from('trainer_withdrawal_accounts')
+      .select('*')
+      .in('trainer_id', Array.from(new Set([profileId, trainerId])))
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (!wAccounts || wAccounts.length === 0) {
+      return NextResponse.json({
+        error: 'لا يوجد حساب سحب مضاف — أضف حسابك أولاً من قسم «حسابات السحب» ثم اطلب السحب',
+        code: 'no_withdrawal_account',
+      }, { status: 400 })
     }
+    const acc = body.account_id
+      ? wAccounts.find((a: any) => a.id === body.account_id)
+      : wAccounts[0]
+    if (!acc) {
+      return NextResponse.json({ error: 'حساب السحب المحدد غير موجود — اختر حساباً من حساباتك المضافة' }, { status: 400 })
+    }
+    // استنتاج نوع الطريقة من اسمها/عملتها (محلي vs عملات رقمية) — لأيقونة العرض
+    const isCrypto = /(usdt|bitcoin|btc|ethereum|\beth\b|binance|tron|tether|عملات\s*رقمية)/i.test(`${acc.method_name || ''} ${acc.currency || ''}`)
 
     // ⚡ MULTI-CURRENCY GATE: الرصيد يُفحص بعملة الطلب نفسها — ما ربح بالدولار يُسحب بالدولار فقط
     const byCur = await getTotalsByCurrency(profileId)
@@ -267,9 +296,11 @@ export async function POST(req: NextRequest) {
         trainer_id: profileId,
         amount,
         currency,
-        method_type: body.method_type || profile.payment_method_type || 'محلي',
-        method_name: body.method_name || profile.payment_method_name,
-        account: body.account || profile.payment_account,
+        method_type: isCrypto ? 'عملات رقمية' : 'محلي',
+        method_name: acc.method_name,
+        account: acc.account_number || acc.account_name,
+        account_owner: acc.account_name,
+        account_country: acc.country,
       })
       .select()
       .single()
@@ -282,11 +313,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Notify admins (non-fatal)
+    const trainerName = profile?.name || 'مدرب'
     try {
       const { notifyAdmins } = await import('@/lib/notifications')
       await notifyAdmins('withdrawal',
-        `💸 طلب سحب أرباح جديد — ${profile.name}`,
-        `طلب المدرب ${profile.name} سحب ${amount.toLocaleString('en-US')} ${currency} إلى ${data.method_name || 'طريقة الدفع المسجلة'}. راجع القسم «أرباح المدربين».`, '/#trainer-earnings')
+        `💸 طلب سحب أرباح جديد — ${trainerName}`,
+        `طلب المدرب ${trainerName} سحب ${amount.toLocaleString('en-US')} ${currency} إلى ${data.method_name || 'حساب السحب المضاف'}. راجع القسم «أرباح المدربين».`, '/#trainer-earnings')
     } catch {}
 
     return NextResponse.json(data)

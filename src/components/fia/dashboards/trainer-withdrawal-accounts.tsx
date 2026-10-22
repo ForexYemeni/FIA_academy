@@ -1,8 +1,9 @@
 'use client'
 
-// 💳👑 حسابات سحب الأرباح الملكية — المدرب يضيف حساباته حسب بلده وطرقه المتاحة
+// 💳 حسابات سحب الأرباح — المدرب يضيف حساباته حسب بلده وطرقه المتاحة
+// قوائم منسدلة بحثية فاخرة (LuxCombo) مطابقة لتجربة لوحة الإدارة
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +11,7 @@ import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
 import { SectionCard } from './shell'
+import { LuxCombo } from './luxury'
 import {
   Landmark, Plus, Trash2, Loader2, Globe2, Wallet, Copy, Star, Coins, Info,
 } from 'lucide-react'
@@ -68,6 +70,18 @@ export function TrainerWithdrawalAccounts() {
   const selectedMethod = countryMethods.find((m) => m.name === form.method_name)
   const knownCurrencies = Array.from(new Set([...methods.map((m) => m.currency).filter(Boolean), 'ر.ي', '$', 'ر.س', 'د.إ', 'ج.م', 'د.أ', 'د.ع', 'د.ك', 'ر.ع', 'د.ق', 'د.ب', 'USDT'])) as string[]
 
+  // 🎛️ القوائم المنسدلة الفاخرة — مطابقة لتجربة حساب الإدارة
+  const countryOptions = useMemo(() => COUNTRIES.map((c) => ({
+    value: c, label: c,
+    emoji: c === 'دولة أخرى' ? '🌍' : c === 'اليمن' ? '🏛️' : '📍',
+    hint: c === 'اليمن' ? 'المقر الرئيسي' : undefined,
+  })), [])
+  const methodOptions = useMemo(() => countryMethods.map((m) => ({
+    value: m.name, label: m.name,
+    meta: m.currency || undefined,
+    hint: m.instructions ? (m.instructions.length > 46 ? m.instructions.slice(0, 46) + '…' : m.instructions) : undefined,
+  })), [methods, form.country])
+
   const addAccount = async () => {
     if (!form.country || !form.method_name || !form.account_name.trim()) {
       toast.error('اختر الدولة والطريقة واكتب اسم صاحب الحساب')
@@ -81,7 +95,7 @@ export function TrainerWithdrawalAccounts() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error || 'تعذر الإضافة'); return }
-      toast.success('👑 أُضيف حساب السحب الملكي')
+      toast.success('أُضيف حساب السحب')
       setForm({ country: form.country, method_name: '', account_name: '', account_number: '', extra_info: '', is_default: false })
       setAdding(false)
       load()
@@ -99,14 +113,14 @@ export function TrainerWithdrawalAccounts() {
   }
 
   return (
-    <SectionCard title="حسابات سحب الأرباح" description="أضف حساباتك الملكية لتصل أرباحك بأمان — الطرق المتاحة تعرض بحسب بلدك والمقر الرئيسي باليمن">
+    <SectionCard title="حسابات سحب الأرباح" description="أضف حساباتك لتصل أرباحك بأمان — الطرق المتاحة تعرض بحسب بلدك والمقر الرئيسي باليمن">
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>
       ) : (
         <>
           {/* العملات المدعومة */}
           <Card className="mb-4 border-gold/20 bg-gradient-to-l from-gold/10 to-transparent p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><Coins className="h-4 w-4 text-gold" /> العملات النقدية المدعومة في المنظومة الملكية</p>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><Coins className="h-4 w-4 text-gold" /> العملات النقدية المدعومة في المنظومة</p>
             <div className="flex flex-wrap gap-1.5" dir="ltr">
               {knownCurrencies.map((c) => (
                 <span key={c} className="rounded-full border border-gold/30 bg-white px-2.5 py-1 text-[10px] font-bold text-navy">{c}</span>
@@ -120,7 +134,7 @@ export function TrainerWithdrawalAccounts() {
             <Card className="mb-4 border-dashed p-8 text-center">
               <Landmark className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm font-bold text-navy">لا توجد حسابات سحب بعد</p>
-              <p className="mt-1 text-xs text-muted-foreground">أضف أول حساب ملكي — وسترن يونيون، محفظة، حوالة بنكية أو عملات رقمية</p>
+              <p className="mt-1 text-xs text-muted-foreground">أضف أول حساب — وسترن يونيون، محفظة، حوالة بنكية أو عملات رقمية</p>
             </Card>
           ) : (
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
@@ -148,7 +162,7 @@ export function TrainerWithdrawalAccounts() {
                       <p className="flex items-center justify-between gap-2">
                         <span className="text-muted-foreground">الرقم / العنوان:</span>
                         <button
-                          onClick={() => { navigator.clipboard?.writeText(a.account_number || '').catch(() => {}); toast.success('نُسخ المفتاح الملكي') }}
+                          onClick={() => { navigator.clipboard?.writeText(a.account_number || '').catch(() => {}); toast.success('نُسخ رقم الحساب') }}
                           className="flex items-center gap-1 font-mono font-bold text-navy hover:text-gold" dir="ltr"
                         >
                           {a.account_number} <Copy className="h-3 w-3" />
@@ -165,20 +179,21 @@ export function TrainerWithdrawalAccounts() {
           {/* نموذج الإضافة */}
           {adding ? (
             <Card className="border-gold/30 bg-gradient-to-br from-gold/5 to-transparent p-4">
-              <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-navy"><Plus className="h-4 w-4 text-gold" /> إضافة حساب سحب ملكي</p>
+              <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-navy"><Plus className="h-4 w-4 text-gold" /> إضافة حساب سحب</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs font-semibold">بلد الحساب *</Label>
-                  <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value, method_name: '' })} className={`${inputCls} w-full text-sm`}>
-                    {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <Label className="mb-1.5 flex items-center gap-1 text-xs font-bold text-navy/70"><Globe2 className="h-3 w-3 text-gold" /> بلد الحساب *</Label>
+                  <LuxCombo value={form.country} onChange={(v) => setForm({ ...form, country: v, method_name: '' })} options={countryOptions} searchPlaceholder="ابحث عن الدولة..." />
                 </div>
                 <div>
-                  <Label className="text-xs font-semibold">طريقة السحب *</Label>
-                  <select value={form.method_name} onChange={(e) => setForm({ ...form, method_name: e.target.value })} className={`${inputCls} w-full text-sm`} disabled={countryMethods.length === 0}>
-                    <option value="">— اختر الطريقة —</option>
-                    {countryMethods.map((m) => <option key={m.id} value={m.name}>{m.name}{m.currency ? ` (${m.currency})` : ''}</option>)}
-                  </select>
+                  <Label className="mb-1.5 flex items-center gap-1 text-xs font-bold text-navy/70"><Landmark className="h-3 w-3 text-gold" /> طريقة السحب *</Label>
+                  <LuxCombo
+                    value={form.method_name}
+                    onChange={(v) => setForm({ ...form, method_name: v })}
+                    options={methodOptions}
+                    searchPlaceholder="ابحث عن الطريقة..."
+                    disabled={countryMethods.length === 0}
+                  />
                   {countryMethods.length === 0 && <p className="mt-1 text-[10px] text-amber-600">لا توجد طرق مفعّلة لهذه الدولة بعد — الإدارة تضيفها من لوحتها</p>}
                 </div>
                 <div>
@@ -201,7 +216,7 @@ export function TrainerWithdrawalAccounts() {
               )}
               <div className="mt-4 flex gap-2">
                 <Button onClick={addAccount} disabled={busy} className="relative flex-1 overflow-hidden rounded-xl bg-gradient-to-l from-gold to-amber-500 text-sm font-extrabold text-navy shadow-lg active:scale-[0.98] disabled:opacity-60">
-                  {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />} حفظ الحساب الملكي
+                  {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />} حفظ الحساب
                 </Button>
                 <Button onClick={() => setAdding(false)} variant="outline" className="rounded-xl border-navy/20 text-sm font-bold text-navy hover:bg-navy/5">إلغاء</Button>
               </div>
@@ -209,7 +224,7 @@ export function TrainerWithdrawalAccounts() {
           ) : (
             <Button onClick={() => setAdding(true)} className="relative w-full overflow-hidden rounded-xl border border-gold/30 bg-gradient-to-l from-navy to-navy-light py-6 text-sm font-bold text-gold hover:from-navy-light hover:to-navy active:scale-[0.99]">
               <span className="absolute inset-0 fia-lux-shine" />
-              <Plus className="ml-2 h-5 w-5" /> أضف حساب سحب ملكي جديد
+              <Plus className="ml-2 h-5 w-5" /> أضف حساب سحب جديد
             </Button>
           )}
         </>
