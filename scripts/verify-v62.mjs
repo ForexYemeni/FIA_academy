@@ -138,12 +138,13 @@ const rejectAfter = await fetch(BASE + '/api/trainers/applications', {
 })
 ok('الرفض بعد التوقيع → 409 (مغلق تماماً)', rejectAfter.status === 409)
 
-// 6-د: بعد الاعتماد — المنتدى والمدونة يُفتحان فعلاً
+// 6-د: بعد الاعتماد — المنتدى والمدونة يُفتحان فعلاً (بفئة حقيقية من القاعدة)
+const { rows: cat } = await pool.query(`SELECT id FROM public.forum_categories LIMIT 1`)
 const topicAfter = await fetch(BASE + '/api/forum-topics', {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tToken}` },
-  body: JSON.stringify({ category_id: randomUUID(), title: 'موضوع بعد الاعتماد (اختبار)', body: 'سيُحذف مع المدرب' }),
+  body: JSON.stringify({ category_id: cat[0]?.id || randomUUID(), title: 'موضوع بعد الاعتماد (اختبار)', body: 'سيُحذف مع المدرب' }),
 })
-ok('بعد التوقيع: إنشاء موضوع يُسمح', topicAfter.status === 200)
+ok('بعد التوقيع: إنشاء موضوع يُسمح', topicAfter.status === 200, topicAfter.status !== 200 ? JSON.stringify(await topicRes.json().catch(() => ({}))).slice(0, 80) : '')
 
 // 6-هـ: المدرب يظهر في قائمة «المتفق معهم»
 const appsRes = await fetch(BASE + '/api/trainers/applications', { headers: { Authorization: `Bearer ${aToken}` } })
