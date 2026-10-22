@@ -412,6 +412,25 @@ export async function resolveTrainerUserId(trainerRef: string | null | undefined
   return null
 }
 
+// === ROYAL BROADCAST (الإشعار الجماعي الملكي) ===
+
+/**
+ * 👑 بث ملكي جماعي — يرسل إشعاراً مخصصاً لقائمة مستخدمين (طلاب دورة،
+ *    الجميع…) عبر قناة الإشعارات الملكية الكاملة (DB + FCM + OneSignal).
+ *    يُستخدم من عرش المدرب (رسالة لطلاب دورته) وقصر الإدارة (إشعار شامل).
+ */
+export async function sendRoyalBroadcast(
+  userIds: string[],
+  title: string,
+  body: string,
+  link?: string
+): Promise<number> {
+  if (!userIds.length) return 0
+  const uniq = Array.from(new Set(userIds.filter(Boolean)))
+  await sendToMany(uniq, 'broadcast', title, body, link || '/')
+  return uniq.length
+}
+
 // === TRAINER EARNINGS (أرباح المدرب) ===
 
 /** A trainer earned money because the admin approved a student payment. */

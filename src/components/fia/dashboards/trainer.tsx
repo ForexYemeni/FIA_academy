@@ -911,6 +911,22 @@ function CourseDialog({ open, onOpenChange, course, trainerId, onSaved }: any) {
 function TrainerStudents({ students, courses }: any) {
   const [enrollments, setEnrollments] = useState<any[]>([])
   const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false)
+  // 👑 العرش الملكي: عرض حسب الدورة مع أشرطة التقدم الحية + النداء الجماعي
+  const [view, setView] = useState<'cards' | 'courses'>('courses')
+  const [courseRosters, setCourseRosters] = useState<any[]>([])
+  const [rostersLoaded, setRostersLoaded] = useState(false)
+  const [broadcastOpen, setBroadcastOpen] = useState(false)
+  const [broadcastCourse, setBroadcastCourse] = useState<string>('all')
+  const [bcTitle, setBcTitle] = useState('')
+  const [bcMessage, setBcMessage] = useState('')
+  const [bcLoading, setBcLoading] = useState(false)
+
+  const loadRosters = useCallback(() => {
+    fetch('/api/trainer/students').then((r) => r.json()).then((d) => {
+      setCourseRosters(Array.isArray(d?.courses) ? d.courses : [])
+      setRostersLoaded(true)
+    }).catch(() => setRostersLoaded(true))
+  }, [])
 
   useEffect(() => {
     fetch('/api/enrollments').then((r) => r.json()).then((d) => {
@@ -921,19 +937,79 @@ function TrainerStudents({ students, courses }: any) {
       setEnrollments(mine)
       setEnrollmentsLoaded(true)
     }).catch(() => setEnrollmentsLoaded(true))
-  }, [courses])
+    loadRosters()
+  }, [courses, loadRosters])
 
   // Helper: get all enrollments for a student
   const studentEnrollments = (studentId: string) => enrollments.filter((e) => e.user_id === studentId)
 
   // Filter students to ONLY those enrolled in at least one of this trainer's courses.
-  // The `enrollments` state is already scoped to the trainer's course IDs, so its
-  // user_id values are exactly the students we want to show.
   const enrolledStudentIds = new Set(enrollments.map((e: any) => e.user_id))
   const filteredStudents = students.filter((s: any) => enrolledStudentIds.has(s.id))
 
+  const totalStudents = courseRosters.reduce((a: number, c: any) => a + c.students_count, 0)
+  const totalCompleted = courseRosters.reduce((a: number, c: any) => a + c.completed_count, 0)
+
+  const sendBroadcast = async () => {
+    if (!bcTitle.trim() || !bcMessage.trim()) {
+      toast.error('العنوان والرسالة مطلوبان')
+      return
+    }
+    setBcLoading(true)
+    try {
+      const res = await fetch('/api/trainer/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_id: broadcastCourse, title: bcTitle, message: bcMessage }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'فشل البث')
+        return
+      }
+      toast.success(`📣 وصل نداؤك الملكي إلى ${data.delivered} طالباً`)
+      setBroadcastOpen(false)
+      setBcTitle('')
+      setBcMessage('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setBcLoading(false)
+    }
+  }
+
   return (
-    <SectionCard title="متدربوّ" description={`${filteredStudents.length} متدرب${filteredStudents.length === 1 ? '' : 'ين'}`}>
+    <SectionCard
+      title="متدربوّ"
+      description={`${totalStudents || filteredStudents.length} متدرب${(totalStudents || filteredStudents.length) === 1 ? '' : 'ين'} — ${totalCompleted} أتم دوراته`}
+    >
+      {/* 👑 مبدّل العرض الملكي + زر النداء الجماعي */}
+      {courses.length > 0 && enrollmentsLoaded && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex rounded-xl border border-gold/30 overflow-hidden">
+            <button
+              onClick={() => setView('courses')}
+              className={`px-3 py-1.5 text-xs font-bold transition-all ${view === 'courses' ? 'bg-gradient-to-r from-navy to-navy-light text-gold' : 'bg-white text-navy/60 hover:text-navy'}`}
+            >
+              <BookOpen className="w-3.5 h-3.5 inline ml-1" /> حسب الدورة
+            </button>
+            <button
+              onClick={() => setView('cards')}
+              className={`px-3 py-1.5 text-xs font-bold transition-all ${view === 'cards' ? 'bg-gradient-to-r from-navy to-navy-light text-gold' : 'bg-white text-navy/60 hover:text-navy'}`}
+            >
+              <Users className="w-3.5 h-3.5 inline ml-1" /> بطاقات المتدربين
+            </button>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => { setBroadcastCourse('all'); setBcTitle(''); setBcMessage(''); setBroadcastOpen(true) }}
+            className="bg-gradient-to-r from-gold to-amber-600 hover:from-amber-600 hover:to-gold text-navy rounded-xl font-bold shadow-md"
+          >
+            <Sparkles className="w-4 h-4 ml-1" /> نداء جماعي
+          </Button>
+        </div>
+      )}
+
       {courses.length === 0 ? (
         /* ⚡ Magical empty state — no courses */
         <div className="text-center py-14">
@@ -946,7 +1022,7 @@ function TrainerStudents({ students, courses }: any) {
           <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد متدربون بعد</h3>
           <p className="text-xs text-muted-foreground max-w-xs mx-auto">أنشئ دورة أولاً ليتمكن المتدربون من التسجيل فيها ✨</p>
         </div>
-      ) : !enrollmentsLoaded ? (
+      ) : !enrollmentsLoaded || !rostersLoaded ? (
         /* ⚡ Magical loading state */
         <div className="text-center py-14">
           <div className="relative inline-block mb-3">
@@ -955,6 +1031,87 @@ function TrainerStudents({ students, courses }: any) {
           </div>
           <p className="text-sm text-muted-foreground">جاري تحميل المتدربين...</p>
         </div>
+      ) : view === 'courses' ? (
+        /* 👑 العرض الملكي حسب الدورة — سجل حي بأشرطة التقدم */
+        courseRosters.length === 0 || courseRosters.every((c: any) => c.students_count === 0) ? (
+          <div className="text-center py-14">
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-xl border border-gold/30">
+                <Users className="w-10 h-10 text-gold" />
+              </div>
+            </div>
+            <h3 className="font-bold text-navy text-base mb-1.5">لا يوجد متدربون في دوراتك بعد</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">عندما يسجّل متدربون في دوراتك سيظهرون هنا بأشرطة تقدمهم الحية ✨</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {courseRosters.filter((c: any) => c.students_count > 0).map((c: any) => (
+              <div key={c.course_id} className="rounded-2xl border border-gold/25 overflow-hidden bg-white shadow-sm">
+                {/* رأس الدورة */}
+                <div className="relative flex flex-wrap items-center gap-2 p-3 bg-gradient-to-l from-navy to-navy-light text-white">
+                  <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 80% 30%, #D4AF37 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+                  <BookOpen className="relative w-4 h-4 text-gold" />
+                  <span className="relative font-bold text-sm flex-1 min-w-0 truncate">{c.course_title}</span>
+                  <span className="relative text-[10px] bg-white/10 border border-white/20 rounded-full px-2 py-0.5">{c.students_count} طالب</span>
+                  {c.completed_count > 0 && (
+                    <span className="relative text-[10px] bg-emerald-500/20 border border-emerald-300/30 text-emerald-200 rounded-full px-2 py-0.5">{c.completed_count} أتم</span>
+                  )}
+                  {c.pending_count > 0 && (
+                    <span className="relative text-[10px] bg-amber-500/20 border border-amber-300/30 text-amber-200 rounded-full px-2 py-0.5">{c.pending_count} بانتظار</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setBroadcastCourse(c.course_id); setBcTitle(''); setBcMessage(''); setBroadcastOpen(true) }}
+                    className="relative h-7 text-[10px] border-gold/40 text-gold hover:bg-gold/10"
+                  >
+                    <Sparkles className="w-3 h-3 ml-1" /> نداء طلابها
+                  </Button>
+                </div>
+                {/* طلاب الدورة */}
+                <div className="divide-y divide-border/40">
+                  {c.students.map((s: any) => (
+                    <div key={s.user_id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gold/5 transition-colors">
+                      <div className="w-9 h-9 rounded-xl overflow-hidden border border-gold/30 bg-navy/5 flex-shrink-0">
+                        {s.avatar ? (
+                          <img src={s.avatar} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-navy font-bold bg-gradient-to-br from-gold/15 to-amber-500/15">
+                            {s.name?.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-navy truncate">{s.name}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-bold flex-shrink-0 ${
+                            s.progress >= 100 ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
+                            : s.status === 'بانتظار' ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                            : 'bg-blue-500/10 text-blue-700 border-blue-500/30'
+                          }`}>
+                            {s.progress >= 100 ? 'أتم الدورة' : s.status === 'بانتظار' ? 'بانتظار الموافقة' : 'قيد التعلّم'}
+                          </span>
+                        </div>
+                        {/* شريط التقدم الحي */}
+                        <div className="mt-1 h-1.5 rounded-full bg-muted/60 overflow-hidden max-w-xs">
+                          <div
+                            className={`h-full rounded-full transition-all ${s.progress >= 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-gold to-amber-500'}`}
+                            style={{ width: `${s.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-left flex-shrink-0">
+                        <div className="text-xs font-extrabold text-navy" dir="ltr">{s.progress}%</div>
+                        <div className="text-[9px] text-muted-foreground">{s.enrolled_at ? new Date(s.enrolled_at).toLocaleDateString('ar-EG') : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : filteredStudents.length === 0 ? (
         /* ⚡ Magical empty state — no enrollments */
         <div className="text-center py-14">
@@ -1067,6 +1224,73 @@ function TrainerStudents({ students, courses }: any) {
           })}
         </div>
       )}
+
+      {/* 👑 حوار النداء الجماعي الملكي */}
+      <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
+        <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 20% 40%, #D4AF37 1.5px, transparent 1.5px)',
+              backgroundSize: '22px 22px'
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-2xl bg-white/10 border border-gold/30 flex items-center justify-center mb-2">
+              <Sparkles className="w-7 h-7 text-gold" />
+            </div>
+            <DialogHeader className="border-0 bg-transparent p-0 text-center items-center">
+              <DialogTitle className="text-white text-xl font-bold">النداء الملكي الجماعي</DialogTitle>
+            </DialogHeader>
+            <p className="relative text-white/70 text-xs mt-1">رسالة تصل لجرس كل طالب مستهدف فوراً مع إشعار جوال</p>
+          </div>
+          <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
+            <div>
+              <Label className="text-navy font-medium mb-1.5 block">النطاق المستهدف</Label>
+              <select
+                value={broadcastCourse}
+                onChange={(e) => setBroadcastCourse(e.target.value)}
+                className="w-full rounded-xl border border-gold/30 bg-white px-3 py-2.5 text-sm text-navy focus:border-gold focus:ring-gold/30 outline-none"
+              >
+                <option value="all">📣 جميع طلاب دوراتي ({courseRosters.reduce((a: number, c: any) => a + c.students_count, 0)})</option>
+                {courseRosters.filter((c: any) => c.students_count > 0).map((c: any) => (
+                  <option key={c.course_id} value={c.course_id}>
+                    {c.course_title} — {c.students_count} طالب
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-navy font-medium mb-1.5 block">عنوان الرسالة</Label>
+              <Input
+                value={bcTitle}
+                onChange={(e) => setBcTitle(e.target.value)}
+                placeholder="مثال: درس جديد أُضيف إلى الدورة 🎬"
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <Label className="text-navy font-medium mb-1.5 block">نص الرسالة</Label>
+              <Textarea
+                value={bcMessage}
+                onChange={(e) => setBcMessage(e.target.value)}
+                placeholder="اكتب نداءك الملكي لطلابك…"
+                rows={4}
+                className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                maxLength={800}
+              />
+              <div className="text-[10px] text-muted-foreground mt-1 text-left" dir="ltr">{bcMessage.length}/800</div>
+            </div>
+            <Button
+              onClick={sendBroadcast}
+              disabled={bcLoading}
+              className="fia-lux-shine w-full bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all border border-gold/30 h-11"
+            >
+              {bcLoading ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
+              {bcLoading ? 'جاري بث النداء...' : 'أرسل النداء الملكي'}
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center">يصل الإشعار لطلاب التسجيلات المؤكدة والمجانية فقط — بحد 8 رسائل في الساعة حفاظاً على هدوء القصر</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 }
