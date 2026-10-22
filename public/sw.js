@@ -7,8 +7,11 @@
 // data from /api/* endpoints for Realtime updates + payment status +
 // enrollment lists. Caching these would cause stale UI.
 
-const APP_SHELL_CACHE = 'fia-shell-v5'
-const DYNAMIC_CACHE = 'fia-dynamic-v5'
+// v6: purges every stale v5 copy — an old cached /download page used to
+// appear first (ugly version) before the fresh royal one loaded. v6 wipes
+// all previous caches on activation so that can never happen again.
+const APP_SHELL_CACHE = 'fia-shell-v6'
+const DYNAMIC_CACHE = 'fia-dynamic-v6'
 
 const APP_SHELL = [
   '/',
@@ -53,6 +56,14 @@ self.addEventListener('fetch', (event) => {
   // /api/payments or /api/enrollments after a Realtime event, we
   // MUST get the latest data, not a stale cached version.
   if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request))
+    return
+  }
+
+  // ⚡ NEVER cache the /download page — it must always render the freshest
+  // royal version straight from the network. Caching it used to serve an
+  // outdated ugly page first when the network was flaky.
+  if (url.pathname === '/download' || url.pathname.startsWith('/download/')) {
     event.respondWith(fetch(request))
     return
   }

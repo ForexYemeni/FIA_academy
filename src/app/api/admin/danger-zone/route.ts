@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
+import { DZ_SECTION_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
 
 // POST /api/admin/danger-zone
 // Body: { section: 'courses'|'trainers'|'students'|'payments'|
@@ -16,6 +17,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { section, user_id } = body as { section: string, user_id?: string }
     if (!section) return NextResponse.json({ error: 'section مطلوب' }, { status: 400 })
+
+    // 🛡️ الدرع الملكي: التقاط نسخة إنقاذ كاملة قبل أي محو — فلا يُفقد شيء أبداً
+    let snapshotId: string | null = null
+    const snapshotTables = DZ_SECTION_TABLES[section]
+    if (snapshotTables) {
+      const snap = await createDangerSnapshot('section', section, section, snapshotTables, user_id)
+      snapshotId = snap?.id || null
+    }
 
     let count = 0
     let label = section
@@ -134,13 +143,14 @@ export async function POST(req: NextRequest) {
 
     // Telegram audit log
     try {
-      await tgDangerZoneWiped(label, count, user_id)
+      await tgDangerZoneWiped(label, count, user_id, snapshotId)
     } catch {}
 
     return NextResponse.json({
       success: true,
       section: label,
       deleted: count,
+      snapshot_id: snapshotId,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

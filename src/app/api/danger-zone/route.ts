@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { tgDangerZoneWiped } from '@/lib/telegram'
+import { DZ_FULL_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
 
 // ===== Danger Zone endpoint =====
 // Accepts a POST with { userId, password } and, after verifying the admin's
@@ -54,6 +56,16 @@ export async function POST(req: NextRequest) {
         { error: 'كلمة المرور غير صحيحة' },
         { status: 401 }
       )
+    }
+
+    // 🛡️ الدرع الملكي: نسخة إنقاذ شاملة لكل الجداول المُمسوحة قبل الحذف
+    //    (المستخدمون، المدربون، الدورات، المدفوعات، الشهادات) — فلا يُفقد شيء أبداً
+    let snapshotId: string | null = null
+    let snapshotRows = 0
+    const snap = await createDangerSnapshot('full', 'all', 'حذف جميع البيانات', DZ_FULL_TABLES, userId)
+    if (snap) {
+      snapshotId = snap.id
+      snapshotRows = snap.rowTotal
     }
 
     // 3. Wipe the data. Order matters: delete child/dependent rows first.
@@ -129,7 +141,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    return NextResponse.json({ success: true })
+    // Telegram audit log — one royal message with the rescue snapshot id
+    try {
+      await tgDangerZoneWiped('كل بيانات الأكاديمية', snapshotRows || 0, userId, snapshotId)
+    } catch {}
+
+    return NextResponse.json({ success: true, snapshot_id: snapshotId, snapshot_rows: snapshotRows })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'خطأ غير متوقع' }, { status: 500 })
   }
