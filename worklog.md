@@ -1589,3 +1589,21 @@ Stage Summary:
 - UX: ما ربح بالدولار يُسحب بالدولار حرفياً — كل عملة خزينة مستقلة في حسابي المدرب والإدارة.
 - Notifications: التسليم (Realtime/polling/FCM/الأصوات/الاختبار) لم يُمَس — فقط واجهة أرقى وتفاعل يفتح دائماً.
 - APK v2.7 needs NO update (WebView remote).
+
+---
+Task ID: royal-v47-critical-fixes-telegram-dedup
+Agent: main (Z.ai)
+Task: v4.7 — إصلاح الأعطال الحرجة من التدقيق الشامل + نظام التلجرام الملكي (رفع مرة واحدة + نشر فاخر دون تكرار) + ملاحظة الاسم الرباعي + قفل تعديل الاسم
+
+Work Log:
+- استعادة البيئة: sandbox أعيد تهيئته وفُقد fia-src → استُعيد من /tmp/my-project/recovery (حزمة النسخ الاحتياطي الكاملة) واستُنسخ المستودع ForexYemeni/FIA_academy بcommit ddd551d (v4.4)
+- نسخة احتياطية كاملة قبل أي تعديل: download/FIA-Academy-v2.7-FULL-BACKUP-2026-10-22.zip (145MB) = APK-PACKAGE (مصدر+mفتاح توقيع+APK مرجعية+توكن) + WEBSITE-SOURCE (git archive) + DATABASE (schema.sql 26KB + data.sql 926 صف/41 جدول + data.json عبر scripts/backup-db.mjs عبر pooler IPv4)
+- الأعطال الحرجة (12): فلترة شهادات الطالب student_name في 3 fetches؛ ترقيم أ ب ج د (استبدال fromCharCode(1571)/(65) بمصفوفة عربية) في exam client + admin.tsx + admin-questions-royal + trainer-questions + admin-extended؛ بوابة الدفع في courses/[slug] (مدفوعة→/checkout مع حالة تحميل)؛ صفحة /verify واعية بالحالة (صالحة/ملغاة/أخرى بألوان snopp)؛ CustomSelect relative في admin.tsx؛ أزرار الحذف الظاهرة على اللمس (opacity-100 md:opacity-0) في bell/chat/admin-extended/shared-community؛ انهيار الشات (conversationsRef بدل activeConv)؛ نبض العد التنازلي offerNow كل 30s؛ روابط الشهادات /verify/{number}؛ إحصائيات حقيقية (معدل التقدم من enrollments + أرقام حية في about)؛ حوار الدفع: حقل حوالة فاخر + حالة فراغ طرق الدفع؛ حماية POST /api/blog (resolveAuthor + أدوار admin/trainer/team_role) مع إرفاق author_id من localStorage في BlogPostDialog
+- التلجرام (ترحيل 017 مطبق مباشرة عبر scripts/migrate-v47.mjs على pooler): telegram_file_cache (forward مرة واحدة + deleteMessage للنسخة المؤقتة + كاش msg:{ch}:{id}) في telegram-file؛ telegram_upload_cache (sha1 بصمة، رفع مرة واحدة) في upload/image + upload/avatar؛ telegram_publish_log (درس: مفتاح lesson:{course}:{type}:{title} / دورة: بصمة محتوى sha1 على course:{id}:{action}) في telegram-publish — الفشل لا يُسجل (لا فقدان) + قالب درس فاخر (تاج + فواصل ملكية)
+- الاسم: ملاحظة رباعي فاخرة في نموذجي التسجيل (login-modal + landing-auth)؛ قفل حقل الاسم في ملف المدرب (disabled + ملاحظة الإدارة فقط)
+- تحقق: tsc — صفر أخطاء في الملفات المعدلة (أزلت 6 أخطاء الشات، بقيت 20 قديمة بملفات لم تُمس)؛ bun run build نجح كاملاً
+
+Stage Summary:
+- Deploy: commit 6871697 pushed → Vercel ينشر تلقائياً
+- الملفات: student, exam client, admin, admin-extended, admin-questions-royal, trainer-questions, trainer, courses/[slug], verify/client, chat-widget, notifications-bell (CSS فقط), shared-community, certificate/share URLs, blog API + BlogPostDialog, telegram-file, telegram-publish, upload/image, upload/avatar, about, login-modal, landing-auth + ترحيل 017 + scripts/backup-db.mjs + scripts/migrate-v47.mjs
+- APK v2.7 لا يحتاج تحديثاً (كل التغييرات من جهة الخادم)
