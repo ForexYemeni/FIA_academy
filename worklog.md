@@ -1956,3 +1956,24 @@ Work Log:
 Stage Summary:
 - الملفات: src/app/royal-night.css (قسم 19) ، src/app/globals.css (مرآة) ، src/components/fia/dashboards/admin-trainer-applications.tsx (تبويبات + قصر الملف الكامل) ، src/components/fia/dashboards/admin.tsx (كلاس fia-royal-cta) ، worklog.md.
 - النسخة الاحتياطية 17 تلي هذا الإصدار.
+
+---
+Task ID: v8.1-final-delivery-github
+Agent: main (Z.ai)
+Task: الرفع النهائي — push + إصدار النسخة الاحتياطية 17 + التحقق الإنتاجي + دليل الضروري/غير الضروري
+
+Work Log:
+- Push ناجح: fd637d2..f4c6711 main → Vercel نشر تلقائي (BUILDING → READY, target=production).
+- تحقق الإنتاج: ملفا CSS الحيان (globals 397KB + royal-night 16.7KB) يحملان قواعد v8.1 (fia-royal-cta + قواعد text-navy\/ الشفافات) + لقطتا إنتاج حي ليل/نهار (fiaacademy.vercel.app).
+- إنشاء Release رسمي: tag=fia-academy-17 (id 422161233) — «fia academy 17 — v8.1 قصر الملف الكامل + نهاية النصوص الشبحية» مع تقرير عربي شامل 17 مقابل 16.
+- رفع الأصل: fia.academy.17.zip — 36.6MB (38325462 بايت) — state=uploaded — وفق اصطلاح fia.academy.14/15/16.
+- تحقق سلامة الرفع: تنزيل الأصل المرفوع ومقارنة SHA-256 — تطابق بايت-ببايت: 75802a17b4d27d0cecf4342bf0e49ce050385e1eda46502a41276c619c23e48b.
+- بناء النسخة: 477 مدخلاً / 47.2MB خام — AES-256 WZ_AES — الكلمة الصحيحة PASS / الخاطئة مرفوضة PASS.
+- محتوى النسخة: WEBSITE-SOURCE (كود v8.1 كامل) + DATABASE (تفريغ حي: 52 جدولاً / 266 صفاً) + APK-PACKAGE (v2.3.3 + Native) + VERIFICATION (4 لقطات: إنتاج ليل/نهار + فحص محسوب ليل/نهار) + 00-اقرأني + 01-تقرير-17-مقابل-16 + 02-دليل-محتويات-النسخة-ضروري-وغير-ضروري (جديد بتكليف المالك).
+- دليل الحجم (أحجام مقاسة): الضروري = DATABASE 2.4MB + WEBSITE-SOURCE بلا download ≈20MB + APK النشط 9.7MB ≈ 32MB خام. غير ضروري/قابل للاستعادة = 29 لقطة تطوير قديمة في download/ (9.9MB — أكبر بند) + Native APK 5.7MB + VERIFICATION 1MB + شهادات نموذجية 0.9MB. سبب الفرق عن 14: بروتوكول «الشاملة الكاملة» منذ 15 (14 كانت خفيفة: بلا download وبـ APK واحد 3.1MB) — الكود نفسه لم يتضخم (src ثابت 4.4MB).
+- صفر مساس بـ: متغيرات Vercel، قاعدة البيانات (تفريغ حي فقط)، sw.js، الإشعارات الثلاثية، حرس الجلسة، النهار خارج الأقسام المذكورة.
+
+Stage Summary:
+- v8.1 «قصر الملف الكامل + نهاية النصوص الشبحية» مكتمل وموثق ومنشور إنتاجياً.
+- رابط النسخة 17: https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-17
+- رابط النسخة 16 (السابقة): https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-16
