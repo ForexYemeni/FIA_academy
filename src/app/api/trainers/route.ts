@@ -455,6 +455,23 @@ export async function DELETE(req: NextRequest) {
       }, { onConflict: 'user_id' })
     } catch {}
 
+    // 👑 v9.1 — «محو الهوية الكامل»: حذف صف المدرب وحده لا يكفي — مرآته في
+    // public.users (النشأة من التسجيل الذاتي/مِرآة 024، بنفس المعرّف وبريده
+    // وكلمة مروره نفسهما) كانت تبقى حيّة بعد الحذف فيظل الحساب المحذوف
+    // قادراً على تسجيل الدخول عبر جدول users (فحص الدخول يبدأ بـ users!)،
+    // ويحجب بريده عن أي إعادة تسجيل بخطأ «هذا البريد مسجل مسبقاً».
+    // محو المرآة بنفس المعرّف يجعل الحذف نهائياً بكل المفاصل — والمفاتيح
+    // الأجنبية كلها CASCADE/SET NULL فلا يعلق شيء. فشل المحو يوقف الحذف
+    // عمداً — أفضل من ترك شبح يستطيع الدخول.
+    const { error: mirrorErr } = await supabaseAdmin.from('users').delete().eq('id', id)
+    if (mirrorErr) {
+      console.error('trainer identity-mirror delete failed:', mirrorErr.message)
+      return NextResponse.json(
+        { error: 'تعذر محو هوية الحساب من جدول المستخدمين — لم يُحذف المدرب. أعد المحاولة.' },
+        { status: 500 }
+      )
+    }
+
     const { error } = await supabaseAdmin.from('trainers').delete().eq('id', id)
     if (error) throw error
     audit({ action: 'trainer_deleted', entity: 'trainers', entityId: id, actor: g.user, req })
