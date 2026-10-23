@@ -985,10 +985,10 @@ body {
 .dark .bg-slate-50, .dark .bg-slate-100 { background-color: #0C1730; }
 .dark .bg-gray-200, .dark .bg-slate-200 { background-color: #16264D; }
 .dark .bg-\[\#FDFDFB\]\/95 { background-color: rgba(15, 27, 54, 0.96); }
-.dark .from-white { --tw-gradient-from: #0F1B36 var(--tw-gradient-from-position); }
-.dark .via-white { --tw-gradient-via: #14224A; --tw-gradient-stops: var(--tw-gradient-via-stops) !important; }
-.dark .to-white { --tw-gradient-to: #0A1428 var(--tw-gradient-to-position) !important; }
-.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 { --tw-gradient-from: #0C1730 var(--tw-gradient-from-position); }
+.dark .from-white { --tw-gradient-from: #0F1B36; }
+.dark .via-white { --tw-gradient-via: #14224A; }
+.dark .to-white { --tw-gradient-to: #0A1428 !important; }
+.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 { --tw-gradient-from: #0C1730; }
 
 /* النصوص — أهم ما في الليل: الكحلي يصير فاتحاً ويبقى كحلياً فوق الذهب */
 .dark .text-gray-900, .dark .text-gray-800,
@@ -1099,8 +1099,8 @@ body {
 .dark .fia-keep-light .text-gray-600 { color: #4B5563 !important; }
 .dark .fia-keep-light .text-gray-500 { color: #6B7280 !important; }
 .dark .fia-keep-light .via-white { --tw-gradient-via: #ffffff; }
-.dark .fia-keep-light .from-white { --tw-gradient-from: #ffffff var(--tw-gradient-from-position); }
-.dark .fia-keep-light .to-white { --tw-gradient-to: #ffffff var(--tw-gradient-to-position); }
+.dark .fia-keep-light .from-white { --tw-gradient-from: #ffffff; }
+.dark .fia-keep-light .to-white { --tw-gradient-to: #ffffff !important; }
 .dark .fia-keep-light::before { display: none; }
 
 /* انتقال سلس بين الوضعين */
@@ -1137,11 +1137,78 @@ html.theme-transitioning * {
 .dark [class*="from-gold"]:not([class*="from-gold/"]) .text-\[\#0A1F44\],
 .dark .bg-gold .text-\[\#0A1F44\],
 .dark .bg-\[\#C9A961\] .text-\[\#0A1F44\] { color: #0B1635 !important; }
-.dark [class*="from-amber-50"],
-.dark [class*="to-amber-50"],
-.dark [class*="via-amber-50"] {
+/* v8.0 — إصلاح المحدد: الكلاس الدقيق + متغيرات الشفافية فقط، فلا يُلتقط
+   from-amber-500/to-amber-500 (تدرج الذهب الصلب — هوية العلامة) بالخطأ */
+.dark .from-amber-50, .dark [class*="from-amber-50/"],
+.dark .to-amber-50, .dark [class*="to-amber-50/"],
+.dark .via-amber-50, .dark [class*="via-amber-50/"] {
   background-image: linear-gradient(to left, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.05)) !important;
 }
 .dark .lux-dialog-body {
   background-image: linear-gradient(to bottom, rgba(212, 175, 55, 0.06), #101C3C) !important;
 }
+
+/* ═════ 👑 v8.0 — الليل الملكي الكامل (نسخة مزدوجة مع royal-night.css 13-18) ═════
+   إغلاق آخر الفجوات: عائلة rose كاملة + fuchsia/pink + درجات متفرقة +
+   توقفات التدرجات الملونة -50 كلها + تمويج التمرير الليلي — النهار صفر تغيير */
+.dark .bg-rose-50, .dark [class*="bg-rose-50/"],
+.dark .bg-rose-100 { background-color: rgba(251, 113, 133, 0.10); }
+.dark .text-rose-500, .dark [class*="text-rose-500/"] { color: #FB7185 !important; }
+.dark .text-rose-600 { color: #FB7185 !important; }
+.dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900 { color: #FDA4AF !important; }
+.dark .border-rose-100, .dark .border-rose-200, .dark .border-rose-300 { border-color: rgba(251, 113, 133, 0.28); }
+.dark .bg-fuchsia-50, .dark [class*="bg-fuchsia-50/"],
+.dark .bg-fuchsia-100, .dark .bg-pink-50, .dark [class*="bg-pink-50/"],
+.dark .bg-pink-100 { background-color: rgba(232, 121, 249, 0.10); }
+.dark .text-fuchsia-600, .dark .text-fuchsia-700 { color: #E879F9 !important; }
+.dark .text-fuchsia-800, .dark .text-fuchsia-900 { color: #F0ABFC !important; }
+.dark .text-pink-600, .dark .text-pink-700 { color: #F472B6 !important; }
+.dark .text-pink-800, .dark .text-pink-900 { color: #F9A8D4 !important; }
+.dark .border-fuchsia-200, .dark .border-pink-200 { border-color: rgba(232, 121, 249, 0.28); }
+.dark .text-sky-800 { color: #93C5FD !important; }
+.dark .text-yellow-900 { color: #E5C158 !important; }
+.dark .border-slate-300 { border-color: #223055; }
+.dark .border-emerald-300 { border-color: rgba(52, 211, 153, 0.28); }
+
+/* التوقفات الملونة -50 ليلية (v4-نقي: لون التوقف فقط بلا لاحقة موضع —
+   النسخة المزدوجة الكاملة في royal-night.css 16) */
+.dark .from-blue-50, .dark [class*="from-blue-50/"] { --tw-gradient-from: rgba(96, 165, 250, 0.16); }
+.dark .to-blue-50, .dark [class*="to-blue-50/"] { --tw-gradient-to: rgba(96, 165, 250, 0.06); }
+.dark .from-emerald-50, .dark [class*="from-emerald-50/"] { --tw-gradient-from: rgba(52, 211, 153, 0.16); }
+.dark .to-emerald-50, .dark [class*="to-emerald-50/"] { --tw-gradient-to: rgba(52, 211, 153, 0.06); }
+.dark .from-rose-50, .dark [class*="from-rose-50/"] { --tw-gradient-from: rgba(251, 113, 133, 0.16); }
+.dark .to-rose-50, .dark [class*="to-rose-50/"] { --tw-gradient-to: rgba(251, 113, 133, 0.06); }
+.dark .from-purple-50, .dark [class*="from-purple-50/"] { --tw-gradient-from: rgba(167, 139, 250, 0.16); }
+.dark .from-pink-50, .dark [class*="from-pink-50/"] { --tw-gradient-from: rgba(244, 114, 182, 0.16); }
+.dark .from-indigo-50, .dark [class*="from-indigo-50/"] { --tw-gradient-from: rgba(129, 140, 248, 0.16); }
+.dark .from-teal-50, .dark [class*="from-teal-50/"] { --tw-gradient-from: rgba(45, 212, 191, 0.16); }
+.dark .from-sky-50, .dark [class*="from-sky-50/"] { --tw-gradient-from: rgba(56, 189, 248, 0.16); }
+.dark .from-cyan-50, .dark [class*="from-cyan-50/"] { --tw-gradient-from: rgba(34, 211, 238, 0.16); }
+.dark .from-green-50, .dark [class*="from-green-50/"] { --tw-gradient-from: rgba(74, 222, 128, 0.16); }
+.dark .from-red-50, .dark [class*="from-red-50/"] { --tw-gradient-from: rgba(248, 113, 113, 0.16); }
+.dark .from-fuchsia-50, .dark [class*="from-fuchsia-50/"] { --tw-gradient-from: rgba(232, 121, 249, 0.16); }
+.dark .from-orange-50, .dark [class*="from-orange-50/"] { --tw-gradient-from: rgba(251, 146, 60, 0.16); }
+.dark .to-teal-50, .dark [class*="to-teal-50/"] { --tw-gradient-to: rgba(45, 212, 191, 0.06); }
+.dark .to-indigo-50, .dark [class*="to-indigo-50/"] { --tw-gradient-to: rgba(129, 140, 248, 0.06); }
+.dark .to-orange-50, .dark [class*="to-orange-50/"] { --tw-gradient-to: rgba(251, 146, 60, 0.06); }
+.dark .to-fuchsia-50, .dark [class*="to-fuchsia-50/"] { --tw-gradient-to: rgba(232, 121, 249, 0.06); }
+.dark .to-pink-50, .dark [class*="to-pink-50/"] { --tw-gradient-to: rgba(244, 114, 182, 0.06); }
+.dark .to-red-50, .dark [class*="to-red-50/"] { --tw-gradient-to: rgba(248, 113, 113, 0.06); }
+.dark .to-green-50, .dark [class*="to-green-50/"] { --tw-gradient-to: rgba(74, 222, 128, 0.06); }
+.dark .to-sky-50, .dark [class*="to-sky-50/"] { --tw-gradient-to: rgba(56, 189, 248, 0.06); }
+.dark .to-cyan-50, .dark [class*="to-cyan-50/"] { --tw-gradient-to: rgba(34, 211, 238, 0.06); }
+.dark .to-purple-50, .dark [class*="to-purple-50/"] { --tw-gradient-to: rgba(167, 139, 250, 0.06); }
+.dark .to-violet-50, .dark [class*="to-violet-50/"] { --tw-gradient-to: rgba(167, 139, 250, 0.06); }
+.dark .to-gray-50, .dark .to-slate-50,
+.dark [class*="to-gray-50/"], .dark [class*="to-slate-50/"] { --tw-gradient-to: rgba(10, 20, 40, 0.85); }
+
+/* التمويج الليلي — حواف التمرير الملوّنة الفاتحة لا تومض ليلاً */
+.dark .hover\:bg-red-50:hover, .dark .hover\:bg-red-100:hover { background-color: rgba(248, 113, 113, 0.16); }
+.dark .hover\:bg-blue-50:hover, .dark .hover\:bg-blue-100:hover,
+.dark .hover\:bg-sky-100:hover { background-color: rgba(96, 165, 250, 0.16); }
+.dark .hover\:bg-emerald-100:hover, .dark .hover\:bg-green-50:hover,
+.dark .hover\:bg-green-100:hover { background-color: rgba(52, 211, 153, 0.16); }
+.dark .hover\:bg-amber-50:hover, .dark .hover\:bg-amber-100:hover,
+.dark .hover\:bg-amber-100\/60:hover { background-color: rgba(212, 175, 55, 0.16); }
+.dark .hover\:bg-cyan-100:hover { background-color: rgba(45, 212, 191, 0.16); }
+.dark .hover\:bg-rose-50:hover, .dark .hover\:bg-rose-100:hover { background-color: rgba(251, 113, 133, 0.16); }

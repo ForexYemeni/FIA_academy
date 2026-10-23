@@ -441,6 +441,20 @@ export async function DELETE(req: NextRequest) {
     // فصل دوراته عنه بدل تركها معلقة
     try { await supabaseAdmin.from('courses').update({ trainer_id: null }).eq('trainer_id', id) } catch {}
 
+    // 🛡 v8.0 — «الخروج الفوري»: تسجيل الحذف في force_logout بنفس بروتوكول
+    // حذف المتدرب — حرس الجلسة الملكي (session-guard) ينبض كل 15 ثانية على
+    // /api/auth/check-deleted فيُخرج جلسة المدرب المحذوف من أي جهاز في نفس
+    // اللحظة تقريباً، وحتى لو كان التطبيق مغلقاً يُخرج فور الفتح عند إعادة
+    // الترطيب. فشل التسجيل لا يعيق الحذف أبداً (الصف نفسه يُحذف — فالفحص
+    // يعيد account_not_found ويكفي للخروج).
+    try {
+      await supabaseAdmin.from('force_logout').upsert({
+        user_id: id,
+        reason: 'account_deleted',
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+    } catch {}
+
     const { error } = await supabaseAdmin.from('trainers').delete().eq('id', id)
     if (error) throw error
     audit({ action: 'trainer_deleted', entity: 'trainers', entityId: id, actor: g.user, req })
