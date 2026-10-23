@@ -1,4 +1,7 @@
 import { Metadata } from 'next'
+// 👑 v10.2 — CSS حقيقي يُخدَم عبر <link> في <head>: الصفحة الفاخرة تُرسَم من
+// أول إطار بلا أي وميض أبيض عاري (FOUC) حتى قبل اكتمال الـ hydration
+import './download.css'
 import DownloadClient from './client'
 
 export const metadata: Metadata = {

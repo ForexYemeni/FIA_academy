@@ -2056,3 +2056,20 @@ Work Log:
 Stage Summary:
 - كل شيء منشور: GitHub 8320f78 + 68b13bc / Vercel READY ×2 / release 19 بمطابقة SHA.
 - رابط النسخة 19: https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-19
+
+---
+Task ID: v10.2
+Agent: main (Z.ai)
+Task: إصلاح «الصفحة السيئة» التي تومض قبل صفحة تحميل التطبيق الفاخرة + تسليم رابط مركز «كيف تبدأ» للمشاركة
+
+Work Log:
+- تشخيص إنتاجي مؤكد: HTML الخادم لصفحة /download كان خالياً تماماً من وسوم <style> (0 وسم، 0 قاعدة .fia-dl-root) — المحتوى يصل عارياً أبيض ثم تُحقن أنماط styled-jsx بعد الـ hydration فتومض «صفحة سيئة» وتختفي وتظهر الفاخرة (FOUC حقيقي، وليس كاش SW كما شُخّص سابقاً في v6/v7).
+- الجذر: App Router يتطلب StyleRegistry لترميز أنماط styled-jsز خادمياً — المشروع كان يستخدم styled-jsx في 3 ملفات دون أي سجل.
+- الإصلاح الجذري: src/app/styled-jsx-registry.tsx (النمط الرسمي: createStyleRegistry + useServerInsertedHTML + flush) وربطه في layout.tsx حول children — يصلح أيضاً SSR لأنماط notification-toast وlesson-preview-modal.
+- تحصين مزدوج لصفحة التحميل (صفحة مشاركة عامة لا تحتمل أي وميض): استخراج كل الأنماط من <style jsx global> في client.tsx إلى src/app/download/download.css حقيقي مُخدَم عبر <link> في <head> (استيراد في page.tsx) — تُرسَم فاخرة من أول إطار حتى لو تعطل أي شيء مستقبلاً.
+- تحقق محلي: build ✓ 89/89 — HTML المُولّد لـ /download يتضمن <link rel="stylesheet" href="/_next/static/chunks/db9bd846f6fa27ef.css"> وهذا الملف يحتوي .fia-dl-root.
+- صفر مساس بـ: قاعدة البيانات، متغيرات Vercel، sw.js، الحرس الثلاثي (SessionGuard/ApiAuthBridge)، الإشعارات، /start ومكونات المركز.
+
+Stage Summary:
+- الصفحة الفاخرة لتحميل APK تفتح مباشرة بلا أي صفحة سيئة تومض — على أي شبكة ومن أي مدخل.
+- رابط المشاركة الرسمي لمركز «كيف تبدأ»: https://fiaacademy.vercel.app/start
