@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import {
   Crown, GraduationCap, Hourglass, CheckCircle2, XCircle, Percent, Loader2,
   Award, Trophy, Star, FileText, Globe2, Mail, Phone, ShieldCheck, ScrollText,
-  Scale, Eye, RefreshCw, Sparkles, Clock, ChevronDown, ChevronUp,
+  Scale, Eye, RefreshCw, Clock, ChevronDown, ChevronUp,
   Ban, PenLine, CalendarClock, BadgeCheck, Lock,
 } from 'lucide-react'
 
@@ -155,7 +155,7 @@ export function AdminTrainerApplications() {
           <div className="flex flex-wrap items-center gap-2">
             <LuxSearch value={query} onChange={setQuery} placeholder="ابحث بالاسم أو البريد أو التخصص أو البلد..." className="min-w-[220px] flex-1" />
             {lastSync && (
-              <span className="hidden items-center gap-1 text-[10px] text-white/45 sm:flex">
+              <span className="hidden items-center gap-1 text-[10px] text-muted-foreground dark:text-white/45 sm:flex">
                 <Clock className="h-3 w-3" /> آخر مزامنة {lastSync.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
@@ -173,8 +173,8 @@ export function AdminTrainerApplications() {
                   className={cn('rounded-full border px-3 py-1 text-[11px] font-bold transition-all active:scale-95',
                     filter === f.key
                       ? 'border-gold bg-gradient-to-l from-gold to-amber-500 text-navy shadow-[0_2px_12px_rgba(212,175,55,0.4)]'
-                      : 'border-white/15 bg-white/5 text-white/60 hover:border-gold/40 hover:text-white')}>
-                  {f.label} {n > 0 && <span className={cn('mr-1 rounded-full px-1.5 text-[9px]', filter === f.key ? 'bg-navy/20' : 'bg-white/10')}>{n}</span>}
+                      : 'border-navy/15 bg-white/80 text-navy/60 shadow-sm hover:border-gold/50 hover:text-navy dark:border-white/15 dark:bg-white/5 dark:text-white/60 dark:shadow-none dark:hover:border-gold/40 dark:hover:text-white')}>
+                  {f.label} {n > 0 && <span className={cn('mr-1 rounded-full px-1.5 text-[9px]', filter === f.key ? 'bg-navy/20' : 'bg-navy/10 text-navy/70 dark:bg-white/10 dark:text-white/70')}>{n}</span>}
                 </button>
               )
             })}
@@ -476,63 +476,126 @@ function QuickChips({ icon: Icon, label, items }: any) {
   )
 }
 
-/* ================= الملف الكامل ================= */
+/* ================= الملف الكامل — القصر الملكي v8.1 👑 ================= */
 function FullProfile({ a }: { a: App }) {
+  const nQual = (a.qualifications || []).length
+  const nAchv = (a.achievements || []).length
+  const nExp = (a.experiences || []).length
+
   return (
     <div className="space-y-4">
-      {/* الهوية */}
-      <div className="relative flex flex-wrap items-center gap-4 overflow-hidden rounded-2xl border border-gold/25 bg-gradient-to-l from-gold/10 to-transparent p-4">
-        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(circle at 85% 30%, #D4AF37 1.2px, transparent 1.2px)', backgroundSize: '14px 14px' }} />
-        {a.avatar ? (
-          <img src={a.avatar} alt={a.name} className="relative h-20 w-20 rounded-full border-4 border-gold/40 object-cover shadow-lg" />
-        ) : (
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-gold/40 bg-gradient-to-br from-navy to-navy-light text-2xl font-bold text-gold">{a.name?.charAt(0)}</div>
-        )}
-        <div className="relative flex-1 space-y-1 text-sm">
-          <p className="text-lg font-extrabold text-navy">{a.name}</p>
-          <p className="text-xs text-muted-foreground"><ShieldCheck className="ml-1 inline h-3.5 w-3.5 text-gold" /> {a.title || '—'} • {a.specialization || '—'}</p>
-          <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-            <span><Mail className="ml-1 inline h-3 w-3" />{a.email}</span>
-            {a.phone && <span><Phone className="ml-1 inline h-3 w-3" />{a.phone}</span>}
-            {a.country && <span><Globe2 className="ml-1 inline h-3 w-3" />{a.country}</span>}
-            {typeof a.years_experience === 'number' && a.years_experience > 0 && <span>⏳ {a.years_experience}+ سنوات خبرة</span>}
+      {/* ═══ الترويسة الملكية — قصر هوية المدرب (كحلي وذهبي في الوضعين) ═══ */}
+      <div className="relative overflow-hidden rounded-3xl border border-gold/35 bg-gradient-to-br from-[#061024] via-navy to-[#3a2f10] p-5 shadow-[0_16px_50px_-18px_rgba(6,16,36,0.55)]">
+        {/* نقش النقاط الذهبية + الأورب المتوهجة + اللمعة الملكية */}
+        <div className="absolute inset-0 opacity-[0.15]" style={{ backgroundImage: 'radial-gradient(circle at 22% 28%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 78% 68%, #ffffff 0.7px, transparent 0.7px)', backgroundSize: '21px 21px, 15px 15px' }} />
+        <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-gold/15 blur-3xl" />
+        <div className="absolute -bottom-20 right-1/5 h-52 w-52 rounded-full bg-gold/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 lux-shimmer" />
+
+        <div className="relative flex flex-wrap items-center gap-4">
+          {/* الصورة — إطار ذهبي بهالة متوهجة + تاج اعتماد */}
+          <div className="relative shrink-0">
+            <div className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-gold/50 to-amber-500/20 blur-md" />
+            {a.avatar ? (
+              <img src={a.avatar} alt={a.name} className="relative h-24 w-24 rounded-full border-[3px] border-gold/70 object-cover shadow-[0_10px_30px_rgba(6,16,36,0.5)]" />
+            ) : (
+              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-[3px] border-gold/70 bg-gradient-to-br from-navy-light to-navy text-3xl font-black text-gold">{a.name?.charAt(0)}</div>
+            )}
+            <span className="absolute -bottom-1 -left-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#061024] bg-gradient-to-br from-gold to-amber-500 shadow-lg">
+              <Crown className="h-3.5 w-3.5 text-navy" />
+            </span>
+          </div>
+
+          {/* الهوية الملكية */}
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <p className="text-xl font-black leading-tight text-white">{a.name}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-[10px] font-extrabold text-gold-light">
+                <ShieldCheck className="h-3 w-3" /> {a.title || 'مدرب'}
+              </span>
+              {a.specialization && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.07] px-2.5 py-0.5 text-[10px] font-bold text-white/85">
+                  <GraduationCap className="h-3 w-3 text-gold/80" /> {a.specialization}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5 text-[11px] text-white/75">
+              <span className="flex items-center gap-1"><Mail className="h-3 w-3 text-gold/80" /> <span dir="ltr" className="font-medium">{a.email}</span></span>
+              {a.phone && <span className="flex items-center gap-1" dir="ltr"><Phone className="h-3 w-3 text-gold/80" /> <span className="font-medium">{a.phone}</span></span>}
+              {a.country && <span className="flex items-center gap-1"><Globe2 className="h-3 w-3 text-gold/80" /> {a.country}</span>}
+              {typeof a.years_experience === 'number' && a.years_experience > 0 && <span className="flex items-center gap-1"><Hourglass className="h-3 w-3 text-gold/80" /> {a.years_experience}+ سنوات خبرة</span>}
+            </div>
+          </div>
+
+          {/* العدادات الذهبية الزجاجية */}
+          <div className="relative flex gap-2">
+            <MiniStat value={nQual} label="مؤهل" icon={Award} />
+            <MiniStat value={nAchv} label="إنجاز" icon={Trophy} />
+            <MiniStat value={nExp} label="خبرة" icon={Star} />
           </div>
         </div>
-        {/* عدادات الملف */}
-        <div className="relative flex gap-2">
-          <MiniStat value={(a.qualifications || []).length} label="مؤهل" icon={Award} />
-          <MiniStat value={(a.achievements || []).length} label="إنجاز" icon={Trophy} />
-          <MiniStat value={(a.experiences || []).length} label="خبرة" icon={Star} />
-        </div>
+
+        {/* خيط ذهبي سفلي */}
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-l from-transparent via-gold/70 to-transparent" />
       </div>
 
-      {/* النبذة */}
+      {/* ═══ لوحة النسبة الذهبية — إن وُجد اتفاق ═══ */}
+      {a.agreement?.percentage !== undefined && (
+        <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-l from-gold/15 via-gold/[0.06] to-transparent px-4 py-3">
+          <div className="absolute inset-0 opacity-[0.09]" style={{ backgroundImage: 'radial-gradient(circle at 85% 30%, #D4AF37 1.1px, transparent 1.1px)', backgroundSize: '12px 12px' }} />
+          <div className="relative flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-amber-500 shadow-md">
+              <Percent className="h-4.5 w-4.5 h-[18px] w-[18px] text-navy" />
+            </span>
+            <div>
+              <p className="text-xs font-extrabold text-navy">نسبة أرباح المدرب من كل دورة</p>
+              <p className="text-[10px] text-muted-foreground">{a.agreement.terms ? 'اتفاق موقّع ببنود موثقة' : 'اتفاق النسبة الرسمي للأكاديمية'}</p>
+            </div>
+          </div>
+          <p className="relative text-2xl font-black text-gold" dir="ltr">{a.agreement.percentage}%</p>
+        </div>
+      )}
+
+      {/* ═══ النبذة المهنية — بشرائط ذهبية جانبية ═══ */}
       {a.bio && (
-        <div className="rounded-2xl border border-gold/20 p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><FileText className="h-4 w-4 text-gold" /> النبذة المهنية</p>
+        <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-white/70 p-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-amber-400 to-transparent" />
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-extrabold text-navy"><FileText className="h-4 w-4 text-gold" /> النبذة المهنية</p>
           <p className="whitespace-pre-line text-xs leading-relaxed text-muted-foreground">{a.bio}</p>
         </div>
       )}
 
+      {/* ═══ الخطوط الزمنية الملكية ═══ */}
       <ListBlock icon={Award} title="المؤهلات العلمية" items={a.qualifications || []} render={(q: any) => typeof q === 'string' ? q : `${q?.title || '—'}${q?.institution ? ' — ' + q.institution : ''}${q?.year ? ` (${q.year})` : ''}`} empty="لم تُضف مؤهلات" />
       <ListBlock icon={Trophy} title="الإنجازات والجوائز" items={a.achievements || []} render={(x: any) => typeof x === 'string' ? x : `${x?.title || '—'}${x?.description ? ' — ' + x.description : ''}${x?.year ? ` (${x.year})` : ''}`} empty="لم تُضف إنجازات" />
       <ListBlock icon={Star} title="الخبرات العملية" items={a.experiences || []} render={(x: any) => typeof x === 'string' ? x : `${x?.position || '—'}${x?.organization ? ' في ' + x.organization : ''}${x?.period ? ` (${x.period})` : ''}${x?.description ? ' — ' + x.description : ''}`} empty="لم تُضف خبرات" />
 
-      {/* سجل الاتفاق */}
+      {/* ═══ سجل الاتفاق — خط زمني بميداليات النسبة ═══ */}
       {a.agreement?.history?.length > 0 && (
-        <div className="rounded-2xl border border-gold/25 bg-gradient-to-l from-gold/5 to-transparent p-4">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><ScrollText className="h-4 w-4 text-gold" /> سجل الاتفاق</p>
-          <div className="space-y-1.5">
+        <div className="relative overflow-hidden rounded-2xl border border-gold/25 bg-white/70 p-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold/60 via-gold/20 to-transparent" />
+          <p className="mb-3 flex items-center gap-2 text-xs font-extrabold text-navy">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-gold/30 bg-gradient-to-br from-gold/20 to-amber-500/10 shadow-sm">
+              <ScrollText className="h-3.5 w-3.5 text-gold" />
+            </span>
+            سجل الاتفاق
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent via-gold/25 to-transparent" />
+          </p>
+          <ul className="space-y-2">
             {a.agreement.history.map((h: any, i: number) => (
-              <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-white/60 px-3 py-1.5 text-[11px]">
-                <span className="font-bold text-navy">
-                  {h.action === 'offered' ? '📜 عرض أول' : h.action === 'revised' ? '🔄 عرض محدّث' : h.action === 'accepted' ? '✅ قبول المدرب' : '⚖️ رفض المدرب'}
-                  {h.percentage !== undefined ? ` — ${h.percentage}%` : ''}
+              <li key={i} className="flex items-center gap-2.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gold/35 bg-gradient-to-br from-gold/20 to-amber-500/10 text-[10px] font-black text-[#8a6d1d] shadow-sm" dir="ltr">
+                  {h.percentage !== undefined ? `${h.percentage}%` : '⚖️'}
                 </span>
-                <span className="text-muted-foreground">{h.byName || ''} • {h.at ? new Date(h.at).toLocaleDateString('ar-EG') : ''}</span>
-              </div>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-gold/15 bg-white/80 px-3.5 py-2 shadow-sm">
+                  <span className="text-[11px] font-extrabold text-navy">
+                    {h.action === 'offered' ? '📜 عرض أول' : h.action === 'revised' ? '🔄 عرض محدّث' : h.action === 'accepted' ? '✅ قبول المدرب' : '⚖️ رفض المدرب'}
+                  </span>
+                  <span className="truncate text-[10px] text-muted-foreground">{h.byName || ''} • {h.at ? new Date(h.at).toLocaleDateString('ar-EG') : ''}</span>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
@@ -543,32 +606,55 @@ function FullProfile({ a }: { a: App }) {
         </div>
       )}
 
-      <p className="flex items-center gap-1 text-center text-[10px] text-muted-foreground"><Clock className="h-3 w-3" /> أُرسل الطلب: {a.created_at ? new Date(a.created_at).toLocaleString('ar-EG') : '—'}</p>
+      <p className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
+        <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold/40" />
+        <Clock className="h-3 w-3 text-gold/70" /> أُرسل الطلب: {a.created_at ? new Date(a.created_at).toLocaleString('ar-EG') : '—'}
+        <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold/40" />
+      </p>
     </div>
   )
 }
 
+/* ميدالية عداد زجاجية ذهبية — فوق الترويسة الكحلية في الوضعين */
 function MiniStat({ value, label, icon: Icon }: { value: number; label: string; icon: any }) {
   return (
-    <div className="flex min-w-[54px] flex-col items-center rounded-xl border border-gold/30 bg-white/70 px-2.5 py-1.5">
-      <Icon className="mb-0.5 h-3.5 w-3.5 text-gold" />
-      <span className="text-sm font-black text-navy tabular-nums">{value}</span>
-      <span className="text-[8px] font-bold text-muted-foreground">{label}</span>
+    <div className="flex min-w-[58px] flex-col items-center rounded-2xl border border-gold/35 bg-white/[0.07] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+      <span className="mb-1 flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-amber-500 shadow-sm">
+        <Icon className="h-3 w-3 text-navy" />
+      </span>
+      <span className="text-base font-black leading-none tabular-nums text-gold">{value}</span>
+      <span className="mt-0.5 text-[8px] font-bold text-white/70">{label}</span>
     </div>
   )
 }
 
+/* كتلة خط زمني ملكية — سكة ذهبية وميداليات متصلة (RTL أصيلة بلا حسابات مطلقة) */
 function ListBlock({ icon: Icon, title, items, render, empty }: any) {
+  const list = items || []
   return (
-    <div className="rounded-2xl border border-gold/20 p-4">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-navy"><Icon className="h-4 w-4 text-gold" /> {title}</p>
-      {(!items || items.length === 0) ? (
-        <p className="text-[11px] text-muted-foreground">{empty}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-gold/20 bg-white/70 p-4">
+      <div className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold/60 via-gold/20 to-transparent" />
+      <p className="mb-3 flex items-center gap-2 text-xs font-extrabold text-navy">
+        <span className="flex h-7 w-7 items-center justify-center rounded-xl border border-gold/30 bg-gradient-to-br from-gold/20 to-amber-500/10 shadow-sm">
+          <Icon className="h-3.5 w-3.5 text-gold" />
+        </span>
+        {title}
+        <span className="h-px flex-1 bg-gradient-to-l from-transparent via-gold/25 to-transparent" />
+      </p>
+      {list.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-gold/25 bg-gold/[0.03] px-3 py-2.5 text-[11px] text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="space-y-1.5">
-          {items.map((it: any, i: number) => (
-            <li key={i} className="flex items-start gap-2 rounded-lg bg-white/60 px-3 py-2 text-xs leading-relaxed text-navy">
-              <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-gold" /> {render(it)}
+        <ul className="space-y-2">
+          {list.map((it: any, i: number) => (
+            <li key={i} className="flex items-start gap-2.5">
+              {/* عمود الوصلة الذهبية: ميدالية + خيط يمتد للعنصر التالي */}
+              <div className="relative flex w-4 shrink-0 flex-col items-center self-stretch">
+                <span className="z-10 mt-3 h-3 w-3 shrink-0 rounded-full border border-gold/60 bg-gradient-to-br from-gold to-amber-500 shadow-[0_0_0_3px_rgba(212,175,55,0.15)]" />
+                {i < list.length - 1 && <span className="w-px flex-1 bg-gradient-to-b from-gold/40 to-gold/10" />}
+              </div>
+              <div className="mb-0.5 flex-1 rounded-xl border border-gold/15 bg-white/80 px-3.5 py-2.5 text-xs leading-relaxed text-navy shadow-sm transition-all hover:border-gold/40 hover:shadow-[0_6px_18px_-6px_rgba(212,175,55,0.35)]">
+                {render(it)}
+              </div>
             </li>
           ))}
         </ul>

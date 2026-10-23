@@ -284,7 +284,7 @@ function AdminContent({ contentCourseId, setContentCourseId }: any) {
                   </div>
                   <Button
                     size="sm"
-                    className="w-full bg-navy hover:bg-navy-light"
+                    className="fia-royal-cta w-full bg-navy hover:bg-navy-light"
                     onClick={() => setContentCourseId(c.id)}
                   >
                     <FileText className="w-3.5 h-3.5 ml-1" /> عرض المحتوى
