@@ -198,6 +198,23 @@ export async function POST(req: NextRequest) {
     if (!g.ok) return g.res
     const body = await req.json()
 
+    // 👑 v6.9.1 — «المرسوم المزدوج للإنشاء الإداري»: المدرب الذي تضيفه الإدارة
+    // لا يُولد معتمداً بنسبة مفتوحة — بل يستلم **عرض اتفاق ملكي** بالنسبة التي
+    // حددتها الإدارة، يدخل بلوحته فيوقّعه فيُقفل التعديل (وبعده لا تغيير إلا
+    // بإعادة تفاوض يوافق عليها هو أيضاً). طريقة السحب يضيفها بنفسه من لوحته.
+    const offeredPct = typeof body.profit_percentage === 'number' ? Math.max(0, Math.min(100, body.profit_percentage)) : 0
+    const wantsOffer = (body.status || 'agreement_pending') === 'agreement_pending'
+    const nowIso = new Date().toISOString()
+    const agreementOffer = wantsOffer
+      ? {
+          offered_at: nowIso,
+          percentage: offeredPct,
+          trainer_response: 'pending',
+          offered_via: 'admin',
+          history: [{ at: nowIso, by: 'admin', action: 'offered', percentage: offeredPct }],
+        }
+      : null
+
     const { data, error } = await supabaseAdmin
       .from('trainers')
       .insert({
@@ -212,10 +229,14 @@ export async function POST(req: NextRequest) {
         courses_count: body.courses_count || 0,
         years_experience: body.years_experience || 0,
         // Earnings system — profit share per course per student + payout method
-        profit_percentage: typeof body.profit_percentage === 'number' ? body.profit_percentage : 0,
+        profit_percentage: offeredPct,
         payment_method_type: body.payment_method_type || 'محلي',
         payment_method_name: body.payment_method_name || null,
         payment_account: body.payment_account || null,
+        // 👑 المنظومة الملكية: العرض بانتظار توقيع المدرب
+        status: body.status || 'agreement_pending',
+        created_via: 'admin',
+        ...(agreementOffer ? { agreement: agreementOffer } : {}),
       })
       .select()
       .single()
@@ -226,7 +247,13 @@ export async function POST(req: NextRequest) {
     // (fire-and-forget — never blocks the response)
     notifyTelegramNewTrainer(rest).catch(() => { /* silent */ })
 
-    return NextResponse.json(rest)
+    return NextResponse.json({
+      ...rest,
+      agreement_offer_sent: !!agreementOffer,
+      message: agreementOffer
+        ? `أُضيف المدرب — وسيجد عرض الاتفاق (${offeredPct}%) في لوحته عند أول دخول، وبعد توقيعه تُقفل النسبة للطرفين`
+        : undefined,
+    })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -329,6 +356,13 @@ export async function PUT(req: NextRequest) {
           }, { status: 423 })
         }
         patch.profit_percentage = newPct
+        // 🤝 v6.9.1 — مزامنة العرض المعلّق: تعديل النسبة قبل توقيع المدرب
+        // يُحدّث ما سيراه ويوقّع عليه في بطاقة الاتفاق (لا عرض قديم يخدع أحداً)
+        if (!isConfirmed && agreementNow.offered_at && agreementNow.trainer_response === 'pending' && newPct !== Number(agreementNow.percentage || 0)) {
+          const history2 = Array.isArray(agreementNow.history) ? agreementNow.history : []
+          history2.push({ at: new Date().toISOString(), by: 'admin', action: 'offer_updated', percentage: newPct, previous_percentage: Number(agreementNow.percentage) || 0 })
+          patch.agreement = { ...agreementNow, percentage: newPct, history: history2 }
+        }
       }
     }
 
