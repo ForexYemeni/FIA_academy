@@ -27,6 +27,9 @@ export interface NavItem {
   /** ⚡ v6.7 — عنوان المجموعة الملكية: الأقسام المتجاورة التي تشترك بنفس العنوان
       تُعرض تحت ترويسة ذهبية مزخرفة واحدة (ترتيب فاخر موحّد لكل الحسابات). */
   group?: string
+  /** 🛡️ v6.9.3 — نبضة ذهبية نابضة: دعوة بصرية ملكية لفتح القسم فوراً
+   *  (تُستخدم لبطاقة اتفاق تعديل العقد المعلّقة في «أرباحي») */
+  pulse?: boolean
 }
 
 interface DashboardShellProps {
@@ -271,6 +274,14 @@ export function DashboardShell({
                     <Icon className="w-5 h-5" strokeWidth={isActive ? 2.4 : 2} />
                   </span>
                   <span className="flex-1 text-right leading-tight">{item.label}</span>
+                  {/* 🛡️ v6.9.3 — النبضة الذهبية: نقطة ملكية نابضة تجذب العين لقسم
+                      فيه قرار بانتظار صاحبه (اتفاق تعديل العقد) */}
+                  {item.pulse && (
+                    <span className="relative ms-auto flex w-3 h-3 flex-shrink-0" aria-hidden>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-60" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-gradient-to-br from-amber-200 via-gold to-amber-600 ring-1 ring-white/40 shadow-[0_0_10px_rgba(212,175,55,0.7)]" />
+                    </span>
+                  )}
                   {/* ⚡ v6.6 — العداد الملكي: شارة ذهبية متوهجة تظهر عند وصول إشعار جديد
                       لهذا القسم، وتنبض ثلاث نبضات راقية ثم تستقر — فاخرة جداً */}
                   {(() => {

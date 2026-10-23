@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { guardAdmin, getAuthUser } from '@/lib/api-auth'
 import { hashPassword } from '@/lib/auth-server'
-import { notifyTrainerRenegotiationOffered } from '@/lib/notifications'
+import { notifyTrainerRenegotiationOffered, resolveTrainerUserId } from '@/lib/notifications'
 import { tgTrainerRenegotiationOffered } from '@/lib/telegram'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
@@ -170,7 +170,20 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
-    const safe = (data || [])
+    // 🛡️ v6.9.3 — هوية مزدوجة: جلسة حساب المستخدم قد تحمل معرّفاً غير معرّف
+    // صف المدرب (عالمان في نموذج الهوية). إن طُلب ملف بـ id ولم يُوجد، نحلّه
+    // ببريد الطالب نفسه من جلسته — لا تسريب: الحل ببريد الطالب حصراً لا بالـ id.
+    let rows = data || []
+    if (id && rows.length === 0) {
+      const au = await getAuthUser(req)
+      if (au?.email) {
+        const { data: byEmail } = await supabaseAdmin
+          .from('trainers').select('*').ilike('email', au.email).limit(1)
+        if (byEmail && byEmail.length) rows = byEmail
+      }
+    }
+
+    const safe = (rows)
       .filter((t: any) => !t.password || !t.password.startsWith(TEAM_MARKER_PREFIX))
       .map((t: any) => {
         const { password, ...rest } = t
@@ -319,7 +332,11 @@ export async function PUT(req: NextRequest) {
         .single()
       if (error) throw error
       // 🤝 v6.9.2 — وصول الطلب للمدرب فوراً: إشعار ثلاثي القنوات (DB + FCM + OneSignal) يحمل السبب + سجل تلجرام للإدارة
-      try { await notifyTrainerRenegotiationOffered(trainerId, Number((current as any).profit_percentage) || 0, newPct, note || null) } catch {}
+      // 🛡️ v6.9.3 — هوية مزدوجة: الإشعار يهبط على معرّفَي صف المدرب وحسابه
+      // معاً (قد يكونان مختلفين) فلا يضيع مهما كان عالم الهوية — والقيد
+      // الأجنبي المميت أُسقط (027) فلا إدراج يسقط بصمت بعد اليوم.
+      const renegRefs = Array.from(new Set([trainerId, (await resolveTrainerUserId(trainerId)) || ''].filter(Boolean)))
+      try { await notifyTrainerRenegotiationOffered(renegRefs, Number((current as any).profit_percentage) || 0, newPct, note || null) } catch (e: any) { console.error('renegotiation notify failed:', e?.message) }
       try { await tgTrainerRenegotiationOffered((data as any).name, Number((current as any).profit_percentage) || 0, newPct, note || null) } catch {}
       const { password: _pw, ...restSafe } = data as any
       return NextResponse.json({

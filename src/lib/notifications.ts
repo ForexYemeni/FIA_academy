@@ -18,14 +18,18 @@ async function send(userId: string, type: string, title: string, body?: string, 
   if (!userId || !type || !title) return
   // 1) Insert into the notifications table (in-app bell + polling fallback)
   try {
-    await supabaseAdmin.from('notifications').insert({
+    // 🛡️ v6.9.3 — الفشل الصامت ممنوع: الخطأ يُسجَّل في سجلات الخادم دائماً
+    // (supabase لا يرمي استثناءات — الخطأ يعود في النتيجة فيُلتقط بلا أثر)
+    const { error: insErr } = await supabaseAdmin.from('notifications').insert({
       user_id: userId,
       type,
       title,
       body: body || null,
       link: link || null,
     })
-  } catch {
+    if (insErr) console.error(`🔔 notification insert failed [${type}] → ${userId}:`, insErr.message)
+  } catch (e: any) {
+    console.error(`🔔 notification insert threw [${type}] → ${userId}:`, e?.message)
     // Non-fatal — don't fail the parent operation because the
     // notification couldn't be inserted.
   }
@@ -500,10 +504,14 @@ export async function notifyTrainerAgreementRevised(trainerUserId: string, perce
 }
 
 /** 🤝 v6.9.2 — للمدرب: وصل طلب تعديل عقد الشراكة من الإدارة مع السبب.
- *  يبقى الاتفاق الساري مفعولاً حتى يوافق المدرب — يراجع الطلب من «أرباحي». */
-export async function notifyTrainerRenegotiationOffered(trainerUserId: string, oldPct: number, newPct: number, reason?: string | null) {
-  await send(trainerUserId, 'trainer_agreement', '📜 طلب تعديل عقد الشراكة',
-    `راجعت الإدارة اتفاقك وتقدمت بطلب تعديل حصتك من ${oldPct}% إلى ${newPct}% من كل دورة.${reason ? `\nسبب الطلب: ${reason}` : ''}\nنسبتك السارية تبقى مفعّلة كما هي حتى توافق — افتح «أرباحي» لمراجعة الطلب وقبوله أو رفضه بحرية تامة.`, '/#earnings')
+ *  🛡️ v6.9.3 — هوية مزدوجة: نموذج هوية الأكاديمية عالمان (صف المدرب + حساب
+ *  المستخدم) وقد يكونان معرفّين مختلفين — الإشعار يهبط على كليهما فلا يضيع
+ *  أبداً، والجلسة تطابق أحدهما حتماً (المكرر زائد لا يضر — كل مستخدم يرى
+ *  إشعارات معرّف جلسته فقط). يبقى الاتفاق الساري مفعولاً حتى يوافق المدرب —
+ *  البطاقة الذهبية تنتظره في «نظرة عامة» مباشرة وفي «أرباحي». */
+export async function notifyTrainerRenegotiationOffered(trainerRefs: string | string[], oldPct: number, newPct: number, reason?: string | null) {
+  await sendToMany(Array.isArray(trainerRefs) ? trainerRefs : [trainerRefs], 'trainer_agreement', '📜 طلب تعديل عقد الشراكة',
+    `راجعت الإدارة اتفاقك وتقدمت بطلب تعديل حصتك من ${oldPct}% إلى ${newPct}% من كل دورة.${reason ? `\nسبب الطلب: ${reason}` : ''}\nنسبتك السارية تبقى مفعّلة كما هي حتى توافق — افتح لوحتك لمراجعة الطلب وقبوله أو رفضه بحرية تامة.`, '/#earnings')
 }
 
 // =========================================================================
