@@ -1917,3 +1917,24 @@ Work Log:
 Stage Summary:
 - الملفات: src/app/royal-night.css (+~180 قاعدة) ، src/app/globals.css (مرايا) ، src/components/fia/session-guard.tsx (جديد) ، src/app/layout.tsx (تركيب الحرس) ، src/app/api/trainers/route.ts (force_logout) ، worklog.md.
 - v8.0 «الليل الملكي الكامل» + «الخروج الفوري» — النسخة الاحتياطية 16 تلي هذا الإصدار.
+
+---
+Task ID: v8.0-final-delivery-github
+Agent: main (Z.ai)
+Task: الرفع النهائي — push + إصدار النسخة الاحتياطية 16 + التحقق الإنتاجي
+
+Work Log:
+- Push ناجح: 422aeb5..cef1515 main → Vercel نشر تلقائي (BUILDING → READY, target=production).
+- إنشاء Release رسمي: tag=fia-academy-16 (id 422119851) — «fia academy 16 — v8.0 الليل الملكي الكامل + الخروج الفوري عند حذف الحساب» مع تقرير عربي شامل 16 مقابل 15.
+- رفع الأصل: fia.academy.16.zip — 36.2MB (37958585 بايت) — state=uploaded — وفق اصطلاح fia.academy.14.zip/15.
+- تحقق سلامة الرفع: تنزيل الأصل المرفوع من الإصدار ومقارنة SHA-256 — تطابق بايت-ببايت: 05f0fb708fe85b9c4a1d33283b5ab357738cb3dd98346fe1a0a24e45ef266566.
+- بناء النسخة: 476 مدخلاً / 46.8MB خام — AES-256 WZ_AES — فحص الكلمة الصحيحة PASS + الكلمة الخاطئة مرفوضة PASS.
+- محتوى النسخة: WEBSITE-SOURCE (كود v8.0 كامل) + DATABASE (تفريغ حي: 52 جدولاً / 267 صفاً — schema.sql + data.sql طوبولوجي + data.json + tables-summary) + APK-PACKAGE (v2.3.3 9.7MB + Native 5.7MB) + VERIFICATION (4 لقطات: إنتاج ليلي/نهاري بعد v8.0 + فحص محسوب ليلي/نهاري) + 00-اقرأني + 01-تقرير-16-مقابل-15.
+- تفريغ القاعدة عبر pg8000 (كلمة مرور القاعدة: m773057153M — مكتشفة بأنها مستقلة عن كلمة النسخ).
+- تحقق إنتاجي إضافي: CSS الحي يحمل قواعد v8 (bg-rose-50 الليلية + from-amber-50 المحدد الدقيق + from-white #0f1b36 + درع keep-light) + الحرس في JS الحي (chunk 4a6d57e3/61298a45 يحمل check-deleted) + مسار check-deleted يعيد {deleted:true,reason:account_not_found} + لقطتا إنتاج حي ليل/نهار تؤكدان البطاقات الليلية الملونة والذهب المتلألئ وبطاقات النهار الباستيل.
+- صفر مساس بـ: متغيرات Vercel، الجداول (لا جديد — force_logout قائم)، sw.js، الإشعارات الثلاثية، النهار.
+
+Stage Summary:
+- v8.0 «الليل الملكي الكامل + الخروج الفوري» مكتمل وموثق ومنشور إنتاجياً.
+- رابط النسخة 16: https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-16
+- رابط النسخة 15 (السابقة كما هي): https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-15
