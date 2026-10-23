@@ -1840,3 +1840,24 @@ Stage Summary:
 6) **النسخة الاحتياطية الموحدة الشاملة v6.8.3**: WEBSITE-SOURCE (كود الإنتاج كاملاً) + APK 2.7.1-royal + APK-SOURCE المطابق + APK-SIGNING (v3+v2) + قاعدة بيانات حية طازجة 51 جدولاً/337 سجلاً + دليل استعادة كامل — ثم حذف النسختين القديمتين (v2.7-backup وv5.6-full-backup) بعد نشرها بقرار المالك.
 
 تحقق: next build 88/88 ✓ (بوابة الرمز صفحة جديدة) — الإنتاج: HOME 200، audio-token يرد 400/401 عربي سليم، stream يرد 404/403 كما هو مصمم — sw.js v6 لم يُمس.
+
+---
+Task ID: v7.2-royal-night-notif-panel-fix-backup15
+Agent: main (Z.ai)
+Task: إصلاح بطاقة الإشعارات المصغّرة في الوضع الليلي + جعل الليل آمناً 100% لكل الحسابات + النسخة الاحتياطية الشاملة «fia academy 15» بكلمة مرور المالك
+
+Work Log:
+- التشخيص الجنائي للمشكلة المبلغة (اللوحة تظهر بطاقة مصغّرة ليلاً فقط): القاعدة .dark .bg-white:not(.fia-keep-light){position:relative} في royal-night.css + globals.css كانت تفرض position:relative على كل عنصر bg-white — وتخصيصها (0,3,0) يهزم كلاس Tailwind .absolute (0,1,0) فتنقلب لوحة الإشعارات (absolute w-[350px]) من لوحة منسدلة عائمة إلى عنصر داخل تدفق صفحة الهيدر h-16 فتُضغط كبطاقة مصغّرة — في الليل فقط.
+- إصلاح جذري في الملفين: استبعاد العناصر العائمة :not(.absolute):not(.fixed):not(.sticky) من قاعدة الخط الذهبي العلوي + حرس مزدوج !important (bg-white.absolute=absolute إلخ) يضمن بقاء العناصر العائمة عائمة للأبد.
+- إصلاحات ضمنية بنفس الجذر: هيدر اللوحات sticky كان يفقد ثباته ليلاً + CustomSelect المنسدلة في admin.tsx (absolute z-[100]) كانت تنكسر + نافذة الدردشة fixed — كلها محمية الآن.
+- قسم ليلي ملكي جديد 11.5 في royal-night.css: .dark .fia-notif-panel بسطح متدرج #101D3D→#0B1731 وإطار ذهبي 45% وهالة ليلية وحلقات ring مدمجة وفواصل ذهبية ناعمة — فخامة متعمدة بدل قلب ألوان آلي.
+- notifications-bell.tsx: إضافة كلاس fia-notif-panel لجذر اللوحة فقط (لم يُمس أي منطق).
+- تحقق مزدوج: npx next build نجاح 88/88 مسار + اختبار وقت تشغيل حقيقي على خادم إنتاج محلي (standalone بعد نسخ static): bg-white+absolute=absolute ليلاً ✓ sticky ✓ fixed ✓ + لوحة كاملة محقونة 350px تطفو بحرية + صور ليل/نهار محفوظة (download/night-panel-fixed.png, light-panel-reference.png) — النهار صفر تغيير.
+- Commit: a5108a8 على main محلياً (لا توكن GitHub في هذه البيئة — الرفع للمالك: git push origin main).
+- النسخة الاحتياطية 15 ببروتوكول v56-royal-full-backup: WEBSITE-SOURCE (git archive a5108a8 بلا node_modules/APKs قديمة) + DATABASE حي (scripts/backup-db.mjs: 52 جدولاً/249 سجلاً — users 8, courses 2 ملكيتان, notifications 35, specializations 59, withdrawal_methods 72, snapshots 6) + APK-PACKAGE (v2.3.3 + Native — JKS لدى المالك) + VERIFICATION (صورتا الإثبات) + 00-اقرأني-أولاً.md + 01-تقرير-النسخة-15-مقابل-14.md.
+- التشفير AES-256 WZ_AES بكلمة مرور المالك (من المحادثة فقط — غير مخزنة في أي ملف): download/fia academy 15.zip — 35.9MB — SHA-256 689191b45b3de43d5a76ea1293000e603289174edcfc18ed2ecadc074004f499 — تحقق: 464 مدخلاً تُقرأ بالكلمة الصحيحة ✓ والخاطئة تُرفض ✓.
+
+Stage Summary:
+- الملفات المتغيرة: src/app/royal-night.css, src/app/globals.css, src/components/fia/notifications-bell.tsx (+48/−6).
+- APK v2.7 لا يحتاج تحديثاً — الإصلاح من جهة الخادم (CSS) يصل عبر WebView فور نشر Vercel.
+- خطوة المالك المتبقية: git push origin main (أو ارسال التوكن لوكيل قادم) + رفع «fia academy 15.zip» إلى GitHub Release باسم v15-full-backup.
