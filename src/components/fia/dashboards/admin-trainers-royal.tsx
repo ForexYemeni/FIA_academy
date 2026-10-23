@@ -330,6 +330,11 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  // 🔒 v6.9 — العقد الملكي المقفول + إعادة التفاوض
+  const [renegOpen, setRenegOpen] = useState(false)
+  const [renegPct, setRenegPct] = useState<number>(0)
+  const [renegNote, setRenegNote] = useState('')
+  const [renegSending, setRenegSending] = useState(false)
 
   useEffect(() => {
     setForm(initial
@@ -397,19 +402,49 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         }),
       })
       if (res.ok) {
-        toast.success(initial ? 'تم تحديث بيانات المدرب' : 'تمت إضافة المدرب بنجاح')
+        toast.success(initial ? 'تم تحديث بيانات المدرب' : 'تمت إضافة المدرب بنجاح — سيضيف هو طريقة سحب أرباحه من لوحته')
         onSaved(); onOpenChange(false)
       } else {
-        const d = await res.json(); toast.error(d.error || 'فشل')
+        const d = await res.json()
+        // 🔒 v6.9 — الخادم يرد 423 إن حاول تعديل نسبة مقفولة — يوجَّه لإعادة التفاوض
+        if (res.status === 423 || d.locked) {
+          toast.error('🔒 الاتفاق مقفول — أرسل «عرض تعديل» ليوقّع المدرب على النسبة الجديدة')
+          setRenegOpen(true); setRenegPct(Number(form.profit_percentage) || 0)
+        } else {
+          toast.error(d.error || 'فشل')
+        }
       }
     } catch { toast.error('خطأ') } finally { setSaving(false) }
   }
 
+  // 🤝 v6.9 — إرسال عرض إعادة التفاوض: يبقى الاتفاق الساري مفعولاً حتى موافقة المدرب
+  const sendRenegotiation = async () => {
+    if (!initial?.id) return
+    setRenegSending(true)
+    try {
+      const res = await fetch('/api/trainers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: initial.id, renegotiation: { percentage: Number(renegPct) || 0, note: renegNote } }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.renegotiation_sent) {
+        toast.success(d.message || 'أُرسل عرض التعديل — بانتظار موافقة المدرب')
+        setRenegOpen(false); setRenegNote('')
+        onSaved(); onOpenChange(false)
+      } else {
+        toast.error(d.error || 'تعذر إرسال العرض')
+      }
+    } catch { toast.error('خطأ') } finally { setRenegSending(false) }
+  }
+
   const pct = Number(form.profit_percentage) || 0
   const PCT_PRESETS = [10, 20, 25, 30, 40, 50]
-  const PM_SUGGESTIONS = form.payment_method_type === 'عملات رقمية'
-    ? ['USDT (TRC20)', 'USDT (ERC20)', 'Binance Pay', 'Bitcoin (BTC)', 'Ethereum (ETH)']
-    : ['محفظة جيب', 'محفظة الكريمي', 'محفظة موبايل موني', 'حساب بنكي', 'الدفع عند المقابلة']
+
+  // 🔒 v6.9 — حالة العقد: نسبة مُوقَّعة من الطرفين = مقفولة على التعديل المباشر
+  const agreementInfo: any = (initial as any)?.agreement || {}
+  const agreementLocked = !!initial && !!agreementInfo.confirmed_at && agreementInfo.trainer_response === 'accepted' && (initial as any).status === 'approved'
+  const pendingRenegotiation = agreementInfo.renegotiation?.trainer_response === 'pending'
 
   return (
     <LuxDialog
@@ -523,22 +558,74 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
       {/* ── 💰 نظام الأرباح — نسبته من كل دورة على كل متدرب ── */}
       <FormSectionTitle icon={Crown} label="نظام الأرباح — نسبته من كل دورة" />
       <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-4 space-y-3">
-        <LuxField label="نسبة الربح من كل اشتراك (%)" icon={BadgePercent} hint="تُضاف أرباحه تلقائياً لمحفظته بعد موافقتك على دفع أي متدرب">
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setForm({ ...form, profit_percentage: Math.max(0, pct - 5) })}
+        {/* 🔒 v6.9 — لافتة العقد المقفول: نسبة مُوقّعة من الطرفين */}
+        {agreementLocked && (
+          <div className="rounded-xl border border-gold/50 bg-gradient-to-l from-amber-50 to-gold/[0.06] p-3.5 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0 shadow">
+                <Lock className="w-4 h-4 text-navy" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-extrabold text-navy">العقد الملكي مقفول — نسبة {Number(initial?.profit_percentage) || pct}% موقّعة من الطرفين</p>
+                <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5">
+                  {pendingRenegotiation
+                    ? '📜 عرض تعديل معروض للمدرب حالياً — النسبة السارية تبقى مفعّلة حتى موافقته على الجديدة'
+                    : 'لا تُعدّل مباشرة — أرسل «عرض تعديل» ليوقّع المدرب على النسبة الجديدة فيقفل العقد من جديد'}
+                </p>
+              </div>
+            </div>
+            {!pendingRenegotiation && !renegOpen && (
+              <button type="button" onClick={() => { setRenegOpen(true); setRenegPct(Number(initial?.profit_percentage) || pct) }}
+                className="w-full py-2 rounded-xl bg-gradient-to-l from-navy to-navy-light text-gold text-xs font-extrabold border border-gold/40 shadow hover:brightness-110 transition-all flex items-center justify-center gap-1.5">
+                <BadgePercent className="w-3.5 h-3.5" /> إرسال عرض تعديل (إعادة تفاوض)
+              </button>
+            )}
+            {renegOpen && (
+              <div className="rounded-xl bg-white border border-gold/30 p-3 space-y-2.5">
+                <LuxField label="النسبة الجديدة المقترحة (%)" icon={BadgePercent}>
+                  <Input type="number" min={0} max={100} value={renegPct || ''} onChange={(e) => setRenegPct(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))} dir="ltr" className={luxInput + ' text-center font-extrabold text-lg'} placeholder="0" />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {PCT_PRESETS.map((p) => (
+                      <button key={p} type="button" onClick={() => setRenegPct(p)}
+                        className={`text-[10px] font-extrabold rounded-full border px-2.5 py-1 transition-colors ${renegPct === p ? 'bg-gradient-to-l from-navy to-navy-light text-gold border-navy shadow' : 'border-gold/25 bg-white hover:bg-gold/10 text-navy'}`}>{p}%</button>
+                    ))}
+                  </div>
+                </LuxField>
+                <LuxField label="ملاحظة للمدرب (اختياري)" icon={FileText}>
+                  <Input value={renegNote} onChange={(e) => setRenegNote(e.target.value)} className={luxInput} placeholder="سبب التعديل أو أي تفاصيل تهمّ المدرب" />
+                </LuxField>
+                <div className="flex gap-2">
+                  <button type="button" disabled={renegSending} onClick={sendRenegotiation}
+                    className="flex-1 py-2 rounded-xl bg-gradient-to-l from-gold to-amber-500 text-navy text-xs font-extrabold shadow hover:brightness-110 transition-all disabled:opacity-60 flex items-center justify-center gap-1.5">
+                    {renegSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    إرسال العرض للمدرب
+                  </button>
+                  <button type="button" onClick={() => setRenegOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-gold/30 text-xs font-bold text-navy hover:bg-gold/10 transition-colors">إلغاء</button>
+                </div>
+                <p className="text-[10px] text-muted-foreground flex items-start gap-1"><Lock className="w-3 h-3 mt-0.5 flex-shrink-0 text-gold" /> النسبة الحالية تبقى سارية ومقفولة حتى يوقّع المدرب على العرض الجديد — وبعد موافقته يُقفل العقد من جديد ولا يمكن تعديلها إلا بعرض آخر.</p>
+              </div>
+            )}
+          </div>
+        )}
+        <LuxField label="نسبة الربح من كل اشتراك (%)" icon={BadgePercent} hint={agreementLocked ? 'مقفولة بموجب الاتفاق الموقّع' : 'تُضاف أرباحه تلقائياً لمحفظته بعد موافقتك على دفع أي متدرب'}>
+          <div className={`flex items-center gap-2 ${agreementLocked ? 'opacity-60 pointer-events-none select-none' : ''}`} aria-disabled={agreementLocked}>
+            <button type="button" disabled={agreementLocked} onClick={() => setForm({ ...form, profit_percentage: Math.max(0, pct - 5) })}
               className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm">−</button>
-            <Input type="number" min={0} max={100} value={form.profit_percentage || ''} onChange={(e) => setForm({ ...form, profit_percentage: e.target.value === '' ? 0 : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })} dir="ltr" className={luxInput + ' text-center font-extrabold text-lg'} placeholder="0" />
-            <button type="button" onClick={() => setForm({ ...form, profit_percentage: Math.min(100, pct + 5) })}
+            <Input type="number" min={0} max={100} value={form.profit_percentage || ''} disabled={agreementLocked} onChange={(e) => setForm({ ...form, profit_percentage: e.target.value === '' ? 0 : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })} dir="ltr" className={luxInput + ' text-center font-extrabold text-lg'} placeholder="0" />
+            <button type="button" disabled={agreementLocked} onClick={() => setForm({ ...form, profit_percentage: Math.min(100, pct + 5) })}
               className="w-9 h-9 rounded-xl border border-gold/30 bg-white hover:bg-gold/10 text-navy font-bold shadow-sm">+</button>
           </div>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {PCT_PRESETS.map((p) => (
-              <button key={p} type="button" onClick={() => setForm({ ...form, profit_percentage: p })}
-                className={`text-[10px] font-extrabold rounded-full border px-2.5 py-1 transition-colors ${pct === p ? 'bg-gradient-to-l from-navy to-navy-light text-gold border-navy shadow' : 'border-gold/25 bg-white hover:bg-gold/10 text-navy'}`}>
-                {p}%
-              </button>
-            ))}
-          </div>
+          {!agreementLocked && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {PCT_PRESETS.map((p) => (
+                <button key={p} type="button" onClick={() => setForm({ ...form, profit_percentage: p })}
+                  className={`text-[10px] font-extrabold rounded-full border px-2.5 py-1 transition-colors ${pct === p ? 'bg-gradient-to-l from-navy to-navy-light text-gold border-navy shadow' : 'border-gold/25 bg-white hover:bg-gold/10 text-navy'}`}>
+                  {p}%
+                </button>
+              ))}
+            </div>
+          )}
         </LuxField>
         {/* Live preview — يظهر للمدرب كم نسبته */}
         <div className="rounded-xl bg-gradient-to-l from-navy to-navy-light p-3.5 text-white border border-gold/40 relative overflow-hidden">
@@ -558,34 +645,20 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
         </div>
       </div>
 
-      {/* ── 🏦 طريقة استلام الأرباح ── */}
+      {/* ── 🏦 طريقة استلام الأرباح — يديرها المدرب بنفسه من لوحته (v6.9) ── */}
       <FormSectionTitle icon={Landmark} label="طريقة استلام الأرباح" />
-      <div className="rounded-xl border border-gold/25 bg-white p-4 space-y-3">
-        <div className="flex items-center gap-1 bg-gold/5 border border-gold/20 rounded-xl p-1 w-fit">
-          <button type="button" onClick={() => setForm({ ...form, payment_method_type: 'محلي', payment_method_name: '' })}
-            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${form.payment_method_type !== 'عملات رقمية' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
-            <Landmark className="w-3.5 h-3.5" /> محلي
-          </button>
-          <button type="button" onClick={() => setForm({ ...form, payment_method_type: 'عملات رقمية', payment_method_name: '' })}
-            className={`px-4 py-1.5 text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all ${form.payment_method_type === 'عملات رقمية' ? 'bg-gradient-to-l from-navy to-navy-light text-gold shadow' : 'text-muted-foreground hover:text-navy'}`}>
-            <Bitcoin className="w-3.5 h-3.5" /> عملات رقمية
-          </button>
+      <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-navy to-navy-light p-4 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }} />
+        <div className="relative flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold/20 border border-gold/40 flex items-center justify-center flex-shrink-0">
+            <Landmark className="w-5 h-5 text-gold" />
+          </div>
+          <div className="text-[11px] leading-relaxed text-white/90 space-y-1">
+            <p className="font-extrabold text-gold">طريقة السحب يضيفها المدرب بنفسه — من لوحته الخاصة</p>
+            <p className="text-white/70">بعد اعتماده، يدخل المدرب إلى «أرباحي ← حسابات السحب» ويضيف حساباته حسب بلده وطرق الكتالوج المعتمدة (محافظ، حوالات، بنوك، عملات رقمية) — وتراها الإدارة جاهزة عند أول طلب سحب.</p>
+            <p className="text-gold/80 flex items-center gap-1"><Sparkles className="w-3 h-3" /> لا حاجة لإدخال أي بيانات محفظة من هنا — بيانات المدرب المالية مسؤوليته وخصوصيته.</p>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <LuxField label="اسم الطريقة">
-            <Input value={form.payment_method_name || ''} onChange={(e) => setForm({ ...form, payment_method_name: e.target.value })} className={luxInput} placeholder={form.payment_method_type === 'عملات رقمية' ? 'USDT (TRC20)' : 'محفظة جيب'} />
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {PM_SUGGESTIONS.map((s) => (
-                <button key={s} type="button" onClick={() => setForm({ ...form, payment_method_name: s })}
-                  className="text-[9px] font-bold rounded-full border border-gold/25 bg-white hover:bg-gold/10 hover:border-gold/50 text-navy px-2 py-0.5 transition-colors">{s}</button>
-              ))}
-            </div>
-          </LuxField>
-          <LuxField label={form.payment_method_type === 'عملات رقمية' ? 'عنوان المحفظة الرقمية' : 'رقم المحفظة / الحساب'}>
-            <Input value={form.payment_account || ''} onChange={(e) => setForm({ ...form, payment_account: e.target.value })} dir="ltr" className={luxInput + ' font-bold'} placeholder={form.payment_method_type === 'عملات رقمية' ? 'TXXXX...' : '7XXXXXXXX'} />
-          </LuxField>
-        </div>
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Sparkles className="w-3 h-3 text-gold" /> يستطيع المدرب تعديل طريقة الاستلام من قسم «أرباحي» في لوحته</p>
       </div>
 
       {/* ── بيانات الحساب والتواصل ── */}

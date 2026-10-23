@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
     }
 
     const profileId = (await resolveTrainerProfileId(trainerId)) || trainerId
-    const profileRes: any = await supabaseAdmin.from('trainers').select('id, name, profit_percentage, payment_method_type, payment_method_name, payment_account').eq('id', profileId).maybeSingle()
+    const profileRes: any = await supabaseAdmin.from('trainers').select('id, name, profit_percentage, payment_method_type, payment_method_name, payment_account, agreement, status').eq('id', profileId).maybeSingle()
     const [earn, wds, totalsByCurrency] = await Promise.all([
       supabaseAdmin.from('trainer_earnings').select('*').eq('trainer_id', profileId).order('created_at', { ascending: false }),
       supabaseAdmin.from('withdrawal_requests').select('*').eq('trainer_id', profileId).order('created_at', { ascending: false }),
@@ -214,6 +214,9 @@ export async function GET(req: NextRequest) {
         id: profileRes?.id || profileId,
         name: profileRes?.name || null,
         percentage,
+        // 👑 v6.9 — حالة العقد الملكي + أي عرض إعادة تفاوض معروض على المدرب
+        agreement: (profileRes as any)?.agreement || null,
+        status: (profileRes as any)?.status || null,
         payment_method_type: profileRes?.payment_method_type || 'محلي',
         payment_method_name: profileRes?.payment_method_name || null,
         payment_account: profileRes?.payment_account || null,

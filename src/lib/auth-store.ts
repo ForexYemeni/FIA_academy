@@ -109,6 +109,16 @@ export const useAuth = create<AuthState>()(
                 state.logout()
                 return
               }
+              // 👑 v6.9 — «هوية المؤسس الخالدة»: شفاء شارة دور الفريق
+              // (المؤسس/قائد/فريق) من الحقيقة الحية للخادم — تُصلح الجلسات
+              // المخزّنة القديمة التي سبقت إنشاء علامة الفريق، فتعود شارة
+              // المؤسس بذاتها بعد «حذف جميع البيانات» دون تسجيل خروج/دخول.
+              if (typeof data.team_role === 'string' && data.team_role && state.user.team_role !== data.team_role) {
+                state.updateUser({ team_role: data.team_role })
+              } else if (data.team_role === null && state.user.team_role) {
+                // الدور الحي فارغ والجلسة تحمل دوراً — تُنظَّف لصالح الحقيقة
+                state.updateUser({ team_role: undefined })
+              }
             }
           } catch {}
           // Account still valid — notify the APK
