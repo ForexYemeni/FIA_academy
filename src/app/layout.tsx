@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
+import "./royal-night.css"; // 🌙👑 v7.1 — طبقة الليل الملكي كملف مستقل صغير يصل سليماً حتى على الشبكات البطيئة
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";

@@ -936,18 +936,15 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   🌙👑 v7.0 — الوضع الليلي الملكي (Royal Night)
+   🌙👑 v7.1 — الليل الملكي: النواة الحرجة الكتابية (Bookend Core)
    ───────────────────────────────────────────────────────────────────
-   فلسفة الطبقة: الوضع النهاري هو المظهر الحالي تماماً (صفر تغيير)،
-   أما .dark فتحوّل الأسطح الفاتحة إلى كحلي ملكي عميق مع خطوط ذهبية
-   رفيعة — دون لمس مئات ملفات الواجهة، ودون كسر أي مكوّن.
-   • الذهبي والكحلي (هوية العلامة) يبقيان كما هما في الوضعين
-   • الشهادات والمحتوى المراد طباعته/التقاطه يوضع داخل .fia-keep-light
-     ليبقى فاتحاً مهما كان الوضع
+   الطبقة الليلية الكاملة انتقلت إلى royal-night.css (ملف مستقل صغير
+   يصل سليماً حتى على الشبكات البطيئة التي تقطع الملفات الضخمة).
+   هذه النواة المضغوطة هنا تأمين مضاد: إن تعذر تحميل الملف الصغير
+   لأي سبب يبقى أساس الليل مقوماً بقواعد !important التي لا تُهزم.
+   الفلسفة نفسها: النهار كما هو تماماً — صفر تغيير خارج .dark
    ═══════════════════════════════════════════════════════════════════ */
-
 .dark {
-  /* تلميع المتغيرات الدلالية — كحلي ملكي أعمق وأغنى */
   --background: #0A1428;
   --foreground: #E9EEF9;
   --card: #0F1B36;
@@ -961,26 +958,20 @@ body {
   --sidebar: #0C1730;
   --secondary: #14224A;
 }
-
-/* جسم الصفحة — ليل كحلي متدرج فاخر */
 .dark body {
   background: radial-gradient(1200px 600px at 85% -5%, #16264D 0%, transparent 55%),
               radial-gradient(900px 500px at 10% 110%, #0E1E40 0%, transparent 50%),
               #0A1428;
   color: #E9EEF9;
 }
-.dark body {
-  transition: background-color 0.45s ease, color 0.45s ease;
-}
+.dark input, .dark textarea, .dark select { color-scheme: dark; }
+.dark input::placeholder, .dark textarea::placeholder { color: #6F7FA3; }
 
-/* ─── الأسطح البيضاء → بطاقات كحلية ملكية ─── */
+/* الأسطح */
 .dark .bg-white:not(.fia-keep-light),
-.dark .fia-keep-light-exempt .bg-white {
-  background-color: #0F1B36;
-}
-.dark .bg-white\/95 { background-color: rgba(15, 27, 54, 0.96); }
+.dark .fia-keep-light-exempt .bg-white { background-color: #0F1B36; }
+.dark .bg-white\/95 { background-color: rgba(15, 27, 54, 0.96) !important; }
 .dark .bg-white\/90 { background-color: rgba(15, 27, 54, 0.92); }
-.dark .bg-white\/85 { background-color: rgba(15, 27, 54, 0.88); }
 .dark .bg-white\/80 { background-color: rgba(15, 27, 54, 0.85); }
 .dark .bg-white\/70 { background-color: rgba(15, 27, 54, 0.78); }
 .dark .bg-white\/60 { background-color: rgba(15, 27, 54, 0.70); }
@@ -990,105 +981,96 @@ body {
 .dark .bg-white\/20 { background-color: rgba(233, 238, 249, 0.08); }
 .dark .bg-white\/10 { background-color: rgba(233, 238, 249, 0.07); }
 .dark .bg-white\/5  { background-color: rgba(233, 238, 249, 0.05); }
-
 .dark .bg-gray-50, .dark .bg-gray-100,
-.dark .bg-slate-50, .dark .bg-slate-100 {
-  background-color: #0C1730;
-}
+.dark .bg-slate-50, .dark .bg-slate-100 { background-color: #0C1730; }
 .dark .bg-gray-200, .dark .bg-slate-200 { background-color: #16264D; }
-.dark .hover\:bg-gray-50:hover, .dark .hover\:bg-gray-100:hover,
-.dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-100:hover {
-  background-color: #16264D;
-}
-.dark .hover\:bg-gray-200:hover { background-color: #1A2C58; }
+.dark .bg-\[\#FDFDFB\]\/95 { background-color: rgba(15, 27, 54, 0.96); }
+.dark .from-white { --tw-gradient-from: #0F1B36 var(--tw-gradient-from-position); }
+.dark .via-white { --tw-gradient-via: #14224A; --tw-gradient-stops: var(--tw-gradient-via-stops) !important; }
+.dark .to-white { --tw-gradient-to: #0A1428 var(--tw-gradient-to-position) !important; }
+.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 { --tw-gradient-from: #0C1730 var(--tw-gradient-from-position); }
 
-/* تدرجات تبدأ من الأبيض → تبدأ من الكحلي الملكي */
-.dark .from-white { --tw-gradient-from: #0F1B36 var(--tw-gradient-from-position); --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position)); }
-.dark .to-white   { --tw-gradient-to: #0A1428 var(--tw-gradient-to-position); }
-.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 { --tw-gradient-from: #0C1730 var(--tw-gradient-from-position); --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position)); }
-
-/* ─── النصوص ─── */
+/* النصوص — أهم ما في الليل: الكحلي يصير فاتحاً ويبقى كحلياً فوق الذهب */
 .dark .text-gray-900, .dark .text-gray-800,
-.dark .text-slate-900, .dark .text-slate-800 { color: #E9EEF9; }
-.dark .text-gray-700, .dark .text-slate-700 { color: #D5DCEE; }
-.dark .text-gray-600, .dark .text-slate-600 { color: #B9C4DC; }
-.dark .text-gray-500, .dark .text-slate-500 { color: #97A5C4; }
-.dark .text-gray-400, .dark .text-slate-400 { color: #7D8DB2; }
-.dark .text-black { color: #E9EEF9; }
-/* الكحلي كنص: على الأسطح الفاتحة القديمة صار لا يُقرأ — يصير فاتحاً،
-   ويبقى كحلياً فوق الأسطح الذهبية (أعلى تخصيصاً) */
-.dark .text-navy { color: #E9EEF9; }
-.dark .bg-gold .text-navy,
-.dark .bg-gold.text-navy,
-.dark [class*="from-gold"] .text-navy,
-.dark [class*="from-gold"].text-navy,
+.dark .text-slate-900, .dark .text-slate-800 { color: #E9EEF9 !important; }
+.dark .text-gray-700, .dark .text-slate-700 { color: #D5DCEE !important; }
+.dark .text-gray-600, .dark .text-slate-600 { color: #B9C4DC !important; }
+.dark .text-gray-500, .dark .text-slate-500 { color: #97A5C4 !important; }
+.dark .text-gray-400, .dark .text-slate-400 { color: #7D8DB2 !important; }
+.dark .text-black { color: #E9EEF9 !important; }
+.dark .text-navy { color: #E9EEF9 !important; }
+.dark .text-\[\#0A1F44\] { color: #E9EEF9 !important; }
+.dark .text-\[\#8a6d1d\], .dark .text-\[\#8A6D1D\] { color: #E5C77E !important; }
+.dark .bg-gold .text-navy, .dark .bg-gold.text-navy,
+.dark [class*="from-gold"] .text-navy, .dark [class*="from-gold"].text-navy,
 .dark [class*="via-gold"] .text-navy,
-.dark .bg-gold-light .text-navy,
-.dark .bg-gold-light.text-navy { color: #0B1635; }
+.dark .bg-gold-light .text-navy, .dark .bg-gold-light.text-navy,
+.dark .bg-\[\#C9A961\] .text-navy, .dark .bg-\[\#C9A961\].text-navy,
+.dark .bg-amber-400 .text-navy, .dark .bg-amber-500 .text-navy { color: #0B1635 !important; }
+.dark .bg-gold .text-\[\#0A1F44\], .dark .bg-gold.text-\[\#0A1F44\],
+.dark [class*="from-gold"] .text-\[\#0A1F44\], .dark [class*="from-gold"].text-\[\#0A1F44\],
+.dark .bg-\[\#C9A961\] .text-\[\#0A1F44\], .dark .bg-\[\#C9A961\].text-\[\#0A1F44\] { color: #0B1635 !important; }
 
-/* ─── الحدود والفواصل ─── */
+/* الحدود */
 .dark .border-gray-100, .dark .border-gray-200,
 .dark .border-slate-100, .dark .border-slate-200,
 .dark .border-gray-300 { border-color: #223055; }
+.dark .border-navy\/10, .dark .border-navy\/15, .dark .border-navy\/20 { border-color: rgba(233, 238, 249, 0.16); }
+.dark .border-navy\/25, .dark .border-navy\/30, .dark .border-navy\/40 { border-color: rgba(233, 238, 249, 0.22); }
 .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #1D2A50;
-}
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #1D2A50; }
 .dark .ring-gray-100, .dark .ring-gray-200 { --tw-ring-color: #223055; }
 
-/* ─── عائلات الألوان الناعمة (شارات/تنبيهات) — صباح داكن متوافق ─── */
+/* عائلات الألوان الناعمة */
 .dark .bg-red-50, .dark .bg-red-100 { background-color: rgba(248, 113, 113, 0.10); }
-.dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: #FCA5A5; }
-.dark .text-red-600 { color: #F87171; }
+.dark .text-red-500, .dark .text-red-600 { color: #F87171 !important; }
+.dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: #FCA5A5 !important; }
 .dark .border-red-100, .dark .border-red-200, .dark .border-red-300 { border-color: rgba(248, 113, 113, 0.28); }
-
 .dark .bg-green-50, .dark .bg-green-100, .dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgba(52, 211, 153, 0.10); }
-.dark .text-green-700, .dark .text-green-800, .dark .text-emerald-700, .dark .text-emerald-800 { color: #6EE7B7; }
-.dark .text-green-600, .dark .text-emerald-600 { color: #34D399; }
+.dark .text-green-600, .dark .text-emerald-600 { color: #34D399 !important; }
+.dark .text-green-700, .dark .text-green-800, .dark .text-emerald-700, .dark .text-emerald-800 { color: #6EE7B7 !important; }
 .dark .border-green-100, .dark .border-green-200, .dark .border-green-300,
 .dark .border-emerald-100, .dark .border-emerald-200 { border-color: rgba(52, 211, 153, 0.28); }
-
 .dark .bg-blue-50, .dark .bg-blue-100, .dark .bg-sky-50, .dark .bg-sky-100, .dark .bg-indigo-50, .dark .bg-indigo-100 { background-color: rgba(96, 165, 250, 0.10); }
-.dark .text-blue-700, .dark .text-blue-800, .dark .text-sky-700, .dark .text-indigo-700, .dark .text-indigo-800 { color: #93C5FD; }
-.dark .text-blue-600, .dark .text-sky-600, .dark .text-indigo-600 { color: #60A5FA; }
+.dark .text-blue-600, .dark .text-sky-600, .dark .text-indigo-600 { color: #60A5FA !important; }
+.dark .text-blue-700, .dark .text-blue-800, .dark .text-sky-700, .dark .text-indigo-700, .dark .text-indigo-800 { color: #93C5FD !important; }
 .dark .border-blue-100, .dark .border-blue-200, .dark .border-blue-300,
 .dark .border-sky-200, .dark .border-indigo-200 { border-color: rgba(96, 165, 250, 0.28); }
-
 .dark .bg-amber-50, .dark .bg-amber-100, .dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: rgba(212, 175, 55, 0.10); }
+.dark .text-amber-600, .dark .text-yellow-600 { color: #D4AF37 !important; }
 .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900,
-.dark .text-yellow-700, .dark .text-yellow-800 { color: #E5C158; }
-.dark .text-amber-600, .dark .text-yellow-600 { color: #D4AF37; }
+.dark .text-yellow-700, .dark .text-yellow-800 { color: #E5C158 !important; }
 .dark .border-amber-100, .dark .border-amber-200, .dark .border-amber-300,
 .dark .border-yellow-200 { border-color: rgba(212, 175, 55, 0.30); }
-
 .dark .bg-purple-50, .dark .bg-purple-100, .dark .bg-violet-50, .dark .bg-violet-100 { background-color: rgba(167, 139, 250, 0.10); }
-.dark .text-purple-700, .dark .text-purple-800, .dark .text-violet-700, .dark .text-violet-800 { color: #C4B5FD; }
-.dark .text-purple-600, .dark .text-violet-600 { color: #A78BFA; }
+.dark .text-purple-600, .dark .text-violet-600 { color: #A78BFA !important; }
+.dark .text-purple-700, .dark .text-purple-800, .dark .text-violet-700, .dark .text-violet-800 { color: #C4B5FD !important; }
 .dark .border-purple-100, .dark .border-purple-200, .dark .border-violet-200 { border-color: rgba(167, 139, 250, 0.28); }
-
 .dark .bg-orange-50, .dark .bg-orange-100 { background-color: rgba(251, 146, 60, 0.10); }
-.dark .text-orange-700, .dark .text-orange-800 { color: #FDBA74; }
-.dark .text-orange-600 { color: #FB923C; }
+.dark .text-orange-600 { color: #FB923C !important; }
+.dark .text-orange-700, .dark .text-orange-800 { color: #FDBA74 !important; }
 .dark .border-orange-100, .dark .border-orange-200 { border-color: rgba(251, 146, 60, 0.28); }
-
 .dark .bg-teal-50, .dark .bg-teal-100, .dark .bg-cyan-50, .dark .bg-cyan-100 { background-color: rgba(45, 212, 191, 0.10); }
-.dark .text-teal-700, .dark .text-teal-800, .dark .text-cyan-700, .dark .text-cyan-800 { color: #5EEAD4; }
-.dark .text-teal-600, .dark .text-cyan-600 { color: #2DD4BF; }
+.dark .text-teal-600, .dark .text-cyan-600 { color: #2DD4BF !important; }
+.dark .text-teal-700, .dark .text-teal-800, .dark .text-cyan-700, .dark .text-cyan-800 { color: #5EEAD4 !important; }
 .dark .border-teal-100, .dark .border-teal-200, .dark .border-cyan-200 { border-color: rgba(45, 212, 191, 0.28); }
 
-/* ─── عناصر النماذج ─── */
-.dark input, .dark textarea, .dark select {
-  color-scheme: dark;
+/* بطاقات الإحصائيات — كانت بيضاء مصمتة فاختفى الفاتح فوقها */
+.dark .stat-card {
+  background: linear-gradient(135deg, #0F1B36 0%, #0C1730 100%) !important;
+  border: 1px solid rgba(212, 175, 55, 0.22) !important;
 }
-.dark input::placeholder, .dark textarea::placeholder { color: #6F7FA3; }
-.dark .bg-input { background-color: rgba(212, 175, 55, 0.06); }
+.dark .stat-card:hover {
+  border-color: rgba(212, 175, 55, 0.55) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.18);
+}
 
-/* ─── لمسات فخامة ليلية ─── */
+/* لمسات فخامة ليلية */
 .dark .shadow-lg, .dark .shadow-xl, .dark .shadow-2xl,
 .dark .shadow-md, .dark .shadow-sm {
   box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(212, 175, 55, 0.05);
 }
-/* البطاقات الكحلية تحصل على خط ذهبي علوي رفيع — توقيع الليل الملكي */
+.dark .bg-white:not(.fia-keep-light) { position: relative; }
 .dark .bg-white:not(.fia-keep-light)::before {
   content: '';
   position: absolute;
@@ -1099,11 +1081,8 @@ body {
   pointer-events: none;
   z-index: 1;
 }
-.dark .bg-white:not(.fia-keep-light) {
-  position: relative;
-}
 
-/* ─── منطقة تبقى فاتحة دائماً (شهادات/طباعة/التقاط صور) ─── */
+/* مناطق تبقى فاتحة دائماً (شهادات/طباعة) */
 .dark .fia-keep-light,
 .dark .fia-keep-light .bg-white,
 .dark .fia-keep-light .bg-gray-50, .dark .fia-keep-light .bg-gray-100,
@@ -1111,21 +1090,22 @@ body {
   background-color: #ffffff;
 }
 .dark .fia-keep-light .text-gray-900, .dark .fia-keep-light .text-gray-800,
-.dark .fia-keep-light .text-slate-900, .dark .fia-keep-light .text-gray-700 {
-  color: #111827;
-}
+.dark .fia-keep-light .text-slate-900, .dark .fia-keep-light .text-gray-700 { color: #111827; }
+.dark .fia-keep-light .text-navy, .dark .fia-keep-light .text-\[\#0A1F44\] { color: #0B1635 !important; }
+.dark .fia-keep-light .text-gray-600 { color: #4B5563 !important; }
+.dark .fia-keep-light .text-gray-500 { color: #6B7280 !important; }
+.dark .fia-keep-light .via-white { --tw-gradient-via: #ffffff; }
+.dark .fia-keep-light .from-white { --tw-gradient-from: #ffffff var(--tw-gradient-from-position); }
+.dark .fia-keep-light .to-white { --tw-gradient-to: #ffffff var(--tw-gradient-to-position); }
 .dark .fia-keep-light::before { display: none; }
 
-/* ─── انتقال سلس بين الوضعين ─── */
+/* انتقال سلس بين الوضعين */
 html.theme-transitioning,
 html.theme-transitioning * {
   transition: background-color 0.4s ease, border-color 0.4s ease, color 0.25s ease !important;
 }
 
-/* ─── الشريط الجانبي واللوحات الكحلية تبقى كما هي (هوية العلامة) ─── */
-.dark .bg-navy, .dark .bg-navy-light, .dark .bg-navy-deep {
-  /* بلا تغيير — الكحلي أصلاً ليل */
-}
+/* الشريط الجانبي واللوحات الكحلية تبقى كما هي — هوية العلامة ليلية أصلاً */
 
 /* 👑 v7.0 — حركة التلألؤ الملكية لهياكل التحميل */
 @keyframes royal-shimmer {
