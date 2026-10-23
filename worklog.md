@@ -1861,3 +1861,22 @@ Stage Summary:
 - الملفات المتغيرة: src/app/royal-night.css, src/app/globals.css, src/components/fia/notifications-bell.tsx (+48/−6).
 - APK v2.7 لا يحتاج تحديثاً — الإصلاح من جهة الخادم (CSS) يصل عبر WebView فور نشر Vercel.
 - خطوة المالك المتبقية: git push origin main (أو ارسال التوكن لوكيل قادم) + رفع «fia academy 15.zip» إلى GitHub Release باسم v15-full-backup.
+
+---
+Task ID: v7.2-final-delivery-github
+Agent: main (Z.ai)
+Task: الرفع النهائي — push إلى GitHub + إصدار النسخة الاحتياطية 15 + التحقق الإنتاجي
+
+Work Log:
+- Push ناجح: 5c759e6..2a22498 main -> main (a5108a8 = إصلاح v7.2 + 2a22498 = توثيق worklog).
+- إنشاء Release رسمي: tag=fia-academy-15، الاسم «fia academy 15 — v7.2 الليل الملكي (إصلاح بطاقة الإشعارات المصغّرة)» مع وصف عربي شامل للمميزات مقابل 14.
+- رفع الأصل: fia.academy.15.zip — 35.9MB — state=uploaded — وفق اصطلاح تسمية النسخة 14 (fia.academy.14.zip).
+- تحقق سلامة الرفع: SHA-256 المحلي = المرفوع = 689191b45b3de43d5a76ea1293000e603289174edcfc18ed2ecadc074004f499 (تطابق بايت-ببايت).
+- تحقق Vercel: deployment لـ commit 2a22498 → target=production, readyState=READY.
+- تحقق الإنتاج المباشر: HOME=200 + globals.css (386KB) يحمل حرس العناصر العائمة :not(.absolute):not(.fixed):not(.sticky) + royal-night.css (9.9KB) يحمل قسم fia-notif-panel 11.5 — الإصلاح حي.
+- صفر تغييرات على: قاعدة البيانات (لا حاجة لجداول جديدة)، متغيرات Vercel (لم يُحذف أو يُعدل أي متغير)، sw.js، منظومة الإشعارات الثلاثية.
+
+Stage Summary:
+- كل شيء مكتمل: الإصلاح على main + منشور إنتاجياً + النسخة الاحتياطية 15 منشورة كإصدار GitHub + روابط النسختين 14 و15 جاهزة للتسليم.
+- رابط النسخة 15: https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-15
+- رابط النسخة 14: https://github.com/ForexYemeni/FIA_academy/releases/tag/fia-academy-14
