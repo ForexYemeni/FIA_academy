@@ -47,6 +47,7 @@ export function Footer() {
           <div>
             <h3 className="font-bold text-gold mb-3">روابط سريعة</h3>
             <ul className="space-y-2 text-sm text-white/70">
+              <li><a href="/start" className="hover:text-gold transition-colors">كيف تبدأ — أدلة مصوّرة</a></li>
               <li><a href="#about" className="hover:text-gold transition-colors">من نحن</a></li>
               <li><a href="#privacy" className="hover:text-gold transition-colors">سياسة الخصوصية</a></li>
               <li><a href="#terms" className="hover:text-gold transition-colors">شروط الاستخدام</a></li>

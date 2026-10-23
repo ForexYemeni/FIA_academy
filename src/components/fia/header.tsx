@@ -14,6 +14,7 @@ const BASE_NAV_LINKS = [
   { href: '#courses', label: 'دوراتنا' },
   { href: '#trainers', label: 'مدربونا' },
   { href: '#team', label: 'المؤسس والفريق' },
+  { href: '/start', label: 'كيف تبدأ' },
   { href: '/forum', label: 'المنتدى' },
   { href: '/blog', label: 'المدونة' },
   { href: '/verify', label: 'تحقق من شهادة' },
