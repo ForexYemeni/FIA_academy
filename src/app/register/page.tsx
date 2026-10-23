@@ -88,7 +88,7 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
             إنشاء حساب في <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">الأكاديمية</span>
           </h1>
-          <p className="mt-2 text-sm text-white/60">اختر جنسيتك الملكية — متدرب يتعلم، أو مدرب ينضم إلى النخبة</p>
+          <p className="mt-2 text-sm text-white/60">اختر صفتك في الأكاديمية — متدرب يتعلم، أو مدرب ينضم إلى النخبة</p>
         </div>
 
         {/* اختيار النوع */}

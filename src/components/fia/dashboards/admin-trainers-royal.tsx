@@ -222,6 +222,14 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                       </LuxBadge>
                     </div>
                   )}
+                  {/* 🤝 v6.9.2 — شارة طلب التعديل المعلق: الإدارة ترى فوراً مَن لم يوافق بعد */}
+                  {!isTeamMember && t.agreement?.renegotiation?.trainer_response === 'pending' && (
+                    <div className="absolute top-2.5 right-2.5 z-10">
+                      <LuxBadge tone="gold" className="bg-gradient-to-l from-gold/90 to-amber-400/90 border-amber-300 text-navy shadow animate-pulse">
+                        <BadgePercent className="w-3 h-3 ml-1" /> طلب تعديل بانتظار موافقته
+                      </LuxBadge>
+                    </div>
+                  )}
                   <div className="relative flex justify-center -mb-7">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gold/50 blur-md rounded-full scale-90" />
@@ -417,23 +425,35 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
     } catch { toast.error('خطأ') } finally { setSaving(false) }
   }
 
-  // 🤝 v6.9 — إرسال عرض إعادة التفاوض: يبقى الاتفاق الساري مفعولاً حتى موافقة المدرب
+  // 🤝 v6.9.2 — إرسال طلب تعديل عقد الشراكة: السبب إلزامي ويصل المدرب مع إشعار فوري
+  // — يبقى الاتفاق الساري مفعولاً حتى موافقة المدرب
+  const RENEG_REASONS = [
+    'مراجعة دورية للاتفاق بين الطرفين',
+    'تحديث سياسة أرباح الأكاديمية',
+    'بحسب أداء الدورات وعدد المتدربين',
+    'تطوير محتوى الدورات وإضافة وحدات جديدة',
+    'اتفاق جديد بعد تفاوض مباشر',
+  ]
   const sendRenegotiation = async () => {
     if (!initial?.id) return
+    if (renegNote.trim().length < 5) {
+      toast.error('✍️ اكتب سبب طلب التعديل بوضوح — السبب يصل المدرب مع الإشعار الفوري ويتعذر الإرسال بلا سبب')
+      return
+    }
     setRenegSending(true)
     try {
       const res = await fetch('/api/trainers', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: initial.id, renegotiation: { percentage: Number(renegPct) || 0, note: renegNote } }),
+        body: JSON.stringify({ id: initial.id, renegotiation: { percentage: Number(renegPct) || 0, note: renegNote.trim() } }),
       })
       const d = await res.json().catch(() => ({}))
       if (res.ok && d.renegotiation_sent) {
-        toast.success(d.message || 'أُرسل عرض التعديل — بانتظار موافقة المدرب')
+        toast.success(d.message || 'أُرسل طلب التعديل مع السبب — وصل المدرب إشعار فوري وبانتظار موافقته')
         setRenegOpen(false); setRenegNote('')
         onSaved(); onOpenChange(false)
       } else {
-        toast.error(d.error || 'تعذر إرسال العرض')
+        toast.error(d.error || 'تعذر إرسال الطلب')
       }
     } catch { toast.error('خطأ') } finally { setRenegSending(false) }
   }
@@ -560,14 +580,14 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
       </div>
 
       {/* ── 💰 نظام الأرباح — نسبته من كل دورة على كل متدرب ── */}
-      <FormSectionTitle icon={Crown} label={initial ? 'نظام الأرباح — نسبته من كل دورة' : 'عرض الاتفاق الملكي — نسبته من كل دورة'} />
+      <FormSectionTitle icon={Crown} label={initial ? 'نظام الأرباح — نسبته من كل دورة' : 'عرض الاتفاق الرسمي — نسبته من كل دورة'} />
       {!initial && (
         <div className="rounded-xl border border-gold/40 bg-gradient-to-l from-gold/[0.10] to-amber-50 p-3.5 flex items-start gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0 shadow">
             <BadgeCheck className="w-4 h-4 text-navy" />
           </div>
           <p className="text-[11px] leading-relaxed text-navy">
-            <b>مراسم الاتفاق الملكي:</b> النسبة التي تحددها هنا تصبح <b>عرض اتفاق رسمياً</b> — يدخل المدرب بلوحته عند أول دخول ليراه ويوقّعه،
+            <b>مراسم الاتفاق الرسمي:</b> النسبة التي تحددها هنا تصبح <b>عرض اتفاق رسمياً</b> — يدخل المدرب بلوحته عند أول دخول ليراه ويوقّعه،
             وبعد توقيعه <b>تُقفل النسبة على الطرفين</b> ولا تتغير إلا بعرض إعادة تفاوض يوافق عليه هو أيضاً.
           </p>
         </div>
@@ -587,22 +607,27 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
                 <Lock className="w-4 h-4 text-navy" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-extrabold text-navy">العقد الملكي مقفول — نسبة {Number(initial?.profit_percentage) || pct}% موقّعة من الطرفين</p>
+                <p className="text-xs font-extrabold text-navy">عقد الشراكة مقفول — نسبة {Number(initial?.profit_percentage) || pct}% موقّعة من الطرفين</p>
                 <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5">
                   {pendingRenegotiation
-                    ? '📜 عرض تعديل معروض للمدرب حالياً — النسبة السارية تبقى مفعّلة حتى موافقته على الجديدة'
-                    : 'لا تُعدّل مباشرة — أرسل «عرض تعديل» ليوقّع المدرب على النسبة الجديدة فيقفل العقد من جديد'}
+                    ? '📜 طلب تعديل معروض للمدرب حالياً — النسبة السارية تبقى مفعّلة حتى موافقته على الجديدة'
+                    : 'لا تُعدّل مباشرة — أرسل «طلب تعديل» مع السبب ليوقّع المدرب على النسبة الجديدة فيقفل العقد من جديد'}
                 </p>
               </div>
             </div>
             {!pendingRenegotiation && !renegOpen && (
               <button type="button" onClick={() => { setRenegOpen(true); setRenegPct(Number(initial?.profit_percentage) || pct) }}
                 className="w-full py-2 rounded-xl bg-gradient-to-l from-navy to-navy-light text-gold text-xs font-extrabold border border-gold/40 shadow hover:brightness-110 transition-all flex items-center justify-center gap-1.5">
-                <BadgePercent className="w-3.5 h-3.5" /> إرسال عرض تعديل (إعادة تفاوض)
+                <BadgePercent className="w-3.5 h-3.5" /> إرسال طلب تعديل العقد للمدرب
               </button>
             )}
             {renegOpen && (
-              <div className="rounded-xl bg-white border border-gold/30 p-3 space-y-2.5">
+              <div className="rounded-xl bg-white border border-gold/30 p-3.5 space-y-3">
+                {/* ترويسة المراسيم */}
+                <div className="flex items-center gap-2 rounded-lg bg-gradient-to-l from-navy to-navy-light px-3 py-2">
+                  <FileText className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                  <p className="text-[11px] font-extrabold text-white">طلب تعديل عقد الشراكة — يصل المدرب إشعار فوري بالسبب</p>
+                </div>
                 <LuxField label="النسبة الجديدة المقترحة (%)" icon={BadgePercent}>
                   <Input type="number" min={0} max={100} value={renegPct || ''} onChange={(e) => setRenegPct(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))} dir="ltr" className={luxInput + ' text-center font-extrabold text-lg'} placeholder="0" />
                   <div className="flex flex-wrap gap-1.5 mt-2">
@@ -612,19 +637,36 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
                     ))}
                   </div>
                 </LuxField>
-                <LuxField label="ملاحظة للمدرب (اختياري)" icon={FileText}>
-                  <Input value={renegNote} onChange={(e) => setRenegNote(e.target.value)} className={luxInput} placeholder="سبب التعديل أو أي تفاصيل تهمّ المدرب" />
+                {/* ✍️ السبب — إلزامي ويصل المدرب مع الإشعار */}
+                <LuxField label="سبب طلب التعديل (إلزامي — يظهر للمدرب)" icon={FileText}>
+                  <textarea
+                    value={renegNote}
+                    onChange={(e) => setRenegNote(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    className={luxInput + ' w-full resize-none py-2.5 leading-relaxed'}
+                    placeholder="اكتب السبب بوضوح واحترام — مثال: راجعنا أداء دوراتك وعدد المتدربين وقررنا تحديث حصتك لتكون عادلة للطرفين…"
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {RENEG_REASONS.map((r) => (
+                      <button key={r} type="button" onClick={() => setRenegNote(r)}
+                        className={`text-[10px] font-bold rounded-full border px-2.5 py-1 transition-colors ${renegNote === r ? 'bg-gradient-to-l from-gold to-amber-500 text-navy border-gold shadow' : 'border-gold/25 bg-white hover:bg-gold/10 text-navy/80'}`}>{r}</button>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5 text-gold" /> {renegNote.trim().length}/500 — السبب يصل المدرب داخل إشعار فوري (الجرس + المنبثق) مع الطلب
+                  </p>
                 </LuxField>
                 <div className="flex gap-2">
                   <button type="button" disabled={renegSending} onClick={sendRenegotiation}
                     className="flex-1 py-2 rounded-xl bg-gradient-to-l from-gold to-amber-500 text-navy text-xs font-extrabold shadow hover:brightness-110 transition-all disabled:opacity-60 flex items-center justify-center gap-1.5">
                     {renegSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    إرسال العرض للمدرب
+                    إرسال الطلب مع السبب
                   </button>
                   <button type="button" onClick={() => setRenegOpen(false)}
                     className="px-4 py-2 rounded-xl border border-gold/30 text-xs font-bold text-navy hover:bg-gold/10 transition-colors">إلغاء</button>
                 </div>
-                <p className="text-[10px] text-muted-foreground flex items-start gap-1"><Lock className="w-3 h-3 mt-0.5 flex-shrink-0 text-gold" /> النسبة الحالية تبقى سارية ومقفولة حتى يوقّع المدرب على العرض الجديد — وبعد موافقته يُقفل العقد من جديد ولا يمكن تعديلها إلا بعرض آخر.</p>
+                <p className="text-[10px] text-muted-foreground flex items-start gap-1"><Lock className="w-3 h-3 mt-0.5 flex-shrink-0 text-gold" /> النسبة الحالية تبقى سارية ومقفولة حتى يوقّع المدرب على الطلب الجديد — وبعد موافقته يُقفل العقد من جديد ولا يمكن تعديله إلا بطلب آخر.</p>
               </div>
             )}
           </div>

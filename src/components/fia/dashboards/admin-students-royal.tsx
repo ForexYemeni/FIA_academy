@@ -565,7 +565,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
             <div className="relative w-14 h-14 mx-auto rounded-2xl bg-white/10 border border-gold/30 flex items-center justify-center mb-2">
               <UserPlus className="w-7 h-7 text-gold" />
             </div>
-            <DialogTitle className="text-white text-xl font-bold">التسجيل اليدوي الملكي</DialogTitle>
+            <DialogTitle className="text-white text-xl font-bold">التسجيل اليدوي</DialogTitle>
             <p className="relative text-white/70 text-xs mt-1">سجّل متدرباً في دورة فوراً — مثلاً بعد تحويل بنكي خارج المنصة أو هدية ملكية</p>
           </div>
           <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">

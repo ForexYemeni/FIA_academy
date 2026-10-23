@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { guardAdmin, getAuthUser } from '@/lib/api-auth'
 import { hashPassword } from '@/lib/auth-server'
+import { notifyTrainerRenegotiationOffered } from '@/lib/notifications'
+import { tgTrainerRenegotiationOffered } from '@/lib/telegram'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
@@ -316,11 +318,16 @@ export async function PUT(req: NextRequest) {
         .select('id, name, profit_percentage, agreement, status')
         .single()
       if (error) throw error
+      // 🤝 v6.9.2 — وصول الطلب للمدرب فوراً: إشعار ثلاثي القنوات (DB + FCM + OneSignal) يحمل السبب + سجل تلجرام للإدارة
+      try { await notifyTrainerRenegotiationOffered(trainerId, Number((current as any).profit_percentage) || 0, newPct, note || null) } catch {}
+      try { await tgTrainerRenegotiationOffered((data as any).name, Number((current as any).profit_percentage) || 0, newPct, note || null) } catch {}
       const { password: _pw, ...restSafe } = data as any
       return NextResponse.json({
         ...restSafe,
         renegotiation_sent: true,
-        message: `أُرسل عرض التعديل (${newPct}%) إلى المدرب — يبقى الاتفاق الساري مفعولاً حتى موافقته`,
+        message: note
+          ? `أُرسل طلب تعديل عقد الشراكة (${newPct}%) إلى المدرب مع السبب — وصلته صورة إشعار فورية، ويبقى الاتفاق الساري مفعولاً حتى موافقته`
+          : `أُرسل طلب تعديل عقد الشراكة (${newPct}%) إلى المدرب — ويبقى الاتفاق الساري مفعولاً حتى موافقته`,
       })
     }
 

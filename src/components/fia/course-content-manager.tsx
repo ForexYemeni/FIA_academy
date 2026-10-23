@@ -750,7 +750,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
         setAudioFileId(data.file_id)
         setAudioMeta({ duration: data.duration ?? null, size: data.size ?? file.size, mime: data.mime ?? file.type ?? null })
         if (data.duration && !duration) setDuration(Math.max(1, Math.round(data.duration / 60)))
-        toast.success('تم رفع الصوت إلى خزينة تيليجرام الملكية بنجاح')
+        toast.success('تم رفع الصوت إلى خزينة تيليجرام الآمنة بنجاح')
       } else {
         toast.error('فشل رفع الصوت: ' + (data.error || '') || 'خطأ غير معروف')
       }
@@ -897,7 +897,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
                 <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
                   <Mic className="w-3 h-3 text-white" />
                 </div>
-                رفع الدرس الصوتي — خزينة تيليجرام الملكية
+                رفع الدرس الصوتي — خزينة تيليجرام الآمنة
               </Label>
               <p className="text-[11px] text-amber-600/80 leading-relaxed">
                 يُخزّن الصوت مجاناً للأبد في أرشيف تيليجرام الخاص بالأكاديمية، ويُبث محمياً عبر الموقع فقط للمسجلين في الدورة — حد أقصى 19 ميجابايت ≈ ساعة صوت واضح.
@@ -911,7 +911,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
               <Button variant="outline" className="w-full bg-white/80 border-amber-300/50 hover:border-amber-500 hover:bg-amber-50 rounded-xl" disabled={uploadingAudio}
                 onClick={() => document.getElementById('audio-upload')?.click()}>
                 {uploadingAudio ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <Mic className="w-4 h-4 ml-1.5" />}
-                {uploadingAudio ? 'جاري الرفع إلى الخزينة الملكية...' : audioFileId ? 'استبدال الملف الصوتي' : 'اختر ملفاً صوتياً للرفع'}
+                {uploadingAudio ? 'جاري الرفع إلى الخزينة الآمنة...' : audioFileId ? 'استبدال الملف الصوتي' : 'اختر ملفاً صوتياً للرفع'}
               </Button>
               {audioFileId ? (
                 <div className="text-xs text-green-700 flex items-center gap-2 bg-green-50 border border-green-200/50 px-3 py-2.5 rounded-xl">

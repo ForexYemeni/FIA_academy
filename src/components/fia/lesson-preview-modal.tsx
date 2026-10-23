@@ -305,7 +305,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
               ) : !audioSrc ? (
                 <div className="flex items-center justify-center gap-2 rounded-2xl border border-gold/30 bg-navy/5 p-6 text-navy/70">
                   <Loader2 className="h-5 w-5 animate-spin text-gold" />
-                  <span className="text-sm font-bold">جاري تجهيز الصوت الملكي…</span>
+                  <span className="text-sm font-bold">جاري تجهيز الصوت…</span>
                 </div>
               ) : (
                 <LuxAudioPlayer

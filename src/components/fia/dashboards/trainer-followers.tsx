@@ -57,7 +57,7 @@ export function TrainerFollowersMuseum({ user }: { user: any }) {
     return (
       <div className="text-center py-20">
         <Loader2 className="w-8 h-8 mx-auto animate-spin text-gold" />
-        <p className="text-xs text-muted-foreground mt-3">جاري فتح أبواب المتحف الملكي...</p>
+        <p className="text-xs text-muted-foreground mt-3">جاري فتح متحف المتابعين...</p>
       </div>
     )
   }
@@ -96,7 +96,7 @@ export function TrainerFollowersMuseum({ user }: { user: any }) {
           </div>
           <div className="flex-1 text-center sm:text-right">
             <p className="text-gold/80 text-xs font-bold flex items-center justify-center sm:justify-start gap-1.5 mb-1">
-              <Sparkles className="w-3.5 h-3.5" /> متحف المتابعين الملكي
+              <Sparkles className="w-3.5 h-3.5" /> متحف المتابعين
             </p>
             <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight mb-1">قاعة مجد جمهورك</h2>
             <p className="text-white/60 text-xs leading-relaxed max-w-md">كل من تابعك يدخل هذه القاعة للأبد — ويصل إشعاراً فورياً بكل دورة أو درس جديد تنشره. هذه نخبة جمهورك المخلص.</p>

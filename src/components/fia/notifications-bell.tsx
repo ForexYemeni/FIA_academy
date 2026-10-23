@@ -708,7 +708,7 @@ export function NotificationsBell() {
               <div className="min-w-0">
                 <h4 className="font-extrabold text-sm leading-tight">{detail ? 'تفاصيل الإشعار' : 'مركز الإشعارات'}</h4>
                 <p className="text-[9px] text-gold/70 font-bold">
-                  {detail ? 'القاعة الملكية' : unreadCount > 0 ? `${unreadCount} غير مقروء من ${items.length}` : 'كل شيء مقروء ✓'}
+                  {detail ? 'مركز الإشعارات' : unreadCount > 0 ? `${unreadCount} غير مقروء من ${items.length}` : 'كل شيء مقروء ✓'}
                 </p>
               </div>
             </div>

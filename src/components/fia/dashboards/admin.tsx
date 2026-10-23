@@ -481,7 +481,7 @@ function AdminOverview() {
       <RoyalGuideBanner
         slug="fia-admin-guide"
         title="دورة إتقان إدارة أكاديمية المستقبل الدولية"
-        subtitle="دليلك الملكي السرّي من الألف إلى الياء — كل أسرار لوحة الإدارة، درساً درساً. لا يراه أحد غيرك."
+        subtitle="دليلك السرّي الشامل من الألف إلى الياء — كل أسرار لوحة الإدارة، درساً درساً. لا يراه أحد غيرك."
       />
 
       {/* ⚡ Magical StatCards — 4 cards with gradient + glow + scale on hover */}
@@ -4339,12 +4339,12 @@ function AdminAccount({ user, updateUser, logout }: any) {
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(`♻️ تمت الاستعادة الملكية — ${data.row_total || 0} سجل عاد إلى مكانه بأمان`)
+        toast.success(`♻️ تمت الاستعادة بنجاح — ${data.row_total || 0} سجل عاد إلى مكانه بأمان`)
         setDzRestoreOpen(false)
         setDzRestoreTarget(null)
         fetchDzSnapshots()
       } else {
-        toast.error(data.error || 'فشلت الاستعادة الملكية')
+        toast.error(data.error || 'فشلت الاستعادة الآمنة')
       }
     } catch {
       toast.error('خطأ في الاتصال')
@@ -4365,7 +4365,7 @@ function AdminAccount({ user, updateUser, logout }: any) {
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success('🗑️ حُذفت نسخة الإنقاذ نهائياً من الأرشيف الملكي')
+        toast.success('🗑️ حُذفت نسخة الإنقاذ نهائياً من الأرشيف الآمن')
         setDzDeleteOpen(false)
         setDzDeleteTarget(null)
         setDzConfirmText('')
@@ -4487,7 +4487,7 @@ type DzSnapshotRow = {
         toast.error(data.error || 'فشل الحذف')
         return
       }
-      toast.success('تم حذف جميع البيانات بنجاح — نسخة الإنقاذ الملكية محفوظة في الأرشيف 🛡️. سيتم تسجيل الخروج...')
+      toast.success('تم حذف جميع البيانات بنجاح — نسخة الإنقاذ الآمنة محفوظة في الأرشيف 🛡️. سيتم تسجيل الخروج...')
       setDzOpen(false)
       setDzPassword('')
       // Log the admin out so they re-login to a clean academy
@@ -4667,7 +4667,7 @@ type DzSnapshotRow = {
         </div>
         <div className="flex-1">
           <h3 className="font-bold text-red-600 text-base">منطقة خطرة</h3>
-          <p className="text-xs text-red-600/80 mt-0.5">حذف البيانات — محميّ بدرع الإنقاذ الملكي: نسخة تلقائية قبل كل حذف</p>
+          <p className="text-xs text-red-600/80 mt-0.5">حذف البيانات — محميّ بدرع الإنقاذ الآمن: نسخة تلقائية قبل كل حذف</p>
         </div>
       </div>
 
@@ -4679,11 +4679,11 @@ type DzSnapshotRow = {
         <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 p-3">
           <Shield className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-amber-800 leading-relaxed">
-            <span className="font-bold">الخاتم الملكي:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» محميتان بالخاتم الملكي — لا تُحذفان أبداً بكل وحداتهما ودروسهما وبنك أسئلتهما، ويبقى الفريق مسجلاً فيهما بعد أي حذف.
+            <span className="font-bold">الحماية الأبدية:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» محميتان بنظام الحماية الأبدية — لا تُحذفان أبداً بكل وحداتهما ودروسهما وبنك أسئلتهما، ويبقى الفريق مسجلاً فيهما بعد أي حذف.
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
-          سيتم الاحتفاظ: بحساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق في قسم «المؤسس والفريق»، إعدادات الموقع، والدورتين الملكيتين — وكذلك رموز إشعارات الأجهزة فتبقى الإشعارات المنبثقة تعمل بعد الحذف.
+          سيتم الاحتفاظ: بحساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق في قسم «المؤسس والفريق»، إعدادات الموقع، والدورتين المحميتين — وكذلك رموز إشعارات الأجهزة فتبقى الإشعارات المنبثقة تعمل بعد الحذف.
         </p>
         <Button
           variant="outline"
@@ -4781,7 +4781,7 @@ type DzSnapshotRow = {
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gold/25 to-yellow-700/10 flex items-center justify-center flex-shrink-0">
                 <Shield className="w-4 h-4 text-gold" />
               </div>
-              <h4 className="font-bold text-sm bg-gradient-to-l from-yellow-600 to-gold bg-clip-text text-transparent">أرشيف الإنقاذ الملكي</h4>
+              <h4 className="font-bold text-sm bg-gradient-to-l from-yellow-600 to-gold bg-clip-text text-transparent">أرشيف الإنقاذ الآمن</h4>
               <button
                 onClick={fetchDzSnapshots}
                 className="ms-auto text-muted-foreground hover:text-gold transition-colors"
@@ -4795,7 +4795,7 @@ type DzSnapshotRow = {
             </p>
             {dzSnapLoading ? (
               <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
-                <Loader2 className="w-4 h-4 ml-2 animate-spin" /> جاري فحص الأرشيف الملكي...
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" /> جاري فحص الأرشيف الآمن...
               </div>
             ) : dzSnapshots.length === 0 ? (
               <div className="text-center p-3 rounded-xl border border-gold/20 bg-gold/5">
@@ -4957,7 +4957,7 @@ type DzSnapshotRow = {
       open={dzSectionOpen}
       onOpenChange={(o) => { if (!o && !dzSectionLoading) setDzSectionOpen(false) }}
       title={`حذف قسم: ${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}`}
-      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً.${dzSection === 'courses' ? ' دورتا «إتقان الإدارة» و«دليل المتدربين والمدربين» محميتان بالخاتم الملكي ولن تُمسا.' : ''}${dzSection === 'trainers' ? ' المؤسس وأعضاء الفريق محميون ولن يُمسوا.' : ''} ستُلتقط تلقائياً نسخة إنقاذ ملكية قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
+      message={`سيتم حذف جميع سجلات القسم "${dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}" نهائياً.${dzSection === 'courses' ? ' دورتا «إتقان الإدارة» و«دليل المتدربين والمدربين» محميتان بنظام الحماية الأبدية ولن تُمسا.' : ''}${dzSection === 'trainers' ? ' المؤسس وأعضاء الفريق محميون ولن يُمسوا.' : ''} ستُلتقط تلقائياً نسخة إنقاذ آمنة قبل الحذف يمكن استعادتها من الأرشيف. أدخل كلمة مرورك للتأكيد.`}
       itemLabel="القسم المراد حذفه:"
       itemName={dzSection ? DZ_SECTION_LABELS[dzSection] || dzSection : ''}
       confirmLabel="حذف القسم نهائياً"
@@ -4972,7 +4972,7 @@ type DzSnapshotRow = {
           })
           const data = await res.json()
           if (res.ok) {
-            toast.success(`تم حذف ${data.deleted || 0} سجل من قسم "${data.section}"${data.snapshot_id ? ' — نسخة الإنقاذ جاهزة في الأرشيف الملكي 🛡️' : ''}`)
+            toast.success(`تم حذف ${data.deleted || 0} سجل من قسم "${data.section}"${data.snapshot_id ? ' — نسخة الإنقاذ جاهزة في الأرشيف الآمن 🛡️' : ''}`)
             setDzSectionOpen(false)
             setDzSection('')
             fetchDzSnapshots()
@@ -4992,7 +4992,7 @@ type DzSnapshotRow = {
     <PasswordConfirmDialog
       open={dzRestoreOpen}
       onOpenChange={(o) => { if (!o && dzSnapBusy === '') setDzRestoreOpen(false) }}
-      title="استعادة نسخة الإنقاذ الملكية"
+      title="استعادة نسخة الإنقاذ"
       message={`سيتم إرجاع ${dzRestoreTarget?.row_total || 0} سجل إلى قاعدة البيانات بأمان تام من نسخة الإنقاذ المحفوظة. أدخل كلمة مرورك للتأكيد.`}
       itemLabel="النسخة المستعادة:"
       itemName={dzRestoreTarget ? (dzRestoreTarget.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzRestoreTarget.section] || dzRestoreTarget.section}`) : ''}
@@ -5109,17 +5109,17 @@ type DzSnapshotRow = {
             <p className="font-bold text-navy text-sm mb-3">الدورات، المتدربون، المدربون، المدفوعات، الشهادات، المدونة والتعليقات، المنتدى والتفاعلات، الكوبونات، الإشعارات، أرباح المدربين وطلبات السحب، رسائل التواصل، المسوقون، التراخيص، الشركاء، الأسئلة الشائعة، الملفات العامة للمتدربين، سجل المحادثات</p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-amber-800 leading-relaxed">
-                👑 <span className="font-bold">الخاتم الملكي:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» لا تُحذفان أبداً — تبقيان بكل دروسهما وبنك أسئلتهما، ويُعاد تسجيل الفريق فيهما تلقائياً بعد الحذف.
+                👑 <span className="font-bold">الحماية الأبدية:</span> دورة «إتقان إدارة الأكاديمية» والدورة التعليمية «دليل المتدربين والمدربين» لا تُحذفان أبداً — تبقيان بكل دروسهما وبنك أسئلتهما، ويُعاد تسجيل الفريق فيهما تلقائياً بعد الحذف.
               </p>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-red-600 leading-relaxed">
-                ⚠️ بعد الحذف لن يبقى سوى: حساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق وملفاتهم العامة، إعدادات الموقع وطرق الدفع، تصنيفات المنتدى، والدورتين الملكيتين. هذه العملية جسيمة ولا تُستعجل.
+                ⚠️ بعد الحذف لن يبقى سوى: حساب المؤسس وحسابات الإدارة، المؤسس وأعضاء الفريق وملفاتهم العامة، إعدادات الموقع وطرق الدفع، تصنيفات المنتدى، والدورتين المحميتين. هذه العملية جسيمة ولا تُستعجل.
               </p>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
               <p className="text-xs text-green-700 leading-relaxed">
-                🛡️ درع الإنقاذ الملكي: قبل الحذف ستُلتقط نسخة كاملة تلقائياً لكل ما سيُمسى — ويمكن استعادتها بالكامل من «أرشيف الإنقاذ الملكي» في لوحة منطقة الخطر. روابط إشعارات أجهزتك محفوظة دائماً فلا تنطفئ المنبثقات أبداً.
+                🛡️ درع الإنقاذ الآمن: قبل الحذف ستُلتقط نسخة كاملة تلقائياً لكل ما سيُمسى — ويمكن استعادتها بالكامل من «أرشيف الإنقاذ الآمن» في لوحة منطقة الخطر. روابط إشعارات أجهزتك محفوظة دائماً فلا تنطفئ المنبثقات أبداً.
               </p>
             </div>
 

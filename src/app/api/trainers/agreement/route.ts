@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       try { await notifyTrainerCertified(user.id, trainer.name) } catch {}
       return NextResponse.json({
         success: true,
-        message: `تم تحديث اتفاقك الملكي — أصبحت نسبتك ${newPercentage}% من كل دورة، مقفولة وموقَّعة من الطرفين`,
+        message: `تم تحديث عقد شراكتك — أصبحت نسبتك ${newPercentage}% من كل دورة، مقفولة وموقَّعة من الطرفين`,
       })
     }
 

@@ -139,7 +139,11 @@ export default function Home() {
       </main>
       <LoginModal open={authOpen} onOpenChange={setAuthOpen} />
       {/* Quick Link Dialog Cards — triggered by sidebar or quick links */}
-      <QuickLinkCard cardId={activeCard} onClose={closeCard} settings={settings} />
+      {/* 🛡️ v6.9.2 — حدود خطأ واقية: أي عطل داخل بطاقات الروابط السريعة
+          يُظهر رسالة أنيقة بدل إسقاط الصفحة الرئيسية كلها */}
+      <ErrorBoundary>
+        <QuickLinkCard cardId={activeCard} onClose={closeCard} settings={settings} />
+      </ErrorBoundary>
     </div>
   )
 }
