@@ -687,7 +687,7 @@ export function NotificationsBell() {
       {/* ⚡ ROYAL v4.4 — لوحة الإشعارات الملكية */}
       {open && (
         <div
-          className="absolute left-0 top-full mt-2 w-[350px] max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl z-50 overflow-hidden border border-gold/40"
+          className="fia-notif-panel absolute left-0 top-full mt-2 w-[350px] max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl z-50 overflow-hidden border border-gold/40"
           style={{ animation: 'fiaBellSlide 0.2s ease-out', boxShadow: '0 24px 70px rgba(11, 22, 53, 0.3), 0 0 50px -12px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(212,175,55,0.25)' }}
         >
           {/* شريط ذهبي علوي */}
