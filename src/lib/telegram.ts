@@ -405,7 +405,7 @@ export async function tgDangerZoneWiped(section: string, count: number, byUserId
     line('📊 عدد السجلات المحذوفة', count) +
     shield +
     line('✨ نفّذها', by) +
-    `\n\n⚠️ هذا إجراء تدميري — لكن نسخة الإنقاذ تسمح بالاستعادة الكاملة من أرشيف الإنقاذ الملكي.`
+    `\n\n⚠️ هذا إجراء تدميري — لكن نسخة الإنقاذ تسمح بالاستعادة الكاملة من أرشيف الإنقاذ الآمن.`
   await sendTelegramMessage(msg)
 }
 
@@ -470,5 +470,16 @@ export async function tgTrainerAgreementDeclined(name: string, note?: string | n
     line('👤 الاسم', name) +
     line('📝 ملاحظته', note || '—') +
     `\n\n💡 يمكنك مراجعة العرض وإعادة تقديمه من: لوحة الإدارة → طلبات المدربين.`
+  await sendTelegramMessage(msg)
+}
+
+export async function tgTrainerRenegotiationOffered(name: string, oldPct: number, newPct: number, reason?: string | null) {
+  const msg =
+    header('📜', 'طلب تعديل عقد شراكة أُرسل للمدرب') +
+    line('👤 الاسم', name) +
+    line('📊 النسبة السارية', oldPct + '%') +
+    line('✨ النسبة المقترحة', newPct + '%') +
+    line('📝 سبب الطلب', reason || '—') +
+    `\n\n💡 الاتفاق الساري يبقى مفعولاً حتى يوافق المدرب من محفظته — وبعد موافقته يُقفل العقد الجديد من الطرفين.`
   await sendTelegramMessage(msg)
 }

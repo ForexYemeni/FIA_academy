@@ -68,10 +68,29 @@ export function QuickLinkCard({ cardId, onClose, settings }: { cardId: string | 
   if (!m) return null
   const Icon = m.icon
 
-  // Parse qualifications/achievements from string to array
-  const parseList = (str: string | null | undefined): string[] => {
-    if (!str) return []
-    try { const arr = JSON.parse(str); return Array.isArray(arr) ? arr : [] } catch { return str.split('\n').filter((s: string) => s.trim()) }
+  // 🛡️ v6.9.2 — محلل قوائم مدرّع ضد كل الأشكال: جدول trainers يعيد
+  // qualifications/achievements كـ JSONB (مصفوفة JS حقيقية) بينما team_members
+  // يعيدهما نصاً — الشكل القديم كان ينهار على المصفوفات (Array.split غير موجود)
+  // فيقتل الصفحة كلها بخطأ client-side. الآن: مصفوفة → تُنقّى مباشرة، نص JSON
+  // → يُفكّ بأمان، نص متعدد الأسطر → يُقسم، كائن {title} → يُستخرج عنوانه.
+  const parseList = (input: unknown): string[] => {
+    if (!input) return []
+    const toStr = (x: any): string => {
+      if (typeof x === 'string') return x
+      if (x && typeof x === 'object') {
+        const t = x.title ?? x.name ?? x.text
+        return t ? String(t) : ''
+      }
+      return x == null ? '' : String(x)
+    }
+    if (Array.isArray(input)) return input.map(toStr).map((s) => s.trim()).filter(Boolean)
+    if (typeof input !== 'string') return []
+    try {
+      const arr = JSON.parse(input)
+      return Array.isArray(arr) ? arr.map(toStr).map((s: string) => s.trim()).filter(Boolean) : []
+    } catch {
+      return input.split('\n').map((s) => s.trim()).filter(Boolean)
+    }
   }
 
   const getContent = () => {

@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     const result = await restoreDangerSnapshot(snapshot_id)
     if (!result.ok) {
       return NextResponse.json(
-        { error: result.error || 'فشلت الاستعادة الملكية' },
+        { error: result.error || 'فشلت الاستعادة الآمنة' },
         { status: 500 }
       )
     }

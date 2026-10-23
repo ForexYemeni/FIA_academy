@@ -141,7 +141,7 @@ export function RoyalGuideBanner({ slug, title, subtitle }: RoyalGuideBannerProp
       {open && (
         <div className="relative border-t border-gold/25 bg-navy/60 backdrop-blur-sm p-4 max-h-[420px] overflow-y-auto">
           {modules.length === 0 ? (
-            <p className="text-center text-sm text-white/60 py-6">جاري تحميل الوحدات الملكية...</p>
+            <p className="text-center text-sm text-white/60 py-6">جاري تحميل الوحدات...</p>
           ) : (
             <div className="space-y-3">
               {modules.map((m, mi) => (

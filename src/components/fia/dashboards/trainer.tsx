@@ -1282,7 +1282,7 @@ function TrainerStudents({ students, courses }: any) {
               <Sparkles className="w-7 h-7 text-gold" />
             </div>
             <DialogHeader className="border-0 bg-transparent p-0 text-center items-center">
-              <DialogTitle className="text-white text-xl font-bold">النداء الملكي الجماعي</DialogTitle>
+              <DialogTitle className="text-white text-xl font-bold">النداء الجماعي</DialogTitle>
             </DialogHeader>
             <p className="relative text-white/70 text-xs mt-1">رسالة تصل لجرس كل طالب مستهدف فوراً مع إشعار جوال</p>
           </div>

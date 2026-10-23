@@ -852,7 +852,7 @@ function NewBlogPostDialog({ open, onOpenChange, user, onCreated }: any) {
                 <DialogTitle className="text-gold text-lg font-bold flex items-center gap-2 truncate">
                   <Sparkles className="w-4 h-4 text-gold flex-shrink-0" /> موضوع جديد في المدونة {rid.label === 'مدرب معتمد' ? '— باسمك كمدرب معتمد' : ''}
                 </DialogTitle>
-                <p className="text-xs text-gold/70 mt-0.5">محرر المدونة الملكي</p>
+                <p className="text-xs text-gold/70 mt-0.5">محرر المدونة</p>
               </div>
             </div>
             <div className="flex items-center gap-1 bg-gold/10 border border-gold/20 rounded-xl p-1 flex-shrink-0">

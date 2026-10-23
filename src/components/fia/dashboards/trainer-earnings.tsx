@@ -11,7 +11,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Wallet, TrendingUp, BadgePercent, Landmark, Bitcoin, CheckCircle2,
   Clock, XCircle, Image as ImageIcon, Send, Loader2, Sparkles, Crown, Coins,
-  ArrowDownToLine, Users, BookOpen, Eye, Gem, ChevronDown, Globe2, Copy, Star,
+  ArrowDownToLine, Users, BookOpen, Eye, Gem, ChevronDown, Globe2, Copy, Star, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -249,7 +249,12 @@ export function TrainerEarnings({ user }: { user: any }) {
               </div>
             </div>
             {renegOffer.note && (
-              <p className="text-[11px] rounded-xl bg-gold/10 border border-gold/25 p-2.5 text-navy"><b className="text-gold">ملاحظة الإدارة:</b> {String(renegOffer.note)}</p>
+              <div className="rounded-xl border border-gold/35 bg-gradient-to-l from-gold/[0.12] to-amber-50 p-3 space-y-1.5">
+                <p className="text-[11px] font-extrabold text-navy flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-gold flex-shrink-0" /> سبب طلب التعديل من الإدارة:
+                </p>
+                <p className="text-xs leading-relaxed text-navy/85 pr-5">{String(renegOffer.note)}</p>
+              </div>
             )}
             <div className="flex flex-col sm:flex-row gap-2">
               <button type="button" disabled={renegBusy} onClick={() => respondRenegotiation('accepted')}
@@ -282,7 +287,7 @@ export function TrainerEarnings({ user }: { user: any }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-gold/80 text-xs font-bold flex items-center gap-1.5 mb-1">
-              <Sparkles className="w-3.5 h-3.5" /> خزينة أرباحك الملكية — كل عملة في خزنتها
+              <Sparkles className="w-3.5 h-3.5" /> خزينة أرباحك — كل عملة في خزنتها
             </p>
             {/* أرصدة السحب لكل عملة — ما ربح بالدولار يُسحب بالدولار */}
             {curEntries.filter((c: any) => c.available > 0 || c.pending_withdrawals > 0).length === 0 ? (

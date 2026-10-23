@@ -499,6 +499,13 @@ export async function notifyTrainerAgreementRevised(trainerUserId: string, perce
     `راجعت الإدارة العرض وحدّثت نسبة الأرباح إلى ${percentage}%. تفحّص الاتفاق الجديد في لوحتك ووقّعه.`, '/#overview')
 }
 
+/** 🤝 v6.9.2 — للمدرب: وصل طلب تعديل عقد الشراكة من الإدارة مع السبب.
+ *  يبقى الاتفاق الساري مفعولاً حتى يوافق المدرب — يراجع الطلب من «أرباحي». */
+export async function notifyTrainerRenegotiationOffered(trainerUserId: string, oldPct: number, newPct: number, reason?: string | null) {
+  await send(trainerUserId, 'trainer_agreement', '📜 طلب تعديل عقد الشراكة',
+    `راجعت الإدارة اتفاقك وتقدمت بطلب تعديل حصتك من ${oldPct}% إلى ${newPct}% من كل دورة.${reason ? `\nسبب الطلب: ${reason}` : ''}\nنسبتك السارية تبقى مفعّلة كما هي حتى توافق — افتح «أرباحي» لمراجعة الطلب وقبوله أو رفضه بحرية تامة.`, '/#earnings')
+}
+
 // =========================================================================
 // AFFILIATE PAYOUTS (v6.3) — إشعارات عمولات المسوّقين وسحبها
 // =========================================================================
