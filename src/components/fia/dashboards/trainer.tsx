@@ -34,6 +34,9 @@ import { TrainerEarnings } from './trainer-earnings'
 import { TrainerFollowersMuseum } from './trainer-followers'
 import { TrainerRoyalGate, TrainerStatus } from './trainer-royal-gate'
 import { RenegotiationOfferCard } from './renegotiation-offer-card'
+// 🛡️ v6.9.4 — المنبّث الذهبي الملكي: جرس + نافذة منبثقة عند طلب تعديل النسبة
+// (مكوّن معزول 100% — لا يمس الإشعارات الثلاثية ولا sw.js ولا أي إشعار قائم)
+import { RenegotiationAlertWatcher } from './renegotiation-alert-watcher'
 import { TrainerWithdrawalAccounts } from './trainer-withdrawal-accounts'
 import { LuxSelect } from './luxury'
 import { useSpecializationCatalog } from '@/lib/use-specializations'
@@ -316,6 +319,9 @@ export function TrainerDashboard() {
       {active === 'profile' && <TrainerProfile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} refreshProfile={refreshTrainerProfile} />}
       {active === 'notifications' && <TrainerNotifs courses={courses} />}
       {active === 'settings' && <TrainerAccountSettings user={user} updateUser={updateUser} logout={logout} />}
+
+      {/* 🛡️ v6.9.4 — المنبّث الذهبي الملكي لعرض تعديل النسبة (معزول عن كل الإشعارات) */}
+      <RenegotiationAlertWatcher trainerId={user?.id || ''} onRefresh={refreshTrainerProfile} />
 
       {isDialogOpen && (
         <ProCourseDialog
