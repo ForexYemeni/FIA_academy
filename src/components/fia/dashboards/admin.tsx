@@ -14,6 +14,8 @@ import {
   ClipboardCheck, Landmark,
 } from 'lucide-react'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
+import { RoyalGridSkeleton, RoyalListSkeleton, RoyalStatsSkeleton } from '@/components/fia/royal-skeleton'
+import { RoyalEmpty } from '@/components/fia/royal-empty-state'
 import { useAuth } from '@/lib/auth-store'
 import { useHashTab } from '@/lib/use-hash-tab'
 import { Button } from '@/components/ui/button'
@@ -51,7 +53,12 @@ import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxCombo, LuxEmpty,
   LuxBadge, LuxField, LuxDialog, LuxSaveBar, LuxRow, luxInput, luxTheme,
 } from './luxury'
-import { CertificateViewer } from '@/components/fia/certificate-viewer'
+import dynamic from 'next/dynamic'
+// ⚡ v7.0 تحميل كسول ملكي: عارض الشهادات لا يُحمل إلا عند الطلب
+const CertificateViewer = dynamic(
+  () => import('@/components/fia/certificate-viewer').then((m) => m.CertificateViewer),
+  { ssr: false }
+)
 import { CourseDialog as ProCourseDialog } from '@/components/fia/course-dialog'
 import { supabasePublic } from '@/lib/supabase'
 
@@ -822,21 +829,16 @@ const AdminCourses = React.memo(function AdminCourses() {
       </div>
       {/* Empty state */}
       {!items.length && !loading && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
-            <BookOpen className="w-8 h-8 text-gray-300" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">لا توجد دورات بعد</p>
-          <Button className="bg-navy hover:bg-navy-light" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> إضافة أول دورة</Button>
-        </div>
+        <RoyalEmpty
+          icon={BookOpen}
+          title="لا توجد دورات بعد"
+          subtitle="أضِف أول دورة وستظهر هنا مباشرة — رحلة المملكة تبدأ بخطوة"
+          actionLabel="إضافة أول دورة"
+          onAction={() => { setEditing(null); setOpen(true) }}
+        />
       )}
       {/* Loading state */}
-      {loading && (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 mx-auto text-navy animate-spin mb-3" />
-          <p className="text-sm text-muted-foreground">جاري تحميل الدورات...</p>
-        </div>
-      )}
+      {loading && <RoyalGridSkeleton count={3} />}
       {open && <ProCourseDialog open={open} onOpenChange={setOpen} course={editing} trainerId={undefined} onSaved={load} />}
 
       {/* Password-confirmation dialog for course deletion. The user must
@@ -1019,10 +1021,7 @@ function AdminExams() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 mx-auto animate-spin text-gold" />
-          <p className="text-xs text-muted-foreground mt-2">جاري تحميل البيانات...</p>
-        </div>
+        <RoyalListSkeleton rows={4} />
       ) : tab === 'exams' ? (
         /* ⚡ Magical Exams cards */
         filteredExams.length === 0 ? (
@@ -5258,9 +5257,9 @@ function AdminReports() {
   if (loading) {
     return (
       <SectionCard title="التقارير" description="إحصائيات حقيقية من قاعدة البيانات">
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-8 h-8 text-navy animate-spin" />
-          <div className="text-sm text-muted-foreground">جاري تحميل البيانات...</div>
+        <div className="space-y-5 py-2">
+          <RoyalStatsSkeleton count={4} />
+          <RoyalListSkeleton rows={4} />
         </div>
       </SectionCard>
     )

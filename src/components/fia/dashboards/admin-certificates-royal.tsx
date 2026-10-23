@@ -25,7 +25,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
-import { CertificateViewer } from '@/components/fia/certificate-viewer'
+import dynamic from 'next/dynamic'
+// ⚡ v7.0 تحميل كسول ملكي
+const CertificateViewer = dynamic(
+  () => import('@/components/fia/certificate-viewer').then((m) => m.CertificateViewer),
+  { ssr: false }
+)
 import { supabasePublic } from '@/lib/supabase'
 import {
   LuxSection, LuxStats, LuxSearch, LuxSelect, LuxCombo, LuxEmpty, LuxBadge,

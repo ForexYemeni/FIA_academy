@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { royalFetch } from '@/lib/royal-cache'
 import {
   Shield, Award, Users, Clock, BookOpen, GraduationCap, Stethoscope,
   HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X, Building2, BadgeCheck,
@@ -52,12 +53,14 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
   const [verifyNumber, setVerifyNumber] = useState('')
 
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/trainers').then((r) => r.json()).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/team?role=founder').then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length > 0) setFounder(d[0]) }).catch(() => {})
-    fetch('/api/partners').then((r) => r.json()).then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/licenses').then((r) => r.json()).then((d) => setLicenses(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/site-settings').then((r) => r.json()).then(setSettings).catch(() => {})
+    // ⚡ v7.0 الخزنة الملكية: الصفحة العامة تُقرأ من الذاكرة فوراً في كل زيارة
+    // وتُحدّث بهدوء في الخلفية — بدل رحلات شبكة متكررة لنفس البيانات
+    royalFetch<any[]>('/api/courses', { ttl: 60_000 }).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    royalFetch<any[]>('/api/trainers', { ttl: 60_000 }).then((d) => setTrainers(Array.isArray(d) ? d : [])).catch(() => {})
+    royalFetch<any[]>('/api/team?role=founder', { ttl: 120_000 }).then((d) => { if (Array.isArray(d) && d.length > 0) setFounder(d[0]) }).catch(() => {})
+    royalFetch<any[]>('/api/partners', { ttl: 120_000 }).then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {})
+    royalFetch<any[]>('/api/licenses', { ttl: 120_000 }).then((d) => setLicenses(Array.isArray(d) ? d : [])).catch(() => {})
+    royalFetch<any>('/api/site-settings', { ttl: 60_000 }).then(setSettings).catch(() => {})
   }, [])
 
   const verify = () => {

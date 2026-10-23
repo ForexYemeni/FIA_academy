@@ -16,8 +16,17 @@ import { toast } from 'sonner'
 // ⚡ CustomPdfViewer is a separate component (extracted for clarity)
 // that uses pdf.js to render PDFs inside the app without Google Docs
 // Viewer. It handles its own pdfjs import + worker setup.
-import { CustomPdfViewer } from '@/components/fia/custom-pdf-viewer'
-import { LuxAudioPlayer } from '@/components/fia/lux-audio-player'
+import dynamic from 'next/dynamic'
+// ⚡ v7.0 تحميل كسول ملكي: pdfjs-dist أثقل مكتبة في المنصة — لا تُحمل إلا عند فتح PDF
+const CustomPdfViewer = dynamic(
+  () => import('@/components/fia/custom-pdf-viewer').then((m) => m.CustomPdfViewer),
+  { ssr: false, loading: () => <div className="h-[70vh] flex items-center justify-center text-sm text-muted-foreground">جارِ تجهيز العارض الملكي…</div> }
+)
+// ⚡ v7.0 تحميل كسول ملكي: مشغل الصوت الفاخر
+const LuxAudioPlayer = dynamic(
+  () => import('@/components/fia/lux-audio-player').then((m) => m.LuxAudioPlayer),
+  { ssr: false }
+)
 
 interface Lesson {
   id: string
