@@ -33,6 +33,7 @@ import { TrainerResultsCenter } from './trainer-results'
 import { TrainerEarnings } from './trainer-earnings'
 import { TrainerFollowersMuseum } from './trainer-followers'
 import { TrainerRoyalGate, TrainerStatus } from './trainer-royal-gate'
+import { RenegotiationOfferCard } from './renegotiation-offer-card'
 import { TrainerWithdrawalAccounts } from './trainer-withdrawal-accounts'
 import { LuxSelect } from './luxury'
 import { useSpecializationCatalog } from '@/lib/use-specializations'
@@ -120,6 +121,8 @@ export function TrainerDashboard() {
   const [trainerStatus, setTrainerStatus] = useState<TrainerStatus | null>(null)
   const [trainerAgreement, setTrainerAgreement] = useState<any | null>(null)
   const [trainerRejectedReason, setTrainerRejectedReason] = useState<string | null>(null)
+  // 🛡️ v6.9.3 — النسبة السارية (تُقرأ مع بطاقة تعديل العقد في «نظرة عامة»)
+  const [trainerProfitPct, setTrainerProfitPct] = useState<number>(0)
 
   const refreshTrainerProfile = useCallback(async () => {
     if (!user?.id) return
@@ -139,6 +142,7 @@ export function TrainerDashboard() {
         if (data.status) setTrainerStatus(data.status as TrainerStatus)
         setTrainerAgreement(data.agreement || null)
         setTrainerRejectedReason(data.rejected_reason || null)
+        setTrainerProfitPct(Number(data.profit_percentage ?? data.agreement?.percentage ?? 0) || 0)
         // Keep auth-store in sync too so other parts of the dashboard reflect
         // any admin-side edits.
         updateUser({
@@ -243,6 +247,8 @@ export function TrainerDashboard() {
   // (والخادم يمنع فعلياً أي إنشاء/تعديل/حذف دورات — هنا مجرد مهابة ملكية)
   const POWER_TABS = ['courses', 'content', 'students', 'followers', 'exams', 'question-bank', 'results', 'earnings', 'withdrawal-accounts']
   const gated = Boolean(trainerStatus && trainerStatus !== 'approved')
+  // 🛡️ v6.9.3 — عرض تعديل العقد المعلّق: بطاقة ذهبية في «نظرة عامة» + نبضة على «أرباحي»
+  const renegPending = !!trainerAgreement?.renegotiation && trainerAgreement.renegotiation.trainer_response === 'pending'
   const gateElement = (
     <TrainerRoyalGate
       status={trainerStatus!}
@@ -254,9 +260,11 @@ export function TrainerDashboard() {
     />
   )
   // أقفال مهيبة على التبويبات المقفلة في القائمة الجانبية — المنتدى مغلق تماماً قبل الاتفاق
-  const navForDisplay = gated
-    ? NAV.map((n) => (POWER_TABS.includes(n.id) || n.id === 'forum') ? { ...n, label: `🔒 ${n.label}` } : n)
-    : NAV
+  const navForDisplay = (
+    gated
+      ? NAV.map((n) => (POWER_TABS.includes(n.id) || n.id === 'forum') ? { ...n, label: `🔒 ${n.label}` } : n)
+      : NAV
+  ).map((n) => (n.id === 'earnings' && renegPending ? { ...n, pulse: true } : n))
 
   return (
     <DashboardShell
@@ -268,7 +276,17 @@ export function TrainerDashboard() {
     >
       {active === 'overview' && (
         gated ? gateElement : (
-          <TrainerOverview user={user} courses={courses} students={myStudents} onOpenMuseum={() => setActive('followers')} />
+          <div className="space-y-6">
+            {/* 🛡️ v6.9.3 — بطاقة اتفاق تعديل العقد أول ما يهبط المدرب لوحته:
+                الطلب المُرسل من الإدارة يظهر هنا مباشرة لموافقة أو رفض فوري */}
+            <RenegotiationOfferCard
+              agreement={trainerAgreement}
+              currentPercentage={trainerProfitPct}
+              trainerId={user?.id || ''}
+              onResponded={refreshTrainerProfile}
+            />
+            <TrainerOverview user={user} courses={courses} students={myStudents} onOpenMuseum={() => setActive('followers')} />
+          </div>
         )
       )}
       {active === 'withdrawal-accounts' && (gated ? gateElement : <TrainerWithdrawalAccounts />)}
