@@ -1212,3 +1212,39 @@ html.theme-transitioning * {
 .dark .hover\:bg-amber-100\/60:hover { background-color: rgba(212, 175, 55, 0.16); }
 .dark .hover\:bg-cyan-100:hover { background-color: rgba(45, 212, 191, 0.16); }
 .dark .hover\:bg-rose-50:hover, .dark .hover\:bg-rose-100:hover { background-color: rgba(251, 113, 133, 0.16); }
+
+/* ═════ مرآة v8.1 (القسم 19 في royal-night.css) — النصوص الكحلية الشفافة تُشرق ليلاً 🌙👑
+   بروتوكول النسخة المزدوجة ضد قطع تحميل royal-night.css — نفس القواعد حرفياً */
+.dark .text-navy\/15 { color: rgba(233, 238, 249, 0.22) !important; }
+.dark .text-navy\/40 { color: rgba(233, 238, 249, 0.52) !important; }
+.dark .text-navy\/60 { color: rgba(233, 238, 249, 0.68) !important; }
+.dark .text-navy\/70 { color: rgba(233, 238, 249, 0.78) !important; }
+.dark .text-navy\/75 { color: rgba(233, 238, 249, 0.8) !important; }
+.dark .text-navy\/80 { color: rgba(233, 238, 249, 0.87) !important; }
+.dark .text-navy\/85 { color: rgba(233, 238, 249, 0.92) !important; }
+.dark .text-navy\/90 { color: rgba(233, 238, 249, 0.97) !important; }
+.dark .bg-gold .text-navy\/60, .dark .bg-gold .text-navy\/70,
+.dark .bg-gold .text-navy\/80, .dark .bg-gold .text-navy\/85,
+.dark .bg-amber-400 .text-navy\/60, .dark .bg-amber-400 .text-navy\/70,
+.dark .bg-amber-400 .text-navy\/80, .dark .bg-amber-400 .text-navy\/85,
+.dark .bg-amber-500 .text-navy\/60, .dark .bg-amber-500 .text-navy\/70,
+.dark .bg-amber-500 .text-navy\/80, .dark .bg-amber-500 .text-navy\/85,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/60,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/70,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/80,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/85 { color: rgba(11, 22, 53, 0.78) !important; }
+.dark .fia-keep-light .text-navy\/60, .dark .fia-keep-light .text-navy\/70,
+.dark .fia-keep-light .text-navy\/75, .dark .fia-keep-light .text-navy\/80,
+.dark .fia-keep-light .text-navy\/85, .dark .fia-keep-light .text-navy\/90 { color: #0B1635 !important; }
+.dark .bg-navy\/5 { background-color: rgba(233, 238, 249, 0.05); }
+.dark .bg-navy\/10 { background-color: rgba(233, 238, 249, 0.08); }
+.dark .bg-navy\/15 { background-color: rgba(233, 238, 249, 0.1); }
+.dark .fia-royal-cta {
+  background-image: linear-gradient(to left, #D4AF37, #f59e0b) !important;
+  color: #0B1635 !important;
+  box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35);
+}
+.dark .fia-royal-cta:hover {
+  background-image: linear-gradient(to left, #E2C14A, #fbbf24) !important;
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5);
+}

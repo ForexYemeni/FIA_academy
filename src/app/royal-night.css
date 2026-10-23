@@ -432,6 +432,58 @@
 .dark .fia-keep-light .bg-rose-50, .dark .fia-keep-light .bg-pink-50 { background-color: #FFF1F2; }
 .dark .fia-keep-light .bg-fuchsia-50 { background-color: #FDF4FF; }
 
+/* ═════ 19) v8.1 — النصوص الكحلية الشفافة تُشرق ليلاً — نهاية عصر النصوص الشبحية 🌙👑
+   المشهد: شرائح فلترة «طرق السحب» و«التخصصات» ودوائر عدادات «محتوى الدورات»
+   كان نصّها الكحلي الشفاف (text-navy/60..90) يبقى داكناً فوق الأسطح الليلية —
+   يُرى الإطار ولا يُرى الحرف. القاعدة الصلبة .dark .text-navy لا تمسك
+   متغيرات الشفافية (كلاسات مختلفة في CSS). الحل: تدرج ضوء ملكي يطابق
+   إحساس كل درجة شفافية، مع حرس الذهب الصلب الذي يحفظ الكحلي فوق
+   الأسطح الذهبية الحقيقية (نفس بروتوكول القسم 5 وقاعدة 11.6 الدقيقة) */
+.dark .text-navy\/15 { color: rgba(233, 238, 249, 0.22) !important; }
+.dark .text-navy\/40 { color: rgba(233, 238, 249, 0.52) !important; }
+.dark .text-navy\/60 { color: rgba(233, 238, 249, 0.68) !important; }
+.dark .text-navy\/70 { color: rgba(233, 238, 249, 0.78) !important; }
+.dark .text-navy\/75 { color: rgba(233, 238, 249, 0.8) !important; }
+.dark .text-navy\/80 { color: rgba(233, 238, 249, 0.87) !important; }
+.dark .text-navy\/85 { color: rgba(233, 238, 249, 0.92) !important; }
+.dark .text-navy\/90 { color: rgba(233, 238, 249, 0.97) !important; }
+
+/* حرس الذهب الصلب — فوق الذهب الحقيقي يبقى الكحلي الشفاف كحلياً (أزرار وشارات ذهبية).
+   التظليلات الذهبية الخافتة (from-gold/ بشرطة) أسطح ليلية — نصّها يُشرق كما في 11.6 */
+.dark .bg-gold .text-navy\/60, .dark .bg-gold .text-navy\/70,
+.dark .bg-gold .text-navy\/80, .dark .bg-gold .text-navy\/85,
+.dark .bg-amber-400 .text-navy\/60, .dark .bg-amber-400 .text-navy\/70,
+.dark .bg-amber-400 .text-navy\/80, .dark .bg-amber-400 .text-navy\/85,
+.dark .bg-amber-500 .text-navy\/60, .dark .bg-amber-500 .text-navy\/70,
+.dark .bg-amber-500 .text-navy\/80, .dark .bg-amber-500 .text-navy\/85,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/60,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/70,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/80,
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy\/85 { color: rgba(11, 22, 53, 0.78) !important; }
+
+/* درع المناطق الفاتحة المحمية — الكحلي الشفاف يبقى نهارياً داخل الشهادات والطباعة */
+.dark .fia-keep-light .text-navy\/60, .dark .fia-keep-light .text-navy\/70,
+.dark .fia-keep-light .text-navy\/75, .dark .fia-keep-light .text-navy\/80,
+.dark .fia-keep-light .text-navy\/85, .dark .fia-keep-light .text-navy\/90 { color: #0B1635 !important; }
+
+/* أسطح الكحلي الشفافة — أثر زجاجي ليلي بدل غسلة داكنة ميتة
+   (دوائر عدادات المتدربين وبلاطات الأيقونات) */
+.dark .bg-navy\/5 { background-color: rgba(233, 238, 249, 0.05); }
+.dark .bg-navy\/10 { background-color: rgba(233, 238, 249, 0.08); }
+.dark .bg-navy\/15 { background-color: rgba(233, 238, 249, 0.1); }
+
+/* زر المحتوى الملكي — CTA كحلي على بطاقة ليلية كان يذوب في الخلفية؛
+   ليلاً يرتدي الذهب المتلألئ بلغة الأزرار الرئيسية للعلامة — النهار كحلي كما وُلد */
+.dark .fia-royal-cta {
+  background-image: linear-gradient(to left, #D4AF37, #f59e0b) !important;
+  color: #0B1635 !important;
+  box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35);
+}
+.dark .fia-royal-cta:hover {
+  background-image: linear-gradient(to left, #E2C14A, #fbbf24) !important;
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5);
+}
+
 /* ═════ 12) انتقال سلس بين الوضعين ═════ */
 html.theme-transitioning,
 html.theme-transitioning * {
