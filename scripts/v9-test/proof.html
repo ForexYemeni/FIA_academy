@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إثبات الديوان الملكي v9</title>
+<link rel="stylesheet" href="./7a5da1d3e5f543e5.css">
+<link rel="stylesheet" href="./77e00645f8b2222c.css">
+<style>
+  body { font-family: 'Cairo', 'Noto Sans Arabic', sans-serif; margin: 0; }
+  /* تقريب خط Cairo بيئياً */
+</style>
+</head>
+<body class="bg-background text-foreground">
+<!-- محاكاة جسم النافذة LuxDialog على موبايل 360px -->
+<div id="dlg" class="lux-dialog-body p-5 bg-gradient-to-b from-[#D4AF37]/[0.04] to-white space-y-4">
+
+  <!-- ═══ الترويسة الملكية v9 ═══ -->
+  <div class="relative overflow-hidden rounded-3xl border border-gold/40 bg-gradient-to-b from-[#050D20] via-[#0B1B3F] to-[#241d08] px-4 pb-5 pt-7 shadow-[0_20px_60px_-20px_rgba(5,13,32,0.7)] sm:px-6">
+    <div class="absolute inset-0 opacity-[0.13]" style="background-image: radial-gradient(circle at 22% 28%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 78% 68%, #ffffff 0.7px, transparent 0.7px); background-size: 21px 21px, 15px 15px;"></div>
+    <div class="absolute -right-14 -top-16 h-48 w-48 rounded-full bg-gold/20 blur-3xl"></div>
+    <div class="absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-amber-500/10 blur-3xl"></div>
+    <div class="absolute inset-x-12 top-0 h-px bg-gradient-to-l from-transparent via-gold/80 to-transparent"></div>
+    <div class="pointer-events-none absolute inset-0 lux-shimmer"></div>
+
+    <span class="absolute right-2.5 top-2.5 h-5 w-5 rounded-tr-lg border-r-2 border-t-2 border-gold/45"></span>
+    <span class="absolute left-2.5 top-2.5 h-5 w-5 rounded-tl-lg border-l-2 border-t-2 border-gold/45"></span>
+    <span class="absolute bottom-2.5 right-2.5 h-5 w-5 rounded-br-lg border-r-2 border-b-2 border-gold/45"></span>
+    <span class="absolute bottom-2.5 left-2.5 h-5 w-5 rounded-bl-lg border-l-2 border-b-2 border-gold/45"></span>
+
+    <div class="relative flex flex-col items-center text-center">
+      <!-- البورتريه -->
+      <div class="relative shrink-0">
+        <div class="absolute -inset-2.5 rounded-full bg-gradient-to-br from-gold/45 via-amber-500/15 to-transparent blur-lg"></div>
+        <div class="absolute -inset-1 rounded-full border border-gold/25"></div>
+        <div class="relative flex h-28 w-28 items-center justify-center rounded-full border-[3px] border-gold/80 bg-gradient-to-br from-[#12234d] to-[#0a1730] text-4xl font-black text-gold ring-4 ring-gold/15">هـ</div>
+        <span class="absolute -bottom-1 -left-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#050D20] bg-gradient-to-br from-gold to-amber-500 shadow-[0_4px_14px_rgba(212,175,55,0.5)]">
+          <svg class="h-4 w-4 text-navy" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18h20l-2-9-5 4-3-7-3 7-5-4z"/></svg>
+        </span>
+      </div>
+
+      <!-- الاسم -->
+      <p id="fullname" class="mt-4 max-w-full break-words text-xl font-black leading-snug text-white sm:text-2xl">د.هاني هاني حسن بن سين الحس العشعشي المكنى بأبي العشاعش</p>
+      <div class="mt-2 flex items-center gap-2.5" aria-hidden>
+        <span class="h-px w-10 bg-gradient-to-l from-transparent to-gold/70"></span>
+        <svg class="h-3 w-3 text-gold/90" viewBox="0 0 24 24" fill="currentColor"><path d="M2 18h20l-2-9-5 4-3-7-3 7-5-4z"/></svg>
+        <span class="h-px w-10 bg-gradient-to-r from-transparent to-gold/70"></span>
+      </div>
+
+      <!-- شارات الهوية -->
+      <div class="mt-3 flex max-w-full flex-wrap items-center justify-center gap-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-[10px] font-extrabold text-gold-light shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <svg class="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V6l8-3 8 3z"/></svg>
+          مدير نادي محفظة
+        </span>
+        <span class="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1 text-[10px] font-bold text-white/85">
+          <svg class="h-3 w-3 shrink-0 text-gold/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10L12 5 2 10l10 5 10-5zM6 12v5c3 3 9 3 12 0v-5"/></svg>
+          التحليل الفني المتقدم
+        </span>
+      </div>
+
+      <!-- بيانات الاتصال -->
+      <div class="mt-2.5 flex max-w-full flex-wrap items-center justify-center gap-1.5">
+        <span id="emailchip" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] font-bold text-white/80">
+          <svg class="h-3 w-3 shrink-0 text-gold/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+          <span dir="ltr" class="break-all font-medium">hals.hafy094@gmail.com</span>
+        </span>
+        <span class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 font-bold text-white/80" dir="ltr">
+          <svg class="h-3 w-3 shrink-0 text-gold/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span class="break-all font-medium text-[10px]">00967774851620</span>
+        </span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] font-bold text-white/80">
+          <svg class="h-3 w-3 shrink-0 text-gold/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/></svg>
+          اليمن — صنعاء
+        </span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[10px] font-extrabold text-gold-light">
+          <svg class="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>
+          8+ سنوات خبرة
+        </span>
+      </div>
+
+      <!-- العدادات الملكية -->
+      <div id="stats" class="mt-4 grid w-full grid-cols-3 gap-2">
+        <div class="flex min-w-0 flex-col items-center rounded-2xl border border-gold/30 bg-white/[0.06] px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm transition-colors hover:bg-white/[0.1]">
+          <span class="mb-1.5 flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-amber-500 shadow-[0_3px_10px_rgba(212,175,55,0.4)]">
+            <svg class="h-3.5 w-3.5 text-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+          </span>
+          <span class="text-lg font-black leading-none tabular-nums text-gold">2</span>
+          <span class="mt-1 text-[9px] font-bold text-white/70">مؤهل</span>
+        </div>
+        <div class="flex min-w-0 flex-col items-center rounded-2xl border border-gold/30 bg-white/[0.06] px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm transition-colors hover:bg-white/[0.1]">
+          <span class="mb-1.5 flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-amber-500 shadow-[0_3px_10px_rgba(212,175,55,0.4)]">
+            <svg class="h-3.5 w-3.5 text-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          </span>
+          <span class="text-lg font-black leading-none tabular-nums text-gold">1</span>
+          <span class="mt-1 text-[9px] font-bold text-white/70">إنجاز</span>
+        </div>
+        <div class="flex min-w-0 flex-col items-center rounded-2xl border border-gold/30 bg-white/[0.06] px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm transition-colors hover:bg-white/[0.1]">
+          <span class="mb-1.5 flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-amber-500 shadow-[0_3px_10px_rgba(212,175,55,0.4)]">
+            <svg class="h-3.5 w-3.5 text-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </span>
+          <span class="text-lg font-black leading-none tabular-nums text-gold">3</span>
+          <span class="mt-1 text-[9px] font-bold text-white/70">خبرة</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-l from-transparent via-gold/70 to-transparent"></div>
+  </div>
+
+  <!-- ═══ لوحة النسبة الذهبية ═══ -->
+  <div class="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-l from-gold/[0.16] via-gold/[0.07] to-transparent px-4 py-3.5 shadow-[0_12px_32px_-14px_rgba(212,175,55,0.5)]">
+    <div class="absolute inset-0 opacity-[0.1]" style="background-image: radial-gradient(circle at 85% 30%, #D4AF37 1.1px, transparent 1.1px); background-size: 12px 12px;"></div>
+    <div class="relative flex items-center gap-3">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-amber-500 shadow-[0_6px_18px_rgba(212,175,55,0.45)]">
+        <svg class="h-[20px] w-[20px] text-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+      </span>
+      <div class="min-w-0 flex-1">
+        <p class="text-[13px] font-black text-navy">نسبة أرباح المدرب من كل دورة</p>
+        <p class="mt-0.5 text-[10px] font-medium text-muted-foreground">اتفاق موقّع ببنود موثقة</p>
+      </div>
+      <p class="shrink-0 text-3xl font-black tracking-tight text-gold drop-shadow-[0_2px_10px_rgba(212,175,55,0.35)]" dir="ltr">20%</p>
+    </div>
+  </div>
+
+  <!-- ═══ النبذة المهنية ═══ -->
+  <div class="relative overflow-hidden rounded-2xl border border-gold/25 bg-white/70 p-4">
+    <div class="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-amber-400 to-transparent"></div>
+    <p class="mb-2.5 flex items-center gap-2 text-xs font-extrabold text-navy">
+      <span class="flex h-7 w-7 items-center justify-center rounded-xl border border-gold/30 bg-gradient-to-br from-gold/20 to-amber-500/10 shadow-sm">
+        <svg class="h-3.5 w-3.5 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </span>
+      النبذة المهنية
+      <span class="h-px flex-1 bg-gradient-to-l from-transparent via-gold/25 to-transparent"></span>
+    </p>
+    <p class="whitespace-pre-line text-[12.5px] leading-relaxed text-muted-foreground">خبير عام ودولاجه داخل على البورود اللولي في الاسواق الحاجيه مدري دول معتمد، مدرب فني معتمد بخبرة تتجاوز ثمان سنوات في التداول والتحليل، خبرة واسعة في التعامل مع شركات التداول العالمية والتعاقدات مع شركات الوسطاء في منطقة الخليج العربي.</p>
+  </div>
+</div>
+</body>
+</html>
