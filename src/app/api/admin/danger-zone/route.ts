@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
         }
         if (toDelete.length > 0) {
           await supabaseAdmin.from('trainers').delete().in('id', toDelete)
+          // 👑 v9.1 — «محو الهوية الكامل»: مرايا المدربين في users تُمحو معهم —
+          // بلا ذلك تبقى حسابات قادرة على الدخول عبر جدول users بعد المسح الشامل
+          try { await supabaseAdmin.from('users').delete().in('id', toDelete) } catch {}
         }
         label = 'المدربون (المؤسس وأعضاء الفريق محفوظون)'
         break

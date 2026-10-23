@@ -274,6 +274,27 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
+    // 👑 v9.1 — «الخروج الفوري + محو الهوية الكامل» لعضو الفريق المحذوف
+    // (نفس بروتوكول حذف المدربين): (1) تسجيل force_logout ليخرج حرس الجلسة
+    // جلسته من أي جهاز في نفس اللحظة، (2) محو مرآته في public.users بنفس
+    // المعرّف — بلا ذلك يظل الحساب المحذوف قادراً على الدخول عبر users ويحجب
+    // بريده عن إعادة التسجيل. المفاتيح الأجنبية كلها CASCADE/SET NULL.
+    try {
+      await supabaseAdmin.from('force_logout').upsert({
+        user_id: id,
+        reason: 'account_deleted',
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+    } catch {}
+    const { error: mirrorErr } = await supabaseAdmin.from('users').delete().eq('id', id)
+    if (mirrorErr) {
+      console.error('team identity-mirror delete failed:', mirrorErr.message)
+      return NextResponse.json(
+        { error: 'تعذر محو هوية الحساب من جدول المستخدمين — لم يُحذف عضو الفريق. أعد المحاولة.' },
+        { status: 500 }
+      )
+    }
+
     const { error } = await supabaseAdmin.from('trainers').delete().eq('id', id)
     if (error) throw error
 
