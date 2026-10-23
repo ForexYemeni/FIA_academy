@@ -190,11 +190,17 @@
 .dark .shadow-md, .dark .shadow-sm {
   box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(212, 175, 55, 0.05);
 }
-/* البطاقات الكحلية تحصل على خط ذهبي علوي رفيع — توقيع الليل الملكي */
-.dark .bg-white:not(.fia-keep-light) {
+
+/* البطاقات الكحلية تحصل على خط ذهبي علوي رفيع — توقيع الليل الملكي
+   ⚠️ v7.2 — إصلاح جذري: قاعدة position:relative كانت تخطف تموضع كل عنصر
+   bg-white عائم (لوحة الإشعارات، القوائم المنسدلة، الهيدر الثابت، نافذة
+   الدردشة) فتتحول من «لوحة منسدلة عائمة» إلى «بطاقة مصغّرة مضغوطة» داخل
+   تدفق الصفحة في الوضع الليلي. الآن نستبعد أي عنصر يتموضع بنفسه
+   (absolute / fixed / sticky) فتحافظ على تموضعه الأصلي في الليل والنهار. */
+.dark .bg-white:not(.fia-keep-light):not(.absolute):not(.fixed):not(.sticky) {
   position: relative;
 }
-.dark .bg-white:not(.fia-keep-light)::before {
+.dark .bg-white:not(.fia-keep-light):not(.absolute):not(.fixed):not(.sticky)::before {
   content: '';
   position: absolute;
   inset-inline: 0;
@@ -204,6 +210,15 @@
   pointer-events: none;
   z-index: 1;
 }
+
+/* 🛡 حماية مزدوجة — مهما حدث مستقبلاً: أي عنصر bg-white مصمم ليطفو
+   يبقى عائماً في الليل تماماً كما في النهار (خط الدفاع الأخير) */
+.dark .bg-white.absolute { position: absolute !important; }
+.dark .bg-white.fixed { position: fixed !important; }
+.dark .bg-white.sticky { position: sticky !important; }
+.dark .bg-white.absolute::before,
+.dark .bg-white.fixed::before,
+.dark .bg-white.sticky::before { display: none; }
 
 /* ═════ 10) منطقة تبقى فاتحة دائماً (شهادات/طباعة/التقاط صور) ═════ */
 .dark .fia-keep-light,
@@ -231,6 +246,29 @@
 
 /* ═════ 11) الشريط الجانبي واللوحات الكحلية — هوية العلامة تبقى كما هي ═════
    (bg-navy / bg-navy-light / bg-navy-deep أصلاً ليلية بلا تغيير) */
+
+/* ═════ 11.5) لوحة الإشعارات الملكية — ليلٌ بنفس عظمة النهار 🌙👑
+   اللوحة تطفو الآن بثبات في الليل (بعد إصلاح قاعدة position) وهذا
+   القسم يمنحها هوية ليلية فاخرة متعمدة بدل الاكتفاء بقلب الألوان:
+   سطح كحلي متدرج، إطار ذهبي أقوى، هالة ليلية، وحلقات مدمجة مع الليل */
+.dark .fia-notif-panel {
+  background: linear-gradient(180deg, #101D3D 0%, #0B1731 100%) !important;
+  border-color: rgba(212, 175, 55, 0.45) !important;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.62),
+              0 0 64px -12px rgba(212, 175, 55, 0.28),
+              inset 0 1px 0 rgba(212, 175, 55, 0.28) !important;
+}
+/* حلقة شارة العدد غير المقروء (الجرس + رأس اللوحة) تندمج مع سطح الليل */
+.dark .notifications-bell-container .ring-white { --tw-ring-color: #0F1B36; }
+.dark .fia-notif-panel .ring-navy { --tw-ring-color: #101D3D; }
+/* الإطارات الداخلية الفاتحة داخل اللوحة تصير ليلية ذهبية ناعمة */
+.dark .fia-notif-panel .border-gray-100,
+.dark .fia-notif-panel .border-gray-200 { border-color: rgba(212, 175, 55, 0.14); }
+.dark .fia-notif-panel .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(212, 175, 55, 0.12); }
+/* أزرار الاختبار السفلية — بطاقات ليلية بإطار كحلي فاتح */
+.dark .fia-notif-panel .border-navy\/20 { border-color: rgba(233, 238, 249, 0.22); }
+/* تظليل بسيط عند مرور المؤشر على صف الإشعار في الليل */
+.dark .fia-notif-panel .hover\:bg-gold\/\[0\.04\]:hover { background-color: rgba(212, 175, 55, 0.07); }
 
 /* ═════ 12) انتقال سلس بين الوضعين ═════ */
 html.theme-transitioning,
