@@ -98,6 +98,38 @@ export default function FaqClient({ faqs }: { faqs: any[] }) {
           ))}
         </div>
       </section>
+
+      {/* 🌟 v10 — لافتة مركز «كيف تبدأ»: أدلة مصوّرة خطوة بخطوة */}
+      <section className="pb-20">
+        <div className="container mx-auto px-4 lg:px-6 max-w-3xl">
+          <a
+            href="/start"
+            className="group relative block overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy-light to-navy text-white p-7 sm:p-9 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1 active:scale-[0.99]"
+          >
+            <div className="absolute inset-0 opacity-25" style={{
+              backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 20%, white 1px, transparent 1px)',
+              backgroundSize: '24px 24px, 18px 18px',
+            }} />
+            <div className="absolute -top-14 -left-14 w-44 h-44 bg-gold/15 rounded-full blur-3xl group-hover:bg-gold/25 transition-colors" />
+            <div className="relative flex items-center gap-5">
+              <div className="shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-gold to-amber-500 text-navy flex items-center justify-center shadow-[0_10px_30px_rgba(212,175,55,0.4)]">
+                <Sparkles className="w-8 h-8" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg sm:text-xl font-extrabold">
+                  <span className="bg-gradient-to-l from-white via-gold/90 to-white bg-clip-text text-transparent">
+                    مركز «كيف تبدأ» — أدلة مصوّرة خطوة بخطوة
+                  </span>
+                </h3>
+                <p className="mt-1.5 text-sm text-white/70 leading-relaxed">
+                  كيف تسجل؟ كيف تدفع؟ كيف تستلم شهادتك؟ كيف تنضم مدرباً؟ — إجابات مصوّرة في دقائق
+                </p>
+              </div>
+              <ChevronDown className="shrink-0 w-6 h-6 text-gold -rotate-90 group-hover:-translate-x-1 transition-transform" />
+            </div>
+          </a>
+        </div>
+      </section>
     </div>
   )
 }
