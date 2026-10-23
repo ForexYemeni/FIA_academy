@@ -35,9 +35,16 @@ import { SharedBlog, SharedFAQ } from './shared-community'
 import { SharedForumRoyal } from './shared-forum-royal'
 import { AffiliateDashboard } from '@/components/fia/affiliate-dashboard'
 import { CertificateRequest } from '@/components/fia/certificate-request'
-import { CertificateViewer } from '@/components/fia/certificate-viewer'
 import { ExamRetakeDialog } from '@/components/fia/exam-retake-dialog'
+// ⚡ v7.0 تحميل كسول ملكي: عارض الشهادات (وزن ثقيل) لا يُحمل إلا عند الطلب الفعلي
+const CertificateViewer = dynamic(
+  () => import('@/components/fia/certificate-viewer').then((m) => m.CertificateViewer),
+  { ssr: false }
+)
+import dynamic from 'next/dynamic'
 import { downloadCertificateFile } from '@/lib/certificate-download'
+import { RoyalGridSkeleton, RoyalListSkeleton } from '@/components/fia/royal-skeleton'
+import { royalFetch, royalInvalidate } from '@/lib/royal-cache'
 
 // ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 6 ترويسات ذهبية
 const NAV: NavItem[] = [
@@ -169,6 +176,7 @@ export function StudentDashboard() {
     ;(window as any).__FIA_refreshActiveView = () => {
       loadEnrollments()
       loadPayments()
+      royalInvalidate('/api/courses') // ⚡ v7.0 إبطال الخزنة قبل التحديث اليدوي
       fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     }
@@ -185,6 +193,7 @@ export function StudentDashboard() {
       // Refresh all relevant data INSTANTLY when a native notification arrives
       loadEnrollments()
       loadPayments()
+      royalInvalidate('/api/courses') // ⚡ v7.0 إبطال الخزنة — بيانات الإشعار أهم من الكاش
       fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
       fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
       // ⚡ Note: We DON'T show a toast here — the notifications-bell component
@@ -204,7 +213,8 @@ export function StudentDashboard() {
   }, [user?.id])
 
   useEffect(() => {
-    fetch('/api/courses').then((r) => r.json()).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
+    // ⚡ v7.0 التحميل الأول من الخزنة الملكية — وكل إشعار لحظي يبطلها فوراً
+    royalFetch<any[]>('/api/courses', { ttl: 45_000 }).then((d) => setCourses(Array.isArray(d) ? d : [])).catch(() => {})
     fetch(`/api/certificates?student_name=${encodeURIComponent(user?.name || '__none__')}`).then((r) => r.json()).then((d) => setCertificates(Array.isArray(d) ? d : [])).catch(() => {})
     loadPayments()
     loadEnrollments()
@@ -1928,13 +1938,7 @@ function Trainers({ userId, onViewCourse }: any) {
   return (
     <SectionCard title="المدربون" description="تابع نخبة المدربين الخبراء — وستصلك إشعارات فورية بكل دورة أو درس جديد ينشرونه">
       {loading ? (
-        <div className="text-center py-14">
-          <div className="relative inline-block mb-3">
-            <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
-            <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
-          </div>
-          <p className="text-sm text-muted-foreground">جاري تحميل المدربين...</p>
-        </div>
+        <RoyalGridSkeleton count={3} />
       ) : (
         <>
           {/* ⚡ Magical hero — follow stats */}
@@ -3596,8 +3600,8 @@ const StudentCertificates = React.memo(function StudentCertificates({ user }: an
   if (loading) {
     return (
       <SectionCard title="شهاداتي" description="الشهادات الصادرة لك">
-        <div className="text-center py-12">
-          <Loader2 className="w-6 h-6 mx-auto animate-spin text-navy" />
+        <div className="py-2">
+          <RoyalListSkeleton rows={3} />
         </div>
       </SectionCard>
     )

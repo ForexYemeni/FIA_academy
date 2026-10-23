@@ -85,6 +85,39 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
+          // 👑 v7.0 — الدرع الخارجي الملكي
+          // HSTS: يُجبر المتصفح على HTTPS لسنتين كاملتين، بما في ذلك النطاقات الفرعية
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          // Permissions-Policy: إغلاق كل قدرات المتصفح الحساسة التي لا يستخدمها الموقع
+          {
+            key: 'Permissions-Policy',
+            value:
+              'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=(), interest-cohort=()',
+          },
+          // Cross-Origin Isolation policies خفيفة لا تكسر شيئاً
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          // CSP ملكية آمنة: تمنع إطار الموقع من جهات خارجية + تحجب الإضافات القديمة
+          // (object-src none يمنع تشغيل إضافات متصفح قديمة، base-uri يمنع اختطاف الروابط،
+          //  form-action يمنع إرسال نماذجنا لجهات خارجية) — سكربتات الموقع نفسه تبقى
+          // مسموحة كما هي بلا أي كسر للـ Next.js ولا لإشعارات FCM/OneSignal.
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://www.gstatic.com https://www.googletagmanager.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "media-src 'self' blob: https:",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https: wss:",
+              "worker-src 'self' blob:",
+              "frame-src 'self' https:",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'",
+            ].join('; '),
+          },
         ],
       },
     ]

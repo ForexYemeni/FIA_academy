@@ -4,6 +4,7 @@ import { guardAdmin, getAuthUser } from '@/lib/api-auth'
 import { hashPassword } from '@/lib/auth-server'
 import { notifyTrainerRenegotiationOffered, resolveTrainerUserId } from '@/lib/notifications'
 import { tgTrainerRenegotiationOffered } from '@/lib/telegram'
+import { audit } from '@/lib/audit'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 
@@ -258,6 +259,8 @@ export async function POST(req: NextRequest) {
     if (error) throw error
     const { password, ...rest } = data
 
+    audit({ action: 'trainer_created', entity: 'trainers', entityId: data.id, actor: g.user, details: { name: body.name, email: body.email, percentage: offeredPct, offered: !!agreementOffer }, req })
+
     // Send a professional Telegram notification with the new trainer's full info
     // (fire-and-forget — never blocks the response)
     notifyTelegramNewTrainer(rest).catch(() => { /* silent */ })
@@ -398,6 +401,7 @@ export async function PUT(req: NextRequest) {
       .single()
     if (error) throw error
     const { password, ...rest } = data
+    audit({ action: 'trainer_updated', entity: 'trainers', entityId: trainerId, actor: g.user, details: { fields: Object.keys(updates || {}) }, req })
     return NextResponse.json(rest)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -439,6 +443,7 @@ export async function DELETE(req: NextRequest) {
 
     const { error } = await supabaseAdmin.from('trainers').delete().eq('id', id)
     if (error) throw error
+    audit({ action: 'trainer_deleted', entity: 'trainers', entityId: id, actor: g.user, req })
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

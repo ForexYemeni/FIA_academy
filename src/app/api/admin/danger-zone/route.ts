@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { tgDangerZoneWiped } from '@/lib/telegram'
 import { DZ_SECTION_TABLES, createDangerSnapshot } from '@/lib/danger-snapshot'
 import { guardDangerZone } from '@/lib/api-auth'
+import { audit } from '@/lib/audit'
 import { getRoyalScope, royalNotInFilter } from '@/lib/royal-guard'
 
 // POST /api/admin/danger-zone
@@ -33,6 +34,9 @@ export async function POST(req: NextRequest) {
       const snap = await createDangerSnapshot('section', section, section, snapshotTables, adminId)
       snapshotId = snap?.id || null
     }
+
+    // 👑 سجل التدقيق الملكي: كل محو يُقيد قبل تنفيذه — من، متى، أي قسم، وأي نسخة إنقاذ
+    audit({ action: 'danger_zone_wipe_started', entity: 'section', entityId: section, actor: guard.user, details: { section, snapshot_id: snapshotId }, req })
 
     let count = 0
     let label = section

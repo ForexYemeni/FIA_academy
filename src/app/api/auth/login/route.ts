@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { hashPassword, verifyPassword } from '@/lib/auth-server'
 import { signTokenAsync, rateLimit, clientIp, tooMany } from '@/lib/api-auth'
+import { audit } from '@/lib/audit'
 
 const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
 const BIO_SEPARATOR = '\n\n===FIA_EXTRA===\n'
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
           role: userRow.role,
           name: userRow.name,
         })
+        audit({ action: 'login_success', entity: 'users', entityId: userRow.id, actor: { id: userRow.id, email: userRow.email, role: userRow.role }, details: { method: 'users_table', team_role: teamRole || null }, req })
         return NextResponse.json({ user, token })
       }
     }
@@ -160,9 +162,11 @@ export async function POST(req: NextRequest) {
               role: 'trainer',
               name: trainer.name,
             })
+            audit({ action: 'login_success', entity: 'trainers', entityId: trainer.id, actor: { id: trainer.id, email: trainer.email, role: 'trainer' }, details: { method: 'team_marker', team_role: role }, req })
             return NextResponse.json({ user, token })
           }
         }
+        audit({ action: 'login_failed', entity: 'trainers', actor: null, details: { email: String(email), reason: 'team_marker_password' }, req })
         return NextResponse.json({ error: 'بيانات الدخول غير صحيحة' }, { status: 401 })
       }
 
@@ -190,10 +194,12 @@ export async function POST(req: NextRequest) {
           role: 'trainer',
           name: trainer.name,
         })
+        audit({ action: 'login_success', entity: 'trainers', entityId: trainer.id, actor: { id: trainer.id, email: trainer.email, role: 'trainer' }, details: { method: 'trainer_table' }, req })
         return NextResponse.json({ user, token })
       }
     }
 
+    audit({ action: 'login_failed', entity: 'auth', actor: null, details: { email: String(email), reason: 'invalid_credentials' }, req })
     return NextResponse.json({ error: 'بيانات الدخول غير صحيحة' }, { status: 401 })
   } catch (e) {
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })

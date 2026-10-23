@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";
+import { ThemeToggle } from "@/components/fia/theme-toggle";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -132,11 +133,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* 👑 v7.0 — تهيئة الوضع الملكي قبل الرسم الأول: لا وميض أبيض أبداً
+            الافتراضي الليل الملكي (dark) — واختيار المستخدم يُحفظ في fia-theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('fia-theme');if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}}catch(e){document.documentElement.classList.add('dark')}})()`,
+          }}
+        />
+      </head>
       <body
         className={`${cairo.variable} font-sans antialiased bg-background text-foreground`}
       >
         <ApiAuthBridge />
         {children}
+        <ThemeToggle />
         <Toaster />
         <SonnerToaster position="top-center" richColors />
         <script

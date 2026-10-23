@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { guardAuth } from '@/lib/api-auth'
 import { notifyTrainerCertified, notifyTrainerAgreementDeclined } from '@/lib/notifications'
 import { tgTrainerCertified, tgTrainerAgreementDeclined } from '@/lib/telegram'
+import { audit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
         .eq('id', trainerId)
       if (error) throw error
       try { await notifyTrainerCertified(user.id, trainer.name) } catch {}
+      audit({ action: 'agreement_renegotiation_accepted', entity: 'trainers', entityId: trainerId, actor: { id: user.id, email: user.email, role: user.role }, details: { trainer: trainer.name, previous_percentage: previousPercentage, new_percentage: newPercentage, note: note || null }, req })
       return NextResponse.json({
         success: true,
         message: `تم تحديث عقد شراكتك — أصبحت نسبتك ${newPercentage}% من كل دورة، مقفولة وموقَّعة من الطرفين`,
@@ -83,6 +85,7 @@ export async function POST(req: NextRequest) {
       .eq('id', trainerId)
     if (error) throw error
     try { await tgTrainerAgreementDeclined(trainer.name, note || null) } catch {}
+    audit({ action: 'agreement_renegotiation_declined', entity: 'trainers', entityId: trainerId, actor: { id: user.id, email: user.email, role: user.role }, details: { trainer: trainer.name, offered_percentage: Number(reneg.percentage) || 0, note: note || null }, req })
     return NextResponse.json({
       success: true,
       message: 'رفضت عرض التعديل — بقيت نسبتك السارية كما هي، وسيصل الإدارة ردُّك',
@@ -117,6 +120,7 @@ export async function POST(req: NextRequest) {
       // اعتماد ملكي: إشعار + تلجرام
       try { await notifyTrainerCertified(user.id, trainer.name) } catch {}
       try { await tgTrainerCertified(trainer.name, agreement.percentage || 0) } catch {}
+      audit({ action: 'agreement_signed', entity: 'trainers', entityId: trainerId, actor: { id: user.id, email: user.email, role: user.role }, details: { trainer: trainer.name, percentage: agreement.percentage || 0, note: note || null }, req })
 
       return NextResponse.json({
         success: true,
@@ -140,6 +144,7 @@ export async function POST(req: NextRequest) {
 
     try { await notifyTrainerAgreementDeclined(trainer.name, note || null) } catch {}
     try { await tgTrainerAgreementDeclined(trainer.name, note || null) } catch {}
+    audit({ action: 'agreement_declined', entity: 'trainers', entityId: trainerId, actor: { id: user.id, email: user.email, role: user.role }, details: { trainer: trainer.name, offered_percentage: agreement.percentage || 0, note: note || null }, req })
 
     return NextResponse.json({
       success: true,

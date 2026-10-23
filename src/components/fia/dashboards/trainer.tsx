@@ -42,6 +42,7 @@ import { LuxSelect } from './luxury'
 import { useSpecializationCatalog } from '@/lib/use-specializations'
 import { Landmark } from 'lucide-react'
 import { supabasePublic } from '@/lib/supabase'
+import { RoyalListSkeleton } from '@/components/fia/royal-skeleton'
 
 // ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 5 ترويسات ذهبية
 const NAV: NavItem[] = [
@@ -1434,14 +1435,8 @@ function TrainerExams({ courses }: { courses: any[] }) {
         description="الاختبارات المستندة إلى محتوى دوراتك التدريبية"
       >
         {loading ? (
-          /* ⚡ Magical loading state */
-          <div className="text-center py-14">
-            <div className="relative inline-block mb-3">
-              <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
-              <Loader2 className="relative w-10 h-10 mx-auto animate-spin text-gold" />
-            </div>
-            <p className="text-sm text-muted-foreground">جاري تحميل الاختبارات...</p>
-          </div>
+          /* ✨ هيكل تحميل ملكي متلألئ */
+          <RoyalListSkeleton rows={4} />
         ) : exams.length === 0 ? (
           /* ⚡ Magical empty state */
           <div className="text-center py-14">
@@ -2036,10 +2031,8 @@ function TrainerNotifs({ courses }: { courses: any[] }) {
       description="آخر التسجيلات في دوراتك التدريبية"
     >
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <Loader2 className="w-8 h-8 text-navy animate-spin" />
-          <p className="text-sm text-muted-foreground">جاري تحميل الإشعارات...</p>
-        </div>
+        /* ✨ هيكل تحميل ملكي متلألئ */
+        <RoyalListSkeleton rows={3} />
       ) : notifs.length === 0 ? (
         <div className="text-center py-16">
           <div className="relative inline-block mb-4">
