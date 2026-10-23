@@ -325,7 +325,7 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
     { value: 'rejected', label: 'مرفوض', emoji: '🚫' },
   ]
   const [form, setForm] = useState<any>(
-    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [] }
+    initial || { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'agreement_pending', qualifications: [], achievements: [], experiences: [] }
   )
   const [saving, setSaving] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
@@ -339,7 +339,7 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
   useEffect(() => {
     setForm(initial
       ? { profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [], ...initial }
-      : { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'approved', qualifications: [], achievements: [], experiences: [] })
+      : { name: '', title: '', specialization: '', bio: '', email: '', password: '', phone: '', avatar: '', years_experience: 0, profit_percentage: 0, payment_method_type: 'محلي', payment_method_name: '', payment_account: '', country: 'اليمن', status: 'agreement_pending', qualifications: [], achievements: [], experiences: [] })
   }, [initial])
 
   const handleAvatarUpload = async (file: File) => {
@@ -549,14 +549,35 @@ function TrainerDialogRoyal({ open, onOpenChange, initial, onSaved }: any) {
           <LuxSelect value={form.country || 'اليمن'} onChange={(v) => setForm({ ...form, country: v })} title="بلد الإقامة" icon={Globe2}
             options={COUNTRY_OPTS_D} />
         </LuxField>
-        <LuxField label="حالة الاعتماد" icon={ShieldCheck} hint="فقط للمنظومة الجديدة: معتمد يظهر في «مدربينا»">
-          <LuxSelect value={form.status || 'approved'} onChange={(v) => setForm({ ...form, status: v })} title="حالة الاعتماد" icon={ShieldCheck}
-            options={STATUS_OPTS_D} />
-        </LuxField>
+        {/* 👑 v6.9.1 — حالة الاعتماد للتعديل فقط: عند الإنشاء يُولد المدرب
+            بعرض اتفاق بانتظار توقيعه ولا تحتاج الإدارة لاختيار الحالة */}
+        {initial && (
+          <LuxField label="حالة الاعتماد" icon={ShieldCheck} hint="فقط للمنظومة الجديدة: معتمد يظهر في «مدربينا»">
+            <LuxSelect value={form.status || 'approved'} onChange={(v) => setForm({ ...form, status: v })} title="حالة الاعتماد" icon={ShieldCheck}
+              options={STATUS_OPTS_D} />
+          </LuxField>
+        )}
       </div>
 
       {/* ── 💰 نظام الأرباح — نسبته من كل دورة على كل متدرب ── */}
-      <FormSectionTitle icon={Crown} label="نظام الأرباح — نسبته من كل دورة" />
+      <FormSectionTitle icon={Crown} label={initial ? 'نظام الأرباح — نسبته من كل دورة' : 'عرض الاتفاق الملكي — نسبته من كل دورة'} />
+      {!initial && (
+        <div className="rounded-xl border border-gold/40 bg-gradient-to-l from-gold/[0.10] to-amber-50 p-3.5 flex items-start gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0 shadow">
+            <BadgeCheck className="w-4 h-4 text-navy" />
+          </div>
+          <p className="text-[11px] leading-relaxed text-navy">
+            <b>مراسم الاتفاق الملكي:</b> النسبة التي تحددها هنا تصبح <b>عرض اتفاق رسمياً</b> — يدخل المدرب بلوحته عند أول دخول ليراه ويوقّعه،
+            وبعد توقيعه <b>تُقفل النسبة على الطرفين</b> ولا تتغير إلا بعرض إعادة تفاوض يوافق عليه هو أيضاً.
+          </p>
+        </div>
+      )}
+      {initial && !agreementLocked && agreementInfo.offered_at && agreementInfo.trainer_response === 'pending' && (
+        <div className="rounded-xl border border-gold/30 bg-gold/[0.07] p-3 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-gold flex-shrink-0" />
+          <p className="text-[11px] text-navy font-bold">📜 عرض قائم بانتظار توقيع المدرب — تعديل النسبة الآن يُحدّث العرض الذي سيوقّع عليه</p>
+        </div>
+      )}
       <div className="rounded-xl border border-gold/30 bg-gradient-to-l from-gold/[0.08] to-transparent p-4 space-y-3">
         {/* 🔒 v6.9 — لافتة العقد المقفول: نسبة مُوقّعة من الطرفين */}
         {agreementLocked && (
