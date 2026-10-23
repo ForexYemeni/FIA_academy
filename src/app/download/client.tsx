@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import {
+  CalendarDays,
   Download,
   Bell,
   Award,
@@ -29,7 +30,24 @@ import {
 const APK_URL =
   'https://github.com/ForexYemeni/FIA-Academy-App/releases/latest/download/FIA-Academy.apk'
 
-const FALLBACK_VERSION = '2.6'
+const FALLBACK_VERSION = '2.7.1'
+const FALLBACK_DATE = '2026-10-23T00:14:14Z'
+
+const AR_MONTHS = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+]
+
+// تنسيق تاريخ ISO إلى عربي قرص (بتوقيت UTC لثبات التاريخ على كل الأجهزة)
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return `${d.getUTCDate()} ${AR_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+  } catch {
+    return ''
+  }
+}
 
 function formatSize(bytes: number): string {
   if (!bytes) return ''
@@ -38,7 +56,9 @@ function formatSize(bytes: number): string {
 }
 
 export default function DownloadClient() {
-  const [version, setVersion] = useState<string | null>(null)
+  // قيم معروضة فوراً من الثوابت المعتمدة، ثم تُنقّح حياً من GitHub إن توفر
+  const [version, setVersion] = useState<string | null>(FALLBACK_VERSION)
+  const [updated, setUpdated] = useState<string | null>(formatDate(FALLBACK_DATE))
   const [size, setSize] = useState<string | null>(null)
   const [qr, setQr] = useState<string>('')
   const [pressed, setPressed] = useState(false)
@@ -52,6 +72,7 @@ export default function DownloadClient() {
         const c = JSON.parse(cached)
         if (c?.version) setVersion(c.version)
         if (c?.size) setSize(c.size)
+        if (c?.updated) setUpdated(c.updated)
       }
     } catch {}
     fetch('https://api.github.com/repos/ForexYemeni/FIA-Academy-App/releases/latest')
@@ -63,10 +84,15 @@ export default function DownloadClient() {
           ? d.assets.find((a: any) => a.name === 'FIA-Academy.apk') || d.assets[0]
           : null
         const s = asset?.size ? formatSize(asset.size) : ''
+        const dt = d.published_at ? formatDate(d.published_at) : ''
         setVersion(v)
         if (s) setSize(s)
+        if (dt) setUpdated(dt)
         try {
-          sessionStorage.setItem('fia-apk-meta', JSON.stringify({ version: v, size: s }))
+          sessionStorage.setItem(
+            'fia-apk-meta',
+            JSON.stringify({ version: v, size: s, updated: dt })
+          )
         } catch {}
       })
       .catch(() => {
@@ -140,6 +166,12 @@ export default function DownloadClient() {
             <ShieldCheck className="w-4 h-4" />
             {version ? `الإصدار ${version}` : 'أحدث إصدار'}
           </span>
+          {updated && (
+            <span className="fia-dl-chip">
+              <CalendarDays className="w-4 h-4" />
+              {`آخر تحديث: ${updated}`}
+            </span>
+          )}
           {size && (
             <span className="fia-dl-chip">
               <Smartphone className="w-4 h-4" />
@@ -223,7 +255,7 @@ export default function DownloadClient() {
               </li>
             </ol>
             <p className="fia-dl-card-note">
-              التطبيق موقّع رسمياً من الأكاديمية وآمن 100%
+              التطبيق موقّع رسمياً من الأكاديمية وآمن 100% — وإن كان لديك إصدار قديم لم يكتمل التثبيت فوقه فأزِله أولاً ثم ثبّت من جديد
             </p>
           </div>
         </div>
