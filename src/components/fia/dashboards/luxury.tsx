@@ -595,8 +595,10 @@ export function LuxDialog({ open, onOpenChange, title, subtitle, icon: Icon, gra
             </DialogTitle>
           </DialogHeader>
         </div>
-        {/* Body */}
-        <div className="p-5 bg-gradient-to-b from-gold/[0.04] to-white space-y-4">{children}</div>
+        {/* Body — v7.3: from-[#D4AF37]/[0.04] بدل from-gold/[0.04] (نفس اللون بكسلياً) حتى لا يطابق
+            جسم النافذة قاعدة [class*="from-gold"] الليلية الجشعة التي كانت تعيد كل نص كحلي
+            داخل النوافذ إلى الداكن، + كلاس lux-dialog-body لسطح ليلي ملكي في royal-night.css */}
+        <div className="lux-dialog-body p-5 bg-gradient-to-b from-[#D4AF37]/[0.04] to-white space-y-4">{children}</div>
         {footer && <DialogFooter className="p-4 bg-muted/20 border-t border-gold/15">{footer}</DialogFooter>}
       </DialogContent>
     </Dialog>

@@ -270,6 +270,50 @@
 /* تظليل بسيط عند مرور المؤشر على صف الإشعار في الليل */
 .dark .fia-notif-panel .hover\:bg-gold\/\[0\.04\]:hover { background-color: rgba(212, 175, 55, 0.07); }
 
+/* ═════ 11.6) التظليل الذهبي الخافت ليس سطحاً ذهبياً — إصلاح جذري لعناوين النوافذ 🌙👑
+   الجذر: قواعد «الكحلي فوق الذهب» تستخدم [class*="from-gold"] فتلتقط أيضاً
+   التظليلات الخافتة جداً (from-gold/[0.03] … from-gold/[0.12]) — وهي همس ذهبي
+   فوق أسطح ليلية (جسم النوافذ LuxDialog، صناديق المعلومات، بطاقات العقد) وليست
+   أسطحاً ذهبية صلبة — فكان كل نص كحلي داخلها يُعاد إلى #0B1635 ويختفي في الليل
+   (عناوين الأقسام + تسميات الحقول + أزرار العدّاد في نوافذ الإدارة كلها).
+   القاعدة أدناه: أي عنصر يحمل تظليلاً ذهبياً «بشفافية» (from-gold/[…] بشرطة مائلة)
+   يُعامَل كسطح ليلي — نصه الكحلي يُشرق — بينما الأسطح الذهبية الصلبة
+   (from-gold to-amber-500 / bg-gold / bg-amber-400 / bg-amber-500) تبقى
+   محفوظة حرفياً بنصها الكحلي فوق الذهب — هوية العلامة لا تُمس */
+.dark [class*="from-gold/"] .text-navy,
+.dark [class*="from-gold/"].text-navy,
+.dark [class*="via-gold/"] .text-navy,
+.dark [class*="via-gold/"].text-navy,
+.dark [class*="from-gold/"] .text-\[\#0A1F44\],
+.dark [class*="from-gold/"].text-\[\#0A1F44\] { color: #E9EEF9 !important; }
+
+/* إعادة تأكيد الذهب الصلب داخل المناطق الخافتة (دائرة القفل الذهبية داخل بطاقة
+   العقد مثلاً): تخصيص أعلى يضمن بقاء النص الكحلي فوق الذهب الحقيقي كحلياً */
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy,
+.dark .bg-gold .text-navy,
+.dark .bg-gold-light .text-navy,
+.dark .bg-amber-400 .text-navy,
+.dark .bg-amber-500 .text-navy,
+.dark .bg-\[\#C9A961\] .text-navy { color: #0B1635 !important; }
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-\[\#0A1F44\],
+.dark .bg-gold .text-\[\#0A1F44\],
+.dark .bg-\[\#C9A961\] .text-\[\#0A1F44\] { color: #0B1635 !important; }
+
+/* أسطح stop الكريمي amber-50 في التدرجات تصبح ليلية ذهبية خافتة —
+   مطابقة للغة ليل الأسطح الصلبة bg-amber-50 المعتمدة (بطاقات عقد الشراكة
+   وصناديق «مراسم الاتفاق» كانت تبقى كريمية ساطعة في الليل) */
+.dark [class*="from-amber-50"],
+.dark [class*="to-amber-50"],
+.dark [class*="via-amber-50"] {
+  background-image: linear-gradient(to left, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.05)) !important;
+}
+
+/* جسم النوافذ الفاخرة LuxDialog — سطح ليلي ملكي متدرج بدل البياض الساطع:
+   همس ذهبي أعلى ثم كحلي ملكي عميق — النهاية البيضاء (to-white) تختفي لليل */
+.dark .lux-dialog-body {
+  background-image: linear-gradient(to bottom, rgba(212, 175, 55, 0.06), #101C3C) !important;
+}
+
 /* ═════ 12) انتقال سلس بين الوضعين ═════ */
 html.theme-transitioning,
 html.theme-transitioning * {

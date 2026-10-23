@@ -1117,3 +1117,31 @@ html.theme-transitioning * {
   100% { transform: translateX(100%); }
 }
 [dir="rtl"] .royal-shimmer-rtl { animation-direction: reverse; }
+
+/* ═════ 👑 v7.3 — التظليل الذهبي الخافت ليس سطحاً ذهبياً (نسخة احتياطية مزدوجة مع royal-night.css 11.6) ═════
+   from-gold/[0.03]…[0.12] همس ذهبي فوق أسطح ليلية (جسم النوافذ/بطاقات العقد/صناديق المعلومات)
+   — قواعد «الكحلي فوق الذهب» الجشعة كانت تعيد كل نص كحلي داخلها إلى الداكن فتختفي
+   عناوين الأقسام وتسميات الحقول ليلاً — الأسطح الذهبية الصلبة تبقى محفوظة حرفياً */
+.dark [class*="from-gold/"] .text-navy,
+.dark [class*="from-gold/"].text-navy,
+.dark [class*="via-gold/"] .text-navy,
+.dark [class*="via-gold/"].text-navy,
+.dark [class*="from-gold/"] .text-\[\#0A1F44\],
+.dark [class*="from-gold/"].text-\[\#0A1F44\] { color: #E9EEF9 !important; }
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-navy,
+.dark .bg-gold .text-navy,
+.dark .bg-gold-light .text-navy,
+.dark .bg-amber-400 .text-navy,
+.dark .bg-amber-500 .text-navy,
+.dark .bg-\[\#C9A961\] .text-navy { color: #0B1635 !important; }
+.dark [class*="from-gold"]:not([class*="from-gold/"]) .text-\[\#0A1F44\],
+.dark .bg-gold .text-\[\#0A1F44\],
+.dark .bg-\[\#C9A961\] .text-\[\#0A1F44\] { color: #0B1635 !important; }
+.dark [class*="from-amber-50"],
+.dark [class*="to-amber-50"],
+.dark [class*="via-amber-50"] {
+  background-image: linear-gradient(to left, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.05)) !important;
+}
+.dark .lux-dialog-body {
+  background-image: linear-gradient(to bottom, rgba(212, 175, 55, 0.06), #101C3C) !important;
+}
