@@ -239,6 +239,64 @@ export async function PUT(req: NextRequest) {
     if (!g.ok) return g.res
     const { id, ...updates } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const trainerId = id
+
+    // 👑 v6.9 — «العقد الملكي المقفول»: قراءة حالة الاتفاق الحالية قبل أي تعديل
+    const { data: current } = await supabaseAdmin
+      .from('trainers')
+      .select('id, name, profit_percentage, agreement, status, password')
+      .eq('id', trainerId)
+      .maybeSingle()
+    if (!current) return NextResponse.json({ error: 'المدرب غير موجود' }, { status: 404 })
+
+    const agreementNow: any = (current as any).agreement || {}
+    const isConfirmed =
+      !!agreementNow.confirmed_at &&
+      agreementNow.trainer_response === 'accepted' &&
+      (current as any).status === 'approved'
+    const isTeamMember = typeof (current as any).password === 'string' &&
+      (current as any).password.startsWith(TEAM_MARKER_PREFIX)
+
+    // 🤝 v6.9 — باب إعادة التفاوض الملكي: الإدارة ترسل عرضاً جديداً للمدرب
+    // بدل التعديل المباشر على نسبة مُتفقاً عليها — يبقى المدرب معتمداً
+    // ونشِراً، ويستعرض العرض في محفظته فيقبل أو يرفض بحرية تامة.
+    if (updates.renegotiation && typeof updates.renegotiation === 'object') {
+      if (!isConfirmed) {
+        return NextResponse.json({ error: 'إعادة التفاوض متاحة فقط بعد اعتماد الاتفاق وتوقيع الطرفين' }, { status: 409 })
+      }
+      const newPct = Math.max(0, Math.min(100, Number(updates.renegotiation.percentage) || 0))
+      const note = String(updates.renegotiation.note || '').trim()
+      const now = new Date().toISOString()
+      const history = Array.isArray(agreementNow.history) ? agreementNow.history : []
+      history.push({
+        at: now, action: 'renegotiation_offered',
+        percentage: newPct, previous_percentage: Number((current as any).profit_percentage) || 0, note: note || null,
+      })
+      const nextAgreement = {
+        ...agreementNow,
+        renegotiation: {
+          offered_at: now,
+          percentage: newPct,
+          note: note || null,
+          trainer_response: 'pending',
+        },
+        trainer_response: 'pending',
+      }
+      const { data, error } = await supabaseAdmin
+        .from('trainers')
+        .update({ agreement: nextAgreement })
+        .eq('id', trainerId)
+        .select('id, name, profit_percentage, agreement, status')
+        .single()
+      if (error) throw error
+      const { password: _pw, ...restSafe } = data as any
+      return NextResponse.json({
+        ...restSafe,
+        renegotiation_sent: true,
+        message: `أُرسل عرض التعديل (${newPct}%) إلى المدرب — يبقى الاتفاق الساري مفعولاً حتى موافقته`,
+      })
+    }
+
     // Bio is stored as plain string now — no encoding.
     // We only update fields that are explicitly provided.
     const patch: any = {}
@@ -253,10 +311,31 @@ export async function PUT(req: NextRequest) {
     // Password update is optional — hashed always
     if (updates.password) patch.password = await hashPassword(String(updates.password))
 
+    // 🔒 v6.9 — القفل الخادمي: نسبة أرباح مُتفقاً عليها لا تُمس بتعديل
+    // مباشر مهما كان مَن يطلب — إن أرادت الإدارة تغييرها فلترسل عرض
+    // إعادة تفاوض (renegotiation) يوافق عليه المدرب ليعود القفل جديداً.
+    if (patch.profit_percentage !== undefined) {
+      if (isTeamMember) {
+        delete patch.profit_percentage // أعضاء الفريق لا يملكون حصة أرباح أصلاً
+      } else {
+        const newPct = Number(patch.profit_percentage) || 0
+        const curPct = Number((current as any).profit_percentage) || 0
+        if (isConfirmed && newPct !== curPct) {
+          return NextResponse.json({
+            error: '🔒 الاتفاق مُوقَّع من الطرفين ومقفول — نسبة الأرباح لا تُعدَّل مباشرة. أرسل «عرض تعديل» للمدرب من بطاقته ليُعيد التوقيع على النسبة الجديدة.',
+            locked: true,
+            renegotiation_required: true,
+            confirmed_percentage: curPct,
+          }, { status: 423 })
+        }
+        patch.profit_percentage = newPct
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('trainers')
       .update(patch)
-      .eq('id', id)
+      .eq('id', trainerId)
       .select()
       .single()
     if (error) throw error

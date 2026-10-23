@@ -65,18 +65,39 @@ export async function POST(req: NextRequest) {
         // instead of the generic role label. The actual password is never
         // sent to the client (it stays empty), so the shell reads
         // `user.team_role` rather than parsing `user.password`.
+        //
+        // 👑 v6.9 — «هوية المؤسس الخالدة»: (1) مطابقة البريد غير حساسة
+        // لحالة الأحرف، (2) وعاء احتياطي في جدول team_members المحصّن ضد
+        // أي محو بيانات — فلن تفقد شارة المؤسس أبداً مهما تغيّرت البيانات.
         let teamRole: string | undefined
         try {
           const { data: trainerRow } = await supabaseAdmin
             .from('trainers')
             .select('password')
-            .eq('email', userRow.email)
+            .ilike('email', userRow.email)
             .maybeSingle()
           if (trainerRow?.password?.startsWith(TEAM_MARKER_PREFIX)) {
             const afterPrefix = trainerRow.password.substring(TEAM_MARKER_PREFIX.length)
             const sepIdx = afterPrefix.indexOf('__')
             if (sepIdx !== -1) {
               teamRole = afterPrefix.substring(0, sepIdx) || 'team'
+            }
+          }
+          if (!teamRole) {
+            const { data: tm } = await supabaseAdmin
+              .from('team_members')
+              .select('role')
+              .eq('user_id', userRow.id)
+              .maybeSingle()
+            if ((tm as any)?.role) {
+              teamRole = String((tm as any).role)
+            } else {
+              const { data: tmEmail } = await supabaseAdmin
+                .from('team_members')
+                .select('role')
+                .ilike('email', userRow.email)
+                .maybeSingle()
+              if ((tmEmail as any)?.role) teamRole = String((tmEmail as any).role)
             }
           }
         } catch {}

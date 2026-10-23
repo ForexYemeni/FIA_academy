@@ -94,6 +94,9 @@ export function TrainerEarnings({ user }: { user: any }) {
 
   // screenshot viewer
   const [shot, setShot] = useState<string | null>(null)
+  // 🤝 v6.9 — ردّ المدرب على عرض إعادة التفاوض الملكي
+  const [renegBusy, setRenegBusy] = useState(false)
+  const [renegDeclineNote, setRenegDeclineNote] = useState('')
 
   const load = useCallback(async () => {
     if (!user?.id) return
@@ -202,8 +205,66 @@ export function TrainerEarnings({ user }: { user: any }) {
   const withdrawals = data?.withdrawals || []
   const courses = data?.courses || []
 
+  // 🤝 v6.9 — عرض إعادة التفاوض المعلّق (إن وُجد): النسبة السارية تبقى مفعّلة حتى الرد
+  const renegOffer: any = data?.profile?.agreement?.renegotiation
+  const renegPending = !!renegOffer && renegOffer.trainer_response === 'pending'
+
+  const respondRenegotiation = async (response: 'accepted' | 'declined') => {
+    if (!user?.id || renegBusy) return
+    setRenegBusy(true)
+    try {
+      const res = await fetch('/api/trainers/agreement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trainer_id: user.id, response, note: response === 'declined' ? renegDeclineNote : undefined }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.success) {
+        toast.success(d.message || 'تم تسجيل ردّك')
+        setRenegDeclineNote('')
+        await load()
+      } else {
+        toast.error(d.error || 'تعذر تسجيل الرد')
+      }
+    } catch { toast.error('خطأ') } finally { setRenegBusy(false) }
+  }
+
   return (
     <div className="space-y-6">
+      {/* 🤝 v6.9 — عرض إعادة التفاوض الملكي: قرارات سريعة بلمسة واحدة */}
+      {renegPending && (
+        <div className="relative overflow-hidden rounded-2xl border border-gold/50 bg-gradient-to-l from-amber-50 via-white to-gold/[0.06] p-5 shadow-lg">
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }} />
+          <div className="relative space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0 shadow">
+                <BadgePercent className="w-5 h-5 text-navy" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold text-navy">📜 عرض تعديل اتفاق الأرباح بانتظار موافقتك</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  الإدارة تقترح تعديل نسبتك من <b className="text-navy" dir="ltr">{percentage}%</b> إلى <b className="text-emerald-700" dir="ltr">{Number(renegOffer.percentage) || 0}%</b> من كل دورة.
+                  نسبتك السارية تبقى مفعّلة حتى توافق — وبعد موافقتك يُقفل العقد الجديد من الطرفين.
+                </p>
+              </div>
+            </div>
+            {renegOffer.note && (
+              <p className="text-[11px] rounded-xl bg-gold/10 border border-gold/25 p-2.5 text-navy"><b className="text-gold">ملاحظة الإدارة:</b> {String(renegOffer.note)}</p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button type="button" disabled={renegBusy} onClick={() => respondRenegotiation('accepted')}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-l from-gold to-amber-500 text-navy text-xs font-extrabold shadow hover:brightness-110 transition-all disabled:opacity-60 flex items-center justify-center gap-1.5">
+                {renegBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                أوافق — أقفل الاتفاق بالنسبة الجديدة {Number(renegOffer.percentage) || 0}%
+              </button>
+              <button type="button" disabled={renegBusy} onClick={() => respondRenegotiation('declined')}
+                className="sm:w-44 py-2.5 rounded-xl border border-navy/25 bg-white text-navy text-xs font-extrabold hover:bg-navy/5 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <XCircle className="w-4 h-4" /> أرفض — تبقى نسبيتي الحالية
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Hero: الخزينة الذهبية متعددة العملات ── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-navy via-navy-light to-navy p-6 text-white shadow-xl ring-1 ring-gold/30">
         <div className="absolute inset-0 opacity-25" style={{
