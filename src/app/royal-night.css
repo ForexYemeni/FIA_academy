@@ -1,15 +1,18 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   🌙👑 v7.1 — الليل الملكي المضمون (Royal Night — Resilient Edition)
+   🌙👑 v8.0 — الليل الملكي الكامل (Royal Night — Total Edition)
    ───────────────────────────────────────────────────────────────────────
    لماذا هذا الملف مستقل؟ لأن قواعد الوضع الليلي كانت في ذيل ملف CSS
    ضخم (‎~385KB) — وعلى الشبكات البطيئة (20KB/s في بعض الدول) قد يُقطع
    التحميل فتضيع القواعد الأخيرة بينما تصل الأولى، فيظهر ليلٌ ناقص:
    خلفيات كحلية بنصوص كحلية لا تُقرأ.
-   • هذا الملف صغير (~15KB) فيحمَّل كاملاً خلال ثوانٍ حتى على أضعف شبكة
+   • هذا الملف صغير (~20KB) فيحمَّل كاملاً خلال ثوانٍ حتى على أضعف شبكة
    • يُحمَّل كملف مستقل بعد globals.css فلا يمس النهار إطلاقاً
    • القواعد الحرجة (النصوص الكحلية/الأسطح) مشدودة بـ !important
      فلا يهزمها أي ترتيب أو تكرار أو إصدار مستقبلي
    • لا يمس sw.js ولا منظومة الإشعارات الثلاثية — طبقة عرض بحتة
+   • v8.0: إغلاق آخر الفجوات — عائلة rose كاملة + fuchsia/pink + توقفات
+     التدرجات الملونة -50 كلها + تمويج التمرير الليلي + إصلاح التقاط
+     amber-500 بالخطأ في محدد v7.3 (عودة تدرج الذهب الصلب للأزرار ليلاً)
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ─── تلميح المتصفح بأن النماذج ليلية ─── */
@@ -66,21 +69,18 @@
 .dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-100:hover { background-color: #16264D; }
 .dark .hover\:bg-gray-200:hover { background-color: #1A2C58; }
 
-/* ═════ 3) تدرجات البياض → تدرجات ليلية (من/عبر/إلى) ═════ */
-.dark .from-white {
-  --tw-gradient-from: #0F1B36 var(--tw-gradient-from-position);
-  --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position)) !important;
-}
-.dark .via-white {
-  --tw-gradient-via: #14224A;
-  --tw-gradient-via-stops: var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-via-stops) !important;
-}
-.dark .to-white { --tw-gradient-to: #0A1428 var(--tw-gradient-to-position) !important; }
-.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 {
-  --tw-gradient-from: #0C1730 var(--tw-gradient-from-position);
-  --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
-}
+/* ═════ 3) تدرجات البياض → تدرجات ليلية (من/عبر/إلى) ═════
+   ⚠️ v8.0 — إصلاح جذري صامت منذ v7.1: Tailwind v4 يسجّل from/via/to
+   كخصائص <color> خالصة (‎@property syntax:"<color>") — فأي إلحاق
+   var(--tw-gradient-*-position) بعد اللون يجعل القيمة غير صالحة فتسقط
+   إلى شفاف #0000 (كانت تعمل في Tailwind v3 ثم انكسرت بصمت بعد الترقية
+   — أي عنصر from-white/to-white كان يُرسم شفافاً في الليل).
+   العلاج: قيم نقية بلون فقط — وسلسلة التوقفات تبقى من أداة Tailwind
+   نفسها فتلتقط اللون الليلي تلقائياً */
+.dark .from-white { --tw-gradient-from: #0F1B36; }
+.dark .via-white { --tw-gradient-via: #14224A; }
+.dark .to-white { --tw-gradient-to: #0A1428 !important; }
+.dark .from-gray-50, .dark .from-gray-100, .dark .from-slate-50, .dark .from-slate-100 { --tw-gradient-from: #0C1730; }
 
 /* ═════ 4) النصوص — عائلة الرمادي ═════ */
 .dark .text-gray-900, .dark .text-gray-800,
@@ -231,17 +231,14 @@
 .dark .fia-keep-light .text-slate-900, .dark .fia-keep-light .text-gray-700 {
   color: #111827;
 }
-/* داخل المناطق الفاتحة المحمية: الكحلي نصاً يبقى كحلياً — وأيضاً التدرجات البيضاء تعود بياضاً */
+/* داخل المناطق الفاتحة المحمية: الكحلي نصاً يبقى كحلياً — وأيضاً التدرجات البيضاء تعود بياضاً
+   (v8.0 — قيم نقية بلا لاحقة موضع — انظر إصلاح القسم 3) */
 .dark .fia-keep-light .text-navy, .dark .fia-keep-light .text-\[\#0A1F44\] { color: #0B1635 !important; }
 .dark .fia-keep-light .text-gray-600 { color: #4B5563 !important; }
 .dark .fia-keep-light .text-gray-500 { color: #6B7280 !important; }
-.dark .fia-keep-light .via-white {
-  --tw-gradient-via: #ffffff;
-  --tw-gradient-via-stops: var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-via-stops);
-}
-.dark .fia-keep-light .from-white { --tw-gradient-from: #ffffff var(--tw-gradient-from-position); }
-.dark .fia-keep-light .to-white { --tw-gradient-to: #ffffff var(--tw-gradient-to-position); }
+.dark .fia-keep-light .via-white { --tw-gradient-via: #ffffff; }
+.dark .fia-keep-light .from-white { --tw-gradient-from: #ffffff; }
+.dark .fia-keep-light .to-white { --tw-gradient-to: #ffffff !important; }
 .dark .fia-keep-light::before { display: none; }
 
 /* ═════ 11) الشريط الجانبي واللوحات الكحلية — هوية العلامة تبقى كما هي ═════
@@ -301,10 +298,15 @@
 
 /* أسطح stop الكريمي amber-50 في التدرجات تصبح ليلية ذهبية خافتة —
    مطابقة للغة ليل الأسطح الصلبة bg-amber-50 المعتمدة (بطاقات عقد الشراكة
-   وصناديق «مراسم الاتفاق» كانت تبقى كريمية ساطعة في الليل) */
-.dark [class*="from-amber-50"],
-.dark [class*="to-amber-50"],
-.dark [class*="via-amber-50"] {
+   وصناديق «مراسم الاتفاق» كانت تبقى كريمية ساطعة في الليل)
+   ⚠️ v8.0 — إصلاح جذري لمحدد v7.3: [class*="from-amber-50"] كان مطابقة نصية
+   جزئية تلتقط بالخطأ from-amber-500 / to-amber-500 / via-amber-500 (284 موضعاً
+   من تدرجات الذهب الصلبة — هوية العلامة!) فتُسطّح تدرجُ الأزرار الذهبية
+   ليلاً إلى غسلة باهتة. الآن: الكلاس الدقيق + متغيرات الشفافية (بشرطة
+   مائلة) فقط — الذهب الصلب 500/600 يعود متلألأً في الليل كما هو */
+.dark .from-amber-50, .dark [class*="from-amber-50/"],
+.dark .to-amber-50, .dark [class*="to-amber-50/"],
+.dark .via-amber-50, .dark [class*="via-amber-50/"] {
   background-image: linear-gradient(to left, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.05)) !important;
 }
 
@@ -313,6 +315,122 @@
 .dark .lux-dialog-body {
   background-image: linear-gradient(to bottom, rgba(212, 175, 55, 0.06), #101C3C) !important;
 }
+
+/* ═════ 13) v8.0 — عائلة الورد rose الناقصة كلياً 🌙👑
+   177 موضعاً (أزرار الحذف/التعليق، حالات الامتحان الخاطئة، بطاقات الشهادات)
+   كانت بلا أي قاعدة ليلية: bg-rose-50 يبقى وردياً ساطعاً وtext-rose-600/700
+   يخفت على الأسطح الداكنة — الآن ليلة وردية ملكية متوافقة مع بقية العائلات */
+.dark .bg-rose-50, .dark [class*="bg-rose-50/"],
+.dark .bg-rose-100 { background-color: rgba(251, 113, 133, 0.10); }
+.dark .text-rose-500, .dark [class*="text-rose-500/"] { color: #FB7185 !important; }
+.dark .text-rose-600 { color: #FB7185 !important; }
+.dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900 { color: #FDA4AF !important; }
+.dark .border-rose-100, .dark .border-rose-200, .dark .border-rose-300 { border-color: rgba(251, 113, 133, 0.28); }
+
+/* ═════ 14) v8.0 — عائلتا الفوشيا والوردي ═════ */
+.dark .bg-fuchsia-50, .dark [class*="bg-fuchsia-50/"],
+.dark .bg-fuchsia-100, .dark .bg-pink-50, .dark [class*="bg-pink-50/"],
+.dark .bg-pink-100 { background-color: rgba(232, 121, 249, 0.10); }
+.dark .text-fuchsia-600, .dark .text-fuchsia-700 { color: #E879F9 !important; }
+.dark .text-fuchsia-800, .dark .text-fuchsia-900 { color: #F0ABFC !important; }
+.dark .text-pink-600, .dark .text-pink-700 { color: #F472B6 !important; }
+.dark .text-pink-800, .dark .text-pink-900 { color: #F9A8D4 !important; }
+.dark .border-fuchsia-200, .dark .border-pink-200 { border-color: rgba(232, 121, 249, 0.28); }
+
+/* ═════ 15) v8.0 — درجات ناقصة متفرقة اكتشفها المسح الجنائي الشامل ═════ */
+.dark .text-sky-800 { color: #93C5FD !important; }      /* صناديق معلومات sky-50: نص كحلي داكن على سطح أزرق داكن */
+.dark .text-yellow-900 { color: #E5C158 !important; }   /* توست التحذير الذهبي */
+.dark .border-slate-300 { border-color: #223055; }
+.dark .border-emerald-300 { border-color: rgba(52, 211, 153, 0.28); }
+
+/* ═════ 16) v8.0 — توقفات التدرجات الملونة الناعمة (-50) تصير ليلية 🌙👑
+   97 موضعاً من بطاقات الروابط السريعة (100 نافذة منبثقة) وصناديق InfoBox
+   وصفوف حالة المحتوى كانت تبقى كريمية ساطعة في الليل: from-blue-50
+   to-indigo-50, from-emerald-50 to-teal-50, from-purple-50 to-fuchsia-50...
+   الأسلوب (v4-نقي): إبدال لون التوقف فقط — خصائص <color> خالصة بلا أي
+   لاحقة موضع (انظر إصلاح القسم 3) فتحافظ سلسلة Tailwind على الاتجاه
+   والأزواج والتقاطع oklab تلقائياً، مع تغطية متغيرات الشفافية
+   (from-blue-50/80...) لأي كود مستقبلي.
+   التدرجات الصلبة المتوسطة (from-emerald-500 to-teal-600 وfrom-rose-500
+   to-rose-600 وto-fuchsia-700...) هوية لا تُمس — تبقى كما هي في الوضعين */
+.dark .from-blue-50, .dark [class*="from-blue-50/"] { --tw-gradient-from: rgba(96, 165, 250, 0.16); }
+.dark .via-blue-50, .dark [class*="via-blue-50/"] { --tw-gradient-via: rgba(96, 165, 250, 0.12); }
+.dark .to-blue-50, .dark [class*="to-blue-50/"] { --tw-gradient-to: rgba(96, 165, 250, 0.06); }
+
+.dark .from-sky-50, .dark [class*="from-sky-50/"] { --tw-gradient-from: rgba(56, 189, 248, 0.16); }
+.dark .to-sky-50, .dark [class*="to-sky-50/"] { --tw-gradient-to: rgba(56, 189, 248, 0.06); }
+
+.dark .from-indigo-50, .dark [class*="from-indigo-50/"] { --tw-gradient-from: rgba(129, 140, 248, 0.16); }
+.dark .via-indigo-50, .dark [class*="via-indigo-50/"] { --tw-gradient-via: rgba(129, 140, 248, 0.12); }
+.dark .to-indigo-50, .dark [class*="to-indigo-50/"] { --tw-gradient-to: rgba(129, 140, 248, 0.06); }
+
+.dark .from-emerald-50, .dark [class*="from-emerald-50/"] { --tw-gradient-from: rgba(52, 211, 153, 0.16); }
+.dark .to-emerald-50, .dark [class*="to-emerald-50/"] { --tw-gradient-to: rgba(52, 211, 153, 0.06); }
+
+.dark .from-teal-50, .dark [class*="from-teal-50/"] { --tw-gradient-from: rgba(45, 212, 191, 0.16); }
+.dark .via-teal-50, .dark [class*="via-teal-50/"] { --tw-gradient-via: rgba(45, 212, 191, 0.12); }
+.dark .to-teal-50, .dark [class*="to-teal-50/"] { --tw-gradient-to: rgba(45, 212, 191, 0.06); }
+
+.dark .from-cyan-50, .dark [class*="from-cyan-50/"] { --tw-gradient-from: rgba(34, 211, 238, 0.16); }
+.dark .to-cyan-50, .dark [class*="to-cyan-50/"] { --tw-gradient-to: rgba(34, 211, 238, 0.06); }
+
+.dark .from-green-50, .dark [class*="from-green-50/"] { --tw-gradient-from: rgba(74, 222, 128, 0.16); }
+.dark .to-green-50, .dark [class*="to-green-50/"] { --tw-gradient-to: rgba(74, 222, 128, 0.06); }
+
+.dark .from-red-50, .dark [class*="from-red-50/"] { --tw-gradient-from: rgba(248, 113, 113, 0.16); }
+.dark .to-red-50, .dark [class*="to-red-50/"] { --tw-gradient-to: rgba(248, 113, 113, 0.06); }
+
+.dark .from-rose-50, .dark [class*="from-rose-50/"] { --tw-gradient-from: rgba(251, 113, 133, 0.16); }
+.dark .to-rose-50, .dark [class*="to-rose-50/"] { --tw-gradient-to: rgba(251, 113, 133, 0.06); }
+
+.dark .from-purple-50, .dark [class*="from-purple-50/"] { --tw-gradient-from: rgba(167, 139, 250, 0.16); }
+.dark .to-purple-50, .dark [class*="to-purple-50/"] { --tw-gradient-to: rgba(167, 139, 250, 0.06); }
+
+.dark .from-violet-50, .dark [class*="from-violet-50/"] { --tw-gradient-from: rgba(167, 139, 250, 0.16); }
+.dark .to-violet-50, .dark [class*="to-violet-50/"] { --tw-gradient-to: rgba(167, 139, 250, 0.06); }
+
+.dark .from-fuchsia-50, .dark [class*="from-fuchsia-50/"] { --tw-gradient-from: rgba(232, 121, 249, 0.16); }
+.dark .to-fuchsia-50, .dark [class*="to-fuchsia-50/"] { --tw-gradient-to: rgba(232, 121, 249, 0.06); }
+
+.dark .from-pink-50, .dark [class*="from-pink-50/"] { --tw-gradient-from: rgba(244, 114, 182, 0.16); }
+.dark .to-pink-50, .dark [class*="to-pink-50/"] { --tw-gradient-to: rgba(244, 114, 182, 0.06); }
+
+.dark .from-orange-50, .dark [class*="from-orange-50/"] { --tw-gradient-from: rgba(251, 146, 60, 0.16); }
+.dark .via-orange-50, .dark [class*="via-orange-50/"] { --tw-gradient-via: rgba(251, 146, 60, 0.12); }
+.dark .to-orange-50, .dark [class*="to-orange-50/"] { --tw-gradient-to: rgba(251, 146, 60, 0.06); }
+
+/* عائلتا الرمادي: توقفات to/via الناقصة + متغيرات الشفافية (from-gray-50
+   وfrom-slate-50 الصرفة مغطاتان في القسم 3 — هذه تكمّل البقية) */
+.dark .to-gray-50, .dark .to-slate-50,
+.dark [class*="to-gray-50/"], .dark [class*="to-slate-50/"] { --tw-gradient-to: rgba(10, 20, 40, 0.85); }
+.dark [class*="from-gray-50/"], .dark [class*="from-slate-50/"] { --tw-gradient-from: rgba(12, 23, 48, 0.92); }
+
+/* ═════ 17) v8.0 — تمويج التمرير الليلي 🌙👑
+   ~20 حافة تمرير بألوان -50/-100 صلبة كانت تومض بياضًا ساطعًا لحظة
+   مرور المؤشر في الليل (أزرار الحذف، صفوف الجداول، بطاقات الاختيار) */
+.dark .hover\:bg-red-50:hover, .dark .hover\:bg-red-100:hover { background-color: rgba(248, 113, 113, 0.16); }
+.dark .hover\:bg-blue-50:hover, .dark .hover\:bg-blue-100:hover,
+.dark .hover\:bg-sky-100:hover { background-color: rgba(96, 165, 250, 0.16); }
+.dark .hover\:bg-emerald-100:hover, .dark .hover\:bg-green-50:hover,
+.dark .hover\:bg-green-100:hover { background-color: rgba(52, 211, 153, 0.16); }
+.dark .hover\:bg-amber-50:hover, .dark .hover\:bg-amber-100:hover,
+.dark .hover\:bg-amber-100\/60:hover { background-color: rgba(212, 175, 55, 0.16); }
+.dark .hover\:bg-cyan-100:hover { background-color: rgba(45, 212, 191, 0.16); }
+.dark .hover\:bg-rose-50:hover, .dark .hover\:bg-rose-100:hover { background-color: rgba(251, 113, 133, 0.16); }
+.dark .hover\:bg-fuchsia-50:hover, .dark .hover\:bg-pink-50:hover { background-color: rgba(232, 121, 249, 0.16); }
+.dark .hover\:bg-teal-50:hover, .dark .hover\:bg-teal-100:hover,
+.dark .hover\:bg-indigo-100:hover, .dark .hover\:bg-purple-100:hover,
+.dark .hover\:bg-orange-100:hover { background-color: rgba(120, 130, 190, 0.16); }
+
+/* ═════ 18) v8.0 — درع المناطق الفاتحة المحمية للعائلات الجديدة ═════
+   داخل .fia-keep-light (شهادات/طباعة/التقاط صور) تعود العائلات الجديدة
+   إلى ألوانها النهارية الحرفية — نفس بروتوكول درع الرمادي في القسم 10 */
+.dark .fia-keep-light .text-rose-500, .dark .fia-keep-light .text-rose-600 { color: #F43F5E !important; }
+.dark .fia-keep-light .text-rose-700, .dark .fia-keep-light .text-rose-800 { color: #BE123C !important; }
+.dark .fia-keep-light .text-fuchsia-600, .dark .fia-keep-light .text-pink-600 { color: #C026D3 !important; }
+.dark .fia-keep-light .text-sky-800 { color: #075985 !important; }
+.dark .fia-keep-light .bg-rose-50, .dark .fia-keep-light .bg-pink-50 { background-color: #FFF1F2; }
+.dark .fia-keep-light .bg-fuchsia-50 { background-color: #FDF4FF; }
 
 /* ═════ 12) انتقال سلس بين الوضعين ═════ */
 html.theme-transitioning,

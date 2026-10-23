@@ -5,6 +5,7 @@ import "./royal-night.css"; // 🌙👑 v7.1 — طبقة الليل الملك�
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";
+import { SessionGuard } from "@/components/fia/session-guard"; // 👑 v8.0 — حرس الجلسة الملكي: خروج فوري لحظة حذف الحساب (كل الأدوار وكل المسارات)
 import { ThemeToggle } from "@/components/fia/theme-toggle";
 
 const cairo = Cairo({
@@ -147,6 +148,7 @@ export default function RootLayout({
         className={`${cairo.variable} font-sans antialiased bg-background text-foreground`}
       >
         <ApiAuthBridge />
+        <SessionGuard />
         {children}
         <ThemeToggle />
         <Toaster />
