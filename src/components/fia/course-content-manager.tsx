@@ -19,6 +19,8 @@ import {
   Package, BookOpen, Sparkles, Layers, Mic,
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
+// 👑 مؤلّف الدروس النصية الملكي — وحدة مشتركة مع القارئ الملكي
+import { LuxTextComposer } from '@/components/fia/lux-text-lesson'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 
 interface Module {
@@ -959,19 +961,9 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
             </div>
           )}
 
-          {/* Text content — blue gradient card */}
+          {/* 👑 Text content — Royal luxury composer (shared with the royal reader) */}
           {lessonType === 'text' && (
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-200/40">
-              <Label className="text-xs font-bold text-blue-600 mb-1.5 flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <FileText className="w-3 h-3 text-white" />
-                </div>
-                محتوى الدرس النصي
-              </Label>
-              <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={6}
-                placeholder="اكتب محتوى الدرس هنا..."
-                className="text-sm bg-white/80 border-blue-200/40 focus:border-blue-500 focus:ring-blue-500/30 rounded-xl resize-y" />
-            </div>
+            <LuxTextComposer value={content} onChange={setContent} />
           )}
 
           {/* Exam builder — purple gradient card */}

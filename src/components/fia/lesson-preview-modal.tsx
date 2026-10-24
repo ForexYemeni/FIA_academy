@@ -9,10 +9,12 @@ import {
 } from '@/components/ui/dialog'
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
-  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Copy, Loader2,
+  Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2,
   Sparkles, Lock, Mic,
 } from 'lucide-react'
 import { toast } from 'sonner'
+// 👑 القارئ الملكي للدرس النصي — وحدة مشتركة مع مؤلّف الدروس في لوحة الإدارة
+import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
 // ⚡ CustomPdfViewer is a separate component (extracted for clarity)
 // that uses pdf.js to render PDFs inside the app without Google Docs
 // Viewer. It handles its own pdfjs import + worker setup.
@@ -324,7 +326,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 />
               )
             )}
-            {lesson.lesson_type === 'text' && <TextContent content={lesson.content} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'text' && <LuxRoyalReader content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
@@ -620,214 +622,6 @@ function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => voi
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ============== Text Content — Magical Reading Experience ==============
-// ⚡ onComplete fires when the student reads the text content:
-//   1. For SHORT content (fits in viewport — no scrollbar): fires after
-//      a 3-second dwell (long enough to read 1-5 lines but not annoying).
-//   2. For LONG content (requires scrolling): fires when student
-//      scrolls to within 30px of the bottom.
-//   3. Safety net: if neither fires within 12 seconds, fire anyway
-//      (we don't want the student stuck — content is finite, the
-//      student can't be expected to wait forever).
-// Each fire is debounced — we only fire ONCE per lesson session.
-function TextContent({ content, onComplete }: { content?: string; onComplete?: () => void }) {
-  const [copied, setCopied] = useState(false)
-  const firedRef = useRef(false)
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const shortDwellTimerRef = useRef<any>(null)
-  const safetyNetTimerRef = useRef<any>(null)
-
-  // ⚡ Fire onComplete exactly once, with all timers cleaned up.
-  const fireNow = () => {
-    if (firedRef.current) return
-    if (!onComplete) return
-    firedRef.current = true
-    if (shortDwellTimerRef.current) { clearTimeout(shortDwellTimerRef.current); shortDwellTimerRef.current = null }
-    if (safetyNetTimerRef.current) { clearTimeout(safetyNetTimerRef.current); safetyNetTimerRef.current = null }
-    onComplete()
-  }
-
-  // Reset the fired flag + start the timers when content changes.
-  useEffect(() => {
-    firedRef.current = false
-    if (!onComplete || !content) return
-
-    // ⚡ Safety net: fire after 12 seconds regardless of scroll — we
-    // don't want the student to wait forever if neither the
-    // short-dwell nor the scroll-to-bottom fired.
-    safetyNetTimerRef.current = setTimeout(() => {
-      fireNow()
-    }, 12000)
-
-    // ⚡ Short content dwell: check after a 600ms delay (gives the
-    // browser time to layout the content + measure scrollHeight
-    // accurately). If scrollHeight <= clientHeight, the content fits
-    // in the viewport (no scrollbar) — fire after a 3-second reading
-    // dwell so the student has time to read it.
-    const measureTimer = setTimeout(() => {
-      const el = scrollContainerRef.current
-      if (!el) return
-      // No scrollbar — content fits entirely in view
-      const hasScrollbar = el.scrollHeight > el.clientHeight + 2
-      if (!hasScrollbar) {
-        shortDwellTimerRef.current = setTimeout(() => {
-          fireNow()
-        }, 3000) // 3-second read time for short content
-      }
-      // If there IS a scrollbar, the onScroll handler in the JSX
-      // below will fire onComplete when the student scrolls to bottom.
-    }, 600)
-
-    return () => {
-      if (measureTimer) clearTimeout(measureTimer)
-      if (shortDwellTimerRef.current) { clearTimeout(shortDwellTimerRef.current); shortDwellTimerRef.current = null }
-      if (safetyNetTimerRef.current) { clearTimeout(safetyNetTimerRef.current); safetyNetTimerRef.current = null }
-    }
-  }, [content, onComplete])
-  if (!content) {
-    // ⚡ Magical empty state
-    return (
-      <div className="relative text-center py-12 bg-gradient-to-br from-white to-gold/5 border border-gold/30 rounded-xl overflow-hidden">
-        <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
-        <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative inline-block mb-3">
-          <div className="absolute inset-0 bg-gold/20 rounded-full blur-xl animate-pulse" />
-          <div className="relative w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-md border border-gold/30">
-            <FileText className="w-8 h-8 text-gold" />
-          </div>
-        </div>
-        <p className="relative text-muted-foreground">لا يوجد محتوى نصي لهذا الدرس</p>
-      </div>
-    )
-  }
-
-  // Format content: split into paragraphs, detect numbered lists, detect headings
-  const formatContent = (text: string) => {
-    const paragraphs = text.split('\n\n')
-    return paragraphs.map((para, pi) => {
-      const trimmed = para.trim()
-      if (!trimmed) return null
-
-      // Check if it's a numbered list (starts with "1." or "1-")
-      const lines = trimmed.split('\n')
-      const isNumberedList = lines.length > 1 && lines.every(l => /^\d+[\.\)]\s/.test(l.trim()))
-      const isBulletList = lines.length > 1 && lines.every(l => /^[-•▪]\s/.test(l.trim()))
-      // Heading detection: short line ending with colon
-      const isHeading = trimmed.length < 80 && (trimmed.endsWith(':') || trimmed.endsWith('：')) && !trimmed.includes('\n')
-
-      if (isHeading) {
-        return (
-          <h3 key={pi} dir="rtl" className="text-navy font-bold text-base md:text-lg mt-6 mb-3 pr-3 border-r-[3px] border-gold">
-            {trimmed}
-          </h3>
-        )
-      }
-
-      if (isNumberedList) {
-        return (
-          <ol key={pi} dir="rtl" className="space-y-3 my-5 list-none pr-1">
-            {lines.map((line, li) => {
-              const num = line.trim().match(/^(\d+)/)?.[1] || (li + 1)
-              const text = line.trim().replace(/^\d+[\.\)]\s*/, '')
-              return (
-                <li key={li} className="flex flex-row-reverse items-start gap-3">
-                  <span className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-navy to-navy-light text-gold text-xs font-bold flex items-center justify-center mt-0.5 shadow-sm">{num}</span>
-                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right break-words">{text}</span>
-                </li>
-              )
-            })}
-          </ol>
-        )
-      }
-
-      if (isBulletList) {
-        return (
-          <ul key={pi} dir="rtl" className="space-y-2.5 my-5 list-none pr-1">
-            {lines.map((line, li) => {
-              const text = line.trim().replace(/^[-•▪]\s*/, '')
-              return (
-                <li key={li} className="flex flex-row-reverse items-start gap-3">
-                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gold mt-2.5 shadow-[0_0_6px_rgba(212,175,55,0.6)]"></span>
-                  <span className="text-foreground/90 leading-loose text-sm md:text-base flex-1 text-right break-words">{text}</span>
-                </li>
-              )
-            })}
-          </ul>
-        )
-      }
-
-      // Regular paragraph — RTL with right alignment (no justify — no stretch)
-      return (
-        <p key={pi} dir="rtl" className="text-foreground/90 leading-loose text-sm md:text-base mb-4 text-right break-words">
-          {trimmed.split('\n').map((line, li) => (
-            <span key={li} className="block">
-              {line}
-            </span>
-          ))}
-        </p>
-      )
-    })
-  }
-
-  return (
-    <div dir="rtl" className="relative bg-gradient-to-br from-white to-gold/5 border border-gold/30 rounded-xl shadow-md overflow-hidden">
-      {/* Top gold strip */}
-      <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
-      {/* Magical glow */}
-      <div className="absolute -top-8 -right-8 w-32 h-32 bg-gold/15 rounded-full blur-2xl pointer-events-none" />
-
-      {/* Reading header — magical navy gradient bar */}
-      <div className="relative flex items-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-r from-navy via-navy-light to-navy text-white">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
-          <FileText className="w-4 h-4 text-navy" />
-        </div>
-        <span className="text-xs md:text-sm font-semibold flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-gold/70" />
-          محتوى الدرس
-        </span>
-        <div className="flex-1"></div>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(content)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-          }}
-          className="text-[10px] md:text-xs text-gold/80 hover:text-gold flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-gold/10 border border-gold/30 transition-all active:scale-95"
-          title="نسخ المحتوى"
-        >
-          {copied ? <><CheckCircle2 className="w-3 h-3" /> تم النسخ</> : <><Copy className="w-3 h-3" /> نسخ</>}
-        </button>
-      </div>
-
-      {/* Thin gold separator line */}
-      <div className="h-0.5 bg-gradient-to-l from-gold via-amber-400 to-gold" />
-
-      {/* Content body — clean, RTL-locked, no animations, no drop caps */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={(e) => {
-          // ⚡ Fire onComplete when the student scrolls to within 30px
-          // of the bottom of the text content. We use a 30px threshold
-          // (instead of strict 0) to be forgiving on mobile browsers
-          // where the scrollbar's exact position can be off by a few
-          // pixels due to inertia.
-          if (firedRef.current || !onComplete) return
-          const el = e.currentTarget
-          const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-          if (distanceFromBottom <= 30) {
-            fireNow()
-          }
-        }}
-        className="relative px-4 md:px-8 py-5 md:py-7 max-h-[60vh] overflow-y-auto"
-      >
-        <div className="max-w-3xl mx-auto" dir="rtl">
-          {formatContent(content)}
-        </div>
-      </div>
     </div>
   )
 }
