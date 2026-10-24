@@ -3833,7 +3833,7 @@ const AdminSite = React.memo(function AdminSite() {
   const [annDraft, setAnnDraft] = useState<{ type: string; text: string; date: string; sig: string }>({ type: 'announce', text: '', date: '', sig: '' })
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
-  // تاريخ المسوّدة اليوم افتراضياً عند فتح الزاوية — التاريخ مطلوب دائماً
+  // تاريخ المسوّدة اليوم افتراضياً عند فتح الزاوية — والتاريخ اختياري: يُعرض عند تحديده فقط
   useEffect(() => {
     if (tab === 'royal') {
       setAnnDraft((d) => ({ ...d, date: d.date || new Date().toISOString().slice(0, 10) }))
@@ -3899,7 +3899,7 @@ const AdminSite = React.memo(function AdminSite() {
   const publishAnnouncement = () => {
     const text = annDraft.text.trim()
     if (!text) { toast.error('اكتب نص الإعلان أولاً'); return }
-    if (!annDraft.date) { toast.error('حدّد تاريخ الإعلان — التاريخ جزء أساسي منه'); return }
+    // التاريخ اختياري — تركه فارغاً يخفي شريط التاريخ من الإعلان المنشور
     const item = {
       id: `ann-${Date.now()}`,
       type: annDraft.type,
@@ -3990,7 +3990,7 @@ const AdminSite = React.memo(function AdminSite() {
                 إعلان جديد مختوم
               </h3>
               <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
-                يصل للطلاب فوراً كشمع عائم في الصفحة الرئيسية — مع نوعه وتاريخه الموثّق وتوقيع الأكاديمية.
+                يصل للطلاب فوراً كشمع عائم في الصفحة الرئيسية — مع نوعه وتوقيع الأكاديمية، والتاريخ يظهر اختيارياً عند تحديده.
               </p>
               <div className="relative space-y-3">
                 {/* نوع الإعلان */}
@@ -4043,7 +4043,7 @@ const AdminSite = React.memo(function AdminSite() {
                   <div>
                     <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
                       <CalendarDays className="w-3.5 h-3.5 text-gold" /> تاريخ الإعلان
-                      <span className="text-[9px] font-black text-red-600 bg-red-500/10 border border-red-500/25 rounded-full px-2 py-0.5">مطلوب</span>
+                      <span className="text-[9px] font-black text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">اختياري</span>
                     </Label>
                     <Input
                       type="date"
@@ -4067,9 +4067,13 @@ const AdminSite = React.memo(function AdminSite() {
                       >
                         غداً
                       </button>
-                      {annDraft.date && (
+                      {annDraft.date ? (
                         <span className="text-[10px] font-bold text-muted-foreground truncate">
                           سيظهر: {fiaFormatArabicDate(annDraft.date)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-muted-foreground truncate">
+                          بدون تاريخ — لن يظهر شريط التاريخ في الإعلان المنشور
                         </span>
                       )}
                     </div>

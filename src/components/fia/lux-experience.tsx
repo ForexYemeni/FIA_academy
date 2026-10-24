@@ -340,7 +340,7 @@ export function LuxRoyalMessage() {
                 backgroundImage: 'linear-gradient(#00000008 1px, transparent 1px)',
                 backgroundSize: '100% 28px',
               }} />
-              {/* التاريخ — مطلوب ويُعرض دائماً بشكل بارز */}
+              {/* التاريخ — يظهر اختيارياً عند تحديده فقط */}
               {String(latest.date || '').trim() && (
                 <div className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-navy text-gold text-[11px] font-black px-3.5 py-1.5 border border-gold/45 shadow-md">
                   <CalendarDays className="w-3.5 h-3.5" />
