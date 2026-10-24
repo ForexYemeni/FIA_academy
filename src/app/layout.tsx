@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "FIA Academy",
+    title: "أكاديمية المستقبل الدولية",
     statusBarStyle: "black-translucent",
   },
   // Reduce DNS lookup time by preconnecting to the external origins

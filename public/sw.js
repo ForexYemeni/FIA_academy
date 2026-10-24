@@ -1,4 +1,4 @@
-// PWA service worker for FIA Academy
+// PWA service worker for أكاديمية المستقبل الدولية (Future International Academy)
 // - Caches the app shell for offline use
 // - Handles push notifications (real external popups, even when app is closed)
 // - Handles notification clicks (navigate to a link)

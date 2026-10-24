@@ -2,12 +2,12 @@
 
 /**
  * ============================================================================
- * FIA ACADEMY — صفحة تحميل التطبيق الرسمية (/download)
+ * أكاديمية المستقبل الدولية — صفحة تحميل التطبيق الرسمية (/download)
  * ============================================================================
  * صفحة فاخرة سينمائية بالهوية الكاملة للأكاديمية (كحلي داكن × ذهبي):
  *  • سماء متحركة بنجوم تتلألأ + هالات ضوئية (Aurora) بلا أي مكتبات — CSS فقط
- *  • زر تنزيل ذهبي نابض بالضوء → الرابط الثابت للأحدث على GitHub
- *  • رقم الإصدار وحجم الملف يُجلبان حياً من GitHub API مع قيم احتياطية
+ *  • زر تنزيل ذهبي نابض بالضوء → ملف التطبيق الرسمي المستضاف على الموقع
+ *  • رقم الإصدار وحجم الملف يُجلبان حياً مع قيم احتياطية معتمدة
  *  • رمز QR للرابط (مكتبة qrcode الموجودة أصلاً) لمشاركة سريعة
  *  • خطوات التثبيت الثلاث بتصميم زجاجي
  * ============================================================================
@@ -27,11 +27,11 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/FIA-Academy.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.7.1.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-const FALLBACK_VERSION = '3.0.0'
-const FALLBACK_DATE = '2026-10-25T12:00:00Z'
+const FALLBACK_VERSION = '2.7.1'
+const FALLBACK_DATE = '2026-10-24T18:00:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -67,7 +67,7 @@ export default function DownloadClient() {
   useEffect(() => {
     let alive = true
     try {
-      const cached = sessionStorage.getItem('fia-apk-meta')
+      const cached = sessionStorage.getItem('academy-apk-meta')
       if (cached) {
         const c = JSON.parse(cached)
         if (c?.size) setSize(c.size)
@@ -81,7 +81,7 @@ export default function DownloadClient() {
           const s = len ? formatSize(len) : ''
           if (s) {
             setSize(s)
-            try { sessionStorage.setItem('fia-apk-meta', JSON.stringify({ size: s })) } catch {}
+            try { sessionStorage.setItem('academy-apk-meta', JSON.stringify({ size: s })) } catch {}
           }
         })
         .catch(() => {})

@@ -1,9 +1,9 @@
 /**
  * Certificate download helper — works in regular browsers AND in the
- * FIA Academy Android APK (which wraps the site in a WebView).
+ * أكاديمية المستقبل الدولية Android APK (which wraps the site in a WebView).
  *
  * HONEST STATUS (verified by inspecting classes.dex in
- * FIA-Academy-v2.2.0.apk)
+ * the v2.2.0 APK)
  * =========================================================
  * The APK has WebViewClient + WebChromeClient (with
  * onShowFileChooser for file uploads), but NO DownloadListener.

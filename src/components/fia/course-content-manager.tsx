@@ -66,7 +66,7 @@ export function CourseContentManager({ courseId }: { courseId: string }) {
   const [setupSqlCopied, setSetupSqlCopied] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const SETUP_SQL = `-- FIA Academy — Database Setup
+  const SETUP_SQL = `-- أكاديمية المستقبل الدولية — Database Setup
 CREATE TABLE IF NOT EXISTS course_modules (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   course_id UUID NOT NULL,
