@@ -48,7 +48,7 @@ export function estimateReadingMinutes(text: string): number {
 
 // صياغة عربية سليمة لعدد الدقائق
 export function readingLabel(min: number): string {
-  if (min <= 0) return 'قراءة خاطفة'
+  if (min <= 0) return 'أقل من دقيقة'
   if (min === 1) return 'دقيقة قراءة واحدة'
   if (min === 2) return 'دقيقتا قراءة'
   if (min >= 3 && min <= 10) return `${min} دقائق قراءة`
@@ -355,7 +355,6 @@ export function LuxRoyalReader({ content, onComplete }: { content?: string; onCo
   // الفهرس والإحصاءات — محسوبة مرة واحدة لكل محتوى
   const headings = useMemo(() => (content ? extractHeadings(content) : []), [content])
   const minutes = useMemo(() => (content ? estimateReadingMinutes(content) : 0), [content])
-  const words = useMemo(() => (content ? wordCount(content) : 0), [content])
   const rendered = useMemo(
     () => (content ? formatLuxContent(content, { dropCap: true }) : []),
     [content]
@@ -403,14 +402,12 @@ export function LuxRoyalReader({ content, onComplete }: { content?: string; onCo
         </div>
         <div className="flex flex-col min-w-0">
           <span className="text-[13px] md:text-sm font-bold flex items-center gap-1.5 leading-tight">
-            القارئ الملكي
+            محتوى الدرس
             <Sparkles className="w-3.5 h-3.5 text-gold/80" />
           </span>
           <span className="text-[10px] md:text-[11px] text-gold/75 flex items-center gap-1.5 leading-tight mt-0.5">
             <Clock className="w-3 h-3" />
             {readingLabel(minutes)}
-            <span className="text-gold/40">•</span>
-            {words} كلمة
           </span>
         </div>
         <div className="flex-1" />
@@ -652,17 +649,17 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
   const TOOLS = [
     { id: 'heading', label: 'عنوان', icon: Type, title: 'عنوان قسم (## )',
       run: () => applyLinePrefix(l => `## ${l.replace(/^#{1,3}\s*/, '')}`) },
-    { id: 'ol', label: 'قائمة مرقمة', icon: ListOrdered, title: 'قائمة مرقمة ملكية',
+    { id: 'ol', label: 'قائمة مرقمة', icon: ListOrdered, title: 'قائمة مرقمة',
       run: () => applyLinePrefix((l, i) => `${i + 1}. ${l.replace(/^\d+[\.\)]\s*/, '').replace(/^[-•▪]\s*/, '')}`) },
-    { id: 'ul', label: 'نقاط', icon: List, title: 'قائمة نقطية ذهبية',
+    { id: 'ul', label: 'نقاط', icon: List, title: 'قائمة نقطية',
       run: () => applyLinePrefix(l => `- ${l.replace(/^[-•▪]\s*/, '').replace(/^\d+[\.\)]\s*/, '')}`) },
-    { id: 'quote', label: 'اقتباس', icon: Quote, title: 'اقتباس ملكي',
+    { id: 'quote', label: 'اقتباس', icon: Quote, title: 'اقتباس',
       run: () => applyLinePrefix(l => l.trim().startsWith('>') ? l.trim().replace(/^>\s?/, '') : `> ${l.trim()}`) },
-    { id: 'bold', label: 'غامق', icon: Bold, title: 'غامق كحلي (Ctrl+B)',
+    { id: 'bold', label: 'غامق', icon: Bold, title: 'غامق (Ctrl+B)',
       run: () => applyWrap('**', '**') },
     { id: 'mark', label: 'تمييز', icon: Highlighter, title: 'تمييز ذهبي',
       run: () => applyWrap('==', '==') },
-    { id: 'divider', label: 'فاصل', icon: Minus, title: 'فاصل زخرفي ملكي',
+    { id: 'divider', label: 'فاصل', icon: Minus, title: 'فاصل زخرفي',
       run: () => insertAt('\n\n---\n\n') },
   ]
 
@@ -709,7 +706,7 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
       onKeyDown={onKeyDown}
       dir="rtl"
       rows={10}
-      placeholder={'اكتب محتوى الدرس هنا...\n\nتلميح: استخدم شريط الأدوات للتنسيق الفاخر\n## عنوان قسم — **غامق** — ==تمييز ذهبي== — > اقتباس'}
+      placeholder={'اكتب محتوى الدرس هنا...\n\nتلميح: استخدم شريط الأدوات للتنسيق\n## عنوان قسم — **غامق** — ==تمييز ذهبي== — > اقتباس'}
       className="w-full rounded-xl border border-gold/35 bg-white/90 px-4 py-3.5 text-sm leading-[2] text-foreground placeholder:text-muted-foreground/50 shadow-[inset_0_1px_4px_rgba(11,22,53,0.07)] focus:border-gold focus:ring-2 focus:ring-gold/25 focus:outline-none resize-y transition-all"
     />
   )
@@ -727,11 +724,11 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
         </div>
         <div className="flex flex-col">
           <span className="text-[13px] font-extrabold text-navy flex items-center gap-1.5 leading-tight">
-            مؤلّف الدروس النصية الملكي
+            محتوى الدرس النصي
             <Sparkles className="w-3.5 h-3.5 text-gold" />
           </span>
           <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-            صمّم درساً يُقرأ كصفحة من كتاب ملكي — والمعاينة تطابق ما يراه المتدرب حرفياً
+            اكتب المحتوى — والمعاينة الحية تطابق ما يراه المتدرب حرفياً
           </span>
         </div>
         <div className="flex-1" />
@@ -812,7 +809,7 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
           className={`h-8 px-4 rounded-lg text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${view === 'preview' ? 'bg-gradient-to-br from-navy to-navy-light text-gold shadow-md border border-gold/40' : 'text-muted-foreground hover:text-navy'}`}
         >
           <Eye className="w-3.5 h-3.5" />
-          معاينة ملكية
+          معاينة حية
         </button>
       </div>
 
@@ -877,7 +874,7 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
             </div>
             <div className="flex flex-col">
               <span className="text-white font-extrabold text-sm flex items-center gap-1.5">
-                وضع التحرير الملكي بملء الشاشة
+                وضع التحرير بملء الشاشة
                 <Sparkles className="w-4 h-4 text-gold" />
               </span>
               <span className="text-gold/70 text-[10.5px]">{words} كلمة • {chars} حرف • {readingLabel(minutes)}</span>
@@ -916,7 +913,7 @@ export function LuxTextComposer({ value, onChange }: { value: string; onChange: 
               onKeyDown={onKeyDown}
               dir="rtl"
               className="w-full h-full rounded-2xl border border-gold/30 bg-navy/[0.35] text-white/95 px-6 py-5 text-[15px] leading-[2.1] placeholder:text-white/35 shadow-inner focus:border-gold focus:ring-2 focus:ring-gold/30 focus:outline-none resize-none"
-              placeholder={'اكتب درسك هنا بكل فخامة...\n\n## عنوان\n**غامق** — ==تمييز== — > اقتباس — --- فاصل'}
+              placeholder={'اكتب درسك هنا...\n\n## عنوان\n**غامق** — ==تمييز== — > اقتباس — --- فاصل'}
             />
           </div>
           {/* التذييل */}
