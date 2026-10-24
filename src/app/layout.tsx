@@ -7,6 +7,7 @@ import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";
 import { SessionGuard } from "@/components/fia/session-guard"; // 👑 v8.0 — حرس الجلسة الملكي: خروج فوري لحظة حذف الحساب (كل الأدوار وكل المسارات)
 import { ThemeToggle } from "@/components/fia/theme-toggle";
+import { LuxGlobalLayer } from "@/components/fia/lux-experience"; // 👑 v10.3 — الطبقة الملكية العالمية: ستارة افتتاحية + بحث Ctrl+K + دعم عائم + رسالة الإدارة المختومة — عرض فقط بلا أي منطق مصادقة أو بيانات
 import StyledJsxRegistry from "./styled-jsx-registry"; // 👑 v10.2 — سجل أنماط styled-jsx: الأنماط تُرسَل من الخادم فلا وميض أبيض عاري (FOUC) على /download
 
 const cairo = Cairo({
@@ -150,7 +151,10 @@ export default function RootLayout({
       >
         <ApiAuthBridge />
         <SessionGuard />
-        <StyledJsxRegistry>{children}</StyledJsxRegistry>
+        <StyledJsxRegistry>
+          {children}
+          <LuxGlobalLayer />
+        </StyledJsxRegistry>
         <ThemeToggle />
         <Toaster />
         <SonnerToaster position="top-center" richColors />

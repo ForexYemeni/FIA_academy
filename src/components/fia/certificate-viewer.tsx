@@ -44,7 +44,7 @@
  * ============================================================================
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Download,
   Calendar,
@@ -55,6 +55,8 @@ import {
   Loader2,
   CheckCircle2,
   X,
+  Share2,
+  Crown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import * as htmlToImage from 'html-to-image'
@@ -75,6 +77,13 @@ export function CertificateViewer({
   const [pdfDownloading, setPdfDownloading] = useState(false)
   const [copying, setCopying] = useState(false)
   const [copied, setCopied] = useState(false)
+  // 👑 v10.3 — ستارة منح الشهادة: تنكشف كحلية وتكشف الشهادة الذهبية عند كل فتح
+  const [revealed, setRevealed] = useState(false)
+  useEffect(() => {
+    setRevealed(false)
+    const t = setTimeout(() => setRevealed(true), 750)
+    return () => clearTimeout(t)
+  }, [])
 
   const issuedAt = certificate.issued_at
     ? new Date(certificate.issued_at)
@@ -722,14 +731,30 @@ export function CertificateViewer({
           cutting off the right half of the certificate in the exported
           PNG/PDF. The cert is now responsive (width: 100%) so it fits
           any parent — no overflow, no clipping. */}
-      <div
-        className="relative bg-gradient-to-b from-amber-50/40 to-white py-6 rounded-2xl"
-        data-cert-skip="true"
-      >
-        {/* The CertificateCard itself — certRef points here.
-            The cert now uses width:100% + aspect-ratio:10/7, so it
-            scales to fit this container perfectly. */}
-        <CertificateCard certificate={certificate} ref={certRef} />
+      {/* 👑 v10.3 — ستارة المنح الملكية: ستارتان كحليتان تنكشفان عن الشهادة */}
+      <div className="relative" dir="rtl">
+        {/* الستارتان — فوق الشهادة فقط قبل الانكشاف */}
+        {!revealed && (
+          <div className="absolute inset-0 z-30 overflow-hidden rounded-2xl pointer-events-none" aria-hidden="true">
+            <div className="fia-cert-curtain fia-cert-curtain-r absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-navy via-navy-light to-navy border-l-2 border-gold/50">
+              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, #D4AF37 1.4px, transparent 1.4px)', backgroundSize: '20px 20px' }} />
+            </div>
+            <div className="fia-cert-curtain fia-cert-curtain-l absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-navy via-navy-light to-navy border-r-2 border-gold/50">
+              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, #D4AF37 1.4px, transparent 1.4px)', backgroundSize: '20px 20px' }} />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="fia-cert-seal w-16 h-16 rounded-full bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-[0_0_35px_rgba(212,175,55,0.6)] border-4 border-white/40">
+                <Crown className="w-7 h-7 text-navy" strokeWidth={2.2} />
+              </div>
+            </div>
+          </div>
+        )}
+        <div className={`fia-cert-reveal relative bg-gradient-to-b from-amber-50/40 to-white py-6 rounded-2xl transition-all duration-700 ${revealed ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.96]'}`} data-cert-skip="true">
+          {/* The CertificateCard itself — certRef points here.
+              The cert now uses width:100% + aspect-ratio:10/7, so it
+              scales to fit this container perfectly. */}
+          <CertificateCard certificate={certificate} ref={certRef} />
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -746,6 +771,31 @@ export function CertificateViewer({
             <Download className="w-4 h-4" />
           )}
           {downloading ? 'جارٍ إنشاء الصورة...' : 'تنزيل (صورة)'}
+        </button>
+
+        {/* 👑 v10.3 — زر المشاركة الملكية: مشاركة أصلية أو نسخ نص فاخر */}
+        <button
+          onClick={async () => {
+            const verifyUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${certificate.certificate_number}`
+            const text = `🎓 شهادة معتمدة من أكاديمية المستقبل الدولية (FIA)\n📜 ${certificate.course_title || 'دورة تدريبية'}\n🆔 رقم الشهادة: ${certificate.certificate_number}\n✅ تحقق من صحتها رسمياً:\n${verifyUrl}`
+            try {
+              if (typeof navigator !== 'undefined' && (navigator as any).share) {
+                await (navigator as any).share({ title: 'شهادتي من أكاديمية المستقبل الدولية', text })
+                return
+              }
+              await navigator.clipboard.writeText(text)
+              toast.success('تم نسخ نص المشاركة — ألصقه في واتساب أو تيليجرام 👑')
+            } catch {
+              try {
+                await navigator.clipboard.writeText(text)
+                toast.success('تم نسخ نص المشاركة 👑')
+              } catch { toast.error('تعذّرت المشاركة — انسخ رقم الشهادة يدوياً') }
+            }
+          }}
+          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl shadow-md active:scale-[0.97] font-bold text-sm transition-all"
+        >
+          <Share2 className="w-4 h-4" />
+          مشاركة الشهادة
         </button>
 
         {/* Copy number */}
@@ -784,6 +834,16 @@ export function CertificateViewer({
           داخل المعرض، وملف PDF في مجلد «Fia academy» داخل التنزيلات — بنفس التصميم الفاخر تماماً.
         </p>
       )}
+
+      {/* 👑 v10.3 — أنماط ختم المنح الملكي */}
+      <style jsx global>{`
+        .fia-cert-seal { animation: certSeal 1.1s cubic-bezier(.2,1.2,.4,1) both; }
+        @keyframes certSeal {
+          0% { transform: scale(0); opacity: 0; }
+          55% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }

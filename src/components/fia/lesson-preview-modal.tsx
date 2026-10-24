@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 // 👑 القارئ الملكي للدرس النصي — وحدة مشتركة مع مؤلّف الدروس في لوحة الإدارة
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
+import { LuxLessonCelebration, saveOfflineTextLesson } from '@/components/fia/lux-experience' // 👑 v10.3 — احتفال نهاية الدرس + حفظ الدروس النصية للمكتبة دون إنترنت (عرض فقط)
 // ⚡ CustomPdfViewer is a separate component (extracted for clarity)
 // that uses pdf.js to render PDFs inside the app without Google Docs
 // Viewer. It handles its own pdfjs import + worker setup.
@@ -90,9 +91,12 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
   // with React's Rules of Hooks (the parent always renders this modal,
   // even when `open` is false and `lesson` is null).
   const firedCompleteRef = useRef<string | null>(null)
+  // 👑 v10.3 — احتفال نهاية الدرس: يظهر مرة واحدة عند أول إكمال حقيقي للدرس
+  const [celebrate, setCelebrate] = useState(false)
   useEffect(() => {
     // Reset the fired flag whenever the lesson changes
     firedCompleteRef.current = null
+    setCelebrate(false)
   }, [lesson?.id])
 
   // 🎫 v6.8.3 — تجهيز رابط البث الصوتي برمز إعلامي قصير العمر (mt)
@@ -137,6 +141,10 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
     if (completedLessons && completedLessons.has(lesson.id)) return // already completed
     firedCompleteRef.current = lesson.id
     onLessonComplete(lesson)
+    // 👑 v10.3 — حفظ الدرس النصي في المكتبة الملكية للقراءة دون إنترنت (محلياً فقط)
+    saveOfflineTextLesson(lesson)
+    // 👑 v10.3 — الاحتفال الملكي: يُطلق مرة واحدة مع الإكمال الأول فقط
+    setCelebrate(true)
   }
 
   // Find current lesson position across all modules
@@ -166,6 +174,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
   const Icon = type.icon
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-0 mx-auto w-[95vw] sm:w-full"
@@ -333,6 +342,15 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
         </div>
       </DialogContent>
     </Dialog>
+    {/* 👑 v10.3 — احتفال نهاية الدرس: ختم «أُنجز» + انتقال سلس للدرس التالي */}
+    <LuxLessonCelebration
+      open={celebrate}
+      lessonTitle={lesson?.title}
+      nextTitle={next?.lesson?.title}
+      onNext={() => { if (next) onNavigate?.(next.lesson) }}
+      onClose={() => setCelebrate(false)}
+    />
+    </>
   )
 }
 

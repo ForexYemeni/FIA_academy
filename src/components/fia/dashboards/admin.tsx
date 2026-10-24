@@ -3826,7 +3826,7 @@ const AdminFounder = React.memo(function AdminFounder({ user }: any) {
 const AdminSite = React.memo(function AdminSite() {
   const [settings, setSettings] = useState<any>({})
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility'>('basic')
+  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility' | 'royal'>('basic')
   const [passwordDialog, setPasswordDialog] = useState<{ password: string; pendingSettings: any } | null>(null)
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
@@ -3882,6 +3882,7 @@ const AdminSite = React.memo(function AdminSite() {
           { id: 'policies',   label: 'السياسات',       icon: Shield,       gradient: 'from-slate-600 to-gray-700' },
           { id: 'social',     label: 'التواصل',         icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
           { id: 'visibility', label: 'الإظهار',        icon: Eye,          gradient: 'from-emerald-500 to-teal-600' },
+          { id: 'royal',      label: 'الزاوية الملكية', icon: Crown,        gradient: 'from-gold to-amber-500' },
         ].map((t) => {
           const TabIcon = t.icon
           const isActive = tab === t.id
@@ -3923,6 +3924,75 @@ const AdminSite = React.memo(function AdminSite() {
       </div>
 
       <div className="space-y-4 max-w-3xl">
+        {/* 👑 v10.3 — الزاوية الملكية: رسالة الإدارة + العرض المحدود (تُخزنان تلقائياً في الإعدادات الإضافية بلا أي ترحيل) */}
+        {tab === 'royal' && (
+          <div className="space-y-4">
+            <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-gold" />
+                </div>
+                رسالة الإدارة المختومة
+              </h3>
+              <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
+                تظهر كختم شمع ملكي عائم في الصفحة الرئيسية — يضغط المتدرب عليه لقراءة الرسالة في بطاقة فاخرة. اتركها فارغة لإخفائها كلياً.
+              </p>
+              <div className="relative space-y-3">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> نص الرسالة</Label>
+                  <Textarea
+                    value={settings.royal_message || ''}
+                    onChange={(e) => setSettings({ ...settings, royal_message: e.target.value })}
+                    rows={5}
+                    placeholder="اكتب رسالة الأسبوع للمتدربين — نصيحة، إعلان، أو كلمة تشجيع…"
+                    className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 leading-relaxed"
+                  />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التوقيع</Label>
+                    <Input value={settings.royal_message_signature || ''} onChange={(e) => setSettings({ ...settings, royal_message_signature: e.target.value })} placeholder="إدارة أكاديمية المستقبل الدولية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التاريخ (اختياري)</Label>
+                    <Input value={settings.royal_message_date || ''} onChange={(e) => setSettings({ ...settings, royal_message_date: e.target.value })} placeholder="جمعة 25 أكتوبر 2026" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+              <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-gold" />
+                </div>
+                العدّاد التنازلي للعروض المحدودة
+              </h3>
+              <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
+                يظهر على كل دورة معدّة كـ«لمدة محدودة» عدّاد ذهبي حي ينتهي بالتاريخ المحدد هنا. اتركه فارغاً لإخفاء العدّاد.
+              </p>
+              <div className="relative grid sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> عنوان العرض (اختياري)</Label>
+                  <Input value={settings.offer_title || ''} onChange={(e) => setSettings({ ...settings, offer_title: e.target.value })} placeholder="خصومات أكتوبر الملكية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> ينتهي في</Label>
+                  <Input
+                    type="datetime-local"
+                    value={settings.offer_ends_at || ''}
+                    onChange={(e) => setSettings({ ...settings, offer_ends_at: e.target.value })}
+                    dir="ltr"
+                    className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* BASIC — magical card */}
         {tab === 'basic' && (
           <div className="space-y-4">

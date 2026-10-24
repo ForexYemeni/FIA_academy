@@ -45,6 +45,10 @@ import dynamic from 'next/dynamic'
 import { downloadCertificateFile } from '@/lib/certificate-download'
 import { RoyalGridSkeleton, RoyalListSkeleton } from '@/components/fia/royal-skeleton'
 import { royalFetch, royalInvalidate } from '@/lib/royal-cache'
+// 👑 v10.3 — الهوية الملكية: الرتب + الأوسمة + بطاقة العضوية + إطار الصورة الذهبي (عرض فقط)
+import { LuxRankBadge, LuxAchievements, LuxMembershipCard } from '@/components/fia/lux-identity'
+// 👑 v10.3 — السحب للتحديث بحلقة ذهبية (لوحة المتدرب فقط)
+import { LuxPullToRefresh, LuxOfflineLibrary } from '@/components/fia/lux-experience'
 
 // ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 6 ترويسات ذهبية
 const NAV: NavItem[] = [
@@ -470,7 +474,7 @@ export function StudentDashboard() {
               <AffiliateDashboard />
             </SectionCard>
           )}
-          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} />}
+          {active === 'profile' && <Profile profile={profile} setProfile={setProfile} user={user} updateUser={updateUser} enrollments={enrollments} certificates={certificates} />}
           {active === 'notifications' && <Notifications userId={user?.id} enrollments={enrollments} courses={courses} />}
           {active === 'settings' && <SettingsTab user={user} updateUser={updateUser} />}
         </>
@@ -503,9 +507,35 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
     return { canOpen: false, reason: 'paid-not-enrolled', enrollment: null }
   }
 
+  // 👑 v10.3 — إحصاءات الرتبة الملكية (من بيانات حقيقية موجودة)
+  const rankStats = {
+    enrolledCount: enrollments?.length || 0,
+    completedCount: enrollments?.filter((e:any)=>e.status==='completed'||e.status==='مكتمل').length || 0,
+    certificatesCount: certificates?.length || 0,
+    avgProgress: enrollments?.length ? Math.round(enrollments.reduce((s:number, e:any)=>s+(e.progress||0), 0)/enrollments.length) : 0,
+  }
+
+  // 👑 v10.3 — بطاقة «أكمل من حيث توقفت»: أحدث دورة نشطة غير مكتملة
+  const activeEnrs = (enrollments || []).filter((e:any) =>
+    e.payment_status !== 'pending' && (e.progress || 0) < 100 && e.status !== 'completed' && e.status !== 'مكتمل')
+  const contEnr = activeEnrs.find((e:any)=>(e.progress||0) > 0) || activeEnrs[0] || null
+  const contCourse = contEnr ? courses.find((c:any)=>c.id===contEnr.course_id) : null
+
+  // 👑 v10.3 — «درس اليوم»: اقتراح ثابت طوال اليوم (من غير المسجّل بها أولاً)
+  const daySeed = Math.floor(Date.now() / 86400000)
+  const unenrolled = (courses || []).filter((c:any)=>!enrollments?.some((e:any)=>e.course_id===c.id))
+  const pickPool = unenrolled.length ? unenrolled : (courses || [])
+  const dailyPick = pickPool.length ? pickPool[daySeed % pickPool.length] : null
+
   return (
+    <LuxPullToRefresh onRefresh={() => {
+      try {
+        ;(window as any).__FIA_refreshActiveView?.()
+        toast.success('تم تحديث بياناتك ✓ — نفّذت للأسفل مرة أخرى متى شئت')
+      } catch {}
+    }}>
     <div className="space-y-6">
-      {/* ⚡ Magical hero header */}
+      {/* ⚡ Magical hero header — تحية ملكية حسب الوقت + رتبة المتدرب (v10.3) */}
       <div className="relative overflow-hidden rounded-2xl p-6 lg:p-7 bg-gradient-to-l from-navy via-navy-light to-navy text-white shadow-xl ring-1 ring-gold/30">
         <div className="absolute inset-0 opacity-25" style={{
           backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.5px, transparent 1.5px), radial-gradient(circle at 88% 50%, white 1px, transparent 1px)',
@@ -518,14 +548,24 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
             <Sparkles className="w-7 h-7 text-navy" strokeWidth={2.2} />
           </div>
           <div className="flex-1">
-            <h2 className="text-2xl font-bold mb-1 tracking-tight">أهلاً، {user?.name}</h2>
-            <p className="text-gold/80 text-sm flex items-center gap-1.5">
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">
+              {(() => { const h = new Date().getHours(); return h < 12 ? 'صباح المعرفة' : h < 17 ? 'نهار موفق' : h < 21 ? 'مساء الإنجاز' : 'طابت ليلتك' })()}، {user?.name}
+            </h2>
+            <p className="text-gold/80 text-sm flex items-center gap-1.5 flex-wrap">
               <span className="w-1 h-1 bg-gold rounded-full animate-pulse" />
               إليك ملخّص نشاطك في أكاديمية المستقبل الدولية
+              <span className="text-gold/50 text-[11px] font-bold">• {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </p>
+          </div>
+          {/* شارة الرتبة الملكية المصغرة */}
+          <div className="hidden sm:block flex-shrink-0">
+            <LuxRankBadge compact stats={rankStats} />
           </div>
         </div>
       </div>
+
+      {/* 👑 v10.3 — شارة الرتبة الكاملة مع الطريق للرتبة التالية */}
+      <LuxRankBadge stats={rankStats} />
 
       {/* ⚡ Magical StatCards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 fia-stagger">
@@ -534,6 +574,67 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
         <StatCard icon={TrendingUp} label="معدل التقدم" value={`${enrollments?.length ? Math.round(enrollments.reduce((s:number, e:any)=>s+(e.progress||0), 0)/enrollments.length) : 0}%`} color="gold" />
         <StatCard icon={Award} label="الشهادات المكتسبة" value={certificates.length} color="blue" />
       </div>
+
+      {/* 👑 v10.3 — بطاقة «أكمل من حيث توقفت» بحلقة تقدم ذهبية */}
+      {contCourse && (
+        <div className="relative rounded-2xl border border-gold/40 bg-gradient-to-l from-navy via-navy-light to-navy p-4 md:p-5 shadow-xl overflow-hidden">
+          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1.4px, transparent 1.4px)',
+            backgroundSize: '22px 22px',
+          }} />
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-gold/15 rounded-full blur-3xl" />
+          <div className="relative flex items-center gap-4">
+            {/* حلقة التقدم الذهبية */}
+            <div className="relative w-[72px] h-[72px] flex-shrink-0">
+              <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90">
+                <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
+                <circle
+                  cx="36" cy="36" r="30" fill="none" stroke="#D4AF37" strokeWidth="6" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 30}
+                  strokeDashoffset={2 * Math.PI * 30 * (1 - Math.min(100, Math.max(0, contEnr?.progress || 0)) / 100)}
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(212,175,55,0.65))', transition: 'stroke-dashoffset .9s ease' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-gold font-black text-sm tabular-nums">{Math.round(contEnr?.progress || 0)}%</span>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 text-white">
+              <div className="text-[10px] font-black text-gold uppercase tracking-widest mb-0.5">أكمل من حيث توقفت</div>
+              <div className="font-black text-base md:text-lg truncate">{contCourse.title}</div>
+              <div className="text-[11px] text-white/60 mt-0.5">درسك القادم ينتظرك — خطوة واحدة تفصلك عن التقدم</div>
+            </div>
+            <Button
+              onClick={() => onViewCourse?.(contCourse)}
+              className="flex-shrink-0 bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-black rounded-xl shadow-lg active:scale-[0.97] transition-all"
+            >
+              أكمل الآن
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 👑 v10.3 — «درس اليوم»: اقتراح ملكي ثابت طوال اليوم */}
+      {dailyPick && (
+        <button
+          onClick={() => onViewCourse?.(dailyPick)}
+          className="group relative w-full text-right rounded-2xl border border-gold/35 bg-gradient-to-br from-gold/[0.10] via-white to-gold/[0.05] p-3.5 shadow-md hover:shadow-lg hover:border-gold/60 transition-all active:scale-[0.99] overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-l from-gold via-amber-400 to-gold opacity-70" />
+          <div className="flex items-center gap-3">
+            <div className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-navy to-navy-light flex items-center justify-center flex-shrink-0 shadow-md border border-gold/30">
+              <Crown className="w-5 h-5 text-gold" strokeWidth={2.2} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-black text-gold uppercase tracking-widest">درس اليوم — اختيار الأكاديمية لك</div>
+              <div className="font-black text-navy text-sm truncate">{dailyPick.title}</div>
+            </div>
+            <span className="text-[11px] font-black text-navy bg-gold/15 border border-gold/35 rounded-full px-3 py-1.5 group-hover:bg-gold/30 transition-colors flex-shrink-0">
+              اكتشفها ←
+            </span>
+          </div>
+        </button>
+      )}
 
       {/* ⚡ Magical progress section */}
       <SectionCard title="تقدّم الدورات" description="متابعة آخر التحديثات في دوراتك">
@@ -635,6 +736,7 @@ const Overview = React.memo(function Overview({ user, courses, certificates, enr
         </div>
       </SectionCard>
     </div>
+    </LuxPullToRefresh>
   )
 })
 
@@ -2911,7 +3013,7 @@ const Payments = React.memo(function Payments({ payments, userId, courses }: any
   )
 })
 
-const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser }: any) {
+const Profile = React.memo(function Profile({ profile, setProfile, user, updateUser, enrollments = [], certificates = [] }: any) {
   // 🔒 v6.5 (طلب صاحب المنصة): المسمى الوظيفي والتخصص حقلا المدرّب حصراً —
   // حُذفا نهائياً من واجهة المتدرب (لا عرض ولا تعديل). القفل الخادمي في
   // PUT /api/profile باقٍ: أي محاولة تمرير الحقلين من متدرب تُتجاهل.
@@ -2961,16 +3063,37 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
           <div className="absolute -top-8 -left-8 w-24 h-24 bg-gold/15 rounded-full blur-2xl" />
           <div className="absolute -bottom-8 -right-8 w-20 h-20 bg-navy/15 rounded-full blur-2xl" />
           <div className="relative">
-            <AvatarUploader
-              userId={user.id}
-              role="student"
-              initialUrl={user?.avatar}
-              name={user?.name}
-              size="xl"
-              onUploaded={(url) => updateUser({ avatar: url })}
-            />
+            {/* 👑 v10.3 — إطار بورتريه ذهبي مزدوج يلمع عند التفاعل (بلا قصّ لزر التغيير) */}
+            <div className="fia-portrait relative rounded-3xl p-[3px] bg-gradient-to-br from-gold via-amber-200 to-gold shadow-xl">
+              <div className="rounded-[21px] border border-gold/50 bg-gradient-to-br from-navy/[0.05] via-white to-gold/[0.08] px-6 py-5">
+                <AvatarUploader
+                  userId={user.id}
+                  role="student"
+                  initialUrl={user?.avatar}
+                  name={user?.name}
+                  size="xl"
+                  onUploaded={(url) => updateUser({ avatar: url })}
+                />
+              </div>
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md border-2 border-white/60 z-20">
+                <Crown className="w-4 h-4 text-navy" strokeWidth={2.4} />
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* 👑 v10.3 — بطاقة العضوية الرقمية القابلة للمشاركة */}
+        <LuxMembershipCard user={user} />
+
+        {/* 👑 v10.3 — أوسمة الإنجاز بشرح عند اللمس */}
+        <SectionCard title="أوسمة الإنجاز" description="ميدالياتك الملكية — كل وسام قصة إنجاز">
+          <LuxAchievements enrollments={enrollments} certificates={certificates} />
+        </SectionCard>
+
+        {/* 👑 v10.3 — المكتبة الملكية للقراءة دون إنترنت */}
+        <SectionCard title="مكتبتك دون إنترنت" description="دروسك النصية المحفوظة — تُقرأ في أي وقت حتى بلا اتصال">
+          <LuxOfflineLibrary />
+        </SectionCard>
 
         {/* ⚡ Magical form fields */}
         <div className="grid sm:grid-cols-2 gap-4">

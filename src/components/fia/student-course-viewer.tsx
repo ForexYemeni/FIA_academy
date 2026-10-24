@@ -530,17 +530,17 @@ export function StudentCourseViewer({
                               disabled={isLocked}
                               className={`flex items-center gap-3 flex-1 text-right min-w-0 ${isLocked ? 'cursor-not-allowed' : ''}`}
                             >
-                              {/* Lesson status circle — magical */}
+                              {/* 👑 v10.3 — دائرة النوع الملكية: أيقونة ذهبية لكل نوع درس */}
                               <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
                                 isCompleted
                                   ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
                                   : isLocked
                                     ? 'bg-gray-300 text-gray-500'
-                                    : `bg-gradient-to-br ${type.gradient} text-white`
+                                    : 'bg-gradient-to-br from-navy to-navy-light text-gold shadow-[0_0_10px_rgba(212,175,55,0.25)]'
                               }`}>
-                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" strokeWidth={2.2} />}
                               </div>
-                              <Badge className={type.color + ' flex-shrink-0'}>
+                              <Badge className={type.color + ' flex-shrink-0 font-bold shadow-[0_1px_6px_rgba(212,175,55,0.2)]'}>
                                 <Icon className="w-3 h-3 ml-1" /> {type.label}
                               </Badge>
                               <div className="flex-1 min-w-0">
