@@ -73,7 +73,7 @@ const GUIDES: Guide[] = [
       },
       {
         icon: LayoutDashboard,
-        title: 'استكشف لوحتك الملكية',
+        title: 'استكشف لوحتك',
         desc: 'دوراتك واختباراتك وشهاداتك وإشعاراتك — كلها من مكان واحد أنيق.',
         action: { label: 'الذهاب للرئيسية', href: '/' },
         tip: 'حمّل تطبيق أندرويد لتصلك الإشعارات الفورية عن كل جديد في دوراتك.',
@@ -122,7 +122,7 @@ const GUIDES: Guide[] = [
       },
       {
         icon: Clock3,
-        title: 'انتظر التفعيل الملكي',
+        title: 'انتظر التفعيل',
         desc: 'تراجع الإدارة إشعارك وتُفعّل اشتراكك — يصلك إشعار فوري في اللحظة التي تُفعَّل فيها، وتظهر دورتك في لوحتك.',
         tip: 'التفعيل اليدوي يستغرق وقتاً قصيراً خلال ساعات العمل — وإن تأخر راسلنا وسننتصر لك فوراً.',
         action: { label: 'تواصل مع الدعم', href: '/contact' },
@@ -177,7 +177,7 @@ const GUIDES: Guide[] = [
     id: 'trainer',
     icon: Crown,
     title: 'كيف أنضمّ مدرباً',
-    desc: 'الانضمام إلى نخبة المدربين — من الاستمارة إلى الاعتماد الملكي',
+    desc: 'الانضمام إلى نخبة المدربين — من الاستمارة إلى الاعتماد الرسمي',
     minutes: '~ 5 دقائق',
     steps: [
       {
@@ -265,7 +265,7 @@ export function GettingStarted() {
         <div className="container mx-auto px-4 lg:px-6 text-center relative">
           <div className="fia-lux-fadeup inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-gold/15 text-gold border border-gold/30 backdrop-blur-sm">
             <Crown className="w-4 h-4" />
-            <span className="text-sm font-bold">مركز الإرشاد الملكي</span>
+            <span className="text-sm font-bold">مركز الإرشاد</span>
           </div>
           <h1 className="fia-lux-fadeup text-4xl md:text-5xl font-extrabold mb-4 tracking-tight" style={{ animationDelay: '60ms' }}>
             <span className="bg-gradient-to-l from-white via-gold/90 to-white bg-clip-text text-transparent">
@@ -425,7 +425,7 @@ export function GettingStarted() {
         <div className="container mx-auto px-4 lg:px-6">
           <div className="text-center mb-8">
             <h3 className="text-2xl font-extrabold text-gray-900">تحتاج مساعدة إضافية؟</h3>
-            <p className="mt-2 text-gray-600">لديك ثلاثة أبواب ملكية — وكلها مفتوحة لك دائماً</p>
+            <p className="mt-2 text-gray-600">لديك ثلاثة أبواب — وكلها مفتوحة لك دائماً</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {HELP_CARDS.map((h) => (

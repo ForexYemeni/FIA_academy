@@ -3086,7 +3086,7 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         <LuxMembershipCard user={user} />
 
         {/* 👑 v10.3 — أوسمة الإنجاز بشرح عند اللمس */}
-        <SectionCard title="أوسمة الإنجاز" description="ميدالياتك الملكية — كل وسام قصة إنجاز">
+        <SectionCard title="أوسمة الإنجاز" description="ميدالياتك — كل وسام قصة إنجاز">
           <LuxAchievements enrollments={enrollments} certificates={certificates} />
         </SectionCard>
 
@@ -3103,7 +3103,7 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
             </Label>
             <Input value={profile.name} disabled readOnly className="rounded-xl border-gold/30 bg-muted/40 cursor-not-allowed font-bold" />
             <p className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
-              🔒 الاسم مغلّف ملكياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله (يظهر على شهاداتك الرسمية)
+              🔒 الاسم مغلّق نهائياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله (يظهر على شهاداتك الرسمية)
             </p>
           </div>
           <div>

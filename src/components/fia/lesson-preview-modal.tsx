@@ -23,7 +23,7 @@ import dynamic from 'next/dynamic'
 // ⚡ v7.0 تحميل كسول ملكي: pdfjs-dist أثقل مكتبة في المنصة — لا تُحمل إلا عند فتح PDF
 const CustomPdfViewer = dynamic(
   () => import('@/components/fia/custom-pdf-viewer').then((m) => m.CustomPdfViewer),
-  { ssr: false, loading: () => <div className="h-[70vh] flex items-center justify-center text-sm text-muted-foreground">جارِ تجهيز العارض الملكي…</div> }
+  { ssr: false, loading: () => <div className="h-[70vh] flex items-center justify-center text-sm text-muted-foreground">جارِ تجهيز العارض…</div> }
 )
 // ⚡ v7.0 تحميل كسول ملكي: مشغل الصوت الفاخر
 const LuxAudioPlayer = dynamic(

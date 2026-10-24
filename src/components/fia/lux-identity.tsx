@@ -117,7 +117,7 @@ export function LuxRankBadge({ stats, compact = false }: { stats: RoyalStats; co
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-black text-gold/80 uppercase tracking-widest">رتبتك الملكية</span>
+            <span className="text-[10px] font-black text-gold/80 uppercase tracking-widest">رتبتك الحالية</span>
             <span className="text-[10px] font-bold text-muted-foreground tabular-nums" dir="ltr">{points} نقطة</span>
           </div>
           <div className="text-lg font-black text-navy leading-tight">{rank.title}</div>
@@ -168,7 +168,7 @@ export function computeAchievements(enrollments: any[], certificates: any[]): Ac
   const completed = enr.filter((e: any) => e.status === 'completed' || e.status === 'مكتمل').length
   return [
     {
-      id: 'first-step', title: 'البداية الملكية', icon: Sparkles, earned: enr.length >= 1,
+      id: 'first-step', title: 'خطوة البداية', icon: Sparkles, earned: enr.length >= 1,
       desc: 'سجّلت أول دورة في الأكاديمية — رحلة الألف ميل تبدأ بخطوة', grad: 'from-sky-500 to-indigo-600',
     },
     {

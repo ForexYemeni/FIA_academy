@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         course_id,
         amount: 0,
         currency: course.currency || 'ر.ي',
-        method: 'تسجيل يدوي ملكي — من الإدارة',
+        method: 'تسجيل يدوي — من الإدارة',
         status: 'مكتمل',
         reference: `ADMIN-ENROLL:${g.user.id}`,
         date: new Date().toISOString(),

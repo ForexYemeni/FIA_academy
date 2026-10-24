@@ -115,7 +115,7 @@ export function RoyalListSkeleton({ rows = 4, className }: { rows?: number; clas
 }
 
 /** شاشة تحميل كاملة للوحة — تُستخدم عند أول جلب للبيانات */
-export function RoyalDashboardSkeleton({ label = 'جارِ تجهيز القصر الملكي…' }: { label?: string }) {
+export function RoyalDashboardSkeleton({ label = 'جارِ تجهيز لوحتك…' }: { label?: string }) {
   return (
     <div className="space-y-5" role="status" aria-busy="true" aria-label={label}>
       <div className="flex items-center justify-center gap-3 pt-2">

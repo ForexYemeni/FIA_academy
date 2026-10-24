@@ -7,7 +7,7 @@
  * مكونات عرض بصرية خالصة — صفر تعديل على قاعدة البيانات أو منطق المصادقة:
  *   1) LuxSplash          — ستارة افتتاحية ملكية (الصفحة الرئيسية، مرة لكل جلسة)
  *   2) LuxOfferCountdown  — عدّاد تنازلي فاخر للعروض المحدودة
- *   3) LuxRoyalMessage    — رسالة الإدارة المختومة (من إعدادات الموقع)
+ *   3) LuxRoyalMessage    — إعلانات الإدارة المختومة بأنواعها: إعلان/تنبيه/تحذير
  *   4) LuxCommandPalette  — بحث شامل فاخر (Ctrl+K)
  *   5) LuxSupportButton   — زر دعم سريع عائم (الجهة اليسرى)
  *   6) LuxGlobalLayer     — تركيب كل ما سبق في مكان واحد داخل layout
@@ -23,6 +23,7 @@ import {
   LifeBuoy, Mail, Phone, Send, MessageCircle, BookOpen, Home,
   GraduationCap, ShieldCheck, Download, Users, Sparkles,
   CheckCircle2, ChevronLeft, Loader2, RefreshCw,
+  Megaphone, BellRing, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 // 👑 v10.3 — القارئ الملكي لإعادة قراءة الدروس المحفوظة دون إنترنت (عرض فقط)
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
@@ -192,44 +193,113 @@ export function LuxOfferCountdown({ endsAt, dark = false, title }: { endsAt?: st
   )
 }
 
-// ═══════════════════════ 3) رسالة الإدارة المختومة ═══════════════════════
+// ═══════════════════════ 3) إعلانات الإدارة المختومة ═══════════════════════
+// 👑 v10.4 — ثلاثة أنواع رسمية لكل إعلان (إعلان / تنبيه / تحذير) ولكل نوع شمعته
+// ولونه وأيقونته، والتاريخ مطلوب ومُعروض بشكل بارز في كل بطاقة. تعمل من مفاتيح
+// الإعدادات الإضافية بلا أي ترحيل قاعدة بيانات، مع دعم كامل للرسالة القديمة.
+
+export const FIA_ANNOUNCE_TYPES: Record<string, { label: string; icon: any; seal: string; badge: string; soft: string }> = {
+  announce: {
+    label: 'إعلان', icon: Megaphone,
+    seal: 'from-red-800 via-red-600 to-red-800',
+    badge: 'bg-gold/15 text-[#8a6d1f] border-gold/45',
+    soft: 'from-gold/[0.10] via-transparent to-gold/[0.04]',
+  },
+  notice: {
+    label: 'تنبيه', icon: BellRing,
+    seal: 'from-amber-700 via-amber-500 to-amber-700',
+    badge: 'bg-amber-500/15 text-amber-700 border-amber-500/45',
+    soft: 'from-amber-500/[0.10] via-transparent to-amber-500/[0.04]',
+  },
+  warning: {
+    label: 'تحذير', icon: AlertTriangle,
+    seal: 'from-red-950 via-red-800 to-red-950',
+    badge: 'bg-red-500/15 text-red-700 border-red-500/45',
+    soft: 'from-red-500/[0.10] via-transparent to-red-500/[0.04]',
+  },
+}
+
+export function fiaAnnounceType(t?: string) {
+  return FIA_ANNOUNCE_TYPES[t || 'announce'] || FIA_ANNOUNCE_TYPES.announce
+}
+
+// تنسيق التاريخ إلى عربي أنيق — والنص الحر يُعاد كما هو
+export function fiaFormatArabicDate(iso?: string): string {
+  const s = String(iso || '').trim()
+  if (!s) return ''
+  try {
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return s
+    return d.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  } catch { return s }
+}
+
+// قراءة الإعلانات النشطة من الإعدادات — الأحدث أولاً — مع دعم الرسالة القديمة
+export function readFiaAnnouncements(settings: any): any[] {
+  let list: any[] = []
+  try {
+    const raw = settings?.admin_announcements
+    if (raw) {
+      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(arr)) {
+        list = arr.filter((a: any) => a && a.active !== false && String(a.text || '').trim())
+      }
+    }
+  } catch {}
+  if (list.length === 0) {
+    const msg = String(settings?.royal_message || '').trim()
+    if (msg) {
+      list = [{
+        id: `legacy:${msg.slice(0, 80)}`,
+        type: 'announce',
+        text: msg,
+        date: String(settings?.royal_message_date || '').trim(),
+        signature: String(settings?.royal_message_signature || '').trim() || 'إدارة أكاديمية المستقبل الدولية',
+        active: true,
+      }]
+    }
+  }
+  return list
+}
 
 export function LuxRoyalMessage() {
   const pathname = usePathname()
   const settings = useSiteSettings()
   const [open, setOpen] = useState(false)
   const [pulsing, setPulsing] = useState(false)
-  const msg = settings?.royal_message?.trim() || ''
-  const sig = settings?.royal_message_signature?.trim() || 'إدارة أكاديمية المستقبل الدولية'
-  const date = settings?.royal_message_date?.trim() || ''
+  const list = useMemo(() => readFiaAnnouncements(settings), [settings])
+  const latest = list[0] || null
+  const meta = latest ? fiaAnnounceType(latest.type) : null
 
-  // نبض الختم فقط إذا الرسالة جديدة (لم تُقرأ هذه النسخة منها)
+  // نبض الشمع فقط إذا آخر إعلان جديد (لم يُقرأ بعد)
   useEffect(() => {
-    if (!msg || pathname !== '/') { setPulsing(false); return }
+    if (!latest || pathname !== '/') { setPulsing(false); return }
     let read = false
-    try { read = localStorage.getItem('fia-royal-msg-read') === msg.slice(0, 120) } catch {}
+    try { read = localStorage.getItem('fia-royal-msg-read') === String(latest.id) } catch {}
     setPulsing(!read)
-  }, [msg, pathname])
+  }, [latest?.id, pathname])
 
-  if (!msg || pathname !== '/') return null
+  if (!latest || pathname !== '/' || !meta) return null
 
   const openLetter = () => {
     setOpen(true)
     setPulsing(false)
-    try { localStorage.setItem('fia-royal-msg-read', msg.slice(0, 120)) } catch {}
+    try { localStorage.setItem('fia-royal-msg-read', String(latest.id)) } catch {}
   }
+  const LatestIcon = meta.icon
 
   return (
     <>
-      {/* ختم الشمع العائم — فوق زر الدعم في اليسار */}
+      {/* شمع الإعلان العائم — قمة عمود الأدوات في الزاوية اليسرى */}
       <button
         onClick={openLetter}
-        title="رسالة من إدارة الأكاديمية"
-        className={`fixed bottom-[124px] left-5 z-[60] w-12 h-12 rounded-full bg-gradient-to-br from-red-800 via-red-600 to-red-800 shadow-xl border-2 border-gold/60 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
+        title="إعلانات إدارة الأكاديمية"
+        aria-label="إعلانات إدارة الأكاديمية"
+        className={`fixed bottom-[176px] left-6 z-[60] w-12 h-12 rounded-full bg-gradient-to-br ${meta.seal} shadow-xl border-2 border-gold/60 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
           pulsing ? 'fia-seal-pulse' : ''
         }`}
       >
-        <Crown className="w-5 h-5 text-gold" strokeWidth={2.2} />
+        <LatestIcon className="w-5 h-5 text-gold" strokeWidth={2.2} />
         {pulsing && <span className="absolute inset-0 rounded-full border-2 border-gold animate-ping opacity-40" />}
       </button>
 
@@ -237,10 +307,10 @@ export function LuxRoyalMessage() {
         <div className="fixed inset-0 z-[9992] flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-navy/70 backdrop-blur-sm" />
           <div
-            className="fia-letter relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border-2 border-gold/50 bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9]"
+            className="fia-letter relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl shadow-2xl border-2 border-gold/50 bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* ترويسة الرسالة */}
+            {/* ترويسة البطاقة */}
             <div className="relative bg-gradient-to-r from-navy via-navy-light to-navy px-5 py-4 text-white">
               <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
                 backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)',
@@ -248,35 +318,76 @@ export function LuxRoyalMessage() {
               }} />
               <div className="relative flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md">
-                  <Crown className="w-5 h-5 text-navy" />
+                  <LatestIcon className="w-5 h-5 text-navy" />
                 </div>
-                <div>
-                  <div className="font-black text-sm">رسالة من الإدارة</div>
-                  <div className="text-[10px] text-gold/80">أكاديمية المستقبل الدولية {date ? `• ${date}` : ''}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-black text-sm flex items-center gap-2">
+                    من إدارة الأكاديمية
+                    <span className={`text-[10px] font-black rounded-full px-2.5 py-0.5 border ${meta.badge} bg-navy/40 !text-gold`}>
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-gold/80">أكاديمية المستقبل الدولية</div>
                 </div>
-                <button onClick={() => setOpen(false)} className="mr-auto text-gold/70 hover:text-gold">
+                <button onClick={() => setOpen(false)} className="text-gold/70 hover:text-gold" aria-label="إغلاق">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            {/* جسد الرسالة — ورق فاخر */}
+            {/* جسد الإعلان الأحدث — ورق فاخر */}
             <div className="relative px-6 py-6">
               <div className="absolute inset-0 opacity-[0.35] pointer-events-none" style={{
                 backgroundImage: 'linear-gradient(#00000008 1px, transparent 1px)',
                 backgroundSize: '100% 28px',
               }} />
+              {/* التاريخ — مطلوب ويُعرض دائماً بشكل بارز */}
+              {String(latest.date || '').trim() && (
+                <div className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-navy text-gold text-[11px] font-black px-3.5 py-1.5 border border-gold/45 shadow-md">
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  {fiaFormatArabicDate(latest.date)}
+                </div>
+              )}
               <p className="relative text-[15px] leading-8 text-[#2a2113] whitespace-pre-wrap font-semibold" dir="rtl">
-                {msg}
+                {latest.text}
               </p>
               {/* التوقيع والختم */}
               <div className="relative mt-6 flex items-end justify-between">
-                <div className="text-xs text-[#6b5a33] font-bold">{sig}</div>
-                <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-red-700 to-red-900 border-2 border-red-800/60 flex items-center justify-center shadow-lg rotate-[-8deg]">
-                  <Crown className="w-6 h-6 text-gold/90" />
+                <div className="text-xs text-[#6b5a33] font-bold">{latest.signature || 'إدارة أكاديمية المستقبل الدولية'}</div>
+                <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br ${meta.seal} border-2 border-black/10 flex items-center justify-center shadow-lg rotate-[-8deg]`}>
+                  <LatestIcon className="w-6 h-6 text-gold/90" />
                   <span className="absolute inset-1.5 rounded-full border border-gold/40" />
                 </div>
               </div>
             </div>
+            {/* بقية الإعلانات السارية */}
+            {list.length > 1 && (
+              <div className="relative border-t border-gold/30 bg-white/50 px-5 py-4">
+                <div className="text-[10px] font-black text-[#8a6d1f] uppercase tracking-widest mb-2.5">إعلانات سابقة ما تزال سارية</div>
+                <div className="space-y-2">
+                  {list.slice(1, 6).map((a: any) => {
+                    const m = fiaAnnounceType(a.type)
+                    const Icon = m.icon
+                    return (
+                      <div key={String(a.id)} className={`relative rounded-xl border border-gold/25 bg-gradient-to-l ${m.soft} px-3 py-2.5`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-md bg-navy text-gold flex items-center justify-center flex-shrink-0">
+                            <Icon className="w-3 h-3" />
+                          </span>
+                          <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${m.badge}`}>{m.label}</span>
+                          {String(a.date || '').trim() && (
+                            <span className="text-[9px] font-bold text-[#6b5a33] flex items-center gap-1">
+                              <CalendarDays className="w-3 h-3" />
+                              {fiaFormatArabicDate(a.date)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] leading-5 text-[#3d3122]" dir="rtl">{a.text}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -495,9 +606,9 @@ export function LuxSupportButton() {
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-[58]" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 z-[66]" onClick={() => setOpen(false)} />}
       {/* اللوحة */}
-      <div className={`fixed bottom-[72px] left-5 z-[59] w-[300px] rounded-2xl overflow-hidden shadow-2xl border border-gold/40 bg-white transition-all duration-300 origin-bottom-left ${
+      <div className={`fixed bottom-[92px] left-5 z-[65] w-[300px] rounded-2xl overflow-hidden shadow-2xl border border-gold/40 bg-white transition-all duration-300 origin-bottom-left ${
         open ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 translate-y-3 pointer-events-none'
       }`} dir="rtl">
         <div className="relative bg-gradient-to-r from-navy via-navy-light to-navy px-4 py-3.5 text-white">
@@ -509,7 +620,7 @@ export function LuxSupportButton() {
               <LifeBuoy className="w-5 h-5 text-navy" />
             </div>
             <div>
-              <div className="text-xs font-black">الدعم السريع الملكي</div>
+              <div className="text-xs font-black">الدعم السريع</div>
               <div className="text-[10px] text-gold/80">نحن معك خطوة بخطوة</div>
             </div>
             <button onClick={() => setOpen(false)} className="mr-auto text-gold/70 hover:text-gold"><X className="w-4 h-4" /></button>
@@ -539,12 +650,12 @@ export function LuxSupportButton() {
           })}
         </div>
       </div>
-      {/* الزر العائم */}
+      {/* الزر العائم — قاعدة عمود الأدوات في الزاوية اليسرى */}
       <button
         onClick={() => setOpen((o) => !o)}
         title="الدعم السريع"
         aria-label="الدعم السريع"
-        className="fixed bottom-6 left-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all z-50 hover:scale-110 active:scale-95 ring-2 ring-gold/30"
+        className="fixed bottom-6 left-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 ring-2 ring-gold/30"
       >
         <span className="absolute inset-0 rounded-full" />
         {open ? <X className="w-6 h-6" /> : <LifeBuoy className="w-6 h-6" />}

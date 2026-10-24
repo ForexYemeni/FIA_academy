@@ -24,7 +24,7 @@ export async function PUT(req: NextRequest) {
 
   // 🔒 محاولة تعديل الاسم → رد ملكي صريح
   if (typeof body?.name === 'string' && body.name.trim() && body.name !== user.name) {
-    return NextResponse.json({ error: '🔒 الاسم مغلّق ملكياً — يُحدد مرة واحدة ولا يُعدّل إلا من إدارة الأكاديمية' }, { status: 403 })
+    return NextResponse.json({ error: '🔒 الاسم مغلّق نهائياً — يُحدد مرة واحدة ولا يُعدّل إلا من إدارة الأكاديمية' }, { status: 403 })
   }
 
   // 🔒 v6.6 — المسمى الوظيفي/التخصص مغلّقان: يُشطرمان صامتاً من أي طلب

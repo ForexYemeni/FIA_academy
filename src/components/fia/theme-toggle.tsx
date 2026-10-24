@@ -8,7 +8,8 @@
  * • الاختيار يُحفظ في localStorage (مفتاح fia-theme) ويُطبق قبل الرسم
  *   عبر سكربت التهيئة في layout — فلا وميض أبيض عند فتح الصفحة
  * • الافتراضي: الليل الملكي (هوية الأكاديمية الكحلية بأبهى صورها)
- * • موضع الزر أسفل اليسار — بعيد عن زر الدردشة (أسفل اليمين)
+ * • موضع الزر عمود الأدوات أسفل اليسار — فوق زر الدعم مباشرة وبمحاذاة مركزية معه
+ *   (عمود مرتّب: الدعم ← الوضع الليلي ← إعلانات الإدارة) بلا أي تصادم
  * • لا يمس أي منظومة إشعارات ولا sw.js — مكوّن عرضي مستقل تماماً
  * ============================================================================
  */
@@ -57,7 +58,7 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label={isDark ? 'التحويل إلى الوضع النهاري' : 'التحويل إلى الوضع الليلي'}
       title={isDark ? 'الوضع النهاري ☀️' : 'الوضع الليلي 🌙'}
-      className="fixed bottom-6 left-6 z-[60] w-12 h-12 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ring-2 ring-gold/30 hover:ring-gold/60 hover:shadow-[0_0_24px_rgba(212,175,55,0.45)]"
+      className="fixed bottom-[104px] left-6 z-[60] w-12 h-12 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ring-2 ring-gold/30 hover:ring-gold/60 hover:shadow-[0_0_24px_rgba(212,175,55,0.45)]"
     >
       {/* قرص توهج ذهبي نابض بهدوء */}
       <span

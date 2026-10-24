@@ -11,8 +11,9 @@ import {
   Gift, Newspaper, MessageSquare, HelpCircle, Ban, X,
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
   Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
-  ClipboardCheck, Landmark,
+  ClipboardCheck, Landmark, Megaphone, BellRing, CalendarDays,
 } from 'lucide-react'
+import { fiaAnnounceType, fiaFormatArabicDate } from '@/components/fia/lux-experience'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { RoyalGridSkeleton, RoyalListSkeleton, RoyalStatsSkeleton } from '@/components/fia/royal-skeleton'
 import { RoyalEmpty } from '@/components/fia/royal-empty-state'
@@ -832,7 +833,7 @@ const AdminCourses = React.memo(function AdminCourses() {
         <RoyalEmpty
           icon={BookOpen}
           title="لا توجد دورات بعد"
-          subtitle="أضِف أول دورة وستظهر هنا مباشرة — رحلة المملكة تبدأ بخطوة"
+          subtitle="أضِف أول دورة وستظهر هنا مباشرة — رحلة النجاح تبدأ بخطوة"
           actionLabel="إضافة أول دورة"
           onAction={() => { setEditing(null); setOpen(true) }}
         />
@@ -3828,15 +3829,24 @@ const AdminSite = React.memo(function AdminSite() {
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility' | 'royal'>('basic')
   const [passwordDialog, setPasswordDialog] = useState<{ password: string; pendingSettings: any } | null>(null)
+  // 👑 v10.4 — مركز إعلانات الإدارة: مسوّدة إعلان جديد + قائمة المنشور
+  const [annDraft, setAnnDraft] = useState<{ type: string; text: string; date: string; sig: string }>({ type: 'announce', text: '', date: '', sig: '' })
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
+  // تاريخ المسوّدة اليوم افتراضياً عند فتح الزاوية — التاريخ مطلوب دائماً
+  useEffect(() => {
+    if (tab === 'royal') {
+      setAnnDraft((d) => ({ ...d, date: d.date || new Date().toISOString().slice(0, 10) }))
+    }
+  }, [tab])
 
   // Save with Telegram-protection: if Telegram token/channel_id changed,
   // prompt for password first; otherwise save directly.
-  const save = async (overridePassword?: string) => {
+  // ⚙️ v10.4 — يقبل نسخة إعدادات جاهزة (overrideSettings) لضمان حفظ أحدث حالة
+  const save = async (overridePassword?: string, overrideSettings?: any) => {
     setSaving(true)
     try {
-      const body = { ...settings }
+      const body = { ...(overrideSettings || settings) }
       if (overridePassword) {
         body.user_id = user?.id
         body.password = overridePassword
@@ -3870,6 +3880,49 @@ const AdminSite = React.memo(function AdminSite() {
     await save(passwordDialog.password)
   }
 
+  // 👑 v10.4 — أدوات مركز الإعلانات: نشر / إظهار-إخفاء / حذف — كلها بحفظ فوري
+  const allAnnouncements: any[] = (() => {
+    try {
+      const raw = settings?.admin_announcements
+      if (!raw) return []
+      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+      return Array.isArray(arr) ? arr : []
+    } catch { return [] }
+  })()
+
+  const saveAnnouncements = (next: any[]) => {
+    const nextSettings = { ...settings, admin_announcements: next }
+    setSettings(nextSettings)
+    save(undefined, nextSettings)
+  }
+
+  const publishAnnouncement = () => {
+    const text = annDraft.text.trim()
+    if (!text) { toast.error('اكتب نص الإعلان أولاً'); return }
+    if (!annDraft.date) { toast.error('حدّد تاريخ الإعلان — التاريخ جزء أساسي منه'); return }
+    const item = {
+      id: `ann-${Date.now()}`,
+      type: annDraft.type,
+      text,
+      date: annDraft.date,
+      signature: annDraft.sig.trim() || 'إدارة أكاديمية المستقبل الدولية',
+      active: true,
+      created_at: new Date().toISOString(),
+    }
+    saveAnnouncements([item, ...allAnnouncements])
+    setAnnDraft((d) => ({ type: d.type, text: '', date: new Date().toISOString().slice(0, 10), sig: '' }))
+    toast.success('نُشر الإعلان — يظهر للطلاب في الصفحة الرئيسية فوراً')
+  }
+
+  const setAnnActive = (id: string, active: boolean) => {
+    saveAnnouncements(allAnnouncements.map((a: any) => (String(a.id) === String(id) ? { ...a, active } : a)))
+  }
+
+  const deleteAnnouncement = (id: string) => {
+    saveAnnouncements(allAnnouncements.filter((a: any) => String(a.id) !== String(id)))
+    toast.success('حُذف الإعلان')
+  }
+
   return (
     <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
       {/* ⚡ Magical tabs — premium style */}
@@ -3882,7 +3935,7 @@ const AdminSite = React.memo(function AdminSite() {
           { id: 'policies',   label: 'السياسات',       icon: Shield,       gradient: 'from-slate-600 to-gray-700' },
           { id: 'social',     label: 'التواصل',         icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
           { id: 'visibility', label: 'الإظهار',        icon: Eye,          gradient: 'from-emerald-500 to-teal-600' },
-          { id: 'royal',      label: 'الزاوية الملكية', icon: Crown,        gradient: 'from-gold to-amber-500' },
+          { id: 'royal',      label: 'زاوية الإدارة', icon: Crown,        gradient: 'from-gold to-amber-500' },
         ].map((t) => {
           const TabIcon = t.icon
           const isActive = tab === t.id
@@ -3924,43 +3977,221 @@ const AdminSite = React.memo(function AdminSite() {
       </div>
 
       <div className="space-y-4 max-w-3xl">
-        {/* 👑 v10.3 — الزاوية الملكية: رسالة الإدارة + العرض المحدود (تُخزنان تلقائياً في الإعدادات الإضافية بلا أي ترحيل) */}
+        {/* 👑 v10.4 — زاوية الإدارة: مركز الإعلانات المختومة بأنواعها + العرض المحدود (إعدادات إضافية بلا أي ترحيل) */}
         {tab === 'royal' && (
           <div className="space-y-4">
+            {/* ═══ بطاقة إعلان جديد ═══ */}
             <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
               <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
               <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
                   <Crown className="w-4 h-4 text-gold" />
                 </div>
-                رسالة الإدارة المختومة
+                إعلان جديد مختوم
               </h3>
               <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
-                تظهر كختم شمع ملكي عائم في الصفحة الرئيسية — يضغط المتدرب عليه لقراءة الرسالة في بطاقة فاخرة. اتركها فارغة لإخفائها كلياً.
+                يصل للطلاب فوراً كشمع عائم في الصفحة الرئيسية — مع نوعه وتاريخه الموثّق وتوقيع الأكاديمية.
               </p>
               <div className="relative space-y-3">
+                {/* نوع الإعلان */}
                 <div>
-                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> نص الرسالة</Label>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Megaphone className="w-3.5 h-3.5 text-gold" /> نوع الإعلان</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'announce', label: 'إعلان', icon: Megaphone, ring: 'border-gold/60 bg-gold/10', dot: 'bg-gold' },
+                      { id: 'notice', label: 'تنبيه', icon: BellRing, ring: 'border-amber-500/60 bg-amber-500/10', dot: 'bg-amber-500' },
+                      { id: 'warning', label: 'تحذير', icon: AlertTriangle, ring: 'border-red-500/60 bg-red-500/10', dot: 'bg-red-500' },
+                    ].map((t) => {
+                      const active = annDraft.type === t.id
+                      const TIcon = t.icon
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setAnnDraft({ ...annDraft, type: t.id })}
+                          className={`relative flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-2.5 transition-all group ${
+                            active
+                              ? `${t.ring} shadow-md scale-[1.02]`
+                              : 'border-gold/20 bg-white hover:border-gold/40 hover:bg-gold/5'
+                          }`}
+                        >
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                            active ? 'bg-gradient-to-br from-navy to-navy-light text-gold shadow-sm' : 'bg-navy/5 text-navy/60 group-hover:text-navy'
+                          }`}>
+                            <TIcon className="w-4 h-4" />
+                          </span>
+                          <span className={`text-[11px] font-black ${active ? 'text-navy' : 'text-muted-foreground'}`}>{t.label}</span>
+                          <span className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full ${t.dot} ${active ? 'opacity-100' : 'opacity-30'}`} />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* نص الإعلان */}
+                <div>
+                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> نص الإعلان</Label>
                   <Textarea
-                    value={settings.royal_message || ''}
-                    onChange={(e) => setSettings({ ...settings, royal_message: e.target.value })}
-                    rows={5}
-                    placeholder="اكتب رسالة الأسبوع للمتدربين — نصيحة، إعلان، أو كلمة تشجيع…"
+                    value={annDraft.text}
+                    onChange={(e) => setAnnDraft({ ...annDraft, text: e.target.value })}
+                    rows={4}
+                    placeholder="مثال: نعلن عن حاجتنا إلى مدرب معتمد لتخصص — تقدّم الآن عبر صفحة التواصل… أو تنبيه مهم أو تحذير سارٍ للجميع"
                     className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 leading-relaxed"
                   />
                 </div>
+                {/* التاريخ + التوقيع */}
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التوقيع</Label>
-                    <Input value={settings.royal_message_signature || ''} onChange={(e) => setSettings({ ...settings, royal_message_signature: e.target.value })} placeholder="إدارة أكاديمية المستقبل الدولية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
+                      <CalendarDays className="w-3.5 h-3.5 text-gold" /> تاريخ الإعلان
+                      <span className="text-[9px] font-black text-red-600 bg-red-500/10 border border-red-500/25 rounded-full px-2 py-0.5">مطلوب</span>
+                    </Label>
+                    <Input
+                      type="date"
+                      value={annDraft.date}
+                      onChange={(e) => setAnnDraft({ ...annDraft, date: e.target.value })}
+                      dir="ltr"
+                      className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
+                    />
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { const d = new Date(); setAnnDraft({ ...annDraft, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }) }}
+                        className="text-[10px] font-black text-navy bg-gold/15 border border-gold/35 rounded-full px-2.5 py-0.5 hover:bg-gold/25 transition-colors"
+                      >
+                        اليوم
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); setAnnDraft({ ...annDraft, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }) }}
+                        className="text-[10px] font-black text-navy bg-gold/15 border border-gold/35 rounded-full px-2.5 py-0.5 hover:bg-gold/25 transition-colors"
+                      >
+                        غداً
+                      </button>
+                      {annDraft.date && (
+                        <span className="text-[10px] font-bold text-muted-foreground truncate">
+                          سيظهر: {fiaFormatArabicDate(annDraft.date)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div>
-                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التاريخ (اختياري)</Label>
-                    <Input value={settings.royal_message_date || ''} onChange={(e) => setSettings({ ...settings, royal_message_date: e.target.value })} placeholder="جمعة 25 أكتوبر 2026" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التوقيع</Label>
+                    <Input value={annDraft.sig} onChange={(e) => setAnnDraft({ ...annDraft, sig: e.target.value })} placeholder="إدارة أكاديمية المستقبل الدولية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                  </div>
+                </div>
+                {/* معاينة حية — كما يراها المتدرب تماماً */}
+                <div className="rounded-xl border border-gold/30 overflow-hidden shadow-sm">
+                  <div className="bg-gradient-to-r from-navy via-navy-light to-navy px-3.5 py-2.5 text-white flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0">
+                      {(() => { const I = fiaAnnounceType(annDraft.type).icon; return <I className="w-3.5 h-3.5 text-navy" /> })()}
+                    </span>
+                    <span className="text-[11px] font-black flex-1">من إدارة الأكاديمية</span>
+                    <span className="text-[9px] font-black text-gold bg-white/10 border border-gold/40 rounded-full px-2 py-0.5">{fiaAnnounceType(annDraft.type).label}</span>
+                  </div>
+                  <div className="bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9] px-4 py-3">
+                    {annDraft.date && (
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-navy text-gold text-[10px] font-black px-3 py-1 border border-gold/45 mb-2">
+                        <CalendarDays className="w-3 h-3" />
+                        {fiaFormatArabicDate(annDraft.date)}
+                      </div>
+                    )}
+                    <p className="text-[12px] leading-6 text-[#2a2113] font-semibold whitespace-pre-wrap" dir="rtl">
+                      {annDraft.text.trim() || 'ستظهر المعاينة هنا مباشرة أثناء الكتابة…'}
+                    </p>
+                    <div className="mt-2.5 flex items-end justify-between">
+                      <span className="text-[10px] text-[#6b5a33] font-bold">{annDraft.sig.trim() || 'إدارة أكاديمية المستقبل الدولية'}</span>
+                      <span className={`w-8 h-8 rounded-full bg-gradient-to-br ${fiaAnnounceType(annDraft.type).seal} border-2 border-black/10 flex items-center justify-center shadow-md rotate-[-8deg]`}>
+                        {(() => { const I = fiaAnnounceType(annDraft.type).icon; return <I className="w-3.5 h-3.5 text-gold/90" /> })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {/* زر النشر */}
+                <Button
+                  onClick={publishAnnouncement}
+                  disabled={saving}
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-black shadow-lg active:scale-[0.98] transition-all"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+                  نشر الإعلان المختوم
+                </Button>
+              </div>
+            </div>
+
+            {/* ═══ الرسالة القديمة المحفوظة — تُعرض حتى نشر أول إعلان ═══ */}
+            {allAnnouncements.length === 0 && String(settings.royal_message || '').trim() && (
+              <div className="relative p-4 rounded-2xl border border-amber-500/40 bg-amber-500/[0.06] overflow-hidden">
+                <div className="flex items-start gap-3">
+                  <span className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <BellRing className="w-4 h-4 text-amber-600" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-navy mb-1">رسالة محفوظة سابقاً ما تزال معروضة للطلاب</div>
+                    <p className="text-[11px] text-muted-foreground leading-5 line-clamp-2">{settings.royal_message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">انشر أول إعلان من الأعلى لتتحول تلقائياً إلى مركز الإعلانات المتعدد.</p>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* ═══ الإعلانات المنشورة ═══ */}
+            {allAnnouncements.length > 0 && (
+              <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
+                <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
+                <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
+                    <Newspaper className="w-4 h-4 text-gold" />
+                  </div>
+                  الإعلانات المنشورة
+                  <span className="text-[10px] font-black text-navy/60 bg-gold/15 border border-gold/30 rounded-full px-2.5 py-0.5">{allAnnouncements.length}</span>
+                </h3>
+                <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
+                  الأحدث في القمة هو ما يظهر على الشمع العائم — وأيقاف أي إعلان يخفيه من الطلاب فوراً دون حذفه.
+                </p>
+                <div className="relative space-y-2.5">
+                  {allAnnouncements.map((a: any) => {
+                    const m = fiaAnnounceType(a.type)
+                    const AIcon = m.icon
+                    return (
+                      <div key={String(a.id)} className={`relative rounded-xl border p-3 transition-all ${
+                        a.active === false ? 'border-gold/15 bg-white/60 opacity-60' : 'border-gold/35 bg-white'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          <span className={`w-9 h-9 rounded-lg bg-gradient-to-br ${m.seal} flex items-center justify-center flex-shrink-0 shadow-sm border border-black/10`}>
+                            <AIcon className="w-4 h-4 text-gold" />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${m.badge}`}>{m.label}</span>
+                              {String(a.date || '').trim() && (
+                                <span className="text-[9px] font-bold text-navy/70 flex items-center gap-1">
+                                  <CalendarDays className="w-3 h-3 text-gold" />
+                                  {fiaFormatArabicDate(a.date)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] leading-5 text-navy/85 line-clamp-2" dir="rtl">{a.text}</p>
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                            <Switch
+                              checked={a.active !== false}
+                              onCheckedChange={(v: boolean) => setAnnActive(a.id, v)}
+                            />
+                            <button
+                              onClick={() => deleteAnnouncement(a.id)}
+                              title="حذف نهائي"
+                              className="w-7 h-7 rounded-lg border border-gold/20 text-gold/50 hover:text-red-500 hover:border-red-300 flex items-center justify-center transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
               <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
@@ -3976,7 +4207,7 @@ const AdminSite = React.memo(function AdminSite() {
               <div className="relative grid sm:grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> عنوان العرض (اختياري)</Label>
-                  <Input value={settings.offer_title || ''} onChange={(e) => setSettings({ ...settings, offer_title: e.target.value })} placeholder="خصومات أكتوبر الملكية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+                  <Input value={settings.offer_title || ''} onChange={(e) => setSettings({ ...settings, offer_title: e.target.value })} placeholder="خصومات الأكاديمية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
                 </div>
                 <div>
                   <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> ينتهي في</Label>
@@ -5119,7 +5350,7 @@ type DzSnapshotRow = {
               open={dzPasswordOpenFor === 'snapshot-delete'}
               onOpenChange={(o) => { if (!o && dzSnapBusy === '') setDzPasswordOpenFor(null) }}
               title="تأكيد الحذف النهائي بكلمة المرور"
-              message="لحظة أمان ملكية أخيرة — أدخل كلمة مرور حسابك لإتمام حذف النسخة نهائياً."
+              message="لحظة أمان أخيرة — أدخل كلمة مرور حسابك لإتمام حذف النسخة نهائياً."
               itemLabel="النسخة المحذوفة:"
               itemName={dzDeleteTarget ? (dzDeleteTarget.kind === 'full' ? 'النسخة الشاملة الكاملة' : `قسم ${DZ_SECTION_LABELS[dzDeleteTarget.section] || dzDeleteTarget.section}`) : ''}
               confirmLabel="حذف نهائي لا رجعة فيه"

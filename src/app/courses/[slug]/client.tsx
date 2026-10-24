@@ -391,7 +391,7 @@ export default function CourseDetailClient({ course }: CourseDetailClientProps) 
                   <GiftCrown className="w-5 h-5 text-navy" />
                 </div>
                 <div>
-                  <div className="font-black text-sm">بطاقة إهداء ملكية</div>
+                  <div className="font-black text-sm">بطاقة إهداء أنيقة</div>
                   <div className="text-[10px] text-gold/80">أهدِ دورة لمن تحب ببطاقة فاخرة</div>
                 </div>
                 <button onClick={() => setGiftOpen(false)} className="mr-auto text-gold/70 hover:text-gold"><GiftX className="w-5 h-5" /></button>

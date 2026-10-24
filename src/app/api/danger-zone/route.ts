@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
             reEnroll.map((r) => ({
               amount: 0,
               currency: 'ر.ي',
-              method: 'تسجيل مجاني ملكي — دليل الأكاديمية',
+              method: 'تسجيل مجاني — دليل الأكاديمية',
               status: 'مكتمل',
               reference: 'GUIDE-FREE',
               date: new Date().toISOString(),

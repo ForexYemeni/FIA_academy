@@ -27,11 +27,11 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL =
-  'https://github.com/ForexYemeni/FIA-Academy-App/releases/latest/download/FIA-Academy.apk'
+const APK_URL = '/apk/FIA-Academy.apk'
 
-const FALLBACK_VERSION = '2.7.1'
-const FALLBACK_DATE = '2026-10-23T00:14:14Z'
+// 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
+const FALLBACK_VERSION = '3.0.0'
+const FALLBACK_DATE = '2026-10-25T12:00:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -63,57 +63,51 @@ export default function DownloadClient() {
   const [qr, setQr] = useState<string>('')
   const [pressed, setPressed] = useState(false)
 
-  // جلب أحدث إصدار وحجمه من GitHub — بقيم احتياطية عند أي فشل
+  // جلب حجم ملف التطبيق المستضاف على الموقع نفسه — بقيم ثابتة للإصدار والتاريخ
   useEffect(() => {
     let alive = true
     try {
       const cached = sessionStorage.getItem('fia-apk-meta')
       if (cached) {
         const c = JSON.parse(cached)
-        if (c?.version) setVersion(c.version)
         if (c?.size) setSize(c.size)
-        if (c?.updated) setUpdated(c.updated)
       }
     } catch {}
-    fetch('https://api.github.com/repos/ForexYemeni/FIA-Academy-App/releases/latest')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('api'))))
-      .then((d) => {
-        if (!alive || !d) return
-        const v = String(d.tag_name || '').replace(/^v/, '') || FALLBACK_VERSION
-        const asset = Array.isArray(d.assets)
-          ? d.assets.find((a: any) => a.name === 'FIA-Academy.apk') || d.assets[0]
-          : null
-        const s = asset?.size ? formatSize(asset.size) : ''
-        const dt = d.published_at ? formatDate(d.published_at) : ''
-        setVersion(v)
-        if (s) setSize(s)
-        if (dt) setUpdated(dt)
-        try {
-          sessionStorage.setItem(
-            'fia-apk-meta',
-            JSON.stringify({ version: v, size: s, updated: dt })
-          )
-        } catch {}
-      })
-      .catch(() => {
-        if (!alive) return
-        setVersion((cur) => cur || FALLBACK_VERSION)
-      })
+    try {
+      fetch(APK_URL, { method: 'HEAD' })
+        .then((r) => {
+          if (!alive || !r.ok) return
+          const len = Number(r.headers.get('content-length') || 0)
+          const s = len ? formatSize(len) : ''
+          if (s) {
+            setSize(s)
+            try { sessionStorage.setItem('fia-apk-meta', JSON.stringify({ size: s })) } catch {}
+          }
+        })
+        .catch(() => {})
+    } catch {}
     return () => {
       alive = false
     }
   }, [])
 
-  // توليد رمز QR للرابط
+  // توليد رمز QR للرابط المطلق الحالي (يعمل من أي جهاز)
   useEffect(() => {
-    QRCode.toDataURL(APK_URL, {
-      margin: 1,
-      width: 640,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#101a33', light: '#ffffff' },
-    })
-      .then((url) => setQr(url))
-      .catch(() => setQr(''))
+    let alive = true
+    try {
+      const abs = `${window.location.origin}${APK_URL}`
+      QRCode.toDataURL(abs, {
+        margin: 1,
+        width: 640,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#101a33', light: '#ffffff' },
+      })
+        .then((url) => { if (alive) setQr(url) })
+        .catch(() => { if (alive) setQr('') })
+    } catch {}
+    return () => {
+      alive = false
+    }
   }, [])
 
   return (
@@ -255,7 +249,7 @@ export default function DownloadClient() {
               </li>
             </ol>
             <p className="fia-dl-card-note">
-              التطبيق موقّع رسمياً من الأكاديمية وآمن 100% — وإن كان لديك إصدار قديم لم يكتمل التثبيت فوقه فأزِله أولاً ثم ثبّت من جديد
+              التطبيق موقّع رسمياً من الأكاديمية وآمن 100% — تُثبّت الإصدارات الجديدة فوق القديمة مباشرة، وإن لم يكتمل التثبيت لأي سبب فأزِل النسخة القديمة أولاً ثم ثبّت من جديد
             </p>
           </div>
         </div>

@@ -397,7 +397,7 @@ export async function tgCleanupOrphans(deletedPayments: number, deletedCertReqs:
 export async function tgDangerZoneWiped(section: string, count: number, byUserId?: string, snapshotId?: string | null) {
   const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
   const shield = snapshotId
-    ? line('🛡️ نسخة إنقاذ ملكية جاهزة للاستعادة', String(snapshotId).slice(0, 8))
+    ? line('🛡️ نسخة إنقاذ جاهزة للاستعادة', String(snapshotId).slice(0, 8))
     : line('🛡️ نسخة الإنقاذ', 'تعذّر إنشاؤها — حذف مباشر')
   const msg =
     header('⚠️', 'تنظيف منطقة خطرة') +
@@ -412,7 +412,7 @@ export async function tgDangerZoneWiped(section: string, count: number, byUserId
 export async function tgDangerZoneRestored(rowTotal: number, byUserId?: string) {
   const by = byUserId ? await getUserName(byUserId) : 'الإدارة'
   const msg =
-    header('🛡️', 'استعادة إنقاذ ملكية') +
+    header('🛡️', 'استعادة إنقاذ') +
     line('♻️ السجلات المستعادة', rowTotal) +
     line('✨ نفّذها', by) +
     `\n\n✅ تم إرجاع البيانات من أرشيف الإنقاذ بنجاح.`

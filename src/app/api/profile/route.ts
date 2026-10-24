@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest) {
     if (Object.keys(updates).length === 0) {
       // محاولة تعديل الاسم وحده → رد ملكي واضح
       if (typeof body?.name === 'string' && body.name.trim()) {
-        return NextResponse.json({ error: '🔒 الاسم مغلّق ملكياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله' }, { status: 403 })
+        return NextResponse.json({ error: '🔒 الاسم مغلّق نهائياً — يُحدد مرة واحدة عند التسجيل ولا يمكن تعديله' }, { status: 403 })
       }
       return NextResponse.json({ error: 'لا توجد حقول صالحة للتحديث' }, { status: 400 })
     }
