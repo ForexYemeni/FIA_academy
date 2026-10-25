@@ -27,13 +27,14 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/Future-International-Academy-v2.9.1.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.9.2.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-// v2.9.1 — تحديث ناعم يبقى في نفس الصفحة + شريط العرض في الحسابات + صيانة تتخطى الإدارة
-// + روابط ذكية (يوتيوب/تيليجرام/واتساب) + زر مشاركة أصلي + مكتبتي
-const FALLBACK_VERSION = '2.9.1'
-const FALLBACK_DATE = '2026-10-25T18:30:00Z'
+// v2.9.2 — إصلاح الخصوصية الجذري: مكتبتي تفتح الدروس داخل التطبيق حصراً
+// (عارض داخلي فاخر بدل التطبيقات الخارجية) + الملفات في مجلد خاص بجهازك
+// ⚠️ هذا الإصدار بتوقيع جديد — يتطلب إزالة التطبيق القديم ثم تثبيته مرة واحدة
+const FALLBACK_VERSION = '2.9.2'
+const FALLBACK_DATE = '2026-10-25T19:50:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -196,6 +197,21 @@ export default function DownloadClient() {
             <small>نسخة أندرويد الرسمية — مجانية</small>
           </span>
         </a>
+
+        {/* ⚠️ تنبيه v2.9.2 — توقيع جديد يتطلب تثبيتاً نظيفاً مرة واحدة */}
+        <div style={{
+          marginTop: '14px', maxWidth: '520px', textAlign: 'right',
+          padding: '14px 16px', borderRadius: '16px',
+          border: '1px solid rgba(201,169,97,0.45)',
+          background: 'linear-gradient(to left, rgba(201,169,97,0.12), rgba(10,31,68,0.04))',
+          display: 'flex', gap: '12px', alignItems: 'flex-start',
+        }}>
+          <ShieldCheck style={{ width: '20px', height: '20px', color: '#C9A961', flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '12.5px', lineHeight: 1.9, color: 'inherit' }}>
+            <strong>مهم عند التثبيت:</strong> هذه النسخة (v2.9.2) تأتي بحماية خصوصية كاملة — دروس «مكتبتي» تُفتح داخل التطبيق حصراً ولا تصل إليها أي تطبيقات أخرى. إذا كان لديك إصدار قديم مثبت،{' '}
+            <strong>أزِله أولاً ثم ثبّت هذه النسخة</strong> — خطوة واحدة مرة واحدة، ثم كل التحديثات القادمة ستتم فوقها مباشرة.
+          </div>
+        </div>
 
         {/* === الميزات === */}
         <div className="fia-dl-features">
