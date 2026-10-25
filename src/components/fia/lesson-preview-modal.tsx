@@ -310,7 +310,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
             {/* 👑 v10.6 — حفظ الدرس للمشاهدة دون إنترنت (داخل التطبيق الأصلي فقط) */}
             {lesson.lesson_type === 'video' && lesson.video_url && (
-              <FiaOfflineSaveButton url={lesson.video_url} kind="video" title={lesson.title} />
+              <FiaOfflineSaveButton url={lesson.video_url} kind="video" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
             )}
             {lesson.lesson_type === 'audio' && (
               audioError ? (
@@ -339,14 +339,14 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 />
               )
             )}
-            {/* 👑 v10.6 — حفظ الصوت دون إنترنت (المصدر هو بوابة البث المصرّح بها بالكوكيز) */}
+            {/* 👑 v10.6 — حفظ الصوت دون إنترنت (المصدر هو بوابة البث المصرّح بها برمز mt) */}
             {lesson.lesson_type === 'audio' && audioSrc && (
-              <FiaOfflineSaveButton url={audioSrc} kind="audio" title={lesson.title} />
+              <FiaOfflineSaveButton url={audioSrc} kind="audio" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
             )}
             {lesson.lesson_type === 'text' && <LuxRoyalReader content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && lesson.pdf_url && (
-              <FiaOfflineSaveButton url={lesson.pdf_url} kind="pdf" title={lesson.title} />
+              <FiaOfflineSaveButton url={lesson.pdf_url} kind="pdf" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
             )}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
@@ -906,13 +906,23 @@ function ExamPreview({ content, title, onComplete }: { content?: string; title: 
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 👑 v10.6 — زر الحفظ الملكي للمشاهدة دون إنترنت (APK v2.9.0+ فقط)
+// 👑 v10.6.2 — زر الحفظ للمشاهدة دون إنترنت (APK v2.9.0+ فقط)
 // يظهر داخل التطبيق الأصلي حصراً (جسر FiaApp.saveOffline): ينزّل الفيديو/
-// الصوت/PDF إلى مكتبة التطبيق الداخلية عبر مُنزّل أصلي يدعم الكوكيز
-// (بوابة بث الصوت محمية) مع إشعار تقدم أصلي — ثم تُشاهد من «مكتبتي» بلا نت.
-// على المتصفح العادي الزر لا يظهر إطلاقاً — صفر إزعاج.
+// الصوت/PDF إلى مكتبة التطبيق الداخلية عبر مُنزّل أصلي — ثم تُشاهد من
+// «مكتبتي» بلا نت. على المتصفح العادي الزر لا يظهر إطلاقاً — صفر إزعاج.
+// ── 🛠️ إصلاح v10.6.2 (فشل التنزيل الفوري «تحقق من اتصالك بالإنترنت»):
+// كان الزر يمرر رابط الدرس خاماً إلى المُنزّل الأصلي فيفشل فوراً:
+//  • الصوت: رابط نسبي /api/lessons/audio-stream?... — المُنزّل الأصلي
+//    (DownloadManager) يرفض النسبي ويتطلب https:// مطلقاً → فشل فوري.
+//  • الفيديو القديم (رابط رسالة t.me/...): يُمرر رابط صفحة HTML
+//    بدل ملف الفيديو → تنزيل تالف/فشل.
+// الحل: مسار حلّ روابط كامل قبل التمرير للمُنزّل:
+//  1) روابط t.me/tg:// تُحلّ عبر واجهتنا إلى بروكسي البث الآمن بلا توكن
+//  2) الصوت: رمز mt جديد لحظة الحفظ (الرمز قصير العمر 15 دقيقة)
+//  3) الروابط النسبية تُثبَّت بمضيف الموقع لتصبح مطلقة https://
+//  4) أي رابط غير قابل للتنزيل → رسالة واضحة بدل الاعتماد على التخمين
 // ═══════════════════════════════════════════════════════════════════
-function FiaOfflineSaveButton({ url, kind, title }: { url: string; kind: 'video' | 'audio' | 'pdf'; title?: string }) {
+function FiaOfflineSaveButton({ url, kind, title, lessonId, courseId }: { url: string; kind: 'video' | 'audio' | 'pdf'; title?: string; lessonId?: string; courseId?: string }) {
   const [available, setAvailable] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -925,17 +935,67 @@ function FiaOfflineSaveButton({ url, kind, title }: { url: string; kind: 'video'
   const ext = kind === 'video' ? 'mp4' : kind === 'audio' ? 'mp3' : 'pdf'
   const safeName = (title || 'درس').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80)
 
-  const save = () => {
-    if (saving) return
+  // يحوّل أي صيغة رابط إلى رابط تنزيل مطلق صالح للمُنزّل الأصلي —
+  // يعيد null عند العجز مع بقاء السبب في رسالة الخطأ اللاحقة.
+  const resolveDownloadable = async (): Promise<string | null> => {
     try {
-      const ok = (window as any).FiaApp.saveOffline(url, `${safeName}.${ext}`, safeName, kind)
-      if (ok !== false) {
-        setSaving(true)
-        toast.success('بدأ التنزيل إلى مكتبتك — ستجده في «مكتبتي» عند اكتماله')
-        setTimeout(() => setSaving(false), 4000)
+      let u = (url || '').trim()
+      if (!u) return null
+      // 1) رابط رسالة تيليجرام (https://t.me/c/CHANNEL/MSG) → حلّ عبر واجهتنا
+      const tm = u.match(/t\.me\/c\/(\d+)\/(\d+)/)
+      if (tm) {
+        const r = await fetch(`/api/telegram-file?channel_id=-100${tm[1]}&message_id=${tm[2]}`)
+        const d = await r.json().catch(() => null)
+        if (d?.url) u = String(d.url)
+        else return null
+      } else if (u.startsWith('tg://')) {
+        // 2) معرف تيليجرام القديم (tg://file_id) → حلّه أيضاً
+        const r = await fetch(`/api/telegram-file?file_id=${encodeURIComponent(u.slice(5))}`)
+        const d = await r.json().catch(() => null)
+        if (d?.url) u = String(d.url)
+        else return null
+      } else if (kind === 'audio' && lessonId) {
+        // 3) الصوت: رمز البث mt ينتهي خلال 15 دقيقة — نطلب رمزاً جديداً
+        //    لحظة الحفظ حتى لا يفشل التنزيل المتأخر برمز منتهٍ. عند فشل
+        //    الطلب نكمل بالرمز الحالي (قد يكون صالحاً بعد).
+        try {
+          const params = new URLSearchParams({ lesson_id: lessonId })
+          if (courseId) params.set('course_id', courseId)
+          const r = await fetch(`/api/lessons/audio-token?${params.toString()}`)
+          const d = await r.json().catch(() => null)
+          if (d?.url) u = String(d.url)
+        } catch {}
       }
+      // 4) الروابط النسبية (/api/...) تُثبَّت بمضيف الموقع — المُنزّل الأصلي
+      //    لا يفهم النسبي إطلاقاً (سبب فشل التنزيل الفوري).
+      if (u.startsWith('/')) {
+        try { u = `${window.location.origin}${u}` } catch { return null }
+      }
+      return /^https:\/\//i.test(u) ? u : null
+    } catch {
+      return null
+    }
+  }
+
+  const save = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const finalUrl = await resolveDownloadable()
+      if (!finalUrl) {
+        toast.error('تعذّر تجهيز ملف التنزيل — أعد المحاولة بعد لحظات')
+        return
+      }
+      const ok = (window as any).FiaApp.saveOffline(finalUrl, `${safeName}.${ext}`, safeName, kind)
+      if (ok === false) {
+        toast.error('تعذّر بدء التنزيل — حدّث التطبيق لأحدث إصدار')
+        return
+      }
+      toast.success('بدأ التنزيل إلى مكتبتك — ستجده في «مكتبتي» عند اكتماله')
     } catch {
       toast.error('تعذّر بدء التنزيل — حدّث التطبيق لأحدث إصدار')
+    } finally {
+      setTimeout(() => setSaving(false), 2500)
     }
   }
 
