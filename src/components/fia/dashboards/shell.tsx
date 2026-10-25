@@ -19,6 +19,7 @@ import {
 } from '@/lib/notification-counts'
 import { NotificationOptInPrompt } from '@/components/fia/notification-opt-in-prompt'
 import { ChatWidget } from '@/components/fia/chat-widget'
+import { LuxOfferBar } from '@/components/fia/lux-experience'
 
 export interface NavItem {
   id: string
@@ -364,7 +365,11 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
+          {/* 👑 v10.6.1 — شريط العرض الفاخر: يظهر في كل الحسابات فور تفعيله من الإعدادات */}
+          <LuxOfferBar />
+          {children}
+        </main>
 
         {/* Floating chat widget — available in every dashboard */}
         <ChatWidget />

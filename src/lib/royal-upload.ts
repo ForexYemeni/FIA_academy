@@ -28,7 +28,7 @@ export async function uploadToRoyalStorage(
   })
   const prep = await prepRes.json().catch(() => ({}))
   if (!prepRes.ok || !prep?.upload_url || !prep?.public_url) {
-    throw new Error(prep?.error || 'تعذّر تحضير التخزين الملكي')
+    throw new Error(prep?.error || 'تعذّر تحضير التخزين المباشر')
   }
 
   // 2) الرفع المباشر مع تقدم حقيقي (محاولة، ثم إعادة محاولة واحدة عند عطل شبكة)

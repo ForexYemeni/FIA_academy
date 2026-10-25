@@ -10,10 +10,10 @@ export const runtime = 'nodejs'
 // ============================================================================
 
 export const APP_VERSION = {
-  version_code: 21,
-  version_name: '2.9.0',
-  apk_url: 'https://fiaacademy.vercel.app/apk/Future-International-Academy-v2.9.0.apk',
-  notes: 'تنزيل الدروس للمشاهدة دون إنترنت + فحص تحديث تلقائي + سحب للتحديث أصلياً + روابط ذكية ليوتيوب وتيليجرام وواتساب + زر مشاركة أصلي',
+  version_code: 22,
+  version_name: '2.9.1',
+  apk_url: 'https://fiaacademy.vercel.app/apk/Future-International-Academy-v2.9.1.apk',
+  notes: 'السحب للتحديث يبقى في نفس الصفحة (لا عودة للوحة التحكم) + شريط العرض في الحسابات + وضع صيانة يتخطى الإدارة دائماً + رسائل جماعية بعدّ صادق وبطاقة نتيجة فاخرة',
   force_update: false,
 }
 

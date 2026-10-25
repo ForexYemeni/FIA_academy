@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     // تأكد من الـbucket ثم اصنع رابط توقيع رفع صالح 60 دقيقة
     const ensured = await ensureBucket()
     if (!ensured.ok) {
-      return NextResponse.json({ error: `تعذّر تهيئة التخزين الملكي: ${ensured.error}` }, { status: 500 })
+      return NextResponse.json({ error: `تعذّر تهيئة التخزين المباشر: ${ensured.error}` }, { status: 500 })
     }
     const signed = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(path)
     if (signed.error || !signed.data) {

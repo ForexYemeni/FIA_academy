@@ -135,7 +135,18 @@ export function getPaymentRecordStatusInfo(status: string | undefined | null): {
 }
 
 export function StudentDashboard() {
-  const [active, setActive] = useState('overview')
+  // 👑 v10.6.1 — حفظ القسم النشط في الجلسة: أي تحديث (سحب للتحديث/إعادة تحميل)
+  // يعيدك لنفس الصفحة التي كنت فيها — لا عودة إلى النظرة العامة أبداً
+  const [active, setActiveState] = useState<string>(() => {
+    try {
+      const v = sessionStorage.getItem('fia-tab-student')
+      return v && NAV.some((n) => n.id === v) ? v : 'overview'
+    } catch { return 'overview' }
+  })
+  const setActive = (id: string) => {
+    setActiveState(id)
+    try { sessionStorage.setItem('fia-tab-student', String(id)) } catch {}
+  }
   useHashTab(NAV.map((n) => n.id), setActive)
   const [viewingCourse, setViewingCourse] = useState<any | null>(null)
   const [viewingEnrollment, setViewingEnrollment] = useState<any | null>(null)

@@ -14,7 +14,7 @@ import {
   ClipboardCheck, Landmark, Megaphone, BellRing, CalendarDays,
   Wrench, Timer,
 } from 'lucide-react'
-import { fiaAnnounceType, fiaFormatArabicDate } from '@/components/fia/lux-experience'
+import { fiaAnnounceType, fiaFormatArabicDate, broadcastSettingsUpdated } from '@/components/fia/lux-experience'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { RoyalGridSkeleton, RoyalListSkeleton, RoyalStatsSkeleton } from '@/components/fia/royal-skeleton'
 import { RoyalEmpty } from '@/components/fia/royal-empty-state'
@@ -105,7 +105,17 @@ const NAV: NavItem[] = [
 ]
 
 export function AdminDashboard() {
-  const [active, setActive] = useState('overview')
+  // 👑 v10.6.1 — حفظ القسم النشط في الجلسة: أي تحديث يعيدك لنفس الصفحة التي كنت فيها
+  const [active, setActiveState] = useState<string>(() => {
+    try {
+      const v = sessionStorage.getItem('fia-tab-admin')
+      return v && NAV.some((n) => n.id === v) ? v : 'overview'
+    } catch { return 'overview' }
+  })
+  const setActive = (id: string) => {
+    setActiveState(id)
+    try { sessionStorage.setItem('fia-tab-admin', String(id)) } catch {}
+  }
   useHashTab(NAV.map((n) => n.id), setActive)
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)
@@ -3839,6 +3849,10 @@ const AdminSite = React.memo(function AdminSite() {
   const [bcMessage, setBcMessage] = useState('')
   const [bcSending, setBcSending] = useState(false)
   const [bcCourses, setBcCourses] = useState<any[]>([])
+  // 👑 v10.6.1 — معاينة المستلمين الحقيقيين قبل البث + بطاقة النتيجة الفاخرة
+  const [bcPreview, setBcPreview] = useState<{ students: number; trainers: number; admins: number; total: number } | null>(null)
+  const [bcPreviewLoading, setBcPreviewLoading] = useState(false)
+  const [bcResult, setBcResult] = useState<null | { sent: number; breakdown: { students: number; trainers: number; admins: number }; title: string; message: string; at: string }>(null)
   const [errReports, setErrReports] = useState<any[]>([])
   const [errLoading, setErrLoading] = useState(false)
   const user = useAuth((s) => s.user)
@@ -3861,6 +3875,22 @@ const AdminSite = React.memo(function AdminSite() {
       setAnnDraft((d) => ({ ...d, date: d.date || new Date().toISOString().slice(0, 10) }))
     }
   }, [tab])
+
+  // 👑 v10.6.1 — معاينة حية: كم مستلماً حقيقياً ستصل الرسالة؟ تتحدث مع تغيّر الشريحة/الدورة
+  useEffect(() => {
+    if (tab !== 'broadcast') return
+    if (bcAudience === 'course' && !bcCourse) { setBcPreview(null); return }
+    let alive = true
+    setBcPreviewLoading(true)
+    const t = setTimeout(() => {
+      fetch(`/api/notifications/broadcast?audience=${bcAudience}&course_id=${encodeURIComponent(bcCourse)}`)
+        .then((r) => r.json())
+        .then((d) => { if (alive) setBcPreview(d?.error ? null : d) })
+        .catch(() => { if (alive) setBcPreview(null) })
+        .finally(() => { if (alive) setBcPreviewLoading(false) })
+    }, 250)
+    return () => { alive = false; clearTimeout(t) }
+  }, [tab, bcAudience, bcCourse])
 
   // Save with Telegram-protection: if Telegram token/channel_id changed,
   // prompt for password first; otherwise save directly.
@@ -3889,6 +3919,8 @@ const AdminSite = React.memo(function AdminSite() {
         toast.error(data.error || 'فشل الحفظ')
       } else {
         toast.success('تم الحفظ بنجاح')
+        // 👑 v10.6.1 — انعكاس فوري: شريط العرض وبوابة الصيانة تتحدثان الآن في كل الصفحات
+        try { broadcastSettingsUpdated() } catch {}
         setPasswordDialog(null)
       }
     } catch { toast.error('فشل') } finally { setSaving(false) }
@@ -4647,7 +4679,7 @@ const AdminSite = React.memo(function AdminSite() {
                     <Wrench className="w-5 h-5 text-navy" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-black text-sm">وضع الصيانة الملكي</div>
+                    <div className="text-white font-black text-sm">وضع الصيانة</div>
                     <div className="text-gold/80 text-[11px] mt-0.5">صفحة «نطور الأكاديمية» أنيقة تُغلف الموقع كله — الإدارة والمدربون يتجاوزونها دائماً</div>
                   </div>
                   {settings.maintenance_active ? (
@@ -4697,7 +4729,7 @@ const AdminSite = React.memo(function AdminSite() {
                     <Timer className="w-5 h-5 text-navy" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-black text-sm">العرض المحدود الملكي</div>
+                    <div className="text-white font-black text-sm">العرض المحدود</div>
                     <div className="text-gold/80 text-[11px] mt-0.5">شريط فاخر بعدّاد تنازلي ذهبي يظهر أعلى الصفحة الرئيسية — ينطفئ تلقائياً عند انتهاء الوقت</div>
                   </div>
                   {settings.offer_active ? (
@@ -4754,6 +4786,60 @@ const AdminSite = React.memo(function AdminSite() {
         {/* ═══ 👑 v10.6 — الرسائل الجماعية الملكية للدفعات ═══ */}
         {tab === 'broadcast' && (
           <div className="space-y-4">
+            {/* ═══ 👑 v10.6.1 — بطاقة النتيجة الفاخرة: ما وصل فعلاً وبأي توزيع ═══ */}
+            {bcResult && (
+              <div className="relative overflow-hidden rounded-2xl border-2 border-gold/50 bg-gradient-to-br from-navy via-navy-light to-navy shadow-2xl shadow-gold/10">
+                <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 15% 25%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 85% 75%, #D4AF37 1px, transparent 1px)', backgroundSize: '28px 28px, 36px 36px' }} />
+                <div className="absolute -top-16 -left-16 w-56 h-56 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative p-5">
+                  <div className="flex items-start gap-4">
+                    {/* خاتم النجاح الذهبي */}
+                    <div className="relative flex-shrink-0">
+                      <div className="absolute inset-0 rounded-full bg-emerald-400/25 blur-xl animate-pulse" />
+                      <div className="relative w-14 h-14 rounded-full border-2 border-gold/60 bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                        <CheckCircle2 className="w-7 h-7 text-white" strokeWidth={2.4} />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-gold font-black text-base">وصلت رسالتك بنجاح</div>
+                        <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/15 border border-emerald-400/40 rounded-full px-2 py-0.5">تم البث</span>
+                      </div>
+                      <div className="text-white/85 text-[12px] mt-1 font-bold truncate">📣 {bcResult.title}</div>
+                      <div className="text-white/55 text-[11px] mt-0.5 line-clamp-2">{bcResult.message}</div>
+                      {/* التوزيع الحقيقي — أرقام صادقة لكل شريحة */}
+                      <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-bold text-white/50">وصلت إلى:</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/12 border border-gold/35 px-3 py-1.5">
+                          <Users className="w-3.5 h-3.5 text-gold" />
+                          <span className="text-gold font-black text-xs tabular-nums">{bcResult.breakdown.students}</span>
+                          <span className="text-white/75 text-[10px] font-bold">متدرب</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/12 border border-gold/35 px-3 py-1.5">
+                          <GraduationCap className="w-3.5 h-3.5 text-gold" />
+                          <span className="text-gold font-black text-xs tabular-nums">{bcResult.breakdown.trainers}</span>
+                          <span className="text-white/75 text-[10px] font-bold">مدرب</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/12 border border-gold/35 px-3 py-1.5">
+                          <Shield className="w-3.5 h-3.5 text-gold" />
+                          <span className="text-gold font-black text-xs tabular-nums">{bcResult.breakdown.admins}</span>
+                          <span className="text-white/75 text-[10px] font-bold">إدارة</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-l from-gold to-amber-400 px-3.5 py-1.5 shadow-md">
+                          <span className="text-navy font-black text-xs tabular-nums">{bcResult.sent}</span>
+                          <span className="text-navy/80 text-[10px] font-black">إجمالي المستلمين</span>
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-white/40 mt-2.5">بُثّت {new Date(bcResult.at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })} — الإشعارات تصل الآن إلى أجراس المستلمين ومنبثقات تطبيقهم</div>
+                    </div>
+                    <button onClick={() => setBcResult(null)} className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors" aria-label="إغلاق البطاقة">
+                      <X className="w-4 h-4 text-white/80" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
               <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
                 <div className="flex items-center gap-3">
@@ -4787,6 +4873,28 @@ const AdminSite = React.memo(function AdminSite() {
                       )
                     })}
                   </div>
+                </div>
+                {/* ═══ 👑 v10.6.1 — معاينة المستلمين الحقيقيين قبل البث ═══ */}
+                <div className={`rounded-xl border p-3.5 flex items-center gap-3 flex-wrap transition-all ${bcPreviewLoading ? 'border-gold/25 bg-gold/5' : bcPreview && bcPreview.total > 0 ? 'border-emerald-400/40 bg-gradient-to-br from-emerald-50/80 to-white' : 'border-amber-400/40 bg-gradient-to-br from-amber-50/80 to-white'}`}>
+                  {bcPreviewLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-gold flex-shrink-0" />
+                      <span className="text-[11px] font-bold text-navy/70">جاري حساب المستلمين الحقيقيين…</span>
+                    </>
+                  ) : bcPreview && bcPreview.total > 0 ? (
+                    <>
+                      <span className="text-[11px] font-black text-navy flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-gold" /> ستصل الرسالة فعلياً إلى:</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-navy/5 border border-navy/15 px-2.5 py-1"><Users className="w-3 h-3 text-navy" /><span className="font-black text-navy text-[11px] tabular-nums">{bcPreview.students}</span><span className="text-[10px] text-muted-foreground">متدرب</span></span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-navy/5 border border-navy/15 px-2.5 py-1"><GraduationCap className="w-3 h-3 text-navy" /><span className="font-black text-navy text-[11px] tabular-nums">{bcPreview.trainers}</span><span className="text-[10px] text-muted-foreground">مدرب</span></span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-navy/5 border border-navy/15 px-2.5 py-1"><Shield className="w-3 h-3 text-navy" /><span className="font-black text-navy text-[11px] tabular-nums">{bcPreview.admins}</span><span className="text-[10px] text-muted-foreground">إدارة</span></span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-navy text-gold px-3 py-1 shadow-sm"><span className="font-black text-[11px] tabular-nums">{bcPreview.total}</span><span className="text-[10px] font-bold">إجمالي</span></span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <span className="text-[11px] font-bold text-navy/70">لا يوجد مستلمون حقيقيون في هذه الشريحة — جرّب شريحة أخرى أو فعّل حسابات المدربين</span>
+                    </>
+                  )}
                 </div>
                 {bcAudience === 'course' && (
                   <div>
@@ -4823,14 +4931,25 @@ const AdminSite = React.memo(function AdminSite() {
                       })
                       const d = await res.json()
                       if (!res.ok) toast.error(d.error || 'فشل البث')
-                      else { toast.success(`وصلت الرسالة إلى ${d.sent} مستلم بنجاح ملكي`); setBcTitle(''); setBcMessage('') }
+                      else {
+                        // 👑 v10.6.1 — بطاقة النتيجة الفاخرة بالتوزيع الحقيقي بدل التوست المقتضب
+                        setBcResult({
+                          sent: d.sent || d.recipients || 0,
+                          breakdown: d.breakdown || { students: 0, trainers: 0, admins: 0 },
+                          title: bcTitle.trim(),
+                          message: bcMessage.trim(),
+                          at: new Date().toISOString(),
+                        })
+                        toast.success('وصلت رسالتك إلى كل المستلمين ✓')
+                        setBcTitle(''); setBcMessage('')
+                      }
                     } catch { toast.error('خطأ في الاتصال') }
                     finally { setBcSending(false) }
                   }}
                   disabled={bcSending}
                   className="w-full h-12 bg-gradient-to-l from-navy via-navy-light to-navy hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-lg active:scale-[0.98] transition-all border border-gold/35"
                 >
-                  {bcSending ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري البث الملكي…</> : <><Send className="w-5 h-5 ml-2" /> بث الرسالة الآن</>}
+                  {bcSending ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري البث…</> : <><Send className="w-5 h-5 ml-2" /> بث الرسالة الآن</>}
                 </Button>
               </div>
             </div>
@@ -4901,7 +5020,7 @@ const AdminSite = React.memo(function AdminSite() {
         {/* Save button — 👑 v10.5 شريط حفظ فاخر */}
         <div className="relative pt-5 border-t border-gold/25">
           <Button onClick={() => save()} disabled={saving} className="relative w-full h-12 overflow-hidden bg-gradient-to-l from-navy via-navy-light to-navy hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-lg active:scale-[0.98] transition-all border border-gold/35">
-            {saving ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري الحفظ الملكي…</> : <><CheckCircle2 className="w-5 h-5 ml-2" /> حفظ الإعدادات</>}
+            {saving ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري الحفظ…</> : <><CheckCircle2 className="w-5 h-5 ml-2" /> حفظ الإعدادات</>}
           </Button>
         </div>
       </div>

@@ -740,7 +740,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
     }
     // 👑 v10.6 — السلّم الملكي للصوت:
     // ≤19MB → خزينة تيليجرام (كما هي — بث مؤكد عبر البروكسي)
-    // >19MB → التخزين الملكي المباشر مباشرة (حتى 50MB) — بلا رفض أبداً
+    // >19MB → التخزين المباشر الفوري مباشرة (حتى 50MB) — بلا رفض أبداً
     if (file.size <= 19 * 1024 * 1024) {
       setUploadingAudio(true)
       try {
@@ -769,20 +769,20 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       toast.error('حجم الصوت كبير جداً (الحد الأقصى 50 ميجابايت) — قسّم الدرس لأجزاء')
       return
     }
-    // التخزين الملكي المباشر — يبثّ أي صيغة حتى 50MB
+    // التخزين المباشر الفوري — يبثّ أي صيغة حتى 50MB
     setUploadingAudio(true)
-    setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (صوت كبير)' })
+    setCompressing({ percent: 1, stage: 'رفع مباشر فوري (صوت كبير)' })
     try {
       const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
       const { publicUrl } = await uploadToRoyalStorage(file, 'audio', (pct) => {
-        setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (صوت كبير)' })
+        setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر فوري (صوت كبير)' })
       })
       setAudioFileId(null)
       setAudioMeta({ duration: null, size: file.size, mime: file.type || 'audio/mpeg' })
       // 👑 v10.6 — الصوت الكبير: رابط التخزين الملكي يُخزَّن في audio_file_id
       // (نص) — بوابة البث تكتشف الروابط وتوجه إليها بعد فحص الصلاحيات كاملاً
       setAudioFileId(publicUrl)
-      toast.success('تم رفع الصوت الكبير إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
+      toast.success('تم رفع الصوت الكبير إلى التخزين المباشر الفوري — يُبثّ بسلاسة كاملة')
     } catch (e: any) {
       toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
     } finally {
@@ -800,7 +800,7 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   //   ≤19MB → تيليجرام مباشرة (بث مؤكد عبر البروكسي)
   //   >19MB → ضغط ملكي v2 (مسبار فكّ ترميز + حارسان صارمان)
   //     ├─ نجح الضغط ≤19MB → تيليجرام
-  //     └─ فشل/عجز (HEVC، تعليق، متصفح…) → التخزين الملكي المباشر (≤50MB)
+  //     └─ فشل/عجز (HEVC، تعليق، متصفح…) → التخزين المباشر الفوري (≤50MB)
   //        رفع مباشر لـSupabase بروابط توقيع — يُبثّ أي صيغة أصلياً بلا حدود getFile
   //   >50MB → رسالة واضحة وحيدة
   const handleVideoUpload = async (file: File) => {
@@ -834,17 +834,17 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
           const saved = Math.max(0, Math.round((1 - res.compressedSize / res.originalSize) * 100))
           toast.success(`تم الضغط بفخامة: ${(res.originalSize / 1048576).toFixed(1)}MB ← ${(res.compressedSize / 1048576).toFixed(1)}MB (وفّرنا ${saved}%)`)
         } else {
-          // 👑 المرحلة 3: الضغط عجز — التخزين الملكي المباشر يتكفل (بلا رفض أبداً)
+          // 👑 المرحلة 3: الضغط عجز — التخزين المباشر الفوري يتكفل (بلا رفض أبداً)
           setCompressing(null)
           setUploadingVideo(true)
-          setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (فيديو كبير)' })
+          setCompressing({ percent: 1, stage: 'رفع مباشر فوري (فيديو كبير)' })
           try {
             const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
             const { publicUrl } = await uploadToRoyalStorage(file, 'video', (pct) => {
-              setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (فيديو كبير)' })
+              setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر فوري (فيديو كبير)' })
             })
             setVideoUrl(publicUrl)
-            toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة لكل المتدربين')
+            toast.success('تم رفع الفيديو إلى التخزين المباشر الفوري — يُبثّ بسلاسة كاملة لكل المتدربين')
           } catch (e: any) {
             toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
           } finally {
@@ -857,14 +857,14 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
         // ضغط انهار استثناءً — نفس المسار البديل الملكي
         setCompressing(null)
         setUploadingVideo(true)
-        setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (فيديو كبير)' })
+        setCompressing({ percent: 1, stage: 'رفع مباشر فوري (فيديو كبير)' })
         try {
           const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
           const { publicUrl } = await uploadToRoyalStorage(file, 'video', (pct) => {
-            setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (فيديو كبير)' })
+            setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر فوري (فيديو كبير)' })
           })
           setVideoUrl(publicUrl)
-          toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة لكل المتدربين')
+          toast.success('تم رفع الفيديو إلى التخزين المباشر الفوري — يُبثّ بسلاسة كاملة لكل المتدربين')
         } catch (e: any) {
           toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
         } finally {
@@ -889,19 +889,19 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
         setVideoUrl(data.url)
         toast.success('تم رفع الفيديو بنجاح — جاهز للبث المباشر لكل المتدربين')
       } else {
-        // تيليجرام رفض (نادر) — التخزين الملكي المباشر يتكفل فوراً
+        // تيليجرام رفض (نادر) — التخزين المباشر الفوري يتكفل فوراً
         const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
         const { publicUrl } = await uploadToRoyalStorage(toUpload, 'video')
         setVideoUrl(publicUrl)
-        toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
+        toast.success('تم رفع الفيديو إلى التخزين المباشر الفوري — يُبثّ بسلاسة كاملة')
       }
     } catch {
-      // خطأ اتصال — محاولة أخيرة عبر التخزين الملكي المباشر
+      // خطأ اتصال — محاولة أخيرة عبر التخزين المباشر الفوري
       try {
         const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
         const { publicUrl } = await uploadToRoyalStorage(toUpload, 'video')
         setVideoUrl(publicUrl)
-        toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
+        toast.success('تم رفع الفيديو إلى التخزين المباشر الفوري — يُبثّ بسلاسة كاملة')
       } catch {
         toast.error('فشل الرفع نهائياً — تحقق من الاتصال وحاول من جديد')
       }

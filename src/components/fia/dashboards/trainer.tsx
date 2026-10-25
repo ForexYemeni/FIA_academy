@@ -70,7 +70,17 @@ const NAV: NavItem[] = [
 ]
 
 export function TrainerDashboard() {
-  const [active, setActive] = useState('overview')
+  // 👑 v10.6.1 — حفظ القسم النشط في الجلسة: أي تحديث يعيدك لنفس الصفحة التي كنت فيها
+  const [active, setActiveState] = useState<string>(() => {
+    try {
+      const v = sessionStorage.getItem('fia-tab-trainer')
+      return v && NAV.some((n) => n.id === v) ? v : 'overview'
+    } catch { return 'overview' }
+  })
+  const setActive = (id: string) => {
+    setActiveState(id)
+    try { sessionStorage.setItem('fia-tab-trainer', String(id)) } catch {}
+  }
   useHashTab(NAV.map((n) => n.id), setActive)
   const [contentCourseId, setContentCourseId] = useState<string | null>(null)
   const user = useAuth((s) => s.user)

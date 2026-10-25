@@ -18,10 +18,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Crown, Search, X, CornerDownLeft, ArrowUp, ArrowDown,
   LifeBuoy, Mail, Phone, Send, MessageCircle, BookOpen, Home,
-  GraduationCap, ShieldCheck, Download, Users, Sparkles,
+  GraduationCap, ShieldCheck, Download, Users, Sparkles, Star,
   CheckCircle2, ChevronLeft, Loader2, RefreshCw,
   Megaphone, BellRing, AlertTriangle, CalendarDays,
 } from 'lucide-react'
@@ -34,16 +35,26 @@ import { installErrorWatcher } from '@/lib/error-report'
 
 let __settingsCache: any = null
 let __settingsPromise: Promise<any> | null = null
+let __settingsAt = 0
+const SETTINGS_TTL = 30_000 // 👑 v10.6.1 — ذاكرة قصيرة: أي تفعيل جديد ينعكس خلال 30 ثانية كحد أقصى
 
-function fetchSiteSettings(): Promise<any> {
-  if (__settingsCache) return Promise.resolve(__settingsCache)
+function fetchSiteSettings(force = false): Promise<any> {
+  if (!force && __settingsCache && Date.now() - __settingsAt < SETTINGS_TTL) {
+    return Promise.resolve(__settingsCache)
+  }
   if (!__settingsPromise) {
     __settingsPromise = fetch('/api/site-settings')
       .then((r) => r.json())
-      .then((d) => { __settingsCache = d || {}; return __settingsCache })
-      .catch(() => { __settingsCache = {}; return __settingsCache })
+      .then((d) => { __settingsCache = d || {}; __settingsAt = Date.now(); __settingsPromise = null; return __settingsCache })
+      .catch(() => { __settingsPromise = null; if (!__settingsCache) { __settingsCache = {}; __settingsAt = Date.now() }; return __settingsCache })
   }
   return __settingsPromise
+}
+
+// 👑 v10.6.1 — تنبيه موحّد: تُطلقه الإدارة بعد أي حفظ ناجح للإعدادات
+// فيُحدَّث شريط العرض وبوابة الصيانة في كل الصفحات المفتوحة فوراً دون انتظار.
+export function broadcastSettingsUpdated() {
+  try { __settingsAt = 0; window.dispatchEvent(new CustomEvent('fia-settings-updated')) } catch {}
 }
 
 // 👑 v10.5 — مُعرَّضة عامة: يستخدمها مركز الأدوات العائم أيضاً
@@ -672,6 +683,27 @@ export function LuxSupportButton() {
 // ═══════════════════════ 6) الطبقة العالمية — تُركّب مرة واحدة ═══════════════════════
 
 export function LuxGlobalLayer() {
+  // 👑 v10.6.1 — جسر التحديث الناعم: السحب للتحديث في التطبيق يستدعي هذه الدالة
+  // فتُحدَّث بيانات الصفحة الحالية في مكانها (يبقى المستخدم في نفس التبويب
+  // ولا يُعاد إلى لوحة التحكم)، وإن لم يوجد معالج لهذه الصفحة أُعيد تحميل
+  // الصفحة نفسها كما هي (نفس الرابط) — لا عودة لأي مكان آخر أبداً.
+  useEffect(() => {
+    ;(window as any).__FIA_softRefresh = () => {
+      const w = window as any
+      try {
+        if (typeof w.__FIA_refreshActiveView === 'function') {
+          w.__FIA_refreshActiveView()
+          window.dispatchEvent(new CustomEvent('fia-soft-refresh'))
+          try { w.__FIA_showToast?.('تم تحديث الصفحة ✓') } catch {}
+          return 'soft'
+        }
+      } catch {}
+      location.reload()
+      return 'hard'
+    }
+    return () => { try { delete (window as any).__FIA_softRefresh } catch {} }
+  }, [])
+
   return (
     <>
       <LuxSplash />
@@ -684,82 +716,190 @@ export function LuxGlobalLayer() {
   )
 }
 
-// ═══════════════ 8) بوابة وضع الصيانة الملكية (v10.6) ═══════════════
+// ═══════════════ 8) بوابة وضع الصيانة (v10.6.1) ═══════════════
 // مفاتيح الإعدادات: maintenance_active + maintenance_message
-// الإدارة والمدربون يتجاوزون البوابة — البقية يرون صفحة أنيقة هادئة.
-// أي فشل في الجلب = لا صيانة (لا نحبس أحداً بعطل شبكة).
-let __whoamiCache: { role?: string; authenticated?: boolean } | null = null
+// 🛡️ القاعدة الحديدية: حساب الإدارة (والمدربون) يتجاوز البوابة دائماً —
+// فحص الدور يجري من جديد في كل مرة تُكشف فيها الصيانة، بلا ذاكرة خالدة
+// قد تُحبس الإدارة خارج موقعها. أي فشل في الجلب = لا صيانة.
+let __whoamiValue: any = null
+let __whoamiAt = 0
+const WHOAMI_TTL = 30_000
+
+async function whoamiCached(): Promise<any> {
+  if (__whoamiValue && Date.now() - __whoamiAt < WHOAMI_TTL) return __whoamiValue
+  try {
+    const r = await fetch('/api/auth/whoami')
+    const d = await r.json()
+    __whoamiValue = d || { authenticated: false }
+    __whoamiAt = Date.now()
+  } catch {
+    // فشل الشبكة لا يُخزَّن إطلاقاً — الفحص القادم فوري ومن جديد
+    __whoamiValue = null
+    __whoamiAt = 0
+    return { authenticated: false }
+  }
+  return __whoamiValue
+}
 
 function LuxMaintenanceGuard() {
   const [active, setActive] = useState(false)
   const [message, setMessage] = useState('')
   const [hidden, setHidden] = useState(false)
+  const [staff, setStaff] = useState(false) // شارة الطاقم: الصيانة مفعّلة وأنت تتصفح فوقها
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
+    let iv: any = null
+    const check = async () => {
       try {
         const s = await fetchSiteSettings()
         if (!alive) return
         const on = s?.maintenance_active === true || s?.maintenance_active === 'true'
-        if (!on) return
-        // من المتجاوزون؟ إدارة أو مدرب — الاسمي مؤقتاً بالجلسة
-        if (!__whoamiCache) {
-          __whoamiCache = await fetch('/api/auth/whoami')
-            .then((r) => r.json())
-            .catch(() => ({ authenticated: false }))
-        }
-        const role = __whoamiCache?.role || ''
-        if (role === 'admin' || role === 'trainer') return
+        if (!on) { setActive(false); setStaff(false); return }
         setMessage(String(s?.maintenance_message || '').slice(0, 400))
-        setActive(true)
+        const me = await whoamiCached()
+        if (!alive) return
+        const role = String(me?.role || '')
+        if (role === 'admin' || role === 'trainer') {
+          // 🛡️ الطاقم فوق البوابة دائماً — شارة أنيقة تؤكد أن الصيانة تعمل وأنه يراها من الداخل
+          setStaff(true)
+          setActive(false)
+        } else {
+          setStaff(false)
+          setActive(true)
+        }
       } catch {}
-    })()
-    return () => { alive = false }
+    }
+    check()
+    // انعكاس فوري: مسح خفيف كل 60ث + فور عودة التركيز + حدث الحفظ من لوحة الإدارة
+    iv = setInterval(check, 60_000)
+    const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') check() }
+    const onSettingsUpdated = () => { __whoamiAt = 0; check() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    window.addEventListener('fia-settings-updated', onSettingsUpdated as EventListener)
+    return () => {
+      alive = false
+      if (iv) clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onVis)
+      window.removeEventListener('fia-settings-updated', onSettingsUpdated as EventListener)
+    }
   }, [])
 
-  if (!active || hidden) return null
-
   return (
-    <div dir="rtl" className="fixed inset-0 z-[9995] overflow-hidden" style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #16233f 0%, #0b1226 55%, #070d1c 100%)' }}>
-      {/* نقش ذهبي + هالات */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 14% 30%, #D4AF37 1.1px, transparent 1.1px), radial-gradient(circle at 84% 70%, #D4AF37 0.9px, transparent 0.9px)', backgroundSize: '34px 34px, 42px 42px' }} />
-      <div className="absolute -top-32 right-1/4 w-[420px] h-[420px] rounded-full bg-gold/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 left-1/5 w-[460px] h-[460px] rounded-full bg-gold/[0.07] blur-3xl pointer-events-none" />
-      <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6 px-6 text-center">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-gold/20 blur-2xl animate-pulse" />
-          <div className="relative w-24 h-24 rounded-3xl border-2 border-gold/60 bg-gradient-to-br from-[#16233f] to-[#0b1226] shadow-[0_0_60px_rgba(212,175,55,0.25)] flex items-center justify-center">
-            <svg viewBox="0 0 48 48" className="w-12 h-12">
-              <path d="M6 34 L13 18 L20 30 L24 14 L28 30 L35 18 L42 34 Z" fill="none" stroke="#D4AF37" strokeWidth="2.4" strokeLinejoin="round" />
-              <circle cx="24" cy="9" r="2.6" fill="none" stroke="#D4AF37" strokeWidth="2" />
-            </svg>
+    <>
+      {/* شارة الطاقم — تظهر للإدارة والمدربين فقط أثناء عمل الصيانة */}
+      {staff && !active && (
+        <div className="fixed bottom-4 left-4 z-[9990] flex items-center gap-2 rounded-2xl border border-amber-400/50 bg-navy/95 backdrop-blur-md shadow-2xl px-4 py-2.5 max-w-[280px]">
+          <span className="relative flex w-2.5 h-2.5 flex-shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-br from-amber-200 via-gold to-amber-600" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[11px] font-black text-gold leading-tight">وضع الصيانة مفعّل الآن</div>
+            <div className="text-[10px] text-white/60 leading-tight mt-0.5">الزوار يرون صفحة «نطور الأكاديمية» — وأنت تتصفح بصلاحية الطاقم</div>
           </div>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-l from-white via-gold to-white bg-clip-text text-transparent">نطور الأكاديمية الآن</h1>
-        <p className="text-white/75 max-w-md leading-8 text-sm sm:text-base">
-          {message || 'ننهي لمسة فاخرة في أرجاء الأكاديمية — عد بعد قليل وستجدها أجمل وأسرع. شكراً لصبرك الجميل 💛'}
-        </p>
-        <div className="flex items-center gap-2 text-gold/90 text-xs font-bold">
-          <span className="inline-block w-2 h-2 rounded-full bg-gold animate-pulse" />
-          أعمال الصيانة تجري بأمر إدارة أكاديمية المستقبل الدولية
+      )}
+      {active && !hidden && (
+      <div dir="rtl" className="fixed inset-0 z-[9995] overflow-hidden" style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #16233f 0%, #0b1226 55%, #070d1c 100%)' }}>
+        {/* نقش ذهبي + هالات */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 14% 30%, #D4AF37 1.1px, transparent 1.1px), radial-gradient(circle at 84% 70%, #D4AF37 0.9px, transparent 0.9px)', backgroundSize: '34px 34px, 42px 42px' }} />
+        <div className="absolute -top-32 right-1/4 w-[420px] h-[420px] rounded-full bg-gold/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-40 left-1/5 w-[460px] h-[460px] rounded-full bg-gold/[0.07] blur-3xl pointer-events-none" />
+        <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6 px-6 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-gold/20 blur-2xl animate-pulse" />
+            <div className="relative w-24 h-24 rounded-3xl border-2 border-gold/60 bg-gradient-to-br from-[#16233f] to-[#0b1226] shadow-[0_0_60px_rgba(212,175,55,0.25)] flex items-center justify-center">
+              <svg viewBox="0 0 48 48" className="w-12 h-12">
+                <path d="M6 34 L13 18 L20 30 L24 14 L28 30 L35 18 L42 34 Z" fill="none" stroke="#D4AF37" strokeWidth="2.4" strokeLinejoin="round" />
+                <circle cx="24" cy="9" r="2.6" fill="none" stroke="#D4AF37" strokeWidth="2" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-l from-white via-gold to-white bg-clip-text text-transparent">نطور الأكاديمية الآن</h1>
+          <p className="text-white/75 max-w-md leading-8 text-sm sm:text-base">
+            {message || 'ننهي لمسة فاخرة في أرجاء الأكاديمية — عد بعد قليل وستجدها أجمل وأسرع. شكراً لصبرك الجميل 💛'}
+          </p>
+          <div className="flex items-center gap-2 text-gold/90 text-xs font-bold">
+            <span className="inline-block w-2 h-2 rounded-full bg-gold animate-pulse" />
+            أعمال الصيانة تجري بأمر إدارة أكاديمية المستقبل الدولية
+          </div>
+          {/* للطاقم: زر دخول متجاوز يظهر بعد 3 نقرات على الشعار */}
+          <button
+            onClick={() => {
+              tapsRef.current += 1
+              if (tapsRef.current >= 3) setHidden(true)
+            }}
+            className="mt-2 text-[10px] text-white/25 hover:text-white/50 transition-colors"
+            aria-label="."
+          >
+            أكاديمية المستقبل الدولية
+          </button>
         </div>
-        {/* للطاقم: زر دخول متجاوز يظهر بعد 3 نقرات على الشعار */}
-        <button
-          onClick={() => {
-            tapsRef.current += 1
-            if (tapsRef.current >= 3) setHidden(true)
-          }}
-          className="mt-2 text-[10px] text-white/25 hover:text-white/50 transition-colors"
-          aria-label="."
-        >
-          أكاديمية المستقبل الدولية
-        </button>
       </div>
-    </div>
+      )}
+    </>
   )
 }
 const tapsRef: { current: number } = { current: 0 }
+
+// ═══════════════ 8.5) شريط العرض داخل الحسابات (v10.6.1) ═══════════════
+// نفس شريط الرئيسية الفاخر (كحلي × ذهبي بعدّاد تنازلي) — لكنه يظهر في لوحات
+// الحسابات (متدرب/مدرب/إدارة) بمجرد تفعيله من إعدادات الموقع، وينطفئ تلقائياً
+// عند انتهاء المهلة أو إطفاء المفتاح. يُحدَّث فوراً عند حفظ الإعدادات.
+export function LuxOfferBar() {
+  const [settings, setSettings] = useState<any>(__settingsCache || null)
+  useEffect(() => {
+    let alive = true
+    fetchSiteSettings().then((d) => { if (alive) setSettings(d) })
+    const onUpdated = () => { fetchSiteSettings(true).then((d) => { if (alive) setSettings(d) }) }
+    window.addEventListener('fia-settings-updated', onUpdated as EventListener)
+    return () => { alive = false; window.removeEventListener('fia-settings-updated', onUpdated as EventListener) }
+  }, [])
+
+  const on = !!settings && (settings.offer_active === true || settings.offer_active === 'true') && !!settings.offer_title
+  if (!on) return null
+  if (settings.offer_ends_at) {
+    const end = new Date(settings.offer_ends_at).getTime()
+    if (Number.isFinite(end) && end <= Date.now()) return null
+  }
+
+  return (
+    <section dir="rtl" className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-navy via-navy-light to-navy border border-gold/40 shadow-lg shadow-navy/20 mb-5">
+      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 16% 40%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 82% 60%, #D4AF37 1px, transparent 1px)',
+        backgroundSize: '30px 30px, 38px 38px',
+      }} />
+      <div className="absolute -top-16 left-1/3 w-64 h-64 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative px-4 lg:px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-center sm:text-right">
+          <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Star className="w-5 h-5 text-navy" />
+          </span>
+          <div>
+            <div className="text-gold font-black text-sm sm:text-base leading-tight">{settings.offer_title}</div>
+            {settings.offer_text && (
+              <div className="text-white/70 text-[11px] sm:text-xs mt-0.5">{settings.offer_text}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <LuxOfferCountdown dark endsAt={settings.offer_ends_at ? new Date(settings.offer_ends_at).toISOString() : undefined} />
+          {settings.offer_link && (
+            <Link
+              href={settings.offer_link}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-l from-gold to-amber-400 text-navy text-xs font-black shadow-lg hover:shadow-gold/30 hover:-translate-y-0.5 active:scale-95 transition-all whitespace-nowrap"
+            >
+              اغتنم العرض الآن
+            </Link>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 // ═══════════════ 9) مراقب الأخطاء الحي — رَكب صامت (v10.6) ═══════════════
 function LuxErrorWatcherMount() {
