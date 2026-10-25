@@ -27,14 +27,14 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/Future-International-Academy-v2.9.2.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.9.3.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-// v2.9.2 — إصلاح الخصوصية الجذري: مكتبتي تفتح الدروس داخل التطبيق حصراً
-// (عارض داخلي فاخر بدل التطبيقات الخارجية) + الملفات في مجلد خاص بجهازك
-// ⚠️ هذا الإصدار بتوقيع جديد — يتطلب إزالة التطبيق القديم ثم تثبيته مرة واحدة
-const FALLBACK_VERSION = '2.9.2'
-const FALLBACK_DATE = '2026-10-25T19:50:00Z'
+// v2.9.3 — إصلاح جذري لانهيار فتح v2.9.2 (VerifyError) + استكمال خصوصية
+// «مكتبتي» الكاملة: الدروس تُفتح داخل التطبيق حصراً بعارض داخلي فاخر
+// ✔ ثبّته فوق v2.9.2 مباشرة (نفس التوقيع) — وللإصدارات الأقدم: إزالة مرة واحدة
+const FALLBACK_VERSION = '2.9.3'
+const FALLBACK_DATE = '2026-10-26T04:10:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -198,19 +198,28 @@ export default function DownloadClient() {
           </span>
         </a>
 
-        {/* ⚠️ تنبيه v2.9.2 — توقيع جديد يتطلب تثبيتاً نظيفاً مرة واحدة */}
-        <div style={{
-          marginTop: '14px', maxWidth: '520px', textAlign: 'right',
-          padding: '14px 16px', borderRadius: '16px',
-          border: '1px solid rgba(201,169,97,0.45)',
-          background: 'linear-gradient(to left, rgba(201,169,97,0.12), rgba(10,31,68,0.04))',
-          display: 'flex', gap: '12px', alignItems: 'flex-start',
-        }}>
-          <ShieldCheck style={{ width: '20px', height: '20px', color: '#C9A961', flexShrink: 0, marginTop: 2 }} />
-          <div style={{ fontSize: '12.5px', lineHeight: 1.9, color: 'inherit' }}>
-            <strong>مهم عند التثبيت:</strong> هذه النسخة (v2.9.2) تأتي بحماية خصوصية كاملة — دروس «مكتبتي» تُفتح داخل التطبيق حصراً ولا تصل إليها أي تطبيقات أخرى. إذا كان لديك إصدار قديم مثبت،{' '}
-            <strong>أزِله أولاً ثم ثبّت هذه النسخة</strong> — خطوة واحدة مرة واحدة، ثم كل التحديثات القادمة ستتم فوقها مباشرة.
+        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.3 */}
+        <div className="fia-dl-guide">
+          <div className="fia-dl-guide-head">
+            <ShieldCheck className="fia-dl-guide-icon" />
+            <div>
+              <strong>دليل التحديث الذكي — v2.9.3</strong>
+              <span>إصلاح كامل لانهيار النسخة السابقة + خصوصية «مكتبتي» الملكية</span>
+            </div>
           </div>
+          <div className="fia-dl-guide-rows">
+            <div className="fia-dl-guide-row">
+              <span className="fia-dl-guide-badge fia-dl-badge-gold">الحالة ١</span>
+              <p>لديك النسخة <strong>v2.9.2</strong> (التي لا تفتح)؟ — <strong>ثبّت v2.9.3 فوقها مباشرة</strong> دون أي حذف، وستُستبدل تلقائياً.</p>
+            </div>
+            <div className="fia-dl-guide-row">
+              <span className="fia-dl-guide-badge">الحالة ٢</span>
+              <p>لديك إصدار أقدم (v2.9.1 فما دون)؟ — <strong>أزِله مرة واحدة</strong> ثم ثبّت v2.9.3، وبعدها كل التحديثات القادمة تتم بضغطة واحدة مباشرة.</p>
+            </div>
+          </div>
+          <p className="fia-dl-guide-note">
+            إن ظهرت رسالة النظام القياسية عند التنزيل («قد يكون هذا الملف ضاراً») فهذا تنبيه أندرويد الاعتيادي لأي تطبيق خارج المتجر — اختر «الاحتفاظ على أي حال» فالتطبيق موقّع رسمياً من الأكاديمية وآمن بالكامل.
+          </p>
         </div>
 
         {/* === الميزات === */}
@@ -267,7 +276,7 @@ export default function DownloadClient() {
               </li>
             </ol>
             <p className="fia-dl-card-note">
-              التطبيق موقّع رسمياً من الأكاديمية وآمن 100% — تُثبّت الإصدارات الجديدة فوق القديمة مباشرة، وإن لم يكتمل التثبيت لأي سبب فأزِل النسخة القديمة أولاً ثم ثبّت من جديد
+              التطبيق موقّع رسمياً من الأكاديمية وآمن 100% — تحذيرات المتصفح القياسية أثناء تنزيل ملفات APK طبيعية وتُتجاهَل بأمان
             </p>
           </div>
         </div>
