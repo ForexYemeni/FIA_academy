@@ -44,7 +44,8 @@ function fetchSiteSettings(): Promise<any> {
   return __settingsPromise
 }
 
-function useSiteSettings() {
+// 👑 v10.5 — مُعرَّضة عامة: يستخدمها مركز الأدوات العائم أيضاً
+export function useSiteSettings() {
   const [settings, setSettings] = useState<any>(__settingsCache || null)
   useEffect(() => {
     let alive = true
@@ -271,7 +272,7 @@ export function LuxRoyalMessage() {
   const latest = list[0] || null
   const meta = latest ? fiaAnnounceType(latest.type) : null
 
-  // نبض الشمع فقط إذا آخر إعلان جديد (لم يُقرأ بعد)
+  // نبض الشمع فقط إذا آخر إعلان جديد (لم يُقرأ بعد) — في الرئيسية فقط
   useEffect(() => {
     if (!latest || pathname !== '/') { setPulsing(false); return }
     let read = false
@@ -279,7 +280,19 @@ export function LuxRoyalMessage() {
     setPulsing(!read)
   }, [latest?.id, pathname])
 
-  if (!latest || pathname !== '/' || !meta) return null
+  // 👑 v10.5 — الفتح من مركز الأدوات العائم (FAB) على أي صفحة — بلا زر عائم مستقل
+  useEffect(() => {
+    const onFabOpen = () => {
+      if (!latest) return
+      setOpen(true)
+      setPulsing(false)
+      try { localStorage.setItem('fia-royal-msg-read', String(latest.id)) } catch {}
+    }
+    window.addEventListener('fia-fab:announce', onFabOpen)
+    return () => window.removeEventListener('fia-fab:announce', onFabOpen)
+  }, [latest?.id])
+
+  if (!latest || !meta) return null
 
   const openLetter = () => {
     setOpen(true)
@@ -290,18 +303,7 @@ export function LuxRoyalMessage() {
 
   return (
     <>
-      {/* شمع الإعلان العائم — قمة عمود الأدوات في الزاوية اليسرى */}
-      <button
-        onClick={openLetter}
-        title="إعلانات إدارة الأكاديمية"
-        aria-label="إعلانات إدارة الأكاديمية"
-        className={`fixed bottom-[176px] left-6 z-[60] w-12 h-12 rounded-full bg-gradient-to-br ${meta.seal} shadow-xl border-2 border-gold/60 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
-          pulsing ? 'fia-seal-pulse' : ''
-        }`}
-      >
-        <LatestIcon className="w-5 h-5 text-gold" strokeWidth={2.2} />
-        {pulsing && <span className="absolute inset-0 rounded-full border-2 border-gold animate-ping opacity-40" />}
-      </button>
+      {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الإعلان يُفتح من مركز الأدوات (FiaFabHub) */}
 
       {open && (
         <div className="fixed inset-0 z-[9992] flex items-center justify-center p-4" onClick={() => setOpen(false)}>
@@ -582,6 +584,13 @@ export function LuxSupportButton() {
   const settings = useSiteSettings()
   const [open, setOpen] = useState(false)
 
+  // 👑 v10.5 — الفتح من مركز الأدوات العائم (FiaFabHub) — بلا زر عائم مستقل
+  useEffect(() => {
+    const onFabOpen = () => setOpen(true)
+    window.addEventListener('fia-fab:support', onFabOpen)
+    return () => window.removeEventListener('fia-fab:support', onFabOpen)
+  }, [])
+
   const channels = useMemo(() => {
     const list: { id: string; label: string; sub: string; icon: any; href: string; grad: string }[] = []
     const wa = String(settings?.social_whatsapp || '').trim()
@@ -606,7 +615,10 @@ export function LuxSupportButton() {
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-[66]" onClick={() => setOpen(false)} />}
+      {/* 🛡️ إصلاح جذري: الطبقة كانت z-[66] فوق اللوحة z-[65] فتبتلع كل النقرات
+          على القنوات (واتساب/تيليجرام/الهاتف/البريد/صفحة التواصل/دليل البدء)
+          وتكتفي بإغلاق النافذة — الآن تحتها مباشرة فتعمل كل الروابط */}
+      {open && <div className="fixed inset-0 z-[63]" onClick={() => setOpen(false)} />}
       {/* اللوحة */}
       <div className={`fixed bottom-[92px] left-5 z-[65] w-[300px] rounded-2xl overflow-hidden shadow-2xl border border-gold/40 bg-white transition-all duration-300 origin-bottom-left ${
         open ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 translate-y-3 pointer-events-none'
@@ -650,17 +662,7 @@ export function LuxSupportButton() {
           })}
         </div>
       </div>
-      {/* الزر العائم — قاعدة عمود الأدوات في الزاوية اليسرى */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        title="الدعم السريع"
-        aria-label="الدعم السريع"
-        className="fixed bottom-6 left-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 ring-2 ring-gold/30"
-      >
-        <span className="absolute inset-0 rounded-full" />
-        {open ? <X className="w-6 h-6" /> : <LifeBuoy className="w-6 h-6" />}
-        {!open && <span className="absolute -top-0.5 -left-0.5 w-3.5 h-3.5 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 border-2 border-white shadow-sm" />}
-      </button>
+      {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الدعم يُفتح من مركز الأدوات (FiaFabHub) */}
     </>
   )
 }

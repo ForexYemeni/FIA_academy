@@ -102,6 +102,15 @@ export async function GET(req: NextRequest) {
     }
 
     const filePath = fileData.result.file_path
+    // 🛡️ v10.5 — كشف الفيديوهات الأكبر من حد بث تيليجرام (20MB) قبل المحاولة:
+    // كان يظهر خطأ غامض («الملف غير متاح») — الآن رسالة واضحة تشرح السبب والحل
+    const fileSize = Number(fileData.result.file_size || 0)
+    if (fileSize > 20 * 1024 * 1024) {
+      return NextResponse.json({
+        error: 'هذا الفيديو أكبر من حد البث في تيليجرام (20 ميجابايت) — أعد رفعه من إدارة الدورة وسيُضغط تلقائياً إلى أقل من 20MB مع الحفاظ على الجودة',
+        too_big: true,
+      }, { status: 413 })
+    }
     // 🛡️ الروابط الملكية الآمنة: بروكسي بث داخلي بلا توكن — كان الرابط يضمّن
     //    `bot<TOKEN>/...` فيكشف توكن البوت لكل طالب يفتح درساً!
     const safeUrl = `/api/telegram-file/stream?file_id=${encodeURIComponent(resolvedFileId)}`

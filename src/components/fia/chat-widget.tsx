@@ -32,6 +32,12 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   const [searching, setSearching] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // 👑 v10.5 — الفتح من مركز الأدوات العائم (FiaFabHub) — بلا زر عائم مستقل
+  useEffect(() => {
+    const onFabOpen = () => setOpen(true)
+    window.addEventListener('fia-fab:chat', onFabOpen)
+    return () => window.removeEventListener('fia-fab:chat', onFabOpen)
+  }, [])
   // ⚡ NEW: typing indicator + read receipts + online status
   const [isTyping, setIsTyping] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
@@ -307,25 +313,8 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
 
   return (
     <>
-      {/* ⚡ Magical floating button — gold glow + scale animation */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-xl flex items-center justify-center transition-all z-50 hover:scale-110 active:scale-95 ring-2 ring-gold/30"
-        style={{ boxShadow: '0 8px 32px rgba(11, 22, 53, 0.45), 0 0 0 0 rgba(212, 175, 55, 0.5)' }}
-      >
-        {!open && (
-          <div className="absolute inset-0 rounded-full bg-gold/20 animate-ping opacity-50" />
-        )}
-        <span className="relative">
-          {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
-        </span>
-        {!open && conversations.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-gradient-to-br from-gold to-amber-500 text-navy text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border border-white/40">
-            {conversations.length > 9 ? '9+' : conversations.length}
-          </span>
-        )}
-      </button>
-
+      {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الدردشة تُفتح من مركز الأدوات (FiaFabHub)
+          عبر حدث النافذة الموحد — بلا أي ازدواج أزرار أسفل الشاشة */}
       {/* Overlay */}
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-[min(860px,calc(100vw-3rem))] h-[min(560px,calc(100vh-8rem))] bg-white rounded-2xl overflow-hidden flex flex-col border-2 border-gold/30" style={{ boxShadow: '0 20px 60px rgba(11, 22, 53, 0.35), 0 0 40px -10px rgba(212, 175, 55, 0.4)' }}>
@@ -350,6 +339,15 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                     ابحث عن مستخدم لبدء محادثة
                   </p>
                 </div>
+                {/* 👑 v10.5 — زر إغلاق في ترويسة البحث (كان الإغلاق عبر الزر العائم المُزال) */}
+                <button
+                  onClick={() => setOpen(false)}
+                  className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors"
+                  title="إغلاق"
+                  aria-label="إغلاق المحادثات"
+                >
+                  <X className="w-4 h-4 text-gold" />
+                </button>
               </div>
 
               {/* Search bar */}

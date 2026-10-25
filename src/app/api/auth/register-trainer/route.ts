@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth-server'
 import { rateLimit, clientIp, tooMany, signTokenAsync } from '@/lib/api-auth'
 import { notifyTrainerApplicationReceived } from '@/lib/notifications'
 import { tgTrainerApplication } from '@/lib/telegram'
+import { getRegistrationGate, registrationStoppedMessage } from '@/lib/registration-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,14 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req)
   const rl = rateLimit(`register-trainer:${ip}`, 5, 60 * 60 * 1000)
   if (!rl.ok) return tooMany(rl.retryAfterSec)
+
+  // 🛡️ بوابة التسجيل — الإدارة قد توقف حسابات المدربين الجديدة
+  try {
+    const gate = await getRegistrationGate()
+    if (gate.isStopped('trainer')) {
+      return NextResponse.json({ error: registrationStoppedMessage('trainer'), registration_stopped: true }, { status: 403 })
+    }
+  } catch {}
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'بيانات غير سليمة' }, { status: 400 }) }

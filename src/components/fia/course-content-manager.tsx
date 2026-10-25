@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
 // 👑 مؤلّف الدروس النصية الملكي — وحدة مشتركة مع القارئ الملكي
-import { LuxTextComposer } from '@/components/fia/lux-text-lesson'
+import { LuxTextComposer, FIA_LESSON_DEMO_SIGNATURES } from '@/components/fia/lux-text-lesson'
 import { ConfirmDialog } from '@/components/fia/confirm-dialog'
 
 interface Module {
@@ -726,6 +726,8 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   }
 
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  // 👑 v10.5 — حالة الضغط الملكي للفيديو (قبل الرفع)
+  const [compressing, setCompressing] = useState<{ percent: number; stage: string } | null>(null)
 
   // 🎙️ رفع الدرس الصوتي إلى تيليجرام عبر البوابة الخادمية — file_id دائم
   // يُخزّن في الدرس، والبث لاحقاً عبر /api/lessons/audio-stream المحمية.
@@ -767,6 +769,11 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   // endpoint (which uses Telegram's sendVideo internally) and store the resulting
   // public URL in the lesson's video_url field. The trainer can also paste a
   // Telegram file URL / direct link directly into the input below.
+  //
+  // 👑 v10.5 — الضغط الملكي قبل الرفع: بوت تيليجرام لا يبثّ أكثر من 20MB —
+  // كان الفيديو الكبير يُرفع ثم يفشل بثّه دائماً («فشل تحميل الفيديو»). الآن
+  // أي فيديو > 19MB يُعاد ترميزه في الجهاز نفسه بجودة عالية ليخرج ≤ 19MB —
+  // فتُبثّ كل الفيديوهات الجديدة بنجاح 100% وبحجم أصغر بكثير.
   const handleVideoUpload = async (file: File) => {
     // Validate the picked file is actually a video — Android WebView's
     // accept filter isn't always honored, so check on the JS side too.
@@ -777,20 +784,49 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       return
     }
     if (file.size > 100 * 1024 * 1024) {
-      toast.error('حجم الفيديو كبير جداً (حد أقصى 100 ميجابايت)')
+      toast.error('حجم الفيديو كبير جداً (حد أقصى 100 ميجابايت قبل الضغط)')
       return
+    }
+    // 🎬 الضغط الذكي — يبدأ تلقائياً للفيديوهات الأكبر من 19 ميجابايت
+    let toUpload = file
+    if (file.size > 19 * 1024 * 1024) {
+      setCompressing({ percent: 2, stage: 'تحضير' })
+      try {
+        const { compressVideoIfNeeded } = await import('@/lib/video-compress')
+        const res = await compressVideoIfNeeded(file, (p) => {
+          setCompressing({
+            percent: p.percent,
+            stage: p.stage === 'prepare' ? 'تحضير' : p.stage === 'compress' ? 'ضغط فاخر بجودة عالية' : 'إنهاء',
+          })
+        })
+        if (res.file.size > 19 * 1024 * 1024) {
+          setCompressing(null)
+          toast.error(`تعذّر ضغط الفيديو تحت 19 ميجابايت (${(res.file.size / 1048576).toFixed(1)}MB) — قسّمه لجزأين أو اختر فيديو أقصر حتى يعمل البث بسلاسة`)
+          return
+        }
+        toUpload = res.file
+        if (!res.skipped) {
+          const saved = Math.max(0, Math.round((1 - res.compressedSize / res.originalSize) * 100))
+          toast.success(`تم الضغط بفخامة: ${(res.originalSize / 1048576).toFixed(1)}MB ← ${(res.compressedSize / 1048576).toFixed(1)}MB (وفّرنا ${saved}%)`)
+        }
+      } catch {
+        setCompressing(null)
+        toast.error('تعذّر ضغط الفيديو — جرّب ملفاً أصغر من 19 ميجابايت')
+        return
+      }
+      setCompressing(null)
     }
     setUploadingVideo(true)
     try {
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', toUpload)
       fd.append('folder', 'videos')
       fd.append('caption', `FIA Lesson Video: ${title || ''}`)
       const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
       const data = await res.json().catch(() => ({}))
       if (data.url) {
         setVideoUrl(data.url)
-        toast.success('تم رفع الفيديو بنجاح')
+        toast.success('تم رفع الفيديو بنجاح — جاهز للبث المباشر لكل المتدربين')
       } else {
         toast.error('فشل رفع الفيديو: ' + (data.error || ''))
       }
@@ -872,11 +908,36 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
               </Label>
               <input type="file" accept="video/*" className="hidden" id="video-upload"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = '' }} />
-              <Button variant="outline" className="w-full bg-white/80 border-red-200/40 hover:border-red-400 hover:bg-red-50 rounded-xl" disabled={uploadingVideo}
+              <Button variant="outline" className="w-full bg-white/80 border-red-200/40 hover:border-red-400 hover:bg-red-50 rounded-xl" disabled={uploadingVideo || !!compressing}
                 onClick={() => document.getElementById('video-upload')?.click()}>
                 {uploadingVideo ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <Video className="w-4 h-4 ml-1.5" />}
                 {uploadingVideo ? 'جاري الرفع...' : 'اختر فيديو للرفع'}
               </Button>
+              {/* 👑 v10.5 — لوحة تقدم الضغط الملكي: تظهر تلقائياً للفيديوهات > 19MB */}
+              {compressing && (
+                <div className="relative overflow-hidden rounded-xl border border-gold/40 bg-gradient-to-l from-navy via-navy-light to-navy p-4 text-white shadow-lg">
+                  <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)', backgroundSize: '18px 18px' }} />
+                  <div className="relative flex items-center gap-3 mb-2.5">
+                    <span className="relative flex h-10 w-10 items-center justify-center">
+                      <span className="absolute inset-0 rounded-full bg-gold/25 animate-ping" />
+                      <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-gold to-amber-500 shadow-md">
+                        <Loader2 className="h-5 w-5 animate-spin text-navy" />
+                      </span>
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-xs font-black text-gold">جاري ضغط الفيديو بفخامة — {compressing.stage}</p>
+                      <p className="text-[10px] text-white/70 mt-0.5 leading-relaxed">يعمل بزمن الفيديو الحقيقي للحفاظ على الجودة الكاملة — أغلق الشاشة وسيُرفع تلقائياً بعد الضغط</p>
+                    </div>
+                    <span className="text-lg font-black text-gold tabular-nums" dir="ltr">{compressing.percent}%</span>
+                  </div>
+                  <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/15">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-l from-gold via-amber-300 to-gold transition-all duration-500 shadow-[0_0_12px_rgba(212,175,55,0.6)]"
+                      style={{ width: `${compressing.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <Label className="text-xs font-bold text-red-600 mb-1.5 block">أو الصق رابط فيديو</Label>
                 <Input value={videoUrl.startsWith('tg://') ? '' : videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
@@ -1001,6 +1062,16 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
             <Button onClick={() => {
                 if (!title) { toast.error('أدخل العنوان'); return }
                 if (lessonType === 'audio' && !audioFileId) { toast.error('ارفع الملف الصوتي أولاً قبل حفظ الدرس'); return }
+                // 🛡️ v10.5 — حارس النص التجريبي: يمنع نشر درس نصي ما زال قالباً
+                // (نصوص تعليمية قديمة مثل «اكتب هنا مقدمة جذابة...» أو هيكلاً فارغاً)
+                if (lessonType === 'text' && content && content.trim()) {
+                  const hitDemo = FIA_LESSON_DEMO_SIGNATURES.some((s) => content.includes(s))
+                  const letters = content.replace(/[^\u0621-\u064Aa-zA-Z0-9]/g, '')
+                  if (hitDemo || letters.length < 20) {
+                    toast.error('محتوى الدرس ما زال قالباً تجريبياً/فارغاً — اكتب محتواك الحقيقي أو امسح القالب قبل الحفظ')
+                    return
+                  }
+                }
                 onSave({
                   title, lesson_type: lessonType, content: content || null,
                   video_url: videoUrl || null, pdf_url: pdfUrl || null,

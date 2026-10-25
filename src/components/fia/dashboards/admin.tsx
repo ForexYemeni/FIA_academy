@@ -3925,17 +3925,41 @@ const AdminSite = React.memo(function AdminSite() {
 
   return (
     <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
-      {/* ⚡ Magical tabs — premium style */}
-      <div className="relative flex gap-2 border-b border-gold/30 pb-3 mb-5 flex-wrap overflow-hidden">
-        {/* Magical background glow */}
-        <div className="absolute -top-8 -right-8 w-24 h-24 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
+      {/* ═══ 👑 v10.5 — الترويسة الفاخرة: لوحة قيادة إعدادات الأكاديمية ═══ */}
+      <div className="relative overflow-hidden rounded-2xl border border-gold/35 bg-gradient-to-l from-navy via-navy-light to-navy p-5 mb-5 shadow-lg">
+        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 15% 40%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 85% 70%, white 1px, transparent 1px)',
+          backgroundSize: '22px 22px, 16px 16px',
+        }} />
+        <div className="absolute -top-10 -left-10 w-36 h-36 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg border border-white/30 flex-shrink-0">
+            <Settings className="w-7 h-7 text-navy" strokeWidth={2.2} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-black text-base sm:text-lg">لوحة قيادة إعدادات الأكاديمية</h3>
+            <p className="text-gold/85 text-[11px] sm:text-xs mt-0.5 leading-relaxed">
+              كل ما يراه الزوار والمتدربين — الهوية، النصوص، القنوات، التسجيل، والإعلانات — من مكان واحد
+            </p>
+          </div>
+          <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0">
+            <span className="text-[9px] font-black text-navy bg-gold rounded-full px-2.5 py-1 shadow-md">6 أقسام</span>
+            <span className={`text-[9px] font-black rounded-full px-2.5 py-0.5 border ${saving ? 'text-amber-300 bg-amber-500/10 border-amber-400/40' : 'text-emerald-300 bg-emerald-500/10 border-emerald-400/40'}`}>
+              {saving ? 'جاري الحفظ…' : 'محفوظ'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 👑 v10.5 — التبويبات الفاخرة: بطاقات أيقونة + عنوان + وصف */}
+      <div className="relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
         {[
-          { id: 'basic',      label: 'معلومات أساسية', icon: Building2,    gradient: 'from-blue-500 to-indigo-600' },
-          { id: 'about',      label: 'من نحن',         icon: BookOpen,     gradient: 'from-purple-500 to-fuchsia-600' },
-          { id: 'policies',   label: 'السياسات',       icon: Shield,       gradient: 'from-slate-600 to-gray-700' },
-          { id: 'social',     label: 'التواصل',         icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
-          { id: 'visibility', label: 'الإظهار',        icon: Eye,          gradient: 'from-emerald-500 to-teal-600' },
-          { id: 'royal',      label: 'زاوية الإدارة', icon: Crown,        gradient: 'from-gold to-amber-500' },
+          { id: 'basic',      label: 'معلومات أساسية', hint: 'الهوية والاتصال', icon: Building2,    grad: 'from-blue-500 to-indigo-600' },
+          { id: 'about',      label: 'من نحن',         hint: 'الرؤية والرسالة', icon: BookOpen,     grad: 'from-purple-500 to-fuchsia-600' },
+          { id: 'policies',   label: 'السياسات',       hint: 'الخصوصية والشروط', icon: Shield,      grad: 'from-slate-600 to-gray-700' },
+          { id: 'social',     label: 'التواصل',        hint: 'القنوات الاجتماعية', icon: MessageSquare, grad: 'from-cyan-500 to-blue-600' },
+          { id: 'visibility', label: 'الإظهار والتسجيل', hint: 'الأقسام + بوابة الحسابات', icon: Eye, grad: 'from-emerald-500 to-teal-600' },
+          { id: 'royal',      label: 'زاوية الإدارة',  hint: 'الإعلانات المختومة', icon: Crown,      grad: 'from-gold to-amber-500' },
         ].map((t) => {
           const TabIcon = t.icon
           const isActive = tab === t.id
@@ -3943,41 +3967,39 @@ const AdminSite = React.memo(function AdminSite() {
             <button
               key={t.id}
               onClick={() => setTab(t.id as any)}
-              className={`relative px-5 py-3 rounded-2xl text-sm font-bold transition-all border overflow-hidden group ${
+              className={`relative rounded-2xl p-3 text-right border transition-all overflow-hidden group ${
                 isActive
-                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-lg border-gold/50'
-                  : 'bg-white text-navy border-gold/20 hover:border-gold/40 hover:bg-gold/5 hover:-translate-y-0.5'
+                  ? 'bg-gradient-to-br from-navy via-navy-light to-navy border-gold/60 shadow-lg shadow-navy/20 -translate-y-0.5'
+                  : 'bg-white border-gold/15 hover:border-gold/40 hover:-translate-y-0.5 hover:shadow-md'
               }`}
             >
               {isActive && (
                 <>
-                  {/* Magical dot pattern */}
-                  <div className="absolute inset-0 opacity-25 pointer-events-none" style={{
-                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px)',
-                    backgroundSize: '12px 12px, 10px 10px'
+                  <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+                    backgroundImage: 'radial-gradient(circle at 20% 20%, #D4AF37 1px, transparent 1px)',
+                    backgroundSize: '11px 11px',
                   }} />
-                  {/* Top magical strip */}
                   <div className="absolute top-0 right-0 left-0 h-0.5 bg-gradient-to-l from-gold via-amber-300 to-gold" />
                 </>
               )}
-              <span className="relative flex items-center gap-2">
-                {/* Icon — colored circle when inactive, gold icon when active */}
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+              <div className="relative flex flex-col gap-1.5">
+                <span className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
                   isActive
                     ? 'bg-gradient-to-br from-gold to-amber-500 text-navy shadow-md'
-                    : `bg-gradient-to-br ${t.gradient} text-white group-hover:scale-110 transition-transform`
+                    : `bg-gradient-to-br ${t.grad} text-white group-hover:scale-110 transition-transform`
                 }`}>
                   <TabIcon className="w-4 h-4" strokeWidth={2.2} />
                 </span>
-                <span>{t.label}</span>
-              </span>
+                <span className={`text-[12px] font-black leading-tight ${isActive ? 'text-gold' : 'text-navy'}`}>{t.label}</span>
+                <span className={`text-[9.5px] leading-tight ${isActive ? 'text-white/60' : 'text-muted-foreground'}`}>{t.hint}</span>
+              </div>
             </button>
           )
         })}
       </div>
 
       <div className="space-y-4 max-w-3xl">
-        {/* 👑 v10.4 — زاوية الإدارة: مركز الإعلانات المختومة بأنواعها + العرض المحدود (إعدادات إضافية بلا أي ترحيل) */}
+        {/* 👑 v10.5 — شبكة التبويبات الفاخرة: أيقونة + عنوان + وصف لكل تبويب */}
         {tab === 'royal' && (
           <div className="space-y-4">
             {/* ═══ بطاقة إعلان جديد ═══ */}
@@ -4469,6 +4491,91 @@ const AdminSite = React.memo(function AdminSite() {
         {/* VISIBILITY — magical toggle cards */}
         {tab === 'visibility' && (
           <div className="space-y-4">
+            {/* ═══ 👑 v10.5 — بوابة التسجيل الجديد: إيقاف/تشغيل إنشاء الحسابات ═══ */}
+            <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-gold/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                    <UserCog className="w-5 h-5 text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black text-sm">بوابة الحسابات الجديدة</div>
+                    <div className="text-gold/80 text-[11px] mt-0.5">تحكّم كامل في من يستطيع إنشاء حساب — متدرب أو مدرب — والحماية مطبقة أيضاً على الخادم</div>
+                  </div>
+                  {(settings.registration_stop_all || settings.registration_stop_students || settings.registration_stop_trainers) ? (
+                    <span className="text-[9px] font-black text-red-300 bg-red-500/15 border border-red-400/40 rounded-full px-2.5 py-1 flex-shrink-0">التسجيل موقوف جزئياً/كلياً</span>
+                  ) : (
+                    <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/15 border border-emerald-400/40 rounded-full px-2.5 py-1 flex-shrink-0">مفتوح للجميع</span>
+                  )}
+                </div>
+              </div>
+              <div className="relative p-4 space-y-3">
+                {/* المفتاح الرئيسي — إيقاف الكل */}
+                <div className={`relative p-4 rounded-xl border flex items-center justify-between overflow-hidden transition-all ${
+                  settings.registration_stop_all ? 'border-red-400/50 bg-gradient-to-br from-red-50 to-white' : 'border-gold/30 bg-gradient-to-br from-white to-gold/5'
+                }`}>
+                  <div className="absolute -top-4 -right-4 w-12 h-12 bg-red-500/10 rounded-full blur-xl pointer-events-none" />
+                  <div className="relative flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${settings.registration_stop_all ? 'bg-gradient-to-br from-red-500 to-rose-600' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
+                      <Ban className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-black text-navy text-sm">إيقاف كل الحسابات الجديدة</div>
+                      <div className="text-xs text-muted-foreground">لا يمكن لأحد التسجيل متدرباً أو مدرباً — تظهر بطاقة فاخرة بأن التسجيل موقوف من قبل الإدارة</div>
+                    </div>
+                  </div>
+                  <label className="relative cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={!!settings.registration_stop_all} onChange={(e) => setSettings({ ...settings, registration_stop_all: e.target.checked })} className="sr-only" />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${settings.registration_stop_all ? 'bg-red-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.registration_stop_all ? 'right-0.5' : 'right-6'}`} />
+                  </label>
+                </div>
+                {/* مفتاح المتدربين */}
+                <div className={`relative p-4 rounded-xl border flex items-center justify-between overflow-hidden ${
+                  settings.registration_stop_students ? 'border-amber-400/50 bg-gradient-to-br from-amber-50 to-white' : 'border-gold/30 bg-gradient-to-br from-white to-gold/5'
+                }`}>
+                  <div className="relative flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+                      <GraduationCap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-navy text-sm">إيقاف حسابات المتدربين فقط</div>
+                      <div className="text-xs text-muted-foreground">المدربون يواصلون التسجيل — والمتدربون الجدد يرون بطاقة التوقف</div>
+                    </div>
+                  </div>
+                  <label className="relative cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={!!settings.registration_stop_students} onChange={(e) => setSettings({ ...settings, registration_stop_students: e.target.checked })} className="sr-only" />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${settings.registration_stop_students ? 'bg-amber-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.registration_stop_students ? 'right-0.5' : 'right-6'}`} />
+                  </label>
+                </div>
+                {/* مفتاح المدربين */}
+                <div className={`relative p-4 rounded-xl border flex items-center justify-between overflow-hidden ${
+                  settings.registration_stop_trainers ? 'border-amber-400/50 bg-gradient-to-br from-amber-50 to-white' : 'border-gold/30 bg-gradient-to-br from-white to-gold/5'
+                }`}>
+                  <div className="relative flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center shadow-md">
+                      <Briefcase className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-navy text-sm">إيقاف حسابات المدربين فقط</div>
+                      <div className="text-xs text-muted-foreground">استقبال طلبات الانضمام كمدرب موقوف — والمتدربون يواصلون</div>
+                    </div>
+                  </div>
+                  <label className="relative cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={!!settings.registration_stop_trainers} onChange={(e) => setSettings({ ...settings, registration_stop_trainers: e.target.checked })} className="sr-only" />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${settings.registration_stop_trainers ? 'bg-amber-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.registration_stop_trainers ? 'right-0.5' : 'right-6'}`} />
+                  </label>
+                </div>
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 px-1">
+                  <Sparkles className="w-3 h-3 text-gold" />
+                  لا تنسَ الضغط على «حفظ الإعدادات» أسفل الصفحة بعد تغيير أي مفتاح
+                </p>
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-gold" />
               تحكم في الأقسام التي تظهر في الصفحة الرئيسية.
@@ -4510,10 +4617,10 @@ const AdminSite = React.memo(function AdminSite() {
           </div>
         )}
 
-        {/* Save button — magical */}
-        <div className="pt-4 border-t border-gold/20">
-          <Button onClick={() => save()} disabled={saving} className="bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md active:scale-[0.97] transition-all px-6">
-            {saving ? <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> جاري الحفظ...</> : <><CheckCircle2 className="w-4 h-4 ml-1.5" /> حفظ الإعدادات</>}
+        {/* Save button — 👑 v10.5 شريط حفظ فاخر */}
+        <div className="relative pt-5 border-t border-gold/25">
+          <Button onClick={() => save()} disabled={saving} className="relative w-full h-12 overflow-hidden bg-gradient-to-l from-navy via-navy-light to-navy hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-lg active:scale-[0.98] transition-all border border-gold/35">
+            {saving ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري الحفظ الملكي…</> : <><CheckCircle2 className="w-5 h-5 ml-2" /> حفظ الإعدادات</>}
           </Button>
         </div>
       </div>

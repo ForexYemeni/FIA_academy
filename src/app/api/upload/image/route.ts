@@ -195,12 +195,17 @@ export async function POST(req: NextRequest) {
     // Validate file size (Telegram limit is 50MB for videos, 10MB for others;
     // our local fallback has no real limit, but we cap at 100MB to be safe)
     // 🎙️ الصوت: سقف 19MB — لأن بث getFile من تيليجرام محدود بـ 20MB
-    const maxSize = isVideo ? 100 * 1024 * 1024 : isAudio ? 19 * 1024 * 1024 : 50 * 1024 * 1024
+    // 👑 v10.5 — الفيديو: سقف 19MB أيضاً (نفس السبب) — المتصفح يضغط تلقائياً
+    // قبل الرفع؛ أي فيديو أكبر لن يُبثّ أبداً فلا معنى لقبوله (كان يُرفع ثم
+    // يفشل تشغيله عند كل طالب: «فشل تحميل الفيديو»)
+    const maxSize = isVideo || isAudio ? 19 * 1024 * 1024 : 50 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json({
         error: isAudio
           ? 'حجم الصوت كبير جداً (الحد 19 ميجابايت ≈ ساعة صوت واضح — قسّم الدرس لأجزاء)'
-          : `حجم الملف كبير جداً (الحد ${isVideo ? '100' : '50'} ميجابايت)`,
+          : isVideo
+            ? 'الفيديو أكبر من 19 ميجابايت — الموقع يضغط الفيديو تلقائياً عند الرفع، تأكد أن الضغط اكتمل أو قسّم الدرس لجزأين حتى يعمل البث بسلاسة'
+            : `حجم الملف كبير جداً (الحد 50 ميجابايت)`,
       }, { status: 400 })
     }
 

@@ -61,6 +61,15 @@ export function LuxAudioPlayer({
     try { onComplete?.() } catch {}
   }, [onComplete])
 
+  // 👑 v10.5 — شبكة أمان زمنية: فتح الدرس الصوتي يفتح قفل الدرس التالي
+  // (نفس نمط القارئ النصي: مهلة قصيرة بعد الفتح تُكمل الدرس تلقائياً —
+  //  كان الطالب يُترك عالقاً إن لم يُنهِ سماع 95% من تسجيل طويل)
+  useEffect(() => {
+    if (!onComplete) return
+    const dwell = setTimeout(() => fireComplete(), 15000)
+    return () => clearTimeout(dwell)
+  }, [src, onComplete, fireComplete])
+
   const toggle = () => {
     const a = audioRef.current
     if (!a) return

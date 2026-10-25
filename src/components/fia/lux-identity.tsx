@@ -14,9 +14,10 @@
  */
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import {
   Crown, Medal, Award, Sparkles, BookOpen, BadgeCheck, Star,
-  Share2, Copy, CheckCircle2, TrendingUp, GraduationCap,
+  Share2, Copy, CheckCircle2, TrendingUp, GraduationCap, Loader2,
 } from 'lucide-react'
 
 // ═══════════════════════ نظام الرتب الملكي ═══════════════════════
@@ -254,8 +255,195 @@ export function LuxAchievements({ enrollments, certificates }: { enrollments: an
 
 // ═══════════════════════ بطاقة العضوية الرقمية ═══════════════════════
 
+// 👑 v10.5 — رسم البطاقة على Canvas لمشاركتها **كصورة حقيقية** عبر مواقع التواصل
+// (كانت المشاركة تنسخ نصاً فقط — الآن صورة فاخرة مطابقة للتصميم تنزل في واتساب/تيليجرام...)
+async function drawMembershipCardImage(user: any): Promise<File | null> {
+  try {
+    const name = String(user?.name || 'متدرب الأكاديمية')
+    const memberId = String(user?.id || '').slice(0, 8).toUpperCase() || 'FIA'
+    const memberSince = (() => {
+      try {
+        if (!user?.created_at) return null
+        const d = new Date(user.created_at)
+        if (isNaN(d.getTime())) return null
+        return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' })
+      } catch { return null }
+    })()
+
+    const W = 1080, H = 640
+    const cv = document.createElement('canvas')
+    cv.width = W; cv.height = H
+    const ctx = cv.getContext('2d')
+    if (!ctx) return null
+
+    // الجسم الكحلي المتدرج
+    const bg = ctx.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, '#0A1F44'); bg.addColorStop(0.5, '#12294f'); bg.addColorStop(1, '#0A1F44')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    // توهجات ذهبية
+    const glow1 = ctx.createRadialGradient(80, 60, 10, 80, 60, 260)
+    glow1.addColorStop(0, 'rgba(212,175,55,0.22)'); glow1.addColorStop(1, 'rgba(212,175,55,0)')
+    ctx.fillStyle = glow1; ctx.fillRect(0, 0, W, H)
+    const glow2 = ctx.createRadialGradient(W - 100, H - 40, 10, W - 100, H - 40, 220)
+    glow2.addColorStop(0, 'rgba(212,175,55,0.12)'); glow2.addColorStop(1, 'rgba(212,175,55,0)')
+    ctx.fillStyle = glow2; ctx.fillRect(0, 0, W, H)
+
+    // نقش النقاط الذهبي
+    ctx.fillStyle = 'rgba(212,175,55,0.30)'
+    for (let x = 22; x < W; x += 44) {
+      for (let y = 22; y < H; y += 44) {
+        ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    for (let x = 36; x < W; x += 36) {
+      for (let y = 40; y < H; y += 36) {
+        ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+
+    // الإطار الذهبي المزدوج
+    ctx.strokeStyle = 'rgba(212,175,55,0.85)'; ctx.lineWidth = 5
+    ctx.strokeRect(10, 10, W - 20, H - 20)
+    ctx.strokeStyle = 'rgba(212,175,55,0.35)'; ctx.lineWidth = 1.5
+    ctx.strokeRect(24, 24, W - 48, H - 48)
+
+    const AR = (size: number, weight = '700') => `${weight} ${size}px Cairo, "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif`
+
+    // ═ الترويسة: تاج ذهبي + اسم الأكاديمية + شارة «متدرب معتمد» ═
+    const hx = 70, hy = 92
+    const gradGold = ctx.createLinearGradient(hx - 34, hy - 34, hx + 34, hy + 34)
+    gradGold.addColorStop(0, '#D4AF37'); gradGold.addColorStop(1, '#F0C75E')
+    ctx.fillStyle = gradGold
+    ctx.beginPath(); ctx.roundRect(hx - 34, hy - 34, 68, 68, 16); ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.roundRect(hx - 34, hy - 34, 68, 68, 16); ctx.stroke()
+    // رسم تاج ملكي بسيط وأنيق
+    ctx.fillStyle = '#0A1F44'
+    ctx.beginPath()
+    ctx.moveTo(hx - 22, hy + 14)
+    ctx.lineTo(hx - 22, hy - 6)
+    ctx.lineTo(hx - 11, hy + 4)
+    ctx.lineTo(hx, hy - 14)
+    ctx.lineTo(hx + 11, hy + 4)
+    ctx.lineTo(hx + 22, hy - 6)
+    ctx.lineTo(hx + 22, hy + 14)
+    ctx.closePath(); ctx.fill()
+    for (const dx of [-22, 0, 22]) {
+      ctx.beginPath(); ctx.arc(hx + dx, hy + (dx === 0 ? -16 : -8), 3.4, 0, Math.PI * 2); ctx.fill()
+    }
+
+    ctx.textBaseline = 'middle'
+    ctx.direction = 'rtl'
+    ctx.textAlign = 'right'
+    ctx.fillStyle = '#D4AF37'
+    ctx.font = AR(20, '800')
+    ctx.fillText('F I A   A C A D E M Y', W - 70 - 0, hy - 16)
+    ctx.fillStyle = 'rgba(255,255,255,0.78)'
+    ctx.font = AR(21, '700')
+    ctx.fillText('أكاديمية المستقبل الدولية', W - 70, hy + 14)
+
+    // شارة متدرب معتمد (أعلى اليسار)
+    ctx.textAlign = 'left'
+    ctx.font = AR(18, '800')
+    const pill = ctx.measureText('متدرب معتمد')
+    const pw = pill.width + 36
+    const pillGrad = ctx.createLinearGradient(60, 0, 60 + pw, 0)
+    pillGrad.addColorStop(0, '#D4AF37'); pillGrad.addColorStop(1, '#F5C842')
+    ctx.fillStyle = pillGrad
+    ctx.beginPath(); ctx.roundRect(60, 64, pw, 40, 20); ctx.fill()
+    ctx.fillStyle = '#0A1F44'
+    ctx.fillText('متدرب معتمد', 78, 85)
+
+    // ═ الصورة الشخصية بإطار ذهبي ═
+    const cx = 118, cy = 305, r = 62
+    let avatarDrawn = false
+    if (user?.avatar) {
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const im = new Image()
+          im.crossOrigin = 'anonymous'
+          const t = setTimeout(() => reject(new Error('timeout')), 3500)
+          im.onload = () => { clearTimeout(t); resolve(im) }
+          im.onerror = () => { clearTimeout(t); reject(new Error('img')) }
+          im.src = user.avatar
+        })
+        // حلقة ذهبية
+        const ring = ctx.createLinearGradient(cx - r - 6, cy - r - 6, cx + r + 6, cy + r + 6)
+        ring.addColorStop(0, '#D4AF37'); ring.addColorStop(0.5, '#F5DC9A'); ring.addColorStop(1, '#B8860B')
+        ctx.fillStyle = ring
+        ctx.beginPath(); ctx.arc(cx, cy, r + 5, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#0A1F44'
+        ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2); ctx.fill()
+        ctx.save()
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip()
+        ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2)
+        ctx.restore()
+        avatarDrawn = true
+      } catch {}
+    }
+    if (!avatarDrawn) {
+      const ring = ctx.createLinearGradient(cx - r - 6, cy - r - 6, cx + r + 6, cy + r + 6)
+      ring.addColorStop(0, '#D4AF37'); ring.addColorStop(0.5, '#F5DC9A'); ring.addColorStop(1, '#B8860B')
+      ctx.fillStyle = ring
+      ctx.beginPath(); ctx.arc(cx, cy, r + 5, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = '#0A1F44'
+      ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = '#D4AF37'
+      ctx.font = AR(52, '900')
+      ctx.textAlign = 'center'
+      ctx.fillText(name.charAt(0), cx, cy + 4)
+    }
+
+    // الاسم + الصفة
+    ctx.direction = 'rtl'
+    ctx.textAlign = 'right'
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = AR(46, '900')
+    const displayName = name.length > 24 ? name.slice(0, 24) + '…' : name
+    ctx.fillText(displayName, W - 70, 278)
+    ctx.fillStyle = 'rgba(212,175,55,0.9)'
+    ctx.font = AR(23, '700')
+    ctx.fillText('عضوية متدرب — تعليم طبي معتمد', W - 70, 326)
+    if (memberSince) {
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'
+      ctx.font = AR(20, '600')
+      ctx.fillText(`عضو منذ ${memberSince}`, W - 70, 362)
+    }
+
+    // ═ التذييل: فاصل + رقم العضوية + رقائق ذهبية ═
+    ctx.strokeStyle = 'rgba(212,175,55,0.3)'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(60, 452); ctx.lineTo(W - 60, 452); ctx.stroke()
+
+    ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(212,175,55,0.75)'
+    ctx.font = AR(19, '700')
+    ctx.fillText('رقم العضوية', W - 60, 508)
+    ctx.fillStyle = '#D4AF37'
+    ctx.font = AR(28, '900')
+    ctx.fillText(`FIA-${memberId}`, W - 60, 548)
+
+    for (let i = 0; i < 3; i++) {
+      const gx = 92 + i * 52
+      const chip = ctx.createLinearGradient(gx, 0, gx + 40, 0)
+      chip.addColorStop(0, 'rgba(212,175,55,0.85)'); chip.addColorStop(1, 'rgba(245,200,66,0.85)')
+      ctx.fillStyle = chip
+      ctx.beginPath(); ctx.roundRect(gx, 528, 40, 28, 5); ctx.fill()
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.roundRect(gx, 528, 40, 28, 5); ctx.stroke()
+    }
+
+    const blob = await new Promise<Blob | null>((resolve) => cv.toBlob(resolve, 'image/png', 0.95))
+    if (!blob) return null
+    return new File([blob], 'بطاقة-عضوية-أكاديمية-المستقبل-الدولية.png', { type: 'image/png' })
+  } catch { return null }
+}
+
 export function LuxMembershipCard({ user }: { user: any }) {
   const [copied, setCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const name = user?.name || 'متدرب الأكاديمية'
   const memberSince = (() => {
     try {
@@ -269,7 +457,34 @@ export function LuxMembershipCard({ user }: { user: any }) {
 
   const share = async () => {
     const text = `👑 أنا ${name} — متدرب في أكاديمية المستقبل الدولية (FIA)\n🎓 تعليم طبي معتمد | بطاقة عضوية رقمية\n🆔 العضوية: FIA-${memberId}\nانضم إلينا وابدأ رحلتك نحو الاحتراف!`
+    setSharing(true)
     try {
+      // 👑 v10.5 — المشاركة الحقيقية: البطاقة تُرسَم كصورة PNG فاخرة وتُشارَك
+      // كملف عبر مواقع التواصل (واتساب/تيليجرام/انستغرام...) — لا نص منسوخ
+      const file = await drawMembershipCardImage(user)
+      if (file && typeof navigator !== 'undefined') {
+        const nav: any = navigator
+        const canShareFiles = !!nav.share && !!nav.canShare && nav.canShare({ files: [file] })
+        if (canShareFiles) {
+          await nav.share({ files: [file], title: 'بطاقة عضوية — أكاديمية المستقبل الدولية', text })
+          return
+        }
+        // لا دعم مشاركة ملفات → ننزل الصورة مباشرة + نفتح مشاركة نصية إن توفرت
+        const url = URL.createObjectURL(file)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = file.name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 4000)
+        try { toast.success('تم تحميل صورة بطاقتك — شاركها الآن عبر واتساب أو تيليجرام') } catch {}
+        if (nav.share) {
+          try { await nav.share({ title: 'بطاقة عضوية — أكاديمية المستقبل الدولية', text }) } catch {}
+        }
+        return
+      }
+      // أخطأنا الرسم — نرجع للمشاركة النصية القديمة
       if (typeof navigator !== 'undefined' && (navigator as any).share) {
         await (navigator as any).share({ title: 'بطاقة عضوية — أكاديمية المستقبل الدولية', text })
         return
@@ -283,6 +498,8 @@ export function LuxMembershipCard({ user }: { user: any }) {
         setCopied(true)
         setTimeout(() => setCopied(false), 2200)
       } catch {}
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -359,9 +576,14 @@ export function LuxMembershipCard({ user }: { user: any }) {
       {/* زر المشاركة */}
       <button
         onClick={share}
-        className="mt-2.5 w-full h-10 rounded-xl bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold text-xs font-black flex items-center justify-center gap-1.5 shadow-md active:scale-[0.97] transition-all border border-gold/30"
+        disabled={sharing}
+        className="mt-2.5 w-full h-10 rounded-xl bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold text-xs font-black flex items-center justify-center gap-1.5 shadow-md active:scale-[0.97] transition-all border border-gold/30 disabled:opacity-70"
       >
-        {copied ? <><CheckCircle2 className="w-4 h-4" /> تم نسخ بطاقتك — شاركها بفخر!</> : <><Share2 className="w-4 h-4" /> مشاركة بطاقة العضوية</>}
+        {sharing
+          ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري تجهيز بطاقتك كصورة…</>
+          : copied
+            ? <><CheckCircle2 className="w-4 h-4" /> تم نسخ بطاقتك — شاركها بفخر!</>
+            : <><Share2 className="w-4 h-4" /> مشاركة بطاقة العضوية كصورة</>}
       </button>
 
       <style jsx global>{`

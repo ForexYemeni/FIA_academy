@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth-store'
 import { TrainerRegistration } from '@/components/fia/trainer-registration'
 import {
-  Crown, BookOpen, GraduationCap, User, ArrowRight, Sparkles, Loader2, Lock, BadgeCheck,
+  Crown, BookOpen, GraduationCap, User, ArrowRight, Sparkles, Loader2, Lock, BadgeCheck, ShieldOff, LifeBuoy,
 } from 'lucide-react'
 
 type AccType = 'student' | 'trainer'
@@ -21,13 +21,31 @@ export default function RegisterPage() {
   const setAuth = useAuth((s) => s.setAuth)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
+  // 🛡️ بوابة التسجيل: الإدارة قد توقف إنشاء الحسابات الجديدة — نتحقق عند الفتح
+  const [regGate, setRegGate] = useState<{ all: boolean; students: boolean; trainers: boolean } | null>(null)
 
   useEffect(() => {
     try {
       const t = new URLSearchParams(window.location.search).get('type')
       if (t === 'trainer' || t === 'student') setType(t)
     } catch {}
+    fetch('/api/site-settings')
+      .then((r) => r.json())
+      .then((s) => {
+        const on = (v: any) => v === true || v === 'true' || v === 1 || v === '1'
+        setRegGate({
+          all: on(s.registration_stop_all),
+          students: on(s.registration_stop_students),
+          trainers: on(s.registration_stop_trainers),
+        })
+      })
+      .catch(() => {})
   }, [])
+
+  // هل التسجيل موقوف للصفة المختارة حالياً؟
+  const stoppedForType = type === 'student'
+    ? !!(regGate?.all || regGate?.students)
+    : !!(regGate?.all || regGate?.trainers)
 
   const submitStudent = async () => {
     if (!form.name.trim() || form.name.trim().length < 3) { toast.error('اكتب اسمك الكامل (3 أحرف على الأقل)'); return }
@@ -127,8 +145,59 @@ export default function RegisterPage() {
           </button>
         </div>
 
-        {/* النموذج حسب النوع */}
-        {type === 'trainer' ? (
+        {/* 🛡️ بطاقة التوقف الفاخرة — إنشاء الحسابات موقوف من قبل الإدارة */}
+        {stoppedForType ? (
+          <div className="fia-lux-fadeup relative w-full overflow-hidden rounded-3xl border border-[#C9A961]/40 bg-gradient-to-br from-[#0A1F44] via-[#12294f] to-[#0A1F44] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+            <div aria-hidden className="pointer-events-none absolute inset-0">
+              <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#C9A961]/15 blur-3xl" />
+              <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-[#1B3A6B]/60 blur-3xl" />
+              <div
+                className="absolute inset-0 opacity-[0.12]"
+                style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 1.2px, transparent 1.2px)', backgroundSize: '38px 38px' }}
+              />
+            </div>
+            <div className="relative">
+              <div className="relative mx-auto mb-5 h-20 w-20">
+                <div className="absolute inset-0 animate-pulse rounded-full bg-[#C9A961]/20 blur-xl" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl border border-[#C9A961]/50 bg-gradient-to-br from-[#C9A961]/25 to-transparent shadow-[0_0_45px_rgba(201,169,97,0.3)]">
+                  <ShieldOff className="h-10 w-10 text-[#E5C77E]" />
+                </div>
+                <span className="absolute -bottom-1 -left-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0A1F44] bg-gradient-to-br from-[#C9A961] to-[#E5C77E]">
+                  <Crown className="h-3.5 w-3.5 text-[#0A1F44]" />
+                </span>
+              </div>
+              <h2 className="text-xl font-extrabold text-white sm:text-2xl">
+                التسجيل موقوف <span className="bg-gradient-to-l from-[#C9A961] to-[#E5C77E] bg-clip-text text-transparent">مؤقتاً</span>
+              </h2>
+              <div className="mx-auto my-4 h-px w-40 bg-gradient-to-l from-transparent via-[#C9A961]/60 to-transparent" />
+              <p className="mx-auto max-w-md text-sm leading-relaxed text-white/70">
+                {type === 'student'
+                  ? 'إنشاء الحسابات الجديدة (متدرب أو مدرب) موقوف حالياً من قبل إدارة الأكاديمية — القرار مؤقت وسيتاح التسجيل مجدداً قريباً بإذن الله.'
+                  : 'استقبال طلبات انضمام المدربين الجدد موقوف حالياً من قبل إدارة الأكاديمية — يُعاد فتح الباب للنخبة قريباً.'}
+              </p>
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#C9A961]/40 bg-white/[0.06] px-4 py-2 text-[11px] font-bold text-[#E5C77E]">
+                <Crown className="h-3.5 w-3.5" /> قرار إداري — إدارة أكاديمية المستقبل الدولية
+              </div>
+              <div className="mt-6 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
+                <a
+                  href="/contact"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-l from-[#C9A961] to-[#E5C77E] px-6 text-sm font-extrabold text-[#0A1F44] shadow-[0_8px_24px_rgba(201,169,97,0.3)] transition-all active:scale-[0.97]"
+                >
+                  <LifeBuoy className="h-4 w-4" /> تواصل مع الإدارة
+                </a>
+                <a
+                  href="/"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/[0.05] px-6 text-sm font-bold text-white/80 transition-all hover:bg-white/10"
+                >
+                  العودة للأكاديمية <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
+              <p className="mt-5 text-center text-[11px] text-white/50">
+                لديك حساب بالفعل؟ <a href="/" className="font-bold text-[#E5C77E] hover:underline">سجّل الدخول من هنا</a>
+              </p>
+            </div>
+          </div>
+        ) : type === 'trainer' ? (
           <div className="w-full">
             <TrainerRegistration />
           </div>

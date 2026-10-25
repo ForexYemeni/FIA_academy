@@ -37,6 +37,14 @@ export async function GET(req: NextRequest) {
       if (!fileData.ok || !fileData.result?.file_path) {
         return NextResponse.json({ error: 'فشل في جلب مسار الملف من تيليجرام' }, { status: 502 })
       }
+      // 🛡️ v10.5 — رسالة واضحة للفيديوهات الأكبر من حد البث بدل فشل غامض
+      const fileSize = Number(fileData.result.file_size || 0)
+      if (fileSize > 20 * 1024 * 1024) {
+        return NextResponse.json({
+          error: 'هذا الفيديو أكبر من حد البث (20 ميجابايت) — سيُعاد رفعه مضغوطاً من إدارة الدورة قريباً',
+          too_big: true,
+        }, { status: 413 })
+      }
       filePath = fileData.result.file_path
     }
 
