@@ -27,13 +27,13 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/Future-International-Academy-v2.9.3.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.9.4.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-// v2.9.3 (versionCode 24) — إصلاح فتح «مكتبتي» (VerifyError في openFile)
-// + خصوصية «مكتبتي» الكاملة — التوقيع الأصلي فالتحديث مباشر دون حذف
-const FALLBACK_VERSION = '2.9.3'
-const FALLBACK_DATE = '2026-10-25T21:55:00Z'
+// v2.9.4 (versionCode 25) — إزالة «مكتبتي» دون إنترنت نهائياً (بقرار الإدارة)
+// + فتح فوري لمعاينة الدروس (كاش ملكي + تحضير مسبق) — التوقيع الأصلي فالتحديث مباشر دون حذف
+const FALLBACK_VERSION = '2.9.4'
+const FALLBACK_DATE = '2026-10-25T23:30:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -197,19 +197,19 @@ export default function DownloadClient() {
           </span>
         </a>
 
-        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.3 */}
+        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.4 */}
         <div className="fia-dl-guide">
           <div className="fia-dl-guide-head">
             <ShieldCheck className="fia-dl-guide-icon" />
             <div>
-              <strong>دليل التحديث الذكي — v2.9.3</strong>
-              <span>إصلاح فتح «مكتبتي» دون إنترنت + التوقيع الأصلي — التحديث المباشر يعمل</span>
+              <strong>دليل التحديث الذكي — v2.9.4</strong>
+              <span>إزالة «مكتبتي» نهائياً + فتح فوري للدروس — التحديث المباشر يعمل</span>
             </div>
           </div>
           <div className="fia-dl-guide-rows">
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge fia-dl-badge-gold">الحالة ١</span>
-              <p>لديك التطبيق الأصلي (v2.9.1 أو v2.9.2)؟ — <strong>ثبّت v2.9.3 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك ودروسك المُنزّلة تظل كما هي.</p>
+              <p>لديك التطبيق الأصلي (v2.9.1 أو v2.9.2 أو v2.9.3)؟ — <strong>ثبّت v2.9.4 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك وتقدمك تظل كما هي. ملفات «مكتبتي» القديمة تُنقّى تلقائياً عند أول تشغيل.</p>
             </div>
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge">الحالة ٢</span>

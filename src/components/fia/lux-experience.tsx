@@ -26,7 +26,7 @@ import {
   CheckCircle2, ChevronLeft, Loader2, RefreshCw,
   Megaphone, BellRing, AlertTriangle, CalendarDays,
 } from 'lucide-react'
-// 👑 v10.3 — القارئ الملكي لإعادة قراءة الدروس المحفوظة دون إنترنت (عرض فقط)
+// 👑 القارئ الملكي للدروس النصية (مشترك مع مؤلّف الدروس في لوحة الإدارة)
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
 // 👑 v10.6 — مراقبة الأخطاء الحية + وضع الصيانة
 import { installErrorWatcher } from '@/lib/error-report'
@@ -997,109 +997,6 @@ export function LuxPullToRefresh({ onRefresh, children }: { onRefresh: () => Pro
       <style jsx global>{`
         .fia-ptr { overscroll-behavior-y: contain; }
       `}</style>
-    </div>
-  )
-}
-
-// ═══════════════════════ 9) المكتبة الملكية للقراءة دون إنترنت ═══════════════════════
-// 👑 v10.3 — تُحفظ الدروس النصية المكتملة محلياً (localStorage) لتُقرأ لاحقاً حتى
-// دون اتصال — تعمل داخل الموقع وفي تطبيق أندرويد (WebView) على السواء. عرض فقط.
-
-const OFFLINE_KEY = 'fia-offline-text-lessons'
-
-export function saveOfflineTextLesson(lesson: any) {
-  try {
-    if (!lesson?.id || lesson.lesson_type !== 'text' || !lesson.content?.trim()) return
-    let arr: any[] = []
-    try { arr = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]') } catch {}
-    arr = arr.filter((l) => l.id !== lesson.id)
-    arr.unshift({ id: lesson.id, title: lesson.title || 'درس', courseId: lesson.course_id || '', content: lesson.content, savedAt: Date.now() })
-    if (arr.length > 30) arr = arr.slice(0, 30)
-    localStorage.setItem(OFFLINE_KEY, JSON.stringify(arr))
-  } catch {}
-}
-
-export function LuxOfflineLibrary() {
-  const [items, setItems] = useState<any[]>([])
-  const [reading, setReading] = useState<any | null>(null)
-
-  useEffect(() => {
-    try { setItems(JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]')) } catch {}
-  }, [])
-
-  const remove = (id: string) => {
-    try {
-      const next = items.filter((l) => l.id !== id)
-      localStorage.setItem(OFFLINE_KEY, JSON.stringify(next))
-      setItems(next)
-    } catch {}
-  }
-
-  return (
-    <div>
-      {items.length === 0 ? (
-        <div className="text-center py-6">
-          <div className="relative inline-block mb-2.5">
-            <div className="absolute inset-0 bg-gold/20 rounded-full blur-xl animate-pulse" />
-            <div className="relative w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-navy via-navy-light to-navy flex items-center justify-center shadow-lg border border-gold/30">
-              <Download className="w-5 h-5 text-gold" />
-            </div>
-          </div>
-          <p className="text-xs font-bold text-navy">مكتبتك فارغة بعد</p>
-          <p className="text-[11px] text-muted-foreground mt-1">أكمل أي درس نصي ليُحفظ هنا تلقائياً — واقرأه لاحقاً حتى دون إنترنت</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-[11px] text-muted-foreground mb-1">{items.length} درساً محفوظاً — متاح للقراءة دون اتصال</p>
-          {items.map((l) => (
-            <div key={l.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gold/25 bg-gradient-to-l from-white to-gold/[0.05] hover:border-gold/50 transition-colors">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light text-gold flex items-center justify-center flex-shrink-0 shadow-sm">
-                <BookOpen className="w-4 h-4" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-extrabold text-navy truncate">{l.title}</div>
-                <div className="text-[9px] text-muted-foreground flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  متاح دون إنترنت
-                </div>
-              </div>
-              <button
-                onClick={() => setReading(l)}
-                className="h-8 px-3 rounded-lg bg-gradient-to-r from-navy to-navy-light text-gold text-[10px] font-black flex items-center gap-1 shadow-sm active:scale-95 transition-all flex-shrink-0"
-              >
-                اقرأ
-              </button>
-              <button
-                onClick={() => remove(l.id)}
-                title="إزالة من المكتبة"
-                className="w-8 h-8 rounded-lg border border-gold/25 text-gold/60 hover:text-red-500 hover:border-red-300 flex items-center justify-center flex-shrink-0 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* نافذة القراءة دون إنترنت — بنفس القارئ الملكي بلا منطق إكمال */}
-      {reading && (
-        <div className="fixed inset-0 z-[9991] flex items-center justify-center p-4" onClick={() => setReading(null)} dir="rtl">
-          <div className="absolute inset-0 bg-navy/60 backdrop-blur-sm" />
-          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-gradient-to-b from-[#fdf8ec] to-white border-2 border-gold/40 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 z-10 flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-navy via-navy-light to-navy text-white border-b-2 border-gold/40">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
-                <BookOpen className="w-4 h-4 text-navy" />
-              </span>
-              <span className="text-xs font-black truncate flex-1">{reading.title}</span>
-              <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 rounded-full px-2 py-0.5 flex-shrink-0">دون إنترنت</span>
-              <button onClick={() => setReading(null)} className="text-gold/70 hover:text-gold flex-shrink-0"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4">
-              <LuxRoyalReader content={reading.content} />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

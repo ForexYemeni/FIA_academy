@@ -97,7 +97,13 @@ export async function GET(req: NextRequest) {
   try {
     const courseId = req.nextUrl.searchParams.get('course_id')
     if (!courseId) return NextResponse.json([])
-    const modules = await fetchCourseModules(courseId)
+    // ⚡ v10.10 — جلب المحتوى والتحقق من الهوية بالتوازي (كانا متتاليين):
+    // رحلتا DB المستقلتان تُنفَّذان معاً — توفير رحلة كاملة في كل فتح للدورة
+    // = افتتاح أسرع لمحتوى الدورات خاصة على شبكات اليمن البطيئة.
+    const [modules, authUser] = await Promise.all([
+      fetchCourseModules(courseId),
+      getAuthUser(req),
+    ])
     // Sort by position
     modules.sort((a, b) => (a.position || 0) - (b.position || 0))
     // Sort lessons too
@@ -110,7 +116,6 @@ export async function GET(req: NextRequest) {
     // 🛡️ بوابة المحتوى الملكية: المحتوى الكامل (فيديو/PDF/نصوص/إجابات)
     // للإدارة والمدرب المالك والمسجلين فقط — للزوار والغير مسجلين معاينة
     // مناهج آمنة (عناوين وأوصاف فقط) فتبقى صفحة الدورة جميلة دون تسريب.
-    const authUser = await getAuthUser(req)
     let fullAccess = authUser?.role === 'admin'
     if (!fullAccess && authUser) {
       if (authUser.role === 'trainer') {

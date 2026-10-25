@@ -48,7 +48,7 @@ import { royalFetch, royalInvalidate } from '@/lib/royal-cache'
 // 👑 v10.3 — الهوية الملكية: الرتب + الأوسمة + بطاقة العضوية + إطار الصورة الذهبي (عرض فقط)
 import { LuxRankBadge, LuxAchievements, LuxMembershipCard } from '@/components/fia/lux-identity'
 // 👑 v10.3 — السحب للتحديث بحلقة ذهبية (لوحة المتدرب فقط)
-import { LuxPullToRefresh, LuxOfflineLibrary } from '@/components/fia/lux-experience'
+import { LuxPullToRefresh } from '@/components/fia/lux-experience'
 
 // ⚡ v6.7 — القائمة الملكية المرتّبة: الأقسام مجمّعة تحت 6 ترويسات ذهبية
 const NAV: NavItem[] = [
@@ -3099,11 +3099,6 @@ const Profile = React.memo(function Profile({ profile, setProfile, user, updateU
         {/* 👑 v10.3 — أوسمة الإنجاز بشرح عند اللمس */}
         <SectionCard title="أوسمة الإنجاز" description="ميدالياتك — كل وسام قصة إنجاز">
           <LuxAchievements enrollments={enrollments} certificates={certificates} />
-        </SectionCard>
-
-        {/* 👑 v10.3 — المكتبة الملكية للقراءة دون إنترنت */}
-        <SectionCard title="مكتبتك دون إنترنت" description="دروسك النصية المحفوظة — تُقرأ في أي وقت حتى بلا اتصال">
-          <LuxOfflineLibrary />
         </SectionCard>
 
         {/* ⚡ Magical form fields */}

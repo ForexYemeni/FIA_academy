@@ -10,12 +10,12 @@ import {
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2,
-  Sparkles, Lock, Mic, Download,
+  Sparkles, Lock, Mic,
 } from 'lucide-react'
 import { toast } from 'sonner'
 // 👑 القارئ الملكي للدرس النصي — وحدة مشتركة مع مؤلّف الدروس في لوحة الإدارة
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
-import { LuxLessonCelebration, saveOfflineTextLesson } from '@/components/fia/lux-experience' // 👑 v10.3 — احتفال نهاية الدرس + حفظ الدروس النصية للمكتبة دون إنترنت (عرض فقط)
+import { LuxLessonCelebration } from '@/components/fia/lux-experience' // 👑 احتفال نهاية الدرس الملكي
 // ⚡ CustomPdfViewer is a separate component (extracted for clarity)
 // that uses pdf.js to render PDFs inside the app without Google Docs
 // Viewer. It handles its own pdfjs import + worker setup.
@@ -30,6 +30,130 @@ const LuxAudioPlayer = dynamic(
   () => import('@/components/fia/lux-audio-player').then((m) => m.LuxAudioPlayer),
   { ssr: false }
 )
+
+// ═════════════════════════════════════════════════════════════════
+// ⚡ v10.10 — محرك السرعة الملكي: كاش حلّ روابط الفيديو والصوت + تحضير مسبق
+// ═════════════════════════════════════════════════════════════════
+// سبب البطء الجذري: أول ضغط على «معاينة الدرس» كان يجري رحلة كاملة إلى
+// /api/telegram-file التي تنفّذ 2-3 استدعاءات تيليجرام خارجية (forward →
+// getFile → delete) قبل إعادة الرابط — أي ثوانٍ طويلة على شبكات اليمن قبل
+// أن يبدأ الفيديو بالتحميل أصلاً.
+// الحل الملكي ثلاثي الطبقات:
+//   1) كاش ذاكرة + sessionStorage (صلاحية 50 دقيقة — روابط تيليجرام تعيش ساعة)
+//   2) حلّ موحّد عبر resolveVideoUrl للضغطات المتكررة (فتح فوري 0ms)
+//   3) تحضير مسبق prefetchCourseMedia تُستدعيه صفحة الدورة بعد تحميل
+//      القائمة لحلّ روابط أول الدروس في الخلفية — فيصبح أول ضغط فورياً أيضاً.
+const TG_CACHE_KEY = 'fia-tg-resolve-v1'
+const TG_TTL = 50 * 60 * 1000 // 50 دقيقة (روابط تيليجرام صالحة ساعة)
+const tgMemory = new Map<string, { u: string; t: number }>()
+
+function tgCacheGet(key: string): string | null {
+  const hit = tgMemory.get(key)
+  const now = Date.now()
+  if (hit && now - hit.t < TG_TTL) return hit.u
+  if (hit) tgMemory.delete(key)
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(TG_CACHE_KEY) || '{}')
+    const e = raw[key]
+    if (e && now - e.t < TG_TTL) {
+      tgMemory.set(key, e)
+      return e.u
+    }
+    if (e) {
+      delete raw[key]
+      try { sessionStorage.setItem(TG_CACHE_KEY, JSON.stringify(raw)) } catch {}
+    }
+  } catch {}
+  return null
+}
+
+function tgCacheSet(key: string, url: string) {
+  const e = { u: url, t: Date.now() }
+  tgMemory.set(key, e)
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(TG_CACHE_KEY) || '{}')
+    raw[key] = e
+    // حصر الكاش بـ 60 عنصراً (الأقدم يُحذف) لتفادي تضخم sessionStorage
+    const keys = Object.keys(raw)
+    if (keys.length > 60) {
+      keys
+        .sort((a, b) => (raw[a]?.t || 0) - (raw[b]?.t || 0))
+        .slice(0, keys.length - 60)
+        .forEach((k) => delete raw[k])
+    }
+    sessionStorage.setItem(TG_CACHE_KEY, JSON.stringify(raw))
+  } catch {}
+}
+
+// ⚡ حلّ أي رابط درس فيديو إلى رابط بث مباشر جاهز — مع الكاش الملكي.
+// تُستخدم داخل مشغّل الفيديو وللتحضير المسبق في الخلفية على السواء.
+export async function resolveVideoUrl(url: string): Promise<string | null> {
+  if (!url) return null
+  // رابط ملف مباشر — يُستخدم كما هو
+  if (url.startsWith('https://api.telegram.org/file/')) return url
+  // رابط عادي (وليس تيليجرام) — يُستخدم كما هو
+  if (!url.startsWith('https://t.me/') && !url.startsWith('http://t.me/') && !url.startsWith('tg://')) return url
+  const cached = tgCacheGet(url)
+  if (cached) return cached
+  try {
+    let endpoint: string | null = null
+    const tm = url.match(/t\.me\/c\/(\d+)\/(\d+)/)
+    if (tm) endpoint = `/api/telegram-file?channel_id=-100${tm[1]}&message_id=${tm[2]}`
+    else if (url.startsWith('tg://')) endpoint = `/api/telegram-file?file_id=${encodeURIComponent(url.slice(5))}`
+    if (!endpoint) return null
+    const r = await fetch(endpoint)
+    const d = await r.json().catch(() => null)
+    if (d?.url) {
+      tgCacheSet(url, String(d.url))
+      return String(d.url)
+    }
+  } catch {}
+  return null
+}
+
+// ⚡ التحضير المسبق الملكي: تُستدعى من عارض الدورة بعد تحميل قائمة الدروس —
+// تحلّ روابط أول 6 دروس فيديو بالخلفية بهدوء (بعد فترة خمول قصيرة
+// حتى لا تنافس تحميل الصفحة) — فيصبح ضغط «معاينة الدرس» الأول فورياً.
+export function prefetchCourseMedia(modules: any[]) {
+  if (typeof window === 'undefined') return
+  const start = () => {
+    let n = 0
+    for (const m of (Array.isArray(modules) ? modules : [])) {
+      for (const l of ((m as any)?.lessons || [])) {
+        if (n >= 6) return
+        if (l?.lesson_type === 'video' && l?.video_url) {
+          n++
+          resolveVideoUrl(String(l.video_url)).catch(() => {})
+        }
+      }
+    }
+  }
+  // بعد 1.2 ثانية من اكتمال القائمة — لا مزاحمة مع تحميل الصفحة الأولي
+  setTimeout(start, 1200)
+}
+
+// كاش رموز البث الصوتي (الرمز mt يعيش 15 دقيقة — نحفظه 12 دقيقة أماناً)
+const AUDIO_CACHE_KEY = 'fia-audio-token-v1'
+const AUDIO_TTL = 12 * 60 * 1000
+function audioCacheGet(lessonId: string): string | null {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(AUDIO_CACHE_KEY) || '{}')
+    const e = raw[lessonId]
+    if (e && Date.now() - e.t < AUDIO_TTL) return e.u
+    if (e) {
+      delete raw[lessonId]
+      try { sessionStorage.setItem(AUDIO_CACHE_KEY, JSON.stringify(raw)) } catch {}
+    }
+  } catch {}
+  return null
+}
+function audioCacheSet(lessonId: string, url: string) {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(AUDIO_CACHE_KEY) || '{}')
+    raw[lessonId] = { u: url, t: Date.now() }
+    sessionStorage.setItem(AUDIO_CACHE_KEY, JSON.stringify(raw))
+  } catch {}
+}
 
 interface Lesson {
   id: string
@@ -113,13 +237,24 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
     if (!lesson || lesson.lesson_type !== 'audio' || !lesson.id) return
     let cancelled = false
     setAudioLoading(true)
+    // ⚡ كاش رمز البث الصوتي: فتح الدرس الصوتي نفسه خلال 12 دقيقة = فوري
+    //    بلا أي رحلة للخادم (الرمز يعيش 15 دقيقة — نحفظه 12 دقيقة أماناً)
+    const cachedAudio = audioCacheGet(lesson.id)
+    if (cachedAudio) {
+      setAudioSrc(cachedAudio)
+      setAudioLoading(false)
+      return
+    }
     const params = new URLSearchParams({ lesson_id: lesson.id })
     if (courseId) params.set('course_id', courseId)
     fetch(`/api/lessons/audio-token?${params.toString()}`)
       .then(async (r) => {
         const data = await r.json().catch(() => null)
         if (cancelled) return
-        if (r.ok && data?.url) setAudioSrc(data.url as string)
+        if (r.ok && data?.url) {
+          audioCacheSet(lesson.id, String(data.url))
+          setAudioSrc(data.url as string)
+        }
         else setAudioError(data?.error || 'تعذّر تجهيز رابط الصوت — أعد المحاولة')
       })
       .catch(() => {
@@ -141,9 +276,7 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
     if (completedLessons && completedLessons.has(lesson.id)) return // already completed
     firedCompleteRef.current = lesson.id
     onLessonComplete(lesson)
-    // 👑 v10.3 — حفظ الدرس النصي في المكتبة الملكية للقراءة دون إنترنت (محلياً فقط)
-    saveOfflineTextLesson(lesson)
-    // 👑 v10.3 — الاحتفال الملكي: يُطلق مرة واحدة مع الإكمال الأول فقط
+    // 👑 الاحتفال الملكي: يُطلق مرة واحدة مع الإكمال الأول فقط
     setCelebrate(true)
   }
 
@@ -308,10 +441,6 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {/* Render the lesson based on type — each component fires
                 onComplete when the student actually finishes viewing. */}
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
-            {/* 👑 v10.6 — حفظ الدرس للمشاهدة دون إنترنت (داخل التطبيق الأصلي فقط) */}
-            {lesson.lesson_type === 'video' && lesson.video_url && (
-              <FiaOfflineSaveButton url={lesson.video_url} kind="video" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
-            )}
             {lesson.lesson_type === 'audio' && (
               audioError ? (
                 <div className="flex items-center gap-3 rounded-2xl border border-red-300/50 bg-red-500/10 p-4">
@@ -339,15 +468,8 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 />
               )
             )}
-            {/* 👑 v10.6 — حفظ الصوت دون إنترنت (المصدر هو بوابة البث المصرّح بها برمز mt) */}
-            {lesson.lesson_type === 'audio' && audioSrc && (
-              <FiaOfflineSaveButton url={audioSrc} kind="audio" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
-            )}
             {lesson.lesson_type === 'text' && <LuxRoyalReader content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
-            {lesson.lesson_type === 'pdf' && lesson.pdf_url && (
-              <FiaOfflineSaveButton url={lesson.pdf_url} kind="pdf" title={lesson.title} lessonId={lesson.id} courseId={courseId} />
-            )}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
         </div>
@@ -423,64 +545,31 @@ function VideoPlayer({ url, onComplete }: { url?: string; onComplete?: () => voi
   }, [resolvedUrl])
 
   // Resolve Telegram message links (https://t.me/c/CHANNEL_ID/MSG_ID) to direct file URLs
+  // ⚡ v10.10 — الآن عبر الكاش الملكي resolveVideoUrl: الرابط المخزّن يفتح فوراً،
+  // والرابط الجديد يُحلّ مرة واحدة ويُحفظ (بعد التحضير المسبق يكون جاهزاً أصلاً).
   useEffect(() => {
     if (!url) return
-
-    // If it's already a direct file URL (api.telegram.org/file/...), use it directly
+    let cancelled = false
+    // روابط الملفات المباشرة والروابط العادية — تُستخدم كما هي بلا أي طلب
     if (url.startsWith('https://api.telegram.org/file/')) {
       setResolvedUrl(url)
       return
     }
-
-    // If it's a Telegram message link (https://t.me/c/CHANNEL_ID/MSG_ID)
-    // We need to resolve it via the bot API
-    if (url.startsWith('https://t.me/') || url.startsWith('http://t.me/')) {
-      setLoading(true)
-      // Extract channel_id and message_id from URL
-      // Format: https://t.me/c/4391183203/64 → channel_id = -1004391183203, message_id = 64
-      const match = url.match(/t\.me\/c\/(\d+)\/(\d+)/)
-      if (match) {
-        const channelId = `-100${match[1]}`
-        const messageId = match[2]
-        // Call our API to resolve the Telegram message to a direct file URL
-        fetch(`/api/telegram-file?channel_id=${channelId}&message_id=${messageId}`)
-          .then((r) => r.json())
-          .then((data) => {
-            if (data.url) {
-              setResolvedUrl(data.url)
-            } else {
-              setError(data.error || 'فشل في جلب الفيديو من تيليجرام')
-            }
-          })
-          .catch(() => setError('خطأ في الاتصال'))
-          .finally(() => setLoading(false))
-      } else {
-        setError('رابط تيليجرام غير صالح')
-        setLoading(false)
-      }
+    if (!url.startsWith('https://t.me/') && !url.startsWith('http://t.me/') && !url.startsWith('tg://')) {
+      setResolvedUrl(url)
       return
     }
-
-    // tg:// file ID (old format) — try to resolve
-    if (url.startsWith('tg://')) {
-      const fileId = url.substring(5)
-      setLoading(true)
-      fetch(`/api/telegram-file?file_id=${encodeURIComponent(fileId)}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.url) {
-            setResolvedUrl(data.url)
-          } else {
-            setError('فشل في جلب الفيديو من تيليجرام')
-          }
-        })
-        .catch(() => setError('خطأ في الاتصال'))
-        .finally(() => setLoading(false))
-      return
-    }
-
-    // Regular URL — use directly
-    setResolvedUrl(url)
+    setLoading(true)
+    setError(null)
+    resolveVideoUrl(url)
+      .then((u) => {
+        if (cancelled) return
+        if (u) setResolvedUrl(u)
+        else setError('فشل في جلب الفيديو من تيليجرام')
+      })
+      .catch(() => { if (!cancelled) setError('خطأ في الاتصال') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [url])
 
   if (!url) {
@@ -902,111 +991,5 @@ function ExamPreview({ content, title, onComplete }: { content?: string; title: 
         </Button>
       )}
     </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 👑 v10.6.2 — زر الحفظ للمشاهدة دون إنترنت (APK v2.9.0+ فقط)
-// يظهر داخل التطبيق الأصلي حصراً (جسر FiaApp.saveOffline): ينزّل الفيديو/
-// الصوت/PDF إلى مكتبة التطبيق الداخلية عبر مُنزّل أصلي — ثم تُشاهد من
-// «مكتبتي» بلا نت. على المتصفح العادي الزر لا يظهر إطلاقاً — صفر إزعاج.
-// ── 🛠️ إصلاح v10.6.2 (فشل التنزيل الفوري «تحقق من اتصالك بالإنترنت»):
-// كان الزر يمرر رابط الدرس خاماً إلى المُنزّل الأصلي فيفشل فوراً:
-//  • الصوت: رابط نسبي /api/lessons/audio-stream?... — المُنزّل الأصلي
-//    (DownloadManager) يرفض النسبي ويتطلب https:// مطلقاً → فشل فوري.
-//  • الفيديو القديم (رابط رسالة t.me/...): يُمرر رابط صفحة HTML
-//    بدل ملف الفيديو → تنزيل تالف/فشل.
-// الحل: مسار حلّ روابط كامل قبل التمرير للمُنزّل:
-//  1) روابط t.me/tg:// تُحلّ عبر واجهتنا إلى بروكسي البث الآمن بلا توكن
-//  2) الصوت: رمز mt جديد لحظة الحفظ (الرمز قصير العمر 15 دقيقة)
-//  3) الروابط النسبية تُثبَّت بمضيف الموقع لتصبح مطلقة https://
-//  4) أي رابط غير قابل للتنزيل → رسالة واضحة بدل الاعتماد على التخمين
-// ═══════════════════════════════════════════════════════════════════
-function FiaOfflineSaveButton({ url, kind, title, lessonId, courseId }: { url: string; kind: 'video' | 'audio' | 'pdf'; title?: string; lessonId?: string; courseId?: string }) {
-  const [available, setAvailable] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    try { setAvailable(!!(window as any).FiaApp?.saveOffline) } catch {}
-  }, [])
-
-  if (!available || !url) return null
-
-  const ext = kind === 'video' ? 'mp4' : kind === 'audio' ? 'mp3' : 'pdf'
-  const safeName = (title || 'درس').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80)
-
-  // يحوّل أي صيغة رابط إلى رابط تنزيل مطلق صالح للمُنزّل الأصلي —
-  // يعيد null عند العجز مع بقاء السبب في رسالة الخطأ اللاحقة.
-  const resolveDownloadable = async (): Promise<string | null> => {
-    try {
-      let u = (url || '').trim()
-      if (!u) return null
-      // 1) رابط رسالة تيليجرام (https://t.me/c/CHANNEL/MSG) → حلّ عبر واجهتنا
-      const tm = u.match(/t\.me\/c\/(\d+)\/(\d+)/)
-      if (tm) {
-        const r = await fetch(`/api/telegram-file?channel_id=-100${tm[1]}&message_id=${tm[2]}`)
-        const d = await r.json().catch(() => null)
-        if (d?.url) u = String(d.url)
-        else return null
-      } else if (u.startsWith('tg://')) {
-        // 2) معرف تيليجرام القديم (tg://file_id) → حلّه أيضاً
-        const r = await fetch(`/api/telegram-file?file_id=${encodeURIComponent(u.slice(5))}`)
-        const d = await r.json().catch(() => null)
-        if (d?.url) u = String(d.url)
-        else return null
-      } else if (kind === 'audio' && lessonId) {
-        // 3) الصوت: رمز البث mt ينتهي خلال 15 دقيقة — نطلب رمزاً جديداً
-        //    لحظة الحفظ حتى لا يفشل التنزيل المتأخر برمز منتهٍ. عند فشل
-        //    الطلب نكمل بالرمز الحالي (قد يكون صالحاً بعد).
-        try {
-          const params = new URLSearchParams({ lesson_id: lessonId })
-          if (courseId) params.set('course_id', courseId)
-          const r = await fetch(`/api/lessons/audio-token?${params.toString()}`)
-          const d = await r.json().catch(() => null)
-          if (d?.url) u = String(d.url)
-        } catch {}
-      }
-      // 4) الروابط النسبية (/api/...) تُثبَّت بمضيف الموقع — المُنزّل الأصلي
-      //    لا يفهم النسبي إطلاقاً (سبب فشل التنزيل الفوري).
-      if (u.startsWith('/')) {
-        try { u = `${window.location.origin}${u}` } catch { return null }
-      }
-      return /^https:\/\//i.test(u) ? u : null
-    } catch {
-      return null
-    }
-  }
-
-  const save = async () => {
-    if (saving) return
-    setSaving(true)
-    try {
-      const finalUrl = await resolveDownloadable()
-      if (!finalUrl) {
-        toast.error('تعذّر تجهيز ملف التنزيل — أعد المحاولة بعد لحظات')
-        return
-      }
-      const ok = (window as any).FiaApp.saveOffline(finalUrl, `${safeName}.${ext}`, safeName, kind)
-      if (ok === false) {
-        toast.error('تعذّر بدء التنزيل — حدّث التطبيق لأحدث إصدار')
-        return
-      }
-      toast.success('بدأ التنزيل إلى مكتبتك — ستجده في «مكتبتي» عند اكتماله')
-    } catch {
-      toast.error('تعذّر بدء التنزيل — حدّث التطبيق لأحدث إصدار')
-    } finally {
-      setTimeout(() => setSaving(false), 2500)
-    }
-  }
-
-  return (
-    <button
-      onClick={save}
-      disabled={saving}
-      className="inline-flex items-center gap-2 mt-2.5 px-4 py-2 rounded-xl border border-gold/40 bg-gradient-to-l from-gold/10 to-transparent text-navy dark:text-gold text-[11.5px] font-black hover:from-gold/20 active:scale-95 transition-all disabled:opacity-60"
-    >
-      <Download className="w-3.5 h-3.5 text-gold" />
-      {saving ? 'جاري التنزيل إلى مكتبتك…' : 'حفظ للمشاهدة دون إنترنت'}
-    </button>
   )
 }

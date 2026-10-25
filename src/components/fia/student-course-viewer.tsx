@@ -11,7 +11,8 @@ import {
   Clock, Play, Lock, CheckCircle2, ArrowRight, Loader2, BookOpen,
   Sparkles, Star, Award, Gift,
 } from 'lucide-react'
-import { LessonPreviewModal } from '@/components/fia/lesson-preview-modal'
+import { LessonPreviewModal, prefetchCourseMedia } from '@/components/fia/lesson-preview-modal'
+import { RoyalListSkeleton } from '@/components/fia/royal-skeleton'
 import { CourseReviews } from '@/components/fia/course-reviews'
 import { CertificateRequest } from '@/components/fia/certificate-request'
 import { useAuth } from '@/lib/auth-store'
@@ -83,6 +84,9 @@ export function StudentCourseViewer({
       const data = await res.json()
       const mods = Array.isArray(data) ? data : []
       setModules(mods)
+      // ⚡ v10.10 — التحضير المسبق الملكي: حلّ روابط أول دروس الفيديو في الخلفية
+      // فور اكتمال القائمة — فيفتح «معاينة الدرس» الأولى فوراً بلا انتظار.
+      prefetchCourseMedia(mods)
       // Auto-expand first UNLOCKED module (sequential progression)
       if (mods.length > 0) {
         setExpanded(new Set([mods[0].id]))
@@ -262,13 +266,12 @@ export function StudentCourseViewer({
   const progress = allLessons.length > 0 ? Math.round((completedCount / allLessons.length) * 100) : 0
 
   if (loading) {
+    // 👑 v10.10 — هيكل تحميل ملكي متلألئ يحاكي شكل المحتوى الحقيقي قبل وصوله
+    // — إحساس فوري بالسرعة بدل شاشة الدوران الفارغة
     return (
-      <div className="text-center py-14">
-        <div className="relative inline-block mb-3">
-          <div className="absolute inset-0 bg-gold/20 rounded-full blur-2xl animate-pulse" />
-          <Loader2 className="relative w-10 h-10 animate-spin mx-auto text-gold" />
-        </div>
-        <p className="text-sm text-muted-foreground">جاري تحميل محتوى الدورة...</p>
+      <div className="space-y-4">
+        <RoyalListSkeleton rows={6} />
+        <p className="text-center text-xs text-muted-foreground animate-pulse">جاري تحميل محتوى الدورة...</p>
       </div>
     )
   }
