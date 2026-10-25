@@ -12,6 +12,7 @@ import {
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
   Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
   ClipboardCheck, Landmark, Megaphone, BellRing, CalendarDays,
+  Wrench, Timer,
 } from 'lucide-react'
 import { fiaAnnounceType, fiaFormatArabicDate } from '@/components/fia/lux-experience'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
@@ -3827,12 +3828,33 @@ const AdminFounder = React.memo(function AdminFounder({ user }: any) {
 const AdminSite = React.memo(function AdminSite() {
   const [settings, setSettings] = useState<any>({})
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility' | 'royal'>('basic')
+  const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility' | 'royal' | 'broadcast' | 'errors'>('basic')
   const [passwordDialog, setPasswordDialog] = useState<{ password: string; pendingSettings: any } | null>(null)
   // 👑 v10.4 — مركز إعلانات الإدارة: مسوّدة إعلان جديد + قائمة المنشور
   const [annDraft, setAnnDraft] = useState<{ type: string; text: string; date: string; sig: string }>({ type: 'announce', text: '', date: '', sig: '' })
+  // 👑 v10.6 — الرسائل الجماعية الملكية + مراقبة الأخطاء الحية + العروض
+  const [bcAudience, setBcAudience] = useState<'all' | 'students' | 'trainers' | 'admins' | 'course'>('students')
+  const [bcCourse, setBcCourse] = useState('')
+  const [bcTitle, setBcTitle] = useState('')
+  const [bcMessage, setBcMessage] = useState('')
+  const [bcSending, setBcSending] = useState(false)
+  const [bcCourses, setBcCourses] = useState<any[]>([])
+  const [errReports, setErrReports] = useState<any[]>([])
+  const [errLoading, setErrLoading] = useState(false)
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
+  // دورات الرسائل الجماعية + سجل الأخطاء عند فتح تبويبهما
+  useEffect(() => {
+    if (tab === 'broadcast' && bcCourses.length === 0) {
+      fetch('/api/courses').then((r) => r.json()).then((d) => setBcCourses(Array.isArray(d) ? d : d?.courses || []))
+        .catch(() => {})
+    }
+    if (tab === 'errors') {
+      setErrLoading(true)
+      fetch('/api/error-reports').then((r) => r.json()).then((d) => setErrReports(d?.reports || []))
+        .catch(() => setErrReports([])).finally(() => setErrLoading(false))
+    }
+  }, [tab])
   // تاريخ المسوّدة اليوم افتراضياً عند فتح الزاوية — والتاريخ اختياري: يُعرض عند تحديده فقط
   useEffect(() => {
     if (tab === 'royal') {
@@ -3951,15 +3973,17 @@ const AdminSite = React.memo(function AdminSite() {
         </div>
       </div>
 
-      {/* 👑 v10.5 — التبويبات الفاخرة: بطاقات أيقونة + عنوان + وصف */}
-      <div className="relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+      {/* 👑 v10.5 — التبويبات الفاخرة: بطاقات أيقونة + عنوان + وصف — v10.6: + بث جماعي وأخطاء */}
+      <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         {[
           { id: 'basic',      label: 'معلومات أساسية', hint: 'الهوية والاتصال', icon: Building2,    grad: 'from-blue-500 to-indigo-600' },
           { id: 'about',      label: 'من نحن',         hint: 'الرؤية والرسالة', icon: BookOpen,     grad: 'from-purple-500 to-fuchsia-600' },
           { id: 'policies',   label: 'السياسات',       hint: 'الخصوصية والشروط', icon: Shield,      grad: 'from-slate-600 to-gray-700' },
           { id: 'social',     label: 'التواصل',        hint: 'القنوات الاجتماعية', icon: MessageSquare, grad: 'from-cyan-500 to-blue-600' },
-          { id: 'visibility', label: 'الإظهار والتسجيل', hint: 'الأقسام + بوابة الحسابات', icon: Eye, grad: 'from-emerald-500 to-teal-600' },
+          { id: 'visibility', label: 'الإظهار والتحكم', hint: 'الأقسام + الصيانة + العروض', icon: Eye, grad: 'from-emerald-500 to-teal-600' },
           { id: 'royal',      label: 'زاوية الإدارة',  hint: 'الإعلانات المختومة', icon: Crown,      grad: 'from-gold to-amber-500' },
+          { id: 'broadcast',  label: 'رسائل جماعية',   hint: 'بث إشعار لشريحة كاملة', icon: Send,      grad: 'from-orange-500 to-amber-600' },
+          { id: 'errors',     label: 'مراقبة الأخطاء', hint: 'سجل حي بأمر واحد', icon: Activity,    grad: 'from-rose-500 to-red-600' },
         ].map((t) => {
           const TabIcon = t.icon
           const isActive = tab === t.id
@@ -4613,6 +4637,263 @@ const AdminSite = React.memo(function AdminSite() {
                 <div className={`w-12 h-6 rounded-full transition-colors ${settings.show_licenses ? 'bg-emerald-500' : 'bg-muted'}`} />
                 <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.show_licenses ? 'right-0.5' : 'right-6'}`} />
               </label>
+            </div>
+
+            {/* ═══ 👑 v10.6 — وضع الصيانة الملكي: مفتاح واحد يغلق الموقع أنيقاً ═══ */}
+            <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
+              <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Wrench className="w-5 h-5 text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black text-sm">وضع الصيانة الملكي</div>
+                    <div className="text-gold/80 text-[11px] mt-0.5">صفحة «نطور الأكاديمية» أنيقة تُغلف الموقع كله — الإدارة والمدربون يتجاوزونها دائماً</div>
+                  </div>
+                  {settings.maintenance_active ? (
+                    <span className="text-[9px] font-black text-amber-300 bg-amber-500/15 border border-amber-400/40 rounded-full px-2.5 py-1 flex-shrink-0">الصيانة مفعّلة</span>
+                  ) : (
+                    <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/15 border border-emerald-400/40 rounded-full px-2.5 py-1 flex-shrink-0">الموقع مفتوح</span>
+                  )}
+                </div>
+              </div>
+              <div className="relative p-4 space-y-3">
+                <div className={`relative p-4 rounded-xl border flex items-center justify-between overflow-hidden transition-all ${
+                  settings.maintenance_active ? 'border-amber-400/50 bg-gradient-to-br from-amber-50 to-white' : 'border-gold/30 bg-gradient-to-br from-white to-gold/5'
+                }`}>
+                  <div className="relative flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${settings.maintenance_active ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
+                      <Wrench className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-navy text-sm">تفعيل وضع الصيانة</div>
+                      <div className="text-xs text-muted-foreground">فور الحفظ يرى الجميع صفحة الصيانة — أطفئه ليعود كل شيء فوراً</div>
+                    </div>
+                  </div>
+                  <label className="relative cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={!!settings.maintenance_active} onChange={(e) => setSettings({ ...settings, maintenance_active: e.target.checked })} className="sr-only" />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${settings.maintenance_active ? 'bg-amber-500' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.maintenance_active ? 'right-0.5' : 'right-6'}`} />
+                  </label>
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy mb-1.5 block">رسالة الصيانة (اختياري — تظهر للزوار بدل الرسالة الافتراضية)</Label>
+                  <Textarea
+                    value={settings.maintenance_message || ''}
+                    onChange={(e) => setSettings({ ...settings, maintenance_message: e.target.value })}
+                    placeholder="مثال: ننهي لمسة فاخرة جديدة — عد بعد قليل وستجد الأكاديمية أجمل وأسرع"
+                    rows={2}
+                    className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ═══ 👑 v10.6 — العرض المحدود الملكي: عداد تنازلي فاخر على الرئيسية ═══ */}
+            <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
+              <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Timer className="w-5 h-5 text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black text-sm">العرض المحدود الملكي</div>
+                    <div className="text-gold/80 text-[11px] mt-0.5">شريط فاخر بعدّاد تنازلي ذهبي يظهر أعلى الصفحة الرئيسية — ينطفئ تلقائياً عند انتهاء الوقت</div>
+                  </div>
+                  {settings.offer_active ? (
+                    <span className="text-[9px] font-black text-gold bg-gold/15 border border-gold/40 rounded-full px-2.5 py-1 flex-shrink-0">يُعرض الآن</span>
+                  ) : (
+                    <span className="text-[9px] font-black text-muted-foreground bg-muted rounded-full px-2.5 py-1 flex-shrink-0">معطل</span>
+                  )}
+                </div>
+              </div>
+              <div className="relative p-4 space-y-3">
+                <div className={`relative p-4 rounded-xl border flex items-center justify-between overflow-hidden transition-all ${
+                  settings.offer_active ? 'border-gold/50 bg-gradient-to-br from-gold/10 to-white' : 'border-gold/30 bg-gradient-to-br from-white to-gold/5'
+                }`}>
+                  <div className="relative flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${settings.offer_active ? 'bg-gradient-to-br from-gold to-amber-500' : 'bg-gradient-to-br from-navy to-navy-light'}`}>
+                      <Timer className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-navy text-sm">تفعيل شريط العرض</div>
+                      <div className="text-xs text-muted-foreground">يظهر للجميع في الصفحة الرئيسية حتى تاريخ الانتهاء</div>
+                    </div>
+                  </div>
+                  <label className="relative cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={!!settings.offer_active} onChange={(e) => setSettings({ ...settings, offer_active: e.target.checked })} className="sr-only" />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${settings.offer_active ? 'bg-gold' : 'bg-muted'}`} />
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${settings.offer_active ? 'right-0.5' : 'right-6'}`} />
+                  </label>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان العرض *</Label>
+                    <Input value={settings.offer_title || ''} onChange={(e) => setSettings({ ...settings, offer_title: e.target.value })} placeholder="مثال: خصم 30% على دورة التمريض" className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">ينتهي في (التاريخ والوقت) *</Label>
+                    <Input type="datetime-local" value={settings.offer_ends_at || ''} onChange={(e) => setSettings({ ...settings, offer_ends_at: e.target.value })} className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" />
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">وصف قصير (اختياري)</Label>
+                    <Input value={settings.offer_text || ''} onChange={(e) => setSettings({ ...settings, offer_text: e.target.value })} placeholder="آخر فرصة بهذا السعر — المقاعد محدودة" className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">رابط عند الضغط (اختياري)</Label>
+                    <Input value={settings.offer_link || ''} onChange={(e) => setSettings({ ...settings, offer_link: e.target.value })} placeholder="/courses أو رابط دورة محددة" className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" dir="ltr" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ 👑 v10.6 — الرسائل الجماعية الملكية للدفعات ═══ */}
+        {tab === 'broadcast' && (
+          <div className="space-y-4">
+            <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
+              <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Send className="w-5 h-5 text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black text-sm">بث رسالة جماعية</div>
+                    <div className="text-gold/80 text-[11px] mt-0.5">إشعار حقيقي يصل لكل مستلم في جرسه وفي منبثقات التطبيق — دفعة كاملة بضغطة واحدة</div>
+                  </div>
+                </div>
+              </div>
+              <div className="relative p-4 space-y-3.5">
+                <div>
+                  <Label className="text-xs font-bold text-navy mb-2 block">الشريحة المستلمة *</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: 'students', label: 'كل المتدربين', hint: 'جميع الحسابات المتدربة' },
+                      { id: 'trainers', label: 'كل المدربين', hint: 'طاقم التدريب كاملاً' },
+                      { id: 'course', label: 'مسجلو دورة', hint: 'دورة محددة بقائمتها' },
+                      { id: 'all', label: 'الجميع', hint: 'كل الحسابات دون استثناء' },
+                      { id: 'admins', label: 'الإدارة فقط', hint: 'للاختبار الداخلي' },
+                    ].map((a) => {
+                      const on = bcAudience === a.id
+                      return (
+                        <button key={a.id} type="button" onClick={() => setBcAudience(a.id as any)}
+                          className={`p-3 rounded-xl border text-right transition-all ${on ? 'border-gold/60 bg-gradient-to-br from-navy to-navy-light shadow-md' : 'border-gold/25 bg-white hover:border-gold/50'}`}>
+                          <div className={`text-[12px] font-black ${on ? 'text-gold' : 'text-navy'}`}>{a.label}</div>
+                          <div className={`text-[9.5px] mt-0.5 ${on ? 'text-white/60' : 'text-muted-foreground'}`}>{a.hint}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {bcAudience === 'course' && (
+                  <div>
+                    <Label className="text-xs font-bold text-navy mb-1.5 block">اختر الدورة *</Label>
+                    <select value={bcCourse} onChange={(e) => setBcCourse(e.target.value)}
+                      className="w-full h-11 text-sm bg-white/80 border border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl px-3">
+                      <option value="">— اختر دورة —</option>
+                      {bcCourses.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-xs font-bold text-navy mb-1.5 block">عنوان الرسالة *</Label>
+                  <Input value={bcTitle} onChange={(e) => setBcTitle(e.target.value)} maxLength={120} placeholder="مثال: 🎓 درس جديد أُضيف إلى دورتك اليوم" className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-navy mb-1.5 block">نص الرسالة *</Label>
+                  <Textarea value={bcMessage} onChange={(e) => setBcMessage(e.target.value)} maxLength={2000} rows={4} placeholder="اكتب رسالتك هنا — ستصل لكل مستلم في شريحته فوراً" className="text-sm bg-white/80 border-gold/30 focus:border-gold focus:ring-gold/30 rounded-xl" />
+                  <div className="text-[10px] text-muted-foreground mt-1">{bcMessage.length}/2000</div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (bcSending) return
+                    if (!bcTitle.trim() || !bcMessage.trim()) { toast.error('أكمل العنوان والنص أولاً'); return }
+                    if (bcAudience === 'course' && !bcCourse) { toast.error('اختر الدورة أولاً'); return }
+                    if (!confirm(`بث الرسالة لشريحة «${bcAudience === 'course' ? 'مسجلو الدورة' : bcAudience}»؟ لا تراجع بعد الإرسال.`)) return
+                    setBcSending(true)
+                    try {
+                      const res = await fetch('/api/notifications/broadcast', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ audience: bcAudience, course_id: bcCourse, title: bcTitle.trim(), message: bcMessage.trim() }),
+                      })
+                      const d = await res.json()
+                      if (!res.ok) toast.error(d.error || 'فشل البث')
+                      else { toast.success(`وصلت الرسالة إلى ${d.sent} مستلم بنجاح ملكي`); setBcTitle(''); setBcMessage('') }
+                    } catch { toast.error('خطأ في الاتصال') }
+                    finally { setBcSending(false) }
+                  }}
+                  disabled={bcSending}
+                  className="w-full h-12 bg-gradient-to-l from-navy via-navy-light to-navy hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-lg active:scale-[0.98] transition-all border border-gold/35"
+                >
+                  {bcSending ? <><Loader2 className="w-5 h-5 ml-2 animate-spin" /> جاري البث الملكي…</> : <><Send className="w-5 h-5 ml-2" /> بث الرسالة الآن</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ 👑 v10.6 — مراقبة الأخطاء الحية ═══ */}
+        {tab === 'errors' && (
+          <div className="space-y-4">
+            <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 shadow-sm">
+              <div className="relative p-5 border-b border-gold/20 bg-gradient-to-l from-navy via-navy-light to-navy rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Activity className="w-5 h-5 text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-black text-sm">سجل الأخطاء الحي</div>
+                    <div className="text-gold/80 text-[11px] mt-0.5">كل خلل في أي جهاز يصلك إشعاراً فورياً — وهنا يُرصد السجل الكامل</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('مسح سجل الأخطاء كاملاً؟')) return
+                      try { await fetch('/api/error-reports', { method: 'DELETE' }); setErrReports([]); toast.success('مُسح السجل بنجاح') } catch {}
+                    }}
+                    className="text-[10px] font-black text-red-300 bg-red-500/10 border border-red-400/40 rounded-full px-3 py-1.5 hover:bg-red-500/20 transition-colors flex-shrink-0"
+                  >مسح السجل</button>
+                </div>
+              </div>
+              <div className="relative p-4">
+                {errLoading ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-gold" /> جاري جلب السجل…
+                  </div>
+                ) : errReports.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="relative inline-block mb-2">
+                      <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl animate-pulse" />
+                      <div className="relative w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                        <Activity className="w-5 h-5 text-white" />
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-navy">صفر أخطاء — الأكاديمية تعمل بنقاء مطلق</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">أي خلل مستقبلي سيظهر هنا ويصلك إشعاراً فور حدوثه</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                    {errReports.map((r: any) => (
+                      <div key={r.id} className="p-3.5 rounded-xl border border-red-200/60 bg-gradient-to-br from-red-50/60 to-white">
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <Activity className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[12px] font-bold text-navy break-words">{String(r.body || '').split('\n')[0] || 'خطأ'}</div>
+                            <div className="text-[10px] text-muted-foreground mt-1 break-all" dir="ltr">{r.link || ''}</div>
+                            <div className="text-[10px] text-muted-foreground/80 mt-0.5">{new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

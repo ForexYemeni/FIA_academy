@@ -61,7 +61,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // ═══ البث من تيليجرام — التوكن داخل الخادم حصراً ═══
+    // ═══ البث من التخزين الملكي المباشر أو تيليجرام ═══
+    // 👑 v10.6 — audio_file_id يقبل الآن رابطاً مباشراً (التخزين الملكي للصوت
+    // الكبير >19MB): إذا بدأ بـhttp نوجه (302) إلى الرابط مباشرة بعد اجتياز
+    // البوابة كاملة — المشغّل يتبع التوجيه والبث يدعم Range أصلاً. معرفات
+    // تيليجرام لا تبدأ أبداً بـhttp فلا لبس إطلاقاً.
+    if (/^https?:\/\//i.test(lesson.audio_file_id || '')) {
+      return NextResponse.redirect(lesson.audio_file_id, 302)
+    }
+
     const token = await getBotToken()
     if (!token) {
       return NextResponse.json({ error: 'إعدادات تيليجرام غير مُهيأة' }, { status: 500 })

@@ -9,6 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { royalFetch } from '@/lib/royal-cache'
+import Link from 'next/link'
+// 👑 v10.6 — شريط العرض المحدود الملكي بعدّاد تنازلي ذهبي على الرئيسية
+import { LuxOfferCountdown } from '@/components/fia/lux-experience'
 import {
   Shield, Award, Users, Clock, BookOpen, GraduationCap, Stethoscope,
   HeartPulse, Pill, Syringe, Baby, Hospital, CheckCircle2, Star, Phone, Mail, MapPin, X, Building2, BadgeCheck,
@@ -78,6 +81,10 @@ export function PublicSite({ onLoginClick }: { onLoginClick: () => void }) {
 
   return (
     <div className="flex-1">
+      {/* ═══ 👑 v10.6 — شريط العرض المحدود الملكي: عدّاد تنازلي ذهبي ═══ */}
+      {(settings.offer_active === true || settings.offer_active === 'true') && settings.offer_title && (
+        <RoyalOfferBanner settings={settings} />
+      )}
       {/* HERO */}
       <section id="home" className="relative bg-navy text-white overflow-hidden">
         <div className="absolute inset-0 bg-fia-radial" />
@@ -781,5 +788,46 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
       <dt className="text-green-700 font-semibold text-xs">{label}</dt>
       <dd className={`text-navy ${mono ? 'font-mono' : 'font-medium'}`} dir={mono ? 'ltr' : 'rtl'}>{value}</dd>
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 👑 v10.6 — شريط العرض المحدود الملكي: كحلي × ذهبي بعدّاد تنازلي حيّ
+// يقرأ مفاتيح الإعدادات: offer_title / offer_text / offer_ends_at / offer_link
+// ينطفئ تلقائياً بعد انتهاء المهلة (LuxOfferCountdown يخفي نفسه عند الصفر)
+// ═══════════════════════════════════════════════════════════════════
+function RoyalOfferBanner({ settings }: { settings: any }) {
+  return (
+    <section className="relative overflow-hidden bg-gradient-to-l from-navy via-navy-light to-navy border-b-2 border-gold/50">
+      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(circle at 16% 40%, #D4AF37 1.2px, transparent 1.2px), radial-gradient(circle at 82% 60%, #D4AF37 1px, transparent 1px)',
+        backgroundSize: '30px 30px, 38px 38px',
+      }} />
+      <div className="absolute -top-16 left-1/3 w-64 h-64 bg-gold/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative container mx-auto px-4 lg:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-center sm:text-right">
+          <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Star className="w-5 h-5 text-navy" />
+          </span>
+          <div>
+            <div className="text-gold font-black text-sm sm:text-base leading-tight">{settings.offer_title}</div>
+            {settings.offer_text && (
+              <div className="text-white/70 text-[11px] sm:text-xs mt-0.5">{settings.offer_text}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <LuxOfferCountdown dark endsAt={settings.offer_ends_at ? new Date(settings.offer_ends_at).toISOString() : undefined} />
+          {settings.offer_link && (
+            <Link
+              href={settings.offer_link}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-l from-gold to-amber-400 text-navy text-xs font-black shadow-lg hover:shadow-gold/30 hover:-translate-y-0.5 active:scale-95 transition-all whitespace-nowrap"
+            >
+              اغتنم العرض الآن
+            </Link>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }

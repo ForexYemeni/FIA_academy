@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing,
+  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing, Library,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 
@@ -64,6 +64,12 @@ export function FiaFabHub() {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'dark' | 'light' | null>(null)
   const [announceNew, setAnnounceNew] = useState(false)
+  // 👑 v10.6 — هل نحن داخل التطبيق الأصلي؟ (جسر FiaApp = APK v2.9.0+)
+  // تظهر أداة «مكتبتي» فقط حينها — الدروس المحفوظة دون إنترنت
+  const [nativeBridge, setNativeBridge] = useState(false)
+  useEffect(() => {
+    try { setNativeBridge(!!(window as any).FiaApp?.openLibrary) } catch {}
+  }, [])
 
   // مزامنة الوضع الليلي مع سكربت التهيئة
   useEffect(() => {
@@ -122,12 +128,20 @@ export function FiaFabHub() {
         show: true, action: () => router.push('/contact'),
       },
       {
+        // 👑 v10.6 — مكتبتي: الدروس المحفوظة دون إنترنت (داخل التطبيق الأصلي فقط — APK v2.9.0+)
+        id: 'library', label: 'مكتبتي دون إنترنت', icon: Library,
+        grad: 'from-amber-500 to-orange-600', ring: 'shadow-[0_0_22px_-4px_rgba(245,158,11,0.55)]',
+        show: !!nativeBridge, action: () => {
+          try { (window as any).FiaApp?.openLibrary() } catch {}
+        },
+      },
+      {
         id: 'theme', label: mode === 'light' ? 'الوضع الليلي' : 'الوضع النهاري', icon: mode === 'light' ? Moon : Sun,
         grad: 'from-navy via-navy-light to-navy', ring: 'ring-2 ring-gold/40',
         show: true, action: toggleTheme,
       },
     ].filter((i) => i.show)
-  }, [user, mode, announceNew, dispatch, router, toggleTheme])
+  }, [user, mode, announceNew, dispatch, router, toggleTheme, nativeBridge])
 
   // Escape يغلق المركز
   useEffect(() => {

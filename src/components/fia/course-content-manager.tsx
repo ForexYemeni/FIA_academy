@@ -738,29 +738,55 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       toast.error(`الملف المختار ليس صوتاً (النوع: ${file.type || 'غير معروف'}). اختر ملفاً صوتياً صالحاً.`)
       return
     }
-    if (file.size > 19 * 1024 * 1024) {
-      toast.error('حجم الصوت كبير جداً (حد أقصى 19 ميجابايت ≈ ساعة صوت واضح) — قسّم الدرس لأجزاء')
+    // 👑 v10.6 — السلّم الملكي للصوت:
+    // ≤19MB → خزينة تيليجرام (كما هي — بث مؤكد عبر البروكسي)
+    // >19MB → التخزين الملكي المباشر مباشرة (حتى 50MB) — بلا رفض أبداً
+    if (file.size <= 19 * 1024 * 1024) {
+      setUploadingAudio(true)
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('folder', 'audios')
+        fd.append('caption', (title || '').trim() || 'FIA Audio Lesson')
+        const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+        const data = await res.json().catch(() => ({}))
+        if (data.url && data.file_id) {
+          setAudioFileId(data.file_id)
+          setAudioMeta({ duration: data.duration ?? null, size: data.size ?? file.size, mime: data.mime ?? file.type ?? null })
+          if (data.duration && !duration) setDuration(Math.max(1, Math.round(data.duration / 60)))
+          toast.success('تم رفع الصوت إلى خزينة تيليجرام الآمنة بنجاح')
+        } else {
+          toast.error('فشل رفع الصوت: ' + (data.error || '') || 'خطأ غير معروف')
+        }
+      } catch {
+        toast.error('خطأ في الاتصال')
+      } finally {
+        setUploadingAudio(false)
+      }
       return
     }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('حجم الصوت كبير جداً (الحد الأقصى 50 ميجابايت) — قسّم الدرس لأجزاء')
+      return
+    }
+    // التخزين الملكي المباشر — يبثّ أي صيغة حتى 50MB
     setUploadingAudio(true)
+    setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (صوت كبير)' })
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('folder', 'audios')
-      fd.append('caption', (title || '').trim() || 'FIA Audio Lesson')
-      const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
-      const data = await res.json().catch(() => ({}))
-      if (data.url && data.file_id) {
-        setAudioFileId(data.file_id)
-        setAudioMeta({ duration: data.duration ?? null, size: data.size ?? file.size, mime: data.mime ?? file.type ?? null })
-        if (data.duration && !duration) setDuration(Math.max(1, Math.round(data.duration / 60)))
-        toast.success('تم رفع الصوت إلى خزينة تيليجرام الآمنة بنجاح')
-      } else {
-        toast.error('فشل رفع الصوت: ' + (data.error || '') || 'خطأ غير معروف')
-      }
-    } catch {
-      toast.error('خطأ في الاتصال')
+      const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
+      const { publicUrl } = await uploadToRoyalStorage(file, 'audio', (pct) => {
+        setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (صوت كبير)' })
+      })
+      setAudioFileId(null)
+      setAudioMeta({ duration: null, size: file.size, mime: file.type || 'audio/mpeg' })
+      // 👑 v10.6 — الصوت الكبير: رابط التخزين الملكي يُخزَّن في audio_file_id
+      // (نص) — بوابة البث تكتشف الروابط وتوجه إليها بعد فحص الصلاحيات كاملاً
+      setAudioFileId(publicUrl)
+      toast.success('تم رفع الصوت الكبير إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
+    } catch (e: any) {
+      toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
     } finally {
+      setCompressing(null)
       setUploadingAudio(false)
     }
   }
@@ -770,10 +796,13 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
   // public URL in the lesson's video_url field. The trainer can also paste a
   // Telegram file URL / direct link directly into the input below.
   //
-  // 👑 v10.5 — الضغط الملكي قبل الرفع: بوت تيليجرام لا يبثّ أكثر من 20MB —
-  // كان الفيديو الكبير يُرفع ثم يفشل بثّه دائماً («فشل تحميل الفيديو»). الآن
-  // أي فيديو > 19MB يُعاد ترميزه في الجهاز نفسه بجودة عالية ليخرج ≤ 19MB —
-  // فتُبثّ كل الفيديوهات الجديدة بنجاح 100% وبحجم أصغر بكثير.
+  // 👑 v10.6 — السلّم الملكي الكامل — صفر طرق مسدودة أبداً:
+  //   ≤19MB → تيليجرام مباشرة (بث مؤكد عبر البروكسي)
+  //   >19MB → ضغط ملكي v2 (مسبار فكّ ترميز + حارسان صارمان)
+  //     ├─ نجح الضغط ≤19MB → تيليجرام
+  //     └─ فشل/عجز (HEVC، تعليق، متصفح…) → التخزين الملكي المباشر (≤50MB)
+  //        رفع مباشر لـSupabase بروابط توقيع — يُبثّ أي صيغة أصلياً بلا حدود getFile
+  //   >50MB → رسالة واضحة وحيدة
   const handleVideoUpload = async (file: File) => {
     // Validate the picked file is actually a video — Android WebView's
     // accept filter isn't always honored, so check on the JS side too.
@@ -783,39 +812,71 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
       toast.error(`الملف المختار ليس فيديو (النوع: ${file.type || 'غير معروف'}). يرجى اختيار ملف فيديو صالح.`)
       return
     }
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('حجم الفيديو كبير جداً (حد أقصى 100 ميجابايت قبل الضغط)')
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('حجم الفيديو كبير جداً (الحد الأقصى 50 ميجابايت) — قسّم الدرس لجزأين أو ارفع نسخة مضغوطة حتى يعمل البث بسلاسة')
       return
     }
-    // 🎬 الضغط الذكي — يبدأ تلقائياً للفيديوهات الأكبر من 19 ميجابايت
+
+    // 🎬 السلّم الملكي — المرحلة 1+2: الضغط الذكي للفيديوهات الأكبر من 19 ميجابايت
     let toUpload = file
     if (file.size > 19 * 1024 * 1024) {
       setCompressing({ percent: 2, stage: 'تحضير' })
       try {
-        const { compressVideoIfNeeded } = await import('@/lib/video-compress')
+        const { compressVideoIfNeeded, COMPRESS_TARGET_BYTES } = await import('@/lib/video-compress')
         const res = await compressVideoIfNeeded(file, (p) => {
           setCompressing({
             percent: p.percent,
             stage: p.stage === 'prepare' ? 'تحضير' : p.stage === 'compress' ? 'ضغط فاخر بجودة عالية' : 'إنهاء',
           })
         })
-        if (res.file.size > 19 * 1024 * 1024) {
-          setCompressing(null)
-          toast.error(`تعذّر ضغط الفيديو تحت 19 ميجابايت (${(res.file.size / 1048576).toFixed(1)}MB) — قسّمه لجزأين أو اختر فيديو أقصر حتى يعمل البث بسلاسة`)
-          return
-        }
-        toUpload = res.file
-        if (!res.skipped) {
+        if (!res.skipped && res.file.size <= COMPRESS_TARGET_BYTES * 1.08) {
+          toUpload = res.file
           const saved = Math.max(0, Math.round((1 - res.compressedSize / res.originalSize) * 100))
           toast.success(`تم الضغط بفخامة: ${(res.originalSize / 1048576).toFixed(1)}MB ← ${(res.compressedSize / 1048576).toFixed(1)}MB (وفّرنا ${saved}%)`)
+        } else {
+          // 👑 المرحلة 3: الضغط عجز — التخزين الملكي المباشر يتكفل (بلا رفض أبداً)
+          setCompressing(null)
+          setUploadingVideo(true)
+          setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (فيديو كبير)' })
+          try {
+            const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
+            const { publicUrl } = await uploadToRoyalStorage(file, 'video', (pct) => {
+              setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (فيديو كبير)' })
+            })
+            setVideoUrl(publicUrl)
+            toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة لكل المتدربين')
+          } catch (e: any) {
+            toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
+          } finally {
+            setCompressing(null)
+            setUploadingVideo(false)
+          }
+          return
         }
       } catch {
+        // ضغط انهار استثناءً — نفس المسار البديل الملكي
         setCompressing(null)
-        toast.error('تعذّر ضغط الفيديو — جرّب ملفاً أصغر من 19 ميجابايت')
+        setUploadingVideo(true)
+        setCompressing({ percent: 1, stage: 'رفع مباشر ملكي (فيديو كبير)' })
+        try {
+          const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
+          const { publicUrl } = await uploadToRoyalStorage(file, 'video', (pct) => {
+            setCompressing({ percent: Math.max(2, pct), stage: 'رفع مباشر ملكي (فيديو كبير)' })
+          })
+          setVideoUrl(publicUrl)
+          toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة لكل المتدربين')
+        } catch (e: any) {
+          toast.error(e?.message || 'فشل الرفع المباشر — حاول من جديد')
+        } finally {
+          setCompressing(null)
+          setUploadingVideo(false)
+        }
         return
       }
       setCompressing(null)
     }
+
+    // المرحلة النهائية: الرفع إلى تيليجرام (≤19MB مضمون هنا)
     setUploadingVideo(true)
     try {
       const fd = new FormData()
@@ -828,10 +889,22 @@ function LessonDialog({ open, onOpenChange, editing, onSave }: any) {
         setVideoUrl(data.url)
         toast.success('تم رفع الفيديو بنجاح — جاهز للبث المباشر لكل المتدربين')
       } else {
-        toast.error('فشل رفع الفيديو: ' + (data.error || ''))
+        // تيليجرام رفض (نادر) — التخزين الملكي المباشر يتكفل فوراً
+        const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
+        const { publicUrl } = await uploadToRoyalStorage(toUpload, 'video')
+        setVideoUrl(publicUrl)
+        toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
       }
     } catch {
-      toast.error('خطأ في الاتصال')
+      // خطأ اتصال — محاولة أخيرة عبر التخزين الملكي المباشر
+      try {
+        const { uploadToRoyalStorage } = await import('@/lib/royal-upload')
+        const { publicUrl } = await uploadToRoyalStorage(toUpload, 'video')
+        setVideoUrl(publicUrl)
+        toast.success('تم رفع الفيديو إلى التخزين الملكي المباشر — يُبثّ بسلاسة كاملة')
+      } catch {
+        toast.error('فشل الرفع نهائياً — تحقق من الاتصال وحاول من جديد')
+      }
     } finally {
       setUploadingVideo(false)
     }

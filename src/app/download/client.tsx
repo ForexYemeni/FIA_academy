@@ -27,13 +27,13 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/Future-International-Academy-v2.8.0.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.9.0.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-// v2.8.0 — إصلاح نافذة اختيار الملفات: درس فيديو يفتح مقاطع الفيديو،
-// الصوتي يفتح الصوتيات، PDF يفتح المستندات (كانت كلها تفتح معرض الصور)
-const FALLBACK_VERSION = '2.8.0'
-const FALLBACK_DATE = '2026-10-25T03:00:00Z'
+// v2.9.0 — تنزيل الدروس للمشاهدة دون إنترنت + فحص تحديث تلقائي + سحب للتحديث
+// + روابط ذكية (يوتيوب/تيليجرام/واتساب) + زر مشاركة أصلي + مكتبتي
+const FALLBACK_VERSION = '2.9.0'
+const FALLBACK_DATE = '2026-10-25T14:00:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',

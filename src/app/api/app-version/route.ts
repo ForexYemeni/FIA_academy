@@ -1,0 +1,24 @@
+import { NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+
+// 👑 v10.6 — نقطة فحص التحديث التلقائي للتطبيق (APK v2.9.0+)
+// ============================================================================
+// التطبيق يستدعي هذه النقطة عند كل فتح: إن كان version_code أحدث من
+// versionCode المثبّت يعرض بطاقة «تحديث متاح» أنيقة بزر تثبيت مباشر.
+// ⚠️ حدّث الثوابت مع كل إصدار APK جديد — لا شيء آخر يتغير.
+// ============================================================================
+
+export const APP_VERSION = {
+  version_code: 21,
+  version_name: '2.9.0',
+  apk_url: 'https://fiaacademy.vercel.app/apk/Future-International-Academy-v2.9.0.apk',
+  notes: 'تنزيل الدروس للمشاهدة دون إنترنت + فحص تحديث تلقائي + سحب للتحديث أصلياً + روابط ذكية ليوتيوب وتيليجرام وواتساب + زر مشاركة أصلي',
+  force_update: false,
+}
+
+export async function GET() {
+  return NextResponse.json(APP_VERSION, {
+    headers: { 'Cache-Control': 'no-store' },
+  })
+}

@@ -10,7 +10,7 @@ import {
 import {
   Video, FileText, HelpCircle, FileUp, X, Play,
   Clock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2,
-  Sparkles, Lock, Mic,
+  Sparkles, Lock, Mic, Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 // 👑 القارئ الملكي للدرس النصي — وحدة مشتركة مع مؤلّف الدروس في لوحة الإدارة
@@ -308,6 +308,10 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
             {/* Render the lesson based on type — each component fires
                 onComplete when the student actually finishes viewing. */}
             {lesson.lesson_type === 'video' && <VideoPlayer url={lesson.video_url} onComplete={fireComplete} />}
+            {/* 👑 v10.6 — حفظ الدرس للمشاهدة دون إنترنت (داخل التطبيق الأصلي فقط) */}
+            {lesson.lesson_type === 'video' && lesson.video_url && (
+              <FiaOfflineSaveButton url={lesson.video_url} kind="video" title={lesson.title} />
+            )}
             {lesson.lesson_type === 'audio' && (
               audioError ? (
                 <div className="flex items-center gap-3 rounded-2xl border border-red-300/50 bg-red-500/10 p-4">
@@ -335,8 +339,15 @@ export function LessonPreviewModal({ open, onOpenChange, lesson, modules = [], c
                 />
               )
             )}
+            {/* 👑 v10.6 — حفظ الصوت دون إنترنت (المصدر هو بوابة البث المصرّح بها بالكوكيز) */}
+            {lesson.lesson_type === 'audio' && audioSrc && (
+              <FiaOfflineSaveButton url={audioSrc} kind="audio" title={lesson.title} />
+            )}
             {lesson.lesson_type === 'text' && <LuxRoyalReader content={lesson.content} onComplete={fireComplete} />}
             {lesson.lesson_type === 'pdf' && <PdfViewer url={lesson.pdf_url} onComplete={fireComplete} />}
+            {lesson.lesson_type === 'pdf' && lesson.pdf_url && (
+              <FiaOfflineSaveButton url={lesson.pdf_url} kind="pdf" title={lesson.title} />
+            )}
             {lesson.lesson_type === 'exam' && <ExamPreview content={lesson.content} title={lesson.title} onComplete={fireComplete} />}
           </div>
         </div>
@@ -891,5 +902,51 @@ function ExamPreview({ content, title, onComplete }: { content?: string; title: 
         </Button>
       )}
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 👑 v10.6 — زر الحفظ الملكي للمشاهدة دون إنترنت (APK v2.9.0+ فقط)
+// يظهر داخل التطبيق الأصلي حصراً (جسر FiaApp.saveOffline): ينزّل الفيديو/
+// الصوت/PDF إلى مكتبة التطبيق الداخلية عبر مُنزّل أصلي يدعم الكوكيز
+// (بوابة بث الصوت محمية) مع إشعار تقدم أصلي — ثم تُشاهد من «مكتبتي» بلا نت.
+// على المتصفح العادي الزر لا يظهر إطلاقاً — صفر إزعاج.
+// ═══════════════════════════════════════════════════════════════════
+function FiaOfflineSaveButton({ url, kind, title }: { url: string; kind: 'video' | 'audio' | 'pdf'; title?: string }) {
+  const [available, setAvailable] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    try { setAvailable(!!(window as any).FiaApp?.saveOffline) } catch {}
+  }, [])
+
+  if (!available || !url) return null
+
+  const ext = kind === 'video' ? 'mp4' : kind === 'audio' ? 'mp3' : 'pdf'
+  const safeName = (title || 'درس').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80)
+
+  const save = () => {
+    if (saving) return
+    try {
+      const ok = (window as any).FiaApp.saveOffline(url, `${safeName}.${ext}`, safeName, kind)
+      if (ok !== false) {
+        setSaving(true)
+        toast.success('بدأ التنزيل إلى مكتبتك — ستجده في «مكتبتي» عند اكتماله')
+        setTimeout(() => setSaving(false), 4000)
+      }
+    } catch {
+      toast.error('تعذّر بدء التنزيل — حدّث التطبيق لأحدث إصدار')
+    }
+  }
+
+  return (
+    <button
+      onClick={save}
+      disabled={saving}
+      className="inline-flex items-center gap-2 mt-2.5 px-4 py-2 rounded-xl border border-gold/40 bg-gradient-to-l from-gold/10 to-transparent text-navy dark:text-gold text-[11.5px] font-black hover:from-gold/20 active:scale-95 transition-all disabled:opacity-60"
+    >
+      <Download className="w-3.5 h-3.5 text-gold" />
+      {saving ? 'جاري التنزيل إلى مكتبتك…' : 'حفظ للمشاهدة دون إنترنت'}
+    </button>
   )
 }

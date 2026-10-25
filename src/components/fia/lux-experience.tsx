@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 // 👑 v10.3 — القارئ الملكي لإعادة قراءة الدروس المحفوظة دون إنترنت (عرض فقط)
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
+// 👑 v10.6 — مراقبة الأخطاء الحية + وضع الصيانة
+import { installErrorWatcher } from '@/lib/error-report'
 
 // ═══════════════════════ إعدادات الموقع — جلب مشترك ═══════════════════════
 
@@ -676,13 +678,103 @@ export function LuxGlobalLayer() {
       <LuxRoyalMessage />
       <LuxCommandPalette />
       <LuxSupportButton />
+      <LuxMaintenanceGuard />
+      <LuxErrorWatcherMount />
     </>
   )
+}
+
+// ═══════════════ 8) بوابة وضع الصيانة الملكية (v10.6) ═══════════════
+// مفاتيح الإعدادات: maintenance_active + maintenance_message
+// الإدارة والمدربون يتجاوزون البوابة — البقية يرون صفحة أنيقة هادئة.
+// أي فشل في الجلب = لا صيانة (لا نحبس أحداً بعطل شبكة).
+let __whoamiCache: { role?: string; authenticated?: boolean } | null = null
+
+function LuxMaintenanceGuard() {
+  const [active, setActive] = useState(false)
+  const [message, setMessage] = useState('')
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const s = await fetchSiteSettings()
+        if (!alive) return
+        const on = s?.maintenance_active === true || s?.maintenance_active === 'true'
+        if (!on) return
+        // من المتجاوزون؟ إدارة أو مدرب — الاسمي مؤقتاً بالجلسة
+        if (!__whoamiCache) {
+          __whoamiCache = await fetch('/api/auth/whoami')
+            .then((r) => r.json())
+            .catch(() => ({ authenticated: false }))
+        }
+        const role = __whoamiCache?.role || ''
+        if (role === 'admin' || role === 'trainer') return
+        setMessage(String(s?.maintenance_message || '').slice(0, 400))
+        setActive(true)
+      } catch {}
+    })()
+    return () => { alive = false }
+  }, [])
+
+  if (!active || hidden) return null
+
+  return (
+    <div dir="rtl" className="fixed inset-0 z-[9995] overflow-hidden" style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #16233f 0%, #0b1226 55%, #070d1c 100%)' }}>
+      {/* نقش ذهبي + هالات */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 14% 30%, #D4AF37 1.1px, transparent 1.1px), radial-gradient(circle at 84% 70%, #D4AF37 0.9px, transparent 0.9px)', backgroundSize: '34px 34px, 42px 42px' }} />
+      <div className="absolute -top-32 right-1/4 w-[420px] h-[420px] rounded-full bg-gold/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 left-1/5 w-[460px] h-[460px] rounded-full bg-gold/[0.07] blur-3xl pointer-events-none" />
+      <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6 px-6 text-center">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-gold/20 blur-2xl animate-pulse" />
+          <div className="relative w-24 h-24 rounded-3xl border-2 border-gold/60 bg-gradient-to-br from-[#16233f] to-[#0b1226] shadow-[0_0_60px_rgba(212,175,55,0.25)] flex items-center justify-center">
+            <svg viewBox="0 0 48 48" className="w-12 h-12">
+              <path d="M6 34 L13 18 L20 30 L24 14 L28 30 L35 18 L42 34 Z" fill="none" stroke="#D4AF37" strokeWidth="2.4" strokeLinejoin="round" />
+              <circle cx="24" cy="9" r="2.6" fill="none" stroke="#D4AF37" strokeWidth="2" />
+            </svg>
+          </div>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-l from-white via-gold to-white bg-clip-text text-transparent">نطور الأكاديمية الآن</h1>
+        <p className="text-white/75 max-w-md leading-8 text-sm sm:text-base">
+          {message || 'ننهي لمسة فاخرة في أرجاء الأكاديمية — عد بعد قليل وستجدها أجمل وأسرع. شكراً لصبرك الجميل 💛'}
+        </p>
+        <div className="flex items-center gap-2 text-gold/90 text-xs font-bold">
+          <span className="inline-block w-2 h-2 rounded-full bg-gold animate-pulse" />
+          أعمال الصيانة تجري بأمر إدارة أكاديمية المستقبل الدولية
+        </div>
+        {/* للطاقم: زر دخول متجاوز يظهر بعد 3 نقرات على الشعار */}
+        <button
+          onClick={() => {
+            tapsRef.current += 1
+            if (tapsRef.current >= 3) setHidden(true)
+          }}
+          className="mt-2 text-[10px] text-white/25 hover:text-white/50 transition-colors"
+          aria-label="."
+        >
+          أكاديمية المستقبل الدولية
+        </button>
+      </div>
+    </div>
+  )
+}
+const tapsRef: { current: number } = { current: 0 }
+
+// ═══════════════ 9) مراقب الأخطاء الحي — رَكب صامت (v10.6) ═══════════════
+function LuxErrorWatcherMount() {
+  useEffect(() => { installErrorWatcher() }, [])
+  return null
 }
 
 // ═══════════════════════ 7) السحب للتحديث بحلقة ذهبية ═══════════════════════
 
 export function LuxPullToRefresh({ onRefresh, children }: { onRefresh: () => Promise<void> | void; children: React.ReactNode }) {
+  // 👑 v10.6 — داخل التطبيق الأصلي السحب للتحديث أصبح أصلياً (SwipeRefreshLayout
+  // في APK v2.9.0) — نُعطّل نظير الويب هنا لمنع ازدواجية التحديث على نفس اللمسة
+  const [inNative] = useState(() => {
+    try { return typeof window !== 'undefined' && !!(window as any).FiaApp } catch { return false }
+  })
   const wrapRef = useRef<HTMLDivElement>(null)
   const [pull, setPull] = useState(0)
   const [spinning, setSpinning] = useState(false)
@@ -702,14 +794,14 @@ export function LuxPullToRefresh({ onRefresh, children }: { onRefresh: () => Pro
   }
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (spinning) return
+    if (inNative || spinning) return
     if (getScrollTop() > 2) return
     startY.current = e.touches[0].clientY
     pulling.current = true
   }
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (!pulling.current || startY.current === null || spinning) return
+    if (inNative || !pulling.current || startY.current === null || spinning) return
     const dy = e.touches[0].clientY - startY.current
     if (dy <= 0) { setPull(0); return }
     // مقاومة ناعمة — كلما زاد السحب قلّت الاستجابة
