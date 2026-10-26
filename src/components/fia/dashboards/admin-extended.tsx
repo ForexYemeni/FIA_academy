@@ -2204,7 +2204,9 @@ export function AdminFaqs() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const load = () => fetch('/api/faqs').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
+  // ⚡ v10.23-CPU — /api/faqs أصبحت مخزّنة على حافة Vercel (60 ثانية) — محرر الإدارة
+  // يكسر الكاش بمعرّف فريد حتى يرى نتائج حفظه فوراً بلا أي طزاجة (نمط site-settings)
+  const load = () => fetch(`/api/faqs?_t=${Date.now()}`).then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
 
   // ⚡ REAL-TIME: FAQs — admin sees FAQ changes INSTANTLY

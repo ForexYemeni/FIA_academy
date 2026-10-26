@@ -3,8 +3,9 @@ import CheckoutClient from './client'
 
 interface Props { params: Promise<{ courseId: string }> }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// ⚡ v10.23-CPU — ISR مخزّن بدل force-dynamic (قشرة client — الدفع والجلسة تعمل client-side كما هي)
+// تعديلات أسعار الدورات تظهر خلال 10 دقائق كحد أقصى — خفض Fluid CPU
+export const revalidate = 600
 
 export default async function Page({ params }: Props) {
   const { courseId } = await params

@@ -94,6 +94,16 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'public, s-maxage=120, stale-while-revalidate=900' },
         ],
       },
+      {
+        // ⚡ v10.23-CPU — قائمة الأسئلة الشائعة: GET عام تماماً (بلا auth ولا حالة طلب)
+        // تُخدَم من حافة Vercel بدل استدعاء قاعدة البيانات عند كل زيارة — بنفس نمط
+        // site-settings المثبت (60 ثانية طزاجة + stale-while-revalidate).
+        // محرر الإدارة يكسر الكاش بـ cache-bust فيرى بياناته فورية كما هي.
+        source: '/api/faqs',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=60, stale-while-revalidate=600' },
+        ],
+      },
       // Security headers — prevent clickjacking, MIME-sniffing, XSS
       {
         source: '/(.*)',

@@ -3,8 +3,8 @@ import ExamRunnerClient from './client'
 
 interface Props { params: Promise<{ attemptId: string }> }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// ⚡ v10.23-CPU — ISR مخزّن بدل force-dynamic (قشرة client — بيانات المحاولة تُجلب client-side عبر API مُصادَق كما هي) — خفض Fluid CPU
+export const revalidate = 1800
 
 export default async function Page({ params }: Props) {
   const { attemptId } = await params
