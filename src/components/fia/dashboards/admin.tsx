@@ -1176,6 +1176,10 @@ const AdminStudents = React.memo(function AdminStudents() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // 👑 v10.11 — حالة مرسوم الحظر
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
+  const [banning, setBanning] = useState(false)
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
@@ -1238,6 +1242,32 @@ const AdminStudents = React.memo(function AdminStudents() {
     }
   }
 
+
+  // 👑 v10.11 — مرسوم الحظر الملكي: حظر/رفع حظر بقرار الإدارة
+  const doBan = async (target: any, banned: boolean, reason: string) => {
+    try {
+      const res = await fetch('/api/admin/ban', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: target.id, banned, reason }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
+      setItems((prev: any[]) => prev.map((x: any) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null } : x))
+      toast.success(banned ? '🚫 تم حظر الحساب — بطاقة الحظر الفاخرة ستظهر له فوراً' : '✅ رُفع الحظر — عاد الحساب للعمل بشكل طبيعي')
+    } catch { toast.error('خطأ في الاتصال') }
+  }
+  const requestBan = (t: any) => {
+    if (t.banned) { doBan(t, false, '') } else { setBanReason(''); setBanTarget(t) }
+  }
+  const confirmBan = async () => {
+    if (!banTarget) return
+    setBanning(true)
+    try {
+      await doBan(banTarget, true, banReason.trim() || 'مخالفة سياسات الأكاديمية')
+      setBanTarget(null)
+    } finally { setBanning(false) }
+  }
+
   const filtered = items.filter(s => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
@@ -1294,7 +1324,10 @@ const AdminStudents = React.memo(function AdminStudents() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs truncate text-white">{s.name}</div>
+                      <div className="font-bold text-xs truncate text-white flex items-center gap-1">
+                        {s.name}
+                        {s.banned && <span className="text-[8px] font-black rounded-full px-1.5 py-0.5 bg-red-500/25 border border-red-400/50 text-red-200 flex-shrink-0">محظور</span>}
+                      </div>
                       <div className="text-[10px] text-white/70 truncate" dir="ltr">{s.email}</div>
                     </div>
                   </div>
@@ -1365,8 +1398,14 @@ const AdminStudents = React.memo(function AdminStudents() {
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] rounded-lg border-gold/30 hover:border-gold hover:bg-gold/5" onClick={() => setSelectedStudent(s)}>
                       <Eye className="w-3 h-3 ml-1" /> عرض
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-500/10" onClick={() => setDeleteTarget(s)}>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-500/10" onClick={() => setDeleteTarget(s)} title="حذف">
                       <Trash2 className="w-3 h-3 text-red-500" />
+                    </Button>
+                    {/* 👑 v10.11 — زر مرسوم الحظر */}
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-500/10" onClick={() => requestBan(s)} title={s.banned ? 'رفع الحظر' : 'حظر الحساب'}>
+                      {s.banned
+                        ? <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        : <Ban className="w-3 h-3 text-red-500" />}
                     </Button>
                   </div>
                 </div>
@@ -1496,6 +1535,33 @@ const AdminStudents = React.memo(function AdminStudents() {
         onConfirm={handleDelete}
         loading={deleting}
       />
+
+      {/* 👑 v10.11 — حوار مرسوم الحظر الملكي */}
+      <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o && !banning) setBanTarget(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-navy">
+              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center"><Ban className="w-4 h-4 text-red-500" /></span>
+              حظر الحساب: {banTarget?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] font-bold text-amber-800 leading-5">
+              سيظهر للمستخدم فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمستخدم)</Label>
+              <Textarea value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مثال: مخالفة سياسات الأكاديمية — تكرار إساءة الاستخدام" className="min-h-[80px] rounded-xl border-gold/30 focus:border-gold" />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-xl" disabled={banning} onClick={() => setBanTarget(null)}>إلغاء</Button>
+            <Button className="rounded-xl bg-red-600 hover:bg-red-700 text-white" disabled={banning} onClick={confirmBan}>
+              {banning ? 'جاري تنفيذ الحظر…' : '🚫 تأكيد الحظر'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 })
@@ -3103,6 +3169,10 @@ const AdminTrainers = React.memo(function AdminTrainers() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [checkingTeam, setCheckingTeam] = useState(false)
+  // 👑 v10.11 — حالة مرسوم الحظر
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
+  const [banning, setBanning] = useState(false)
   const load = () => fetch('/api/trainers').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
   useEffect(() => { load() }, [])
 
@@ -3163,9 +3233,38 @@ const AdminTrainers = React.memo(function AdminTrainers() {
       setDeleting(false)
     }
   }
+
+
+  // 👑 v10.11 — مرسوم الحظر الملكي: حظر/رفع حظر بقرار الإدارة
+  const doBan = async (target: any, banned: boolean, reason: string) => {
+    try {
+      const res = await fetch('/api/admin/ban', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: target.id, banned, reason }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'فشلت العملية')
+        return
+      }
+      setItems((prev: any[]) => prev.map((x: any) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null } : x))
+      toast.success(banned ? '🚫 تم حظر الحساب — بطاقة الحظر الفاخرة ستظهر له فوراً' : '✅ رُفع الحظر — عاد الحساب للعمل بشكل طبيعي')
+    } catch { toast.error('خطأ في الاتصال') }
+  }
+  const requestBan = (t: any) => {
+    if (isTeamMemberCheck(t)) { toast.error('أعضاء الفريق من الإدارة — لا يمكن حظرهم'); return }
+    if (t.banned) { doBan(t, false, '') } else { setBanReason(''); setBanTarget(t) }
+  }
+  const confirmBan = async () => {
+    if (!banTarget) return
+    setBanning(true)
+    try {
+      await doBan(banTarget, true, banReason.trim() || 'مخالفة سياسات الأكاديمية')
+      setBanTarget(null)
+    } finally { setBanning(false) }
+  }
+  // أعضاء الفريق (علامة قاعدة البيانات) لا يُحظرون أبداً
+  const isTeamMemberCheck = (t: any) => !!(t && typeof t.password === 'string' && t.password.startsWith('__TEAM_MEMBER__'))
   return (
     <SectionCard
-      title="المدربون"
+      title="المدربون\"
       description={`${items.length} مدرب`}
       action={<Button className="bg-navy hover:bg-navy-light rounded-xl" onClick={() => { setEditing(null); setOpen(true) }}><Plus className="w-4 h-4 ml-1" /> جديد</Button>}
     >
@@ -3207,6 +3306,7 @@ const AdminTrainers = React.memo(function AdminTrainers() {
                       <div className="font-bold text-xs truncate text-white flex items-center gap-1">
                         {t.name}
                         {isTeamMember && <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                        {!isTeamMember && t.banned && <span className="text-[8px] font-black rounded-full px-1.5 py-0.5 bg-red-500/25 border border-red-400/50 text-red-200 flex-shrink-0">محظور</span>}
                       </div>
                       <div className="text-[10px] text-gold truncate">{t.title}</div>
                     </div>
@@ -3244,6 +3344,12 @@ const AdminTrainers = React.memo(function AdminTrainers() {
                     <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="h-8 w-8 p-0 border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق' : 'حذف'}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
+                    {/* 👑 v10.11 — زر مرسوم الحظر */}
+                    <Button size="sm" variant="outline" disabled={isTeamMember} className="h-8 w-8 p-0 border-red-500/30 text-red-500 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestBan(t)} title={isTeamMember ? 'أعضاء الفريق لا يُحظرون' : (t.banned ? 'رفع الحظر' : 'حظر الحساب')}>
+                      {t.banned
+                        ? <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        : <Ban className="w-3 h-3" />}
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -3264,6 +3370,33 @@ const AdminTrainers = React.memo(function AdminTrainers() {
         onConfirm={handleDelete}
         loading={deleting}
       />
+
+      {/* 👑 v10.11 — حوار مرسوم الحظر الملكي */}
+      <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o && !banning) setBanTarget(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-navy">
+              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center"><Ban className="w-4 h-4 text-red-500" /></span>
+              حظر الحساب: {banTarget?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] font-bold text-amber-800 leading-5">
+              سيظهر للمستخدم فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمستخدم)</Label>
+              <Textarea value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مثال: مخالفة سياسات الأكاديمية — تكرار إساءة الاستخدام" className="min-h-[80px] rounded-xl border-gold/30 focus:border-gold" />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-xl" disabled={banning} onClick={() => setBanTarget(null)}>إلغاء</Button>
+            <Button className="rounded-xl bg-red-600 hover:bg-red-700 text-white" disabled={banning} onClick={confirmBan}>
+              {banning ? 'جاري تنفيذ الحظر…' : '🚫 تأكيد الحظر'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 })

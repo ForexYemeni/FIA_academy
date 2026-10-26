@@ -332,13 +332,17 @@ export function StudentDashboard() {
         .on('postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'payments', filter: `user_id=eq.${user.id}` },
           (payload: any) => {
-            // ⚡ When the admin flips status to 'مكتمل' (approved), the
-            // course opens immediately for the student. Show a toast and
-            // reload enrollments to pick up the new payment_status.
-            const newStatus = payload?.new?.status
-            if (newStatus === 'مكتمل' || newStatus === 'completed' || newStatus === 'paid') {
+            // 👑 v10.11 — حرس الانتقال الملكي: التوست فقط عند تغيّر الحالة
+            // فعلياً (old ≠ new) — كل إكمال درس يلمس صف الدفع (progress) فيُحدث
+            // حدث realtime حتى بلا تغيّر حالة، فكان التوست يتكرر بعد كل درس.
+            const oldStatus = String(payload?.old?.status || '')
+            const newStatus = String(payload?.new?.status || '')
+            const changed = oldStatus !== newStatus
+            const approved = newStatus === 'مكتمل' || newStatus === 'completed' || newStatus === 'paid'
+            const rejected = newStatus === 'ملغي' || newStatus === 'cancelled' || newStatus === 'failed'
+            if (changed && approved) {
               toast.success('✅ تم تأكيد دفعك! الدورة متاحة الآن')
-            } else if (newStatus === 'ملغي' || newStatus === 'cancelled' || newStatus === 'failed') {
+            } else if (changed && rejected) {
               toast.error('❌ تم رفض الدفع. يرجى التواصل مع الإدارة')
             }
             triggerReload()

@@ -276,6 +276,6 @@ export function showNotificationToast(n: { type?: string; title: string; body?: 
         `}</style>
       </div>
     ),
-    { duration: 6000, position: 'top-center' as any }
+    { className: 'fia-notif-toast', duration: 6000, position: 'top-center' as any }
   )
 }

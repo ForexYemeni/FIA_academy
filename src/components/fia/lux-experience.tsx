@@ -280,6 +280,7 @@ export function LuxRoyalMessage() {
   const pathname = usePathname()
   const settings = useSiteSettings()
   const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [pulsing, setPulsing] = useState(false)
   const list = useMemo(() => readFiaAnnouncements(settings), [settings])
   const latest = list[0] || null
@@ -297,9 +298,7 @@ export function LuxRoyalMessage() {
   useEffect(() => {
     const onFabOpen = () => {
       if (!latest) return
-      setOpen(true)
-      setPulsing(false)
-      try { localStorage.setItem('fia-royal-msg-read', String(latest.id)) } catch {}
+      openLetter()
     }
     window.addEventListener('fia-fab:announce', onFabOpen)
     return () => window.removeEventListener('fia-fab:announce', onFabOpen)
@@ -307,8 +306,16 @@ export function LuxRoyalMessage() {
 
   if (!latest || !meta) return null
 
+  // 👑 v10.11 — الإغلاق الملكي: طيّ أنيق بحركة خروج كاملة قبل التفكيك
+  const closeLetter = () => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(() => { setOpen(false); setClosing(false) }, 400)
+  }
+  // 👑 v10.11 — الفتح الملكي: ستارة متوهجة + ختم شمع يهبط + محتوى متدرج الظهور
   const openLetter = () => {
     setOpen(true)
+    setClosing(false)
     setPulsing(false)
     try { localStorage.setItem('fia-royal-msg-read', String(latest.id)) } catch {}
   }
@@ -319,14 +326,19 @@ export function LuxRoyalMessage() {
       {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الإعلان يُفتح من مركز الأدوات (FiaFabHub) */}
 
       {open && (
-        <div className="fixed inset-0 z-[9992] flex items-center justify-center p-4" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-navy/70 backdrop-blur-sm" />
+        <div
+          className="fixed inset-0 z-[9992] flex items-center justify-center p-4"
+          onClick={closeLetter}
+        >
           <div
-            className="fia-letter relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl shadow-2xl border-2 border-gold/50 bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9]"
+            className={`absolute inset-0 bg-navy/70 backdrop-blur-sm ${closing ? 'fia-rlm-bd-out' : 'fia-rlm-bd'}`}
+          />
+          <div
+            className={`relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl shadow-2xl border-2 border-gold/50 bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9] fia-letter ${closing ? 'fia-letter-out' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* ترويسة البطاقة */}
-            <div className="relative bg-gradient-to-r from-navy via-navy-light to-navy px-5 py-4 text-white">
+            <div className="relative bg-gradient-to-r from-navy via-navy-light to-navy px-5 py-4 text-white fia-rlm-stagger" style={{ animationDelay: '.12s' }}>
               <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
                 backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)',
                 backgroundSize: '18px 18px',
@@ -344,7 +356,7 @@ export function LuxRoyalMessage() {
                   </div>
                   <div className="text-[10px] text-gold/80">أكاديمية المستقبل الدولية</div>
                 </div>
-                <button onClick={() => setOpen(false)} className="text-gold/70 hover:text-gold" aria-label="إغلاق">
+                <button onClick={closeLetter} className="text-gold/70 hover:text-gold transition-colors" aria-label="إغلاق">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -357,18 +369,18 @@ export function LuxRoyalMessage() {
               }} />
               {/* التاريخ — يظهر اختيارياً عند تحديده فقط */}
               {String(latest.date || '').trim() && (
-                <div className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-navy text-gold text-[11px] font-black px-3.5 py-1.5 border border-gold/45 shadow-md">
+                <div className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-navy text-gold text-[11px] font-black px-3.5 py-1.5 border border-gold/45 shadow-md fia-rlm-stagger" style={{ animationDelay: '.26s' }}>
                   <CalendarDays className="w-3.5 h-3.5" />
                   {fiaFormatArabicDate(latest.date)}
                 </div>
               )}
-              <p className="relative text-[15px] leading-8 text-[#2a2113] whitespace-pre-wrap font-semibold" dir="rtl">
+              <p className="relative text-[15px] leading-8 text-[#2a2113] whitespace-pre-wrap font-semibold fia-rlm-stagger" style={{ animationDelay: '.36s' }} dir="rtl">
                 {latest.text}
               </p>
-              {/* التوقيع والختم */}
+              {/* التوقيع والختم — الشمع يهبط ختماً ملكياً */}
               <div className="relative mt-6 flex items-end justify-between">
-                <div className="text-xs text-[#6b5a33] font-bold">{latest.signature || 'إدارة أكاديمية المستقبل الدولية'}</div>
-                <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br ${meta.seal} border-2 border-black/10 flex items-center justify-center shadow-lg rotate-[-8deg]`}>
+                <div className="text-xs text-[#6b5a33] font-bold fia-rlm-stagger" style={{ animationDelay: '.5s' }}>{latest.signature || 'إدارة أكاديمية المستقبل الدولية'}</div>
+                <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br ${meta.seal} border-2 border-black/10 flex items-center justify-center shadow-lg fia-rlm-seal ${closing ? 'fia-rlm-seal-out' : ''}`}>
                   <LatestIcon className="w-6 h-6 text-gold/90" />
                   <span className="absolute inset-1.5 rounded-full border border-gold/40" />
                 </div>
@@ -376,7 +388,7 @@ export function LuxRoyalMessage() {
             </div>
             {/* بقية الإعلانات السارية */}
             {list.length > 1 && (
-              <div className="relative border-t border-gold/30 bg-white/50 px-5 py-4">
+              <div className="relative border-t border-gold/30 bg-white/50 px-5 py-4 fia-rlm-stagger" style={{ animationDelay: '.6s' }}>
                 <div className="text-[10px] font-black text-[#8a6d1f] uppercase tracking-widest mb-2.5">إعلانات سابقة ما تزال سارية</div>
                 <div className="space-y-2">
                   {list.slice(1, 6).map((a: any) => {
@@ -403,6 +415,8 @@ export function LuxRoyalMessage() {
                 </div>
               </div>
             )}
+            {/* ✦ خيط ذهبي زخرفي أسفل الرسالة ✦ */}
+            <div aria-hidden className="fia-rlm-stagger relative h-px w-32 mx-auto mb-4 bg-gradient-to-l from-transparent via-gold/70 to-transparent" style={{ animationDelay: '.68s' }} />
           </div>
         </div>
       )}
@@ -413,8 +427,38 @@ export function LuxRoyalMessage() {
           0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.5), 0 10px 30px -8px rgba(0,0,0,0.5); }
           50% { box-shadow: 0 0 0 12px rgba(212,175,55,0), 0 10px 30px -8px rgba(0,0,0,0.5); }
         }
-        .fia-letter { animation: letterIn .45s cubic-bezier(.2,.9,.3,1.2) both; }
-        @keyframes letterIn { from { opacity: 0; transform: translateY(26px) scale(.94); } to { opacity: 1; transform: none; } }
+        /* ✦ الفتح: الستارة تتوهج ثم الرسالة تنزلق بنابض ملكي ✦ */
+        .fia-rlm-bd { animation: rlmBd .4s ease both; }
+        @keyframes rlmBd { from { opacity: 0; } to { opacity: 1; } }
+        .fia-letter { animation: letterIn .55s cubic-bezier(.2,.9,.3,1.18) both; transform-origin: 50% 0%; }
+        @keyframes letterIn {
+          from { opacity: 0; transform: translateY(34px) scale(.9) rotateX(8deg); }
+          to   { opacity: 1; transform: none; }
+        }
+        /* ✦ الإغلاق: طيّ ملكي أنيق — لا اختفاء لحظي جامد ✦ */
+        .fia-rlm-bd-out { animation: rlmBdOut .4s ease both; }
+        @keyframes rlmBdOut { from { opacity: 1; } to { opacity: 0; } }
+        .fia-letter-out { animation: letterOut .4s cubic-bezier(.4,0,.2,1) both !important; }
+        @keyframes letterOut {
+          from { opacity: 1; transform: none; }
+          30%  { opacity: 1; transform: translateY(-8px) scale(.985) rotateX(-4deg); }
+          to   { opacity: 0; transform: translateY(26px) scale(.92) rotateX(7deg); }
+        }
+        /* ✦ المحتوى يظهر بتدرج راقٍ بعد وصول الرسالة ✦ */
+        .fia-rlm-stagger { animation: rlmRise .5s cubic-bezier(.2,.8,.3,1) both; }
+        @keyframes rlmRise {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: none; }
+        }
+        /* ✦ ختم الشمع يهبط هبوطاً ختامياً ✦ */
+        .fia-rlm-seal { animation: rlmSeal .65s cubic-bezier(.2,1.4,.4,1) .42s both; }
+        @keyframes rlmSeal {
+          0%   { opacity: 0; transform: scale(2.4) rotate(-28deg); }
+          62%  { opacity: 1; transform: scale(.92) rotate(2deg); }
+          100% { transform: scale(1) rotate(-8deg); }
+        }
+        .fia-rlm-seal-out { animation: rlmSealOut .3s ease both !important; }
+        @keyframes rlmSealOut { from { opacity: 1; } to { opacity: 0; transform: scale(1.5) rotate(-20deg); } }
       `}</style>
     </>
   )
@@ -1014,7 +1058,7 @@ export function LuxLessonCelebration({
 }) {
   useEffect(() => {
     if (!open) return
-    const t = setTimeout(onClose, 7000)
+    const t = setTimeout(onClose, 2600) // 👑 v10.11 — سريعة وملكية: 2.6 ثانية بدل 7
     return () => clearTimeout(t)
   }, [open, onClose])
 

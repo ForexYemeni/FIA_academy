@@ -13,6 +13,10 @@ import { supabaseAdmin } from '@/lib/supabase'
  * بريده) ليشفي الجلسات المخزّنة التي سجّل دخولها قبل إنشاء العلامة —
  * فبعد «حذف جميع البيانات» تعود شارة المؤسس بذاتها عند فتح التطبيق.
  *
+ * 👑 v10.11 — «مرسوم الحظر الملكي»: يُعيد المسار أيضاً حالة حظر الحساب
+ * (banned + banned_reason) من users/trainers — فيرسم الحرس الملكي بطاقة
+ * الحظر الفاخرة فوراً بنبضته كل 15 ثانية وحظة العودة للتطبيق.
+ *
  * Called by the auth-store on app rehydration to force-logout
  * deleted users and refresh the team role badge.
  */
@@ -66,7 +70,7 @@ export async function GET(req: NextRequest) {
     // 1. Check if the user exists in the users table
     const { data: userRow } = await supabaseAdmin
       .from('users')
-      .select('id, email')
+      .select('id, email, banned, banned_reason, role')
       .eq('id', userId)
       .maybeSingle()
 
@@ -80,6 +84,15 @@ export async function GET(req: NextRequest) {
       if (fl) {
         return NextResponse.json({ deleted: true, reason: fl.reason })
       }
+      // 👑 v10.11 — مرسوم الحظر: حساب محظور (الإدارة لا تُحظر أصلاً من الـ API)
+      if ((userRow as any).banned) {
+        return NextResponse.json({
+          deleted: false,
+          banned: true,
+          ban_reason: (userRow as any).banned_reason || 'مخالفة سياسات الأكاديمية',
+          role: (userRow as any).role || 'student',
+        })
+      }
       // 👑 v6.9 — شفاء هوية الفريق مع كل فتح للتطبيق
       const team_role = await resolveTeamRole(userId, (userRow as any).email)
       return NextResponse.json({ deleted: false, team_role })
@@ -88,7 +101,7 @@ export async function GET(req: NextRequest) {
     // 2. Check if the user exists in the trainers table (for team members)
     const { data: trainerRow } = await supabaseAdmin
       .from('trainers')
-      .select('id, email, password')
+      .select('id, email, password, banned, banned_reason')
       .eq('id', userId)
       .maybeSingle()
 
@@ -108,6 +121,15 @@ export async function GET(req: NextRequest) {
         const afterPrefix = pw.substring(TEAM_MARKER_PREFIX.length)
         const sepIdx = afterPrefix.indexOf('__')
         team_role = sepIdx !== -1 ? afterPrefix.substring(0, sepIdx) : undefined
+      }
+      // 👑 v10.11 — مرسوم الحظر: مدرب محظور (أعضاء الفريق = إدارة لا تُحظر)
+      if ((trainerRow as any).banned && !team_role) {
+        return NextResponse.json({
+          deleted: false,
+          banned: true,
+          ban_reason: (trainerRow as any).banned_reason || 'مخالفة سياسات الأكاديمية',
+          role: 'trainer',
+        })
       }
       return NextResponse.json({ deleted: false, team_role })
     }

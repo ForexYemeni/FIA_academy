@@ -1248,3 +1248,58 @@ html.theme-transitioning * {
   background-image: linear-gradient(to left, #E2C14A, #fbbf24) !important;
   box-shadow: 0 6px 24px rgba(212, 175, 55, 0.5);
 }
+/* ═══════════════════════════════════════════════════════════════════
+   👑✨ v10.11 — التوست الملكي وسط الشاشة (sonner)
+   كل توستات sonner تصبح بطاقة ملكية كحلية/ذهبية وسط الشاشة،
+   والتوست المخصص (إشعارات الجرس) يظهر بتصميمه الخاص فوق الستارة.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ✦ التوسيط الرأسي المطلق لصندوق sonner ✦ */
+[data-sonner-toaster] {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+}
+
+/* ✦ البطاقة الملكية ✦ */
+[data-sonner-toast] {
+  background: linear-gradient(160deg, #0b1635 0%, #122454 55%, #0b1635 100%) !important;
+  border: 1px solid rgba(212, 175, 55, 0.5) !important;
+  color: #ffffff !important;
+  border-radius: 22px !important;
+  box-shadow:
+    0 24px 70px -18px rgba(0, 0, 0, 0.78),
+    0 0 44px -12px rgba(212, 175, 55, 0.4) !important;
+  padding: 15px 18px !important;
+  min-height: 64px !important;
+}
+[data-sonner-toast][data-type="error"] {
+  border-color: rgba(248, 113, 113, 0.6) !important;
+  background: linear-gradient(160deg, #2a0a12 0%, #3d0f1a 55%, #1f060c 100%) !important;
+}
+[data-sonner-toast][data-type="warning"] {
+  border-color: rgba(251, 191, 36, 0.6) !important;
+}
+[data-sonner-toast] [data-title] {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+}
+[data-sonner-toast] [data-description] {
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-weight: 600 !important;
+}
+[data-sonner-toast] [data-close-button] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* ✦ التوست المخصص (إشعارات الجرس الفاخرة) — بلا بطاقة فوق بطاقة ✦ */
+[data-sonner-toast].fia-notif-toast {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}

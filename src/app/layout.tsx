@@ -5,7 +5,8 @@ import "./royal-night.css"; // 🌙👑 v7.1 — طبقة الليل الملك�
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ApiAuthBridge } from "@/components/fia/api-auth-bridge";
-import { SessionGuard } from "@/components/fia/session-guard"; // 👑 v8.0 — حرس الجلسة الملكي: خروج فوري لحظة حذف الحساب (كل الأدوار وكل المسارات)
+import { SessionGuard } from "@/components/fia/session-guard";
+import { UpdateRoyalPrompt } from "@/components/fia/update-royal-prompt"; // 👑 v10.11 — بطاقة التحديث الملكية المتحركة
 import { FiaFabHub } from "@/components/fia/fia-fab"; // 👑 v10.5 — مركز الأدوات العائم: زر واحد ينبثق منه كل الأدوات دائرياً
 import { LuxGlobalLayer } from "@/components/fia/lux-experience"; // 👑 v10.3 — الطبقة الملكية العالمية: ستارة افتتاحية + بحث Ctrl+K + دعم عائم + رسالة الإدارة المختومة — عرض فقط بلا أي منطق مصادقة أو بيانات
 import StyledJsxRegistry from "./styled-jsx-registry"; // 👑 v10.2 — سجل أنماط styled-jsx: الأنماط تُرسَل من الخادم فلا وميض أبيض عاري (FOUC) على /download
@@ -151,13 +152,14 @@ export default function RootLayout({
       >
         <ApiAuthBridge />
         <SessionGuard />
+        <UpdateRoyalPrompt />
         <StyledJsxRegistry>
           {children}
           <LuxGlobalLayer />
         </StyledJsxRegistry>
         <FiaFabHub />
         <Toaster />
-        <SonnerToaster position="top-center" richColors />
+        <SonnerToaster position="top-center" />
         <script
           dangerouslySetInnerHTML={{ __html: SW_REGISTER }}
         />

@@ -209,7 +209,6 @@ export function StudentCourseViewer({
     }
     next.add(lesson.id)
     setCompletedLessons(next)
-    toast.success(`✅ أكملت درس: ${lesson.title}`)
     // Persist in localStorage
     const key = `fia_completed_lessons_${course.id}`
     localStorage.setItem(key, JSON.stringify(Array.from(next)))

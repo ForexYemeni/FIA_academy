@@ -38,6 +38,19 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     window.addEventListener('fia-fab:chat', onFabOpen)
     return () => window.removeEventListener('fia-fab:chat', onFabOpen)
   }, [])
+  // 👑 v10.11 — «دردشة فورية مع الإدارة» من بطاقة الحظر الملكية:
+  // يفتح محادثة مباشرة مع حساب الإدارة الأساسي (api/admin/contact)
+  useEffect(() => {
+    const onBanChat = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { id?: string; name?: string; avatar?: string } | null
+      setOpen(true)
+      if (detail?.id) {
+        openConversation({ id: detail.id, name: detail.name || 'إدارة الأكاديمية', avatar: detail.avatar })
+      }
+    }
+    window.addEventListener('fia-ban:chat-admin', onBanChat)
+    return () => window.removeEventListener('fia-ban:chat-admin', onBanChat)
+  })
   // ⚡ NEW: typing indicator + read receipts + online status
   const [isTyping, setIsTyping] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())

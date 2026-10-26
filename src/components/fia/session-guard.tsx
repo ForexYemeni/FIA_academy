@@ -24,15 +24,25 @@
  * • مكافأة: شفاء حي لشارة دور الفريق (team_role) من الحقيقة الخادمية
  *   بنفس بروتوكول v6.9 — شارة المؤسس تبقى صادقة دائماً
  *
+ * 👑 v10.11 — «مرسوم الحظر الملكي»:
+ * • النبضة تكشف أيضاً banned من check-deleted → تُرسم بطاقة الحظر
+ *   الفاخرة (RoyalBanScreen) فوراً — بلا خروج، ليرى المستخدم سببه
+ *   ويتواصل مع الإدارة فوراً
+ * • مراقب realtime على صف المستخدم (users + trainers) — الحظر
+ *   يظهر في نفس اللحظة التي تضغط فيها الإدارة الزر، حتى لو كان
+ *   التطبيق مفتوحاً على درس أو امتحان
+ *
  * يُركَّب مرة واحدة في layout.tsx فيعمل على كل المسارات والصفحات
  * (لوحات التحكم + الامتحان + الدفع + صفحات التحقق) لكل الأدوار:
  * admin / trainer / student / team.
  * ═══════════════════════════════════════════════════════════════════
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth-store'
+import { supabasePublic } from '@/lib/supabase'
 import { showNotificationToast } from '@/lib/notification-toast'
+import { RoyalBanScreen } from '@/components/fia/royal-ban-screen'
 
 /** نبضة الحرس — كل 15 ثانية (أسنر من نبضة عرض تعديل النسبة 20s، أخف من أن يُثقل الشبكة) */
 const GUARD_PULSE_MS = 15_000
@@ -42,9 +52,10 @@ const FIRST_PULSE_MS = 2_000
 
 export function SessionGuard() {
   const userId = useAuth((s) => s.user?.id)
+  const [banReason, setBanReason] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!userId) return // لا جلسة — لا حرس
+    if (!userId) { setBanReason(null); return } // لا جلسة — لا حرس ولا بطاقة
 
     let cancelled = false
     const controller = new AbortController()
@@ -72,6 +83,12 @@ export function SessionGuard() {
           return
         }
 
+        // 👑 v10.11 — مرسوم الحظر: بطاقة الحظر الملكية فوراً (بلا خروج)
+        if (data.banned) {
+          setBanReason(String(data.ban_reason || 'مخالفة سياسات الأكاديمية'))
+          return
+        }
+
         // 👑 شفاء حي لشارة دور الفريق — نفس بروتوكول إعادة الترطيب v6.9
         // (لا كتابة إلا عند اختلاف فعلي — صفر إعادة رسم زائدة)
         const current = useAuth.getState().user
@@ -93,6 +110,35 @@ export function SessionGuard() {
       if (document.visibilityState === 'visible') check()
     }
 
+    // 👑 v10.11 — مراقب الحظر اللحظي: الحظر يظهر بنفس لحظة ضغط الإدارة
+    // (قناتان خفيفتان: users بمعرف المستخدم + trainers بمعرف المستخدم)
+    let channel: any = null
+    try {
+      channel = supabasePublic
+        .channel(`royal-ban-watcher:${userId}`)
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
+          (payload: any) => {
+            if (payload?.new?.banned) {
+              setBanReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
+            } else if (payload?.new && payload.new.banned === false) {
+              setBanReason(null) // رفع الحظر — عودة الحياة فوراً
+            }
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'trainers', filter: `id=eq.${userId}` },
+          (payload: any) => {
+            if (payload?.new?.banned) {
+              setBanReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
+            } else if (payload?.new && payload.new.banned === false) {
+              setBanReason(null)
+            }
+          }
+        )
+        .subscribe()
+    } catch {}
+
     const first = setTimeout(check, FIRST_PULSE_MS)
     const pulse = setInterval(check, GUARD_PULSE_MS)
     document.addEventListener('visibilitychange', onVisible)
@@ -105,8 +151,22 @@ export function SessionGuard() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', onVisible)
       controller.abort()
+      try { if (channel) supabasePublic.removeChannel(channel) } catch {}
     }
   }, [userId])
+
+  // 👑 بطاقة الحظر الملكية — شاشة كاملة فوق كل شيء
+  if (banReason && userId) {
+    return (
+      <RoyalBanScreen
+        reason={banReason}
+        onLogout={() => {
+          setBanReason(null)
+          useAuth.getState().logout()
+        }}
+      />
+    )
+  }
 
   return null // حرس بلا وجه — صفر أثر بصري
 }

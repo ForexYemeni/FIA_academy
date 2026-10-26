@@ -16,9 +16,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing,
+  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing, Share2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
+import { toast } from 'sonner'
 
 const THEME_KEY = 'fia-theme'
 
@@ -101,6 +102,28 @@ export function FiaFabHub() {
 
   const items = useMemo<FabItem[]>(() => {
     return [
+      {
+        id: 'share', label: 'مشاركة التطبيق', icon: Share2,
+        grad: 'from-violet-500 to-purple-600', ring: 'shadow-[0_0_22px_-4px_rgba(139,92,246,0.55)]',
+        show: true,
+        action: () => {
+          try {
+            const bridge = (window as any)?.FIANativeBridge
+            if (bridge && typeof bridge.shareApp === 'function') { bridge.shareApp(); return }
+          } catch {}
+          const shareData = {
+            title: 'أكاديمية المستقبل الدولية',
+            text: '👑 حمّل تطبيق أكاديمية المستقبل الدولية — تعلّم بأسلوب ملكي',
+            url: 'https://fiaacademy.vercel.app/download',
+          }
+          if (typeof navigator !== 'undefined' && (navigator as any).share) {
+            (navigator as any).share(shareData).catch(() => {})
+          } else {
+            try { navigator.clipboard?.writeText(shareData.url) } catch {}
+            toast.success('🔗 تم نسخ رابط التطبيق — شاركه بفخر!')
+          }
+        },
+      },
       {
         id: 'support', label: 'الدعم السريع', icon: LifeBuoy,
         grad: 'from-emerald-500 to-teal-600', ring: 'shadow-[0_0_22px_-4px_rgba(16,185,129,0.55)]',
