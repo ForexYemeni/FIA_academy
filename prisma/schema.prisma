@@ -73,6 +73,9 @@ model Course {
   trainerId   String?
   modules     Module[]
   enrollments Enrollment[]
+  examAttempts ExamAttempt[]
+  certificates Certificate[]
+  payments     Payment[]
 
   @@map("courses")
 }
@@ -217,9 +220,9 @@ model Certificate {
   hasExternalAccreditation Boolean @default(false)
   externalAccreditationBody String?
 
-  user    User   @relation(fields: [userId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
     userId  String?
-  course  Course @relation(fields: [courseId], references: [id])
+  course  Course? @relation(fields: [courseId], references: [id])
   courseId String?
 
   @@map("certificates")
