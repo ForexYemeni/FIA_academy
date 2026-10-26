@@ -2131,3 +2131,26 @@ Stage Summary:
 - المشاكل الثماني المبلّغ عنها: مُصلحة كلها ومثبتة على الإنتاج الحي (بصرياً وخادمياً).
 - روابط التسليم النهائية: النسخة 28 (المحدثة): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-28 — النسخة 27: https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-27 — APK v2.9.9: https://github.com/ForexYemeni/FIA_academy/releases/tag/app-v2.9.9 — الموقع: https://fiaacademy.vercel.app
 - الأرشيف النهائي SHA-256: 22f0d13f5feeff217baa73154d4cbb1774654a9431cd7db55fe04d0eb5442e69
+
+---
+Task ID: v10.19
+Agent: main (Z.ai)
+Task: أوامر المالك الستة الجديدة: مركز + دائري بالمشاركة + حذف زاوية الإدارة كلياً + برومبت لكل خطأ لوحده + معالجة تضخم النسخة الاحتياطية + أيقونة تحديث حقيقية 100% + Google Search Console + تسليم فاخر
+
+Work Log:
+- تشخيص عميق: فحص smali v2.9.9 المفكوك كشف الجذر — الجسر بلا getAppVersion فكان فحص التحديث أعمى (يعرض «أحدث إصدار متاح» دائماً) + فحص أرشيف 28 الفعلي كشف 6 ملفات APK متراكمة في public/apk (19.4MB) + 1.6MB لقطات v9-test = سبب التضخم من 18.80 إلى 32.74MB.
+- المركز الدائري (fia-fab.tsx إعادة كتابة كاملة): لوحة الشبكة استُبدلت بقوس دائري حقيقي 90°→0° حول مركز زر + بدقة هندسية (إزاحة 28px لمركز الزر أُصلحت بعد لقطة كشفت قصاً عند الحافة) — دوائر زجاجية متدرجة بتسميات ذهبية تنبثق بتتابع cubic-bezier(.2,1.35,.4,1) والمشاركة داخله دائماً (جسر shareApp أصلي في APK / navigator.share / نسخ).
+- حذف زاوية الإدارة كلياً: lux-experience.tsx (‑286 سطراً: LuxRoyalMessage + readFiaAnnouncements + FIA_ANNOUNCE_TYPES + fiaAnnounceType + fiaFormatArabicDate) + admin.tsx (‑330 سطراً: تبويب royal + مفتاح المؤسس + محرر الإعلانات + annDraft والدوال) + site-settings route (تطبيع admin_corner_enabled + isFounderAccount) — صفر بقايا في الكود والبناء.
+- برومبت لكل خطأ: أُزيل copyAllReports وزر «نسخ كبرومبت جاهز» الجماعي — كل بطاقة خطأ تحمل «برومبت هذا الخطأ» بقالب مستقل (الشدة/الرسالة/الصفحة/الوقت/التتبع) بلا ترقيم جماعي.
+- التحديث الحقيقي: update-royal-prompt.tsx حالة upToDate جديدة ببطاقة خضراء «التطبيق محدّث بالكامل» (ShieldCheck + رقم نسختك + فحص فعلي) تظهر فقط بجسر getAppVersion فعلي — والأجهزة الجديدة على v2.9.10 تحصل عليها حقيقةً.
+- Google Search Console: verification.google في layout.tsx metadata — الوسم الحرفي متحقق curl على الإنتاج.
+- APK v2.9.10 (vc 31): 3 دوال @JavascriptInterface smali جديدة (getAppVersion يقرأ PackageManager فعلياً / shareApp ACTION_SEND / installUpdate عبر handleDownload + access$installUpdateApk بنمط synthetic) → apktool b → uber-apk-signer → بصمة 42dfab26 مطابقة → فك وتحقق → release app-v2.9.10 بتحقق عكسي بايت-ببايت (SHA ae3b0729…).
+- تنظيف المستودع: حذف 5 APKs قديمة (2.9.1–2.9.8) + v2.9.9 بعد رفع 2.9.10 (بقيت واحدة رسمية) + scripts/v9-test كاملاً.
+- النشر: push 71ff710 → Vercel READY → تحقق حي شامل: الوسم الحرفي + app-version 31/2.9.10 + APK 200 (3,414,038B) + المركز الدائري بصرياً + المشاركة تعمل بتوست + الإعدادات بلا زاوية (لقطة) + بطاقة التحديث بالمميزات (لقطة) + صفر أخطاء console.
+- النسخة الاحتياطية 29: تفريغ حي (53/454) + مصدر 408 ملفات بلا public/apk + APK + SIGNING + PATCH-v2.9.10 موثق + 5 لقطات إنتاج + SHA256SUMS (15) → AES-256 13.56MB (18 مدخلاً) كلمة المالك PASS/خاطئة مرفوضة → release future-international-academy-29 بتحقق عكسي SHA 856f85c1… بايت-ببايت.
+- الروابط النهائية كلها 200: الموقع /download /apk الجديد /api/app-version + إصدارات GitHub (29 الجديدة + 28 + 27 + app-v2.9.10).
+
+Stage Summary:
+- الأوامر الستة: مكتملة 100% ومثبتة حياً بصرياً وخادمياً.
+- النسخة الاحتياطية الجديدة أخف من كل السابقات (13.56MB) مع محتوى أكمل — سبب التضخم مُعالَج جذرياً بالحذف الفعلي.
+- روابط التسليم: https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-29 (النسخة 29) — /releases/tag/app-v2.9.10 (التحديث) — https://fiaacademy.vercel.app/download (التحميل المعتمد) — النسخة 27 باقية على وسمها.
