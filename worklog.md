@@ -2091,3 +2091,24 @@ Stage Summary:
 - الملفات: src/components/fia/dashboards/shell.tsx + admin.tsx + admin-students-royal.tsx + admin-trainers-royal.tsx + fia-fab.tsx + lux-experience.tsx + lux-identity.tsx + update-royal-prompt.tsx + src/app/api/site-settings/route.ts + src/app/api/app-version/route.ts + src/app/register/page.tsx + src/app/download/client.tsx + worklog.md.
 - الأوامر المثبّتة الست اكتملت: (1) الحظر — كان منفذاً في v10.16 وتم التحقق (2) بطاقة التحديث — منفذة v10.16 وتم التحقق (3) التنظيف اللغوي — اكتمل الآن (4) مفتاح الزاوية الإدارية — نُفذ الآن (5) المشاركة المكررة — أُصلحت الآن (6) النسخة الاحتياطية 28 المحدثة (v10.17 + APK 2.9.8 + قاعدة حية + مفاتيح) تلي هذا الإصدار.
 - النسخة الاحتياطية 28 المنشورة سابقاً (04:34) كانت تشمل v10.13 + APK 2.9.6 — ستُستبدل أصلها بنسخة كاملة محدثة على نفس الوسم.
+
+---
+Task ID: v10.17-final-delivery
+Agent: main (Z.ai)
+Task: التسليم النهائي — استبدال أصل النسخة الاحتياطية 28 بالحالة الكاملة الأخيرة (v10.17 + APK v2.9.8) والتحقق العكسي
+
+Work Log:
+- تفريغ قاعدة البيانات الحية عبر pg8000 (سلسلة الاتصال pooler 6543): 53 جدولاً / 446 صفاً — schema.sql (CREATE TABLE IF NOT EXISTS) + data.sql طوبولوجي (session_replication_role=replica → DEFAULT) + data.json + tables-summary.
+- بناء مكونات النسخة: WEBSITE-SOURCE.tar.gz (v10.17 — HEAD 2ceb9d1 — 568 مدخلاً) + APK v2.9.8 (3401750 بايت) + SIGNING (fia-release-v3.jks + keystore.properties منسوخان حرفياً من 28 الأصلية) + SOURCE.tar.gz (مستودع FIA-Academy-App) + 00-اقرأني محدث + 01-تقرير-التحديث + VERIFICATION + SHA256SUMS (13 مدخلاً).
+- مطابقة التوقيع بالفحص الفعلي: keytool -printcert على APK v2.9.8 = keytool -list على fia-release-v3.jks = 42dfab26121917b091c509a9007352d03eca2338f41606505e8d3ccb32be2a67 — تطابق تام.
+- بناء الأرشيف AES-256 (WZ_AES): 13 مدخلاً / 31.4MB خام → 29.2MB (30630962 بايت) — الكلمة الصحيحة PASS / الخاطئة مرفوضة PASS — SHA-256: 060d7ddd77e76c6164326cee1a9d765b460a53a4f7bfd185ee1836f68ea2fc0d.
+- الاستبدال على الإصدار الرسمي: حذف الأصل القديم (v10.13+APK2.9.6 — asset 677023798 — 204) + رفع الجديد (state=uploaded) + تحديث اسم ونص الإصدار ليعكس v10.17 + APK 2.9.8 واكتمال الأوامر الست.
+- التحقق العكسي الكامل: تنزيل الأصل المرفوع من الإصدار → SHA-256 مطابق بايت-ببايت (060d7ddd…) + فتح بالكلمة الصحيحة PASS + 13 مدخلاً كاملة.
+- تحقق إنتاجي حي لـ v10.17: app-version نظيف من الملكي/المرسوم + chunk FAB (defb4e5c2cd1e8ed) يحوي النص الجديد وFIANativeBridge وشرط الزاوية + chunk اللوحة يحوي admin_corner_enabled + /download تعرض «الحارس الذكي» + الصفحات 200.
+- APK v2.9.8 ثابت بلا أي لمس — مثبت بفحص apktool أنه نظيف من الكلمات الملكية أصلاً.
+
+Stage Summary:
+- الأوامر المثبّتة الست: مكتملة 100% وموثقة في 01-تقرير-التحديث داخل النسخة.
+- رابط النسخة الاحتياطية 28 المحدثة (التسليم النهائي): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-28
+- رابط النسخة الاحتياطية القديمة التي قبلها (27): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-27
+- رابط التطبيق الرسمي الحي: https://github.com/ForexYemeni/FIA_academy/releases/tag/app-v2.9.8
