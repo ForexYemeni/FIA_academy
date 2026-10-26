@@ -2112,3 +2112,22 @@ Stage Summary:
 - رابط النسخة الاحتياطية 28 المحدثة (التسليم النهائي): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-28
 - رابط النسخة الاحتياطية القديمة التي قبلها (27): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-27
 - رابط التطبيق الرسمي الحي: https://github.com/ForexYemeni/FIA_academy/releases/tag/app-v2.9.8
+---
+Task ID: v10.18
+Agent: main (Z.ai)
+Task: الإصلاح الملكي الشامل — المشاكل الثماني المبلّغ عنها من المالك + APK v2.9.9 + تحديث النسخة الاحتياطية 28
+
+Work Log:
+- تشخيص حي عميق: قراءة كود المركز العائم/بطاقة الحظر/الحرس/المحادثة/المسارات + فحص قاعدة الإنتاج الحية (pg8000) + فحص APK v2.9.8 المفكوك + تجربة الإنتاج بمتصفح حقيقي (agent-browser).
+- الاكتشافات الجذرية: (1) تبعية settings مفقودة من useMemo في مركز الأدوات → أيقونة الزاوية تبقى ظاهرة بعد الإطفاء (2) openLetter/closeLetter في LuxRoyalMessage معرّفان بعد العائد المبكر → TDZ «Cannot access 'b' before initialization» عند النقر (نفس خطأ لقطة المالك) (3) /api/admin/contact يعيد أول حساب إداري (د. أحمد المؤيدي) بدل المؤسس (4) مسار الدخول لا يفحص الحظر + أول نبضة حرس 2ث → وميض لوحة التحكم (5) وضع الدردشة في بطاقة الحظر يرفع الحاجز كلياً → هروب كامل للصفحات (6) APK v2.9.8 الفعلي يملك SwipeRefreshLayout أصلياً والمصدر الكوتلني قديم (v2.7) — الحقيقة المصدرية = smali المفكوك (7) /api/* محجوب عن الكاش كلياً في next.config → كل استدعاء = دالة باردة (8) سجل الأخطاء بلا أي زر نسخ.
+- إصلاحات الموقع (14 ملفاً، كومِت 69cb82f): طبقة حظر كاملة (types + login route + auth-store rehydration + SessionGuard ببطاقة فورية وعلم محفوظ ونبضة 0ms) + بطاقة الحظر بحاجز معتم z-9990 واستقبال إغلاق المحادثة وجلب الإدارة مسبقاً + ChatWidget بوضع حظر مفروض (بلا بحث/رجوع/حذف، إغلاق يبث fia-ban:chat-closed، z-9996) + إصلاح زر الإرسال (لا تعليق disabled، رسائل واضحة، استعادة النص عند الفشل) + حرس خادمي في /api/chat POST: المحظور للإدارة فقط (403) + /api/admin/contact بروتوكول founder الرسمي (المتحقق حياً: يعيد د. هاني الشافعي) + fia-fab.tsx إعادة تصميم فاخرة كاملة (لوحة زجاجية شبكية role=menu بترويسة «مركز الأدوات السريع») مع تبعية settings + إخفاء الزاوية عند الإطفاء + رسالة راقية بلا إعلانات + lux-experience: إصلاح TDZ + useSiteSettings حي (بث + focus + cache-bust) + LuxPullToRefresh يحترم data-scroll-locked + shell.tsx جسر setPullToRefreshEnabled مع فتح القائمة + admin.tsx أزرار «نسخ كبرومبت جاهز 100%» (فردي + كامل) بنسخ ذكي مع بديل execCommand + next.config كاش حافة (site-settings 60s/SWR + app-version 120s) + layout preconnect Supabase.
+- اختبار محلي: بناء 96/96 ✓ + اختبار متصفح حي محلياً (اللوحة الجديدة + سيناريو الانفجار السابق أصبح رسالة راقية «لا توجد إعلانات جديدة حالياً» بصفر أخطاء console).
+- نشر الموقع: push 69cb82f → Vercel READY → تحقق إنتاجي حي: admin_corner_enabled=false حية، announceGone=true بصرياً، /api/admin/contact=d.هاني الشافعي، كاش الحافة يعمل، صفر أخطاء.
+- APK v2.9.9 (كومِت 19b16e0): نسخ شجرة smali المفكوكة → إضافة طريقة setPullToRefreshEnabled(Z)V لـ FiaNativeBridge (تستخدم access$getSwipeRefresh$p → setEnabled) + versionCode 30/versionName 2.9.9 → apktool b → توقيع uber-apk-signer (v2+v3، zipalign verified، البصمة 42dfab26… مطابقة) → فك النسخة الموقعة والتحقق (الإصدار + الجسر + البصمة) → رفع release app-v2.9.9 بتحقق عكسي SHA f403cfa9… بايت-ببايت + رفع APK إلى public/apk/ + تحديث app-version route (30/2.9.9) → Vercel READY → /download تعرض 2.9.9 والتنزيل المباشر 200 (3,414,038 بايت).
+- النسخة الاحتياطية 28 المحدثة: تفريغ حي طازج (53 جدولاً/452 صفاً) + WEBSITE-SOURCE.tar.gz كامل (v10.18 — HEAD 19b16e0 — يشمل public/apk) + APK v2.9.9 + PATCH-v2.9.9 (الرقعة والمنهج الموثق) + SIGNING + VERIFICATION (لقطات إنتاج طازجة + توثيق إثباتات) + 00-اقرأني + 01-تقرير محدثان + SHA256SUMS (18) → أرشيف AES-256 (19 مدخلاً/35MB خام/32.7MB) كلمة m773057153M@#$778288150omy (صحيحة PASS/خاطئة مرفوضة) → استبدال الأصل على release future-international-academy-28 (حذف 204 + رفع 201 + تحديث نص) → تحقق عكسي SHA 22f0d13f… بايت-ببايت ✓.
+- النسخة 27 متحقق وجودها على وسمها (الأصل 24.4MB + APK 2.9.3).
+
+Stage Summary:
+- المشاكل الثماني المبلّغ عنها: مُصلحة كلها ومثبتة على الإنتاج الحي (بصرياً وخادمياً).
+- روابط التسليم النهائية: النسخة 28 (المحدثة): https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-28 — النسخة 27: https://github.com/ForexYemeni/FIA_academy/releases/tag/future-international-academy-27 — APK v2.9.9: https://github.com/ForexYemeni/FIA_academy/releases/tag/app-v2.9.9 — الموقع: https://fiaacademy.vercel.app
+- الأرشيف النهائي SHA-256: 22f0d13f5feeff217baa73154d4cbb1774654a9431cd7db55fe04d0eb5442e69
