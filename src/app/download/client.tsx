@@ -224,7 +224,7 @@ export default function DownloadClient() {
             <ShieldCheck className="fia-dl-guide-icon" />
             <div>
               <strong>دليل التحديث الذكي — v2.9.8</strong>
-              <span>الحارس الملكي — نهاية مشكلة «التطبيق توقف» نهائياً + مراقب أعطال حي</span>
+              <span>الحارس الذكي — نهاية مشكلة «التطبيق توقف» نهائياً + مراقب أعطال حي</span>
             </div>
           </div>
           <div className="fia-dl-guide-rows">

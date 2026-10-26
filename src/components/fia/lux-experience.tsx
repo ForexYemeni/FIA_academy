@@ -279,6 +279,8 @@ export function readFiaAnnouncements(settings: any): any[] {
 export function LuxRoyalMessage() {
   const pathname = usePathname()
   const settings = useSiteSettings()
+  // 👑 v10.17 — مفتاح الزاوية الإدارية الكلي: عند الإطفاء لا تُرسم البطاقة إطلاقاً
+  const cornerEnabled = settings?.admin_corner_enabled !== false
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [pulsing, setPulsing] = useState(false)
@@ -304,7 +306,7 @@ export function LuxRoyalMessage() {
     return () => window.removeEventListener('fia-fab:announce', onFabOpen)
   }, [latest?.id])
 
-  if (!latest || !meta) return null
+  if (!cornerEnabled || !latest || !meta) return null
 
   // 👑 v10.11 — الإغلاق الملكي: طيّ أنيق بحركة خروج كاملة قبل التفكيك
   const closeLetter = () => {

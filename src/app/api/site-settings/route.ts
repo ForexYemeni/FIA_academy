@@ -68,6 +68,63 @@ function parseRow(row: any) {
   }
 }
 
+// 👑 v10.17 — «مفتاح الزاوية الإدارية الكلي»: حسم هوية المؤسس حصراً
+// نفس بروتوكول «هوية المؤسس الخالدة» (v6.9): علامة الفريق في جدول المدربين
+// ثم سجل team_members المحصّن ضد أي محو — بالمعرّف أو بالبريد.
+const TEAM_MARKER_PREFIX = '__TEAM_MEMBER__:'
+
+async function isFounderAccount(userId: string, email: string | null | undefined): Promise<boolean> {
+  try {
+    if (email) {
+      const { data: tr } = await supabaseAdmin
+        .from('trainers')
+        .select('password')
+        .ilike('email', email)
+        .maybeSingle()
+      const pw = (tr as any)?.password
+      if (typeof pw === 'string' && pw.startsWith(TEAM_MARKER_PREFIX)) {
+        const afterPrefix = pw.substring(TEAM_MARKER_PREFIX.length)
+        const sepIdx = afterPrefix.indexOf('__')
+        const role = sepIdx !== -1 ? afterPrefix.substring(0, sepIdx) : ''
+        if (role === 'founder') return true
+      }
+    }
+    const byId = await supabaseAdmin
+      .from('team_members')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if ((byId.data as any)?.role === 'founder') return true
+    if (email) {
+      const byEmail = await supabaseAdmin
+        .from('team_members')
+        .select('role')
+        .ilike('email', email)
+        .maybeSingle()
+      if ((byEmail.data as any)?.role === 'founder') return true
+    }
+  } catch {}
+  return false
+}
+
+// قراءة القيمة المخزنة حالياً لمفتاح الزاوية الإدارية من JSON الإضافي
+async function readStoredCornerEnabled(): Promise<boolean> {
+  try {
+    const { data: curRow } = await supabaseAdmin
+      .from('site_settings')
+      .select('address')
+      .limit(1)
+      .maybeSingle()
+    const addr: string = (curRow as any)?.address || ''
+    const idx = addr.indexOf(EXTRA_SEPARATOR)
+    if (idx !== -1) {
+      const ex = JSON.parse(addr.substring(idx + EXTRA_SEPARATOR.length))
+      if (ex && ex.admin_corner_enabled !== undefined) return !!ex.admin_corner_enabled
+    }
+  } catch {}
+  return true // الافتراضي: الزاوية تعمل
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Select only known-existing columns to avoid schema cache errors
@@ -91,6 +148,22 @@ export async function PUT(req: NextRequest) {
     const g = await guardAdmin(req)
     if (!g.ok) return g.res
     const body = await req.json()
+
+    // 👑 v10.17 — «مفتاح الزاوية الإدارية الكلي»: تغيير إيقاف/تشغيل الزاوية
+    // (الإعلانات المختومة + بطاقة الرسالة العامة) بقرار المؤسس حصراً.
+    // أي طلب من غير المؤسس يحاول تحريك المفتاح (عمداً عبر API أو ببيانات قديمة)
+    // تُطبَّع قيمته صمتاً إلى القيمة المخزنة بقرار المؤسس — فلا يُحرك المفتاح أبداً،
+    // ولا يفشل حفظٌ بريء لإعدادات أخرى بسبب بيانات قديمة.
+    if (body.admin_corner_enabled !== undefined) {
+      const newVal = !!body.admin_corner_enabled
+      const curVal = await readStoredCornerEnabled()
+      if (curVal !== newVal) {
+        const founder = await isFounderAccount(String(g.user?.id || ''), (g.user as any)?.email)
+        if (!founder) {
+          body.admin_corner_enabled = curVal
+        }
+      }
+    }
 
     // === Telegram integration protection ===
     // The Telegram bot token + channel ID are critical — they control

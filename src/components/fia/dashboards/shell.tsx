@@ -366,10 +366,10 @@ export function DashboardShell({
                 variant="ghost"
                 size="sm"
                 className="h-9 rounded-xl border border-gold/35 bg-gold/[0.07] hover:bg-gold/15 hover:border-gold/60 text-navy font-extrabold px-2.5 sm:px-3 shadow-sm"
-                title="بطاقة التحديث الملكية — فحص أحدث إصدار"
+                title="بطاقة التحديث — فحص أحدث إصدار"
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('fia-check-updates'))
-                  toast('👑 جاري فحص أحدث إصدار…', { description: 'ستظهر بطاقة التحديث الملكية خلال لحظات' })
+                  toast('جاري فحص أحدث إصدار…', { description: 'ستظهر بطاقة التحديث خلال لحظات' })
                 }}
               >
                 <RefreshCw className="w-4 h-4 text-gold sm:ml-1.5" />

@@ -181,7 +181,7 @@ export function computeAchievements(enrollments: any[], certificates: any[]): Ac
       desc: 'تجاوزت 50% في دورة — العزيمة التي تصنع المحترفين', grad: 'from-cyan-500 to-blue-600',
     },
     {
-      id: 'finisher', title: 'التتويج الكامل', icon: BadgeCheck, earned: maxProgress >= 100 || completed >= 1,
+      id: 'finisher', title: 'الإنجاز الكامل', icon: BadgeCheck, earned: maxProgress >= 100 || completed >= 1,
       desc: 'أكملت دورة بنسبة 100% — إنجاز يستحق الاعتزاز', grad: 'from-emerald-500 to-teal-600',
     },
     {
@@ -197,7 +197,7 @@ export function computeAchievements(enrollments: any[], certificates: any[]): Ac
       desc: 'مسجّل في 3 دورات أو أكثر — عقل فضولي لا يتوقف', grad: 'from-purple-500 to-fuchsia-600',
     },
     {
-      id: 'crown', title: 'وسام التاج', icon: Crown, earned: certs.length >= 5 && completed >= 3,
+      id: 'crown', title: 'وسام التميز', icon: Crown, earned: certs.length >= 5 && completed >= 3,
       desc: '5 شهادات و3 دورات مكتملة — من أعظم خريجي الأكاديمية', grad: 'from-gold via-amber-400 to-gold-light',
     },
   ]

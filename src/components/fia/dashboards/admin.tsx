@@ -1547,7 +1547,7 @@ const AdminStudents = React.memo(function AdminStudents() {
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] font-bold text-amber-800 leading-5">
-              سيظهر للمستخدم فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
+              سيظهر للمستخدم فوراً بطاقة حظر تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
             </div>
             <div>
               <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمستخدم)</Label>
@@ -3382,7 +3382,7 @@ const AdminTrainers = React.memo(function AdminTrainers() {
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] font-bold text-amber-800 leading-5">
-              سيظهر للمستخدم فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
+              سيظهر للمستخدم فوراً بطاقة حظر تحجب التطبيق كاملاً، وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل.
             </div>
             <div>
               <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمستخدم)</Label>
@@ -4191,6 +4191,54 @@ const AdminSite = React.memo(function AdminSite() {
         {/* 👑 v10.5 — شبكة التبويبات الفاخرة: أيقونة + عنوان + وصف لكل تبويب */}
         {tab === 'royal' && (
           <div className="space-y-4">
+            {/* ═══ 👑 v10.17 — مفتاح الزاوية الإدارية الكلي: إيقاف/تشغيل بقرار المؤسس حصراً ═══ */}
+            {(() => {
+              const isFounder = (user as any)?.team_role === 'founder'
+              const cornerOn = settings?.admin_corner_enabled !== false
+              return (
+                <div className={`relative p-4 sm:p-5 rounded-2xl border overflow-hidden ${cornerOn ? 'border-emerald-500/40 bg-gradient-to-br from-white to-emerald-500/[0.06]' : 'border-red-500/45 bg-gradient-to-br from-white to-red-500/[0.07]'}`}>
+                  <div className="absolute -top-6 -left-6 w-20 h-20 rounded-full blur-2xl pointer-events-none" />
+                  <div className="relative flex items-start gap-3.5">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md ${cornerOn ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-red-500 to-rose-600'}`}>
+                      {cornerOn ? <Eye className="w-5 h-5 text-white" /> : <EyeOff className="w-5 h-5 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-black text-[15px] text-navy flex items-center gap-2 flex-wrap">
+                        الزاوية الإدارية
+                        <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${cornerOn ? 'text-emerald-700 bg-emerald-500/10 border-emerald-500/30' : 'text-red-700 bg-red-500/10 border-red-500/30'}`}>
+                          {cornerOn ? 'تعمل الآن' : 'مطفأة كلياً'}
+                        </span>
+                        {!isFounder && (
+                          <span className="text-[9px] font-black rounded-full px-2 py-0.5 border text-amber-800 bg-amber-500/10 border-amber-500/30">
+                            قرار المؤسس حصراً
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-[11.5px] text-muted-foreground leading-relaxed mt-1">
+                        عند الإطفاء تختفي الزاوية كلياً من كل مكان: بطاقة الرسالة المختومة في الصفحة الرئيسية، وزر «إعلانات الإدارة» في مركز الأدوات العائم — وعند التشغيل تعود كما هي فوراً. الإعلانات المحفوظة لا تُمس أبداً.
+                      </p>
+                      {!isFounder && (
+                        <p className="text-[10.5px] text-amber-700/90 font-bold mt-1.5">
+                          🔒 هذا المفتاح مخصص لحساب المؤسس وحده — حسابك يعرض حالته فقط.
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 pt-1">
+                      <Switch
+                        checked={cornerOn}
+                        disabled={!isFounder || saving}
+                        onCheckedChange={(v) => {
+                          const nextSettings = { ...settings, admin_corner_enabled: v }
+                          setSettings(nextSettings)
+                          save(undefined, nextSettings)
+                          toast.success(v ? 'تشغّلت الزاوية الإدارية — ظهرت للجميع فوراً' : 'أُطفئت الزاوية الإدارية — اختفت من كل مكان فوراً')
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
             {/* ═══ بطاقة إعلان جديد ═══ */}
             <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
               <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />

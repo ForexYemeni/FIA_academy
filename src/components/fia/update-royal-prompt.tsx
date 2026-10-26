@@ -54,7 +54,7 @@ export function UpdateRoyalPrompt() {
         if (hasBridge) {
           installed = Number(await bridge.getAppVersion())
           if (!installed || Number.isNaN(installed)) {
-            if (isManual) toast.info('👑 أنت على أحدث إصدار — التطبيق محدّث بالكامل')
+            if (isManual) toast.info('أنت على أحدث إصدار — التطبيق محدّث بالكامل')
             return
           }
         }
@@ -62,7 +62,7 @@ export function UpdateRoyalPrompt() {
         const data = await res.json()
         if (!alive || !data?.version_code) return
         if (hasBridge && Number(data.version_code) <= installed) {
-          if (isManual) toast.success('👑 أنت على أحدث إصدار — التطبيق محدّث بالكامل')
+          if (isManual) toast.success('أنت على أحدث إصدار — التطبيق محدّث بالكامل')
           return
         }
         if (!hasBridge && !isManual) {
@@ -133,7 +133,7 @@ export function UpdateRoyalPrompt() {
               <Crown className="w-8 h-8 text-navy" strokeWidth={2.3} />
             </div>
           </div>
-          <div className="relative mt-3 text-white font-black text-lg">{manual ? 'أحدث إصدار متاح 👑' : 'تحديث جديد متاح ✨'}</div>
+          <div className="relative mt-3 text-white font-black text-lg">{manual ? 'أحدث إصدار متاح ✨' : 'تحديث جديد متاح ✨'}</div>
           <div className="relative mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 border border-gold/50 px-3 py-1 text-[11px] font-black text-gold">
             <Crown className="w-3 h-3" />
             الإصدار {info.version_name}

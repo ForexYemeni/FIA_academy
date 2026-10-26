@@ -233,7 +233,7 @@ export default function RegisterPage() {
                 disabled={loading}
                 className="relative h-12 w-full overflow-hidden rounded-xl bg-gradient-to-l from-[#C9A961] to-[#E5C77E] text-sm font-extrabold text-[#0A1F44] shadow-[0_8px_24px_rgba(201,169,97,0.35)] active:scale-[0.98] disabled:opacity-60"
               >
-                {loading ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جاري التتويج...</> : <><Sparkles className="ml-2 h-4 w-4" /> إنشاء حساب المتدرب</>}
+                {loading ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جاري إنشاء الحساب...</> : <><Sparkles className="ml-2 h-4 w-4" /> إنشاء حساب المتدرب</>}
               </Button>
               <p className="text-center text-[11px] text-white/50">
                 لديك حساب بالفعل؟ <a href="/" className="font-bold text-[#E5C77E] hover:underline">سجّل الدخول من هنا</a>

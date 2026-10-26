@@ -116,7 +116,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
       }
       setItems((prev) => prev.map((x) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null, banned_at: banned ? new Date().toISOString() : null } : x))
       setSelectedStudent((prev: any) => (prev && prev.id === target.id) ? { ...prev, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null } : prev)
-      toast.success(banned ? `🚫 تم حظر حساب "${target.name}" — ستظهر له بطاقة الحظر الملكية فوراً حتى لو كان التطبيق مفتوحاً` : `✅ رُفع الحظر عن "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
+      toast.success(banned ? `🚫 تم حظر حساب "${target.name}" — ستظهر له بطاقة الحظر فوراً حتى لو كان التطبيق مفتوحاً` : `✅ رُفع الحظر عن "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
       setBanTarget(null)
       setBanReason('')
     } catch {
@@ -468,7 +468,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => setSelectedStudent(s)}>
                       <Eye className="w-3 h-3 ml-1" /> الملف الكامل
                     </Button>
-                    <Button size="sm" variant="ghost" className={`h-8 w-9 p-0 ${s.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={s.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب — مرسوم الحظر الملكي'} onClick={() => requestBan(s)}>
+                    <Button size="sm" variant="ghost" className={`h-8 w-9 p-0 ${s.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={s.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب'} onClick={() => requestBan(s)}>
                       {s.banned
                         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         : <Ban className="w-3.5 h-3.5 text-rose-500" />}
@@ -526,7 +526,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
                 <div className="rounded-xl border border-red-400/40 bg-red-500/[0.08] p-3 flex items-start gap-2.5">
                   <ShieldAlert className="w-4.5 h-4.5 text-red-600 mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-[12.5px] font-black text-red-700">هذا الحساب محظور حالياً — التطبيق محجوب عنه ببطاقة الحظر الملكية</div>
+                    <div className="text-[12.5px] font-black text-red-700">هذا الحساب محظور حالياً — التطبيق محجوب عنه ببطاقة الحظر</div>
                     {selectedStudent.banned_reason && <div className="text-[11px] text-red-600/90 mt-0.5">السبب: {selectedStudent.banned_reason}</div>}
                     {selectedStudent.banned_at && <div className="text-[10px] text-muted-foreground mt-0.5">بتاريخ: {new Date(selectedStudent.banned_at).toLocaleString('ar-EG')}</div>}
                   </div>
@@ -711,7 +711,7 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
             </div>
             <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3 text-[11px] text-navy/80 flex items-start gap-2">
               <ShieldAlert className="w-3.5 h-3.5 text-gold mt-0.5 flex-shrink-0" />
-              <span>سيظهر للمتدرب فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. حسابات الإدارة وأعضاء الفريق محمية ولا تُحظر أبداً.</span>
+              <span>سيظهر للمتدرب فوراً بطاقة حظر تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. حسابات الإدارة وأعضاء الفريق محمية ولا تُحظر أبداً.</span>
             </div>
           </div>
           <div className="flex gap-2 p-4 bg-muted/20 border-t border-gold/15">

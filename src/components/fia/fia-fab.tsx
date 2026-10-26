@@ -65,6 +65,12 @@ export function FiaFabHub() {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'dark' | 'light' | null>(null)
   const [announceNew, setAnnounceNew] = useState(false)
+  // 👑 v10.17 — رصد الثنائية الأصلية: داخل التطبيق (APK) يوجد زر مشاركة أصلي،
+  // فتُخفى مشاركة المركز العائم لتبقى أيقونة مشاركة واحدة فقط (إصلاح التكرار).
+  const [isNativeApp, setIsNativeApp] = useState(false)
+  useEffect(() => {
+    try { setIsNativeApp(!!(window as any)?.FIANativeBridge) } catch {}
+  }, [])
 
   // مزامنة الوضع الليلي مع سكربت التهيئة
   useEffect(() => {
@@ -105,7 +111,7 @@ export function FiaFabHub() {
       {
         id: 'share', label: 'مشاركة التطبيق', icon: Share2,
         grad: 'from-violet-500 to-purple-600', ring: 'shadow-[0_0_22px_-4px_rgba(139,92,246,0.55)]',
-        show: true,
+        show: !isNativeApp,
         action: () => {
           try {
             const bridge = (window as any)?.FIANativeBridge
@@ -113,7 +119,7 @@ export function FiaFabHub() {
           } catch {}
           const shareData = {
             title: 'أكاديمية المستقبل الدولية',
-            text: '👑 حمّل تطبيق أكاديمية المستقبل الدولية — تعلّم بأسلوب ملكي',
+            text: '👑 حمّل تطبيق أكاديمية المستقبل الدولية — تعلّم بأسلوب احترافي',
             url: 'https://fiaacademy.vercel.app/download',
           }
           if (typeof navigator !== 'undefined' && (navigator as any).share) {
@@ -137,7 +143,7 @@ export function FiaFabHub() {
       {
         id: 'announce', label: 'إعلانات الإدارة', icon: BellRing,
         grad: 'from-gold to-amber-500', ring: 'shadow-[0_0_22px_-4px_rgba(212,175,55,0.6)]',
-        show: true, badge: announceNew, action: () => dispatch('fia-fab:announce'),
+        show: settings?.admin_corner_enabled !== false, badge: announceNew, action: () => dispatch('fia-fab:announce'),
       },
       {
         id: 'contact', label: 'تواصل معنا', icon: Mail,

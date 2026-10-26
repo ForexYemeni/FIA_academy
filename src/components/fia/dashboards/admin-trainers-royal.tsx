@@ -147,7 +147,7 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
         return
       }
       setItems((prev) => prev.map((x) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null, banned_at: banned ? new Date().toISOString() : null } : x))
-      toast.success(banned ? `🚫 تم حظر حساب المدرب "${target.name}" — ستظهر له بطاقة الحظر الملكية فوراً` : `✅ رُفع الحظر عن المدرب "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
+      toast.success(banned ? `🚫 تم حظر حساب المدرب "${target.name}" — ستظهر له بطاقة الحظر فوراً` : `✅ رُفع الحظر عن المدرب "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
       setBanTarget(null)
       setBanReason('')
     } catch {
@@ -335,7 +335,7 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => { setEditing(t); setOpen(true) }}>
                       <Edit className="w-3 h-3 ml-1" /> تعديل
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={isTeamMember} className={`h-8 w-9 p-0 disabled:opacity-30 disabled:cursor-not-allowed ${t.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={isTeamMember ? 'أعضاء الفريق من الإدارة — لا يمكن حظرهم' : t.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب — مرسوم الحظر الملكي'} onClick={() => requestBan(t)}>
+                    <Button size="sm" variant="ghost" disabled={isTeamMember} className={`h-8 w-9 p-0 disabled:opacity-30 disabled:cursor-not-allowed ${t.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={isTeamMember ? 'أعضاء الفريق من الإدارة — لا يمكن حظرهم' : t.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب'} onClick={() => requestBan(t)}>
                       {t.banned
                         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         : <Ban className="w-3.5 h-3.5 text-rose-500" />}
@@ -374,7 +374,7 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
             </div>
             <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3 text-[11px] text-navy/80 flex items-start gap-2">
               <ShieldAlert className="w-3.5 h-3.5 text-gold mt-0.5 flex-shrink-0" />
-              <span>سيظهر للمدرب فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. أعضاء الفريق وحسابات الإدارة محمية ولا تُحظر أبداً.</span>
+              <span>سيظهر للمدرب فوراً بطاقة حظر تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. أعضاء الفريق وحسابات الإدارة محمية ولا تُحظر أبداً.</span>
             </div>
           </div>
           <div className="flex gap-2 p-4 bg-muted/20 border-t border-gold/15">
