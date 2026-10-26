@@ -3,8 +3,8 @@ import VerifyClient from './client'
 
 interface Props { params: Promise<{ certNumber: string }> }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// ⚡ v10.23-CPU — ISR بخزنة 5 دقائق (توازن بين طزاجة بيانات التحقق وخفض Fluid CPU)
+export const revalidate = 300
 
 export default async function Page({ params }: Props) {
   const { certNumber } = await params

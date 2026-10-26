@@ -74,3 +74,4 @@ android-fia/local.properties
 *.apk
 !download/*.apk
 !public/apk/*.apk
+.dev.vars

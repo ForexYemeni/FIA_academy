@@ -1,6 +1,10 @@
 import { MetadataRoute } from 'next'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// ⚡ v10.23-CPU — خزنة ساعة: زواحف Google لا تستدعي قاعدة البيانات في كل زحفة
+// (الـ sitemap يُبنى مرة كل ساعة بدل كل طلب) — الروابط نفسها دون أي تغيير
+export const revalidate = 3600
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = 'https://fiaacademy.vercel.app'
   

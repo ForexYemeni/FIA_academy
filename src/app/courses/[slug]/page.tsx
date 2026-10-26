@@ -83,9 +83,11 @@ function decodeSlug(raw: string): string {
   }
 }
 
-// Always server-render on demand — newly-created courses must work without a redeploy.
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// ⚡ v10.23-CPU — قشرة client خالصة (صفر قراءة لـ cookies/headers/searchParams على السيرفر)
+// ISR مخزّن على الحافة بدل إعادة تصيير serverless لكل زائر — خفض Fluid CPU جذري
+// الدورات الجديدة تعمل فوراً بلا redeploy (ISR يصيّر أي slug جديد عند أول زيارة)
+// وتعديلات الإدارة تظهر خلال 10 دقائق كحد أقصى
+export const revalidate = 600
 
 export default async function Page({ params }: Props) {
   const { slug: rawSlug } = await params

@@ -65,11 +65,9 @@ export async function generateMetadata({ params }: Props, parent: ResolvingMetad
   }
 }
 
-// Always server-render on demand so newly-created posts work immediately.
-export const dynamic = 'force-dynamic'
-// Disable static rendering — every request re-fetches from the DB so admin
-// edits / new posts are visible without a redeploy.
-export const revalidate = 0
+// ⚡ v10.23-CPU — ISR مخزّن بدل force-dynamic (قشرة client بلا قراءة حالة طلب) — خفض Fluid CPU
+// المقالات الجديدة تُصيَّر عند أول زيارة بلا redeploy، وتعديلات الإدارة تظهر خلال 10 دقائق
+export const revalidate = 600
 
 export default async function Page({ params }: Props) {
   const { slug: rawSlug } = await params
