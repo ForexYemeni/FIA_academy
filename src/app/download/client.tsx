@@ -28,12 +28,12 @@ import {
 } from 'lucide-react'
 
 // 👑 رابط APK الاحتياطي — الرابط الفعلي يُشتق تلقائياً من الإصدار الحي أدناه
-const FALLBACK_APK = '/apk/Future-International-Academy-v2.9.7.apk'
+const FALLBACK_APK = '/apk/Future-International-Academy-v2.9.8.apk'
 
 // 🧾 بيانات الإصدار — احتياط فقط، الإصدار يُجلب حياً من /api/app-version
-// v2.9.7 (versionCode 28) — الحارس الملكي: إيقاف نافذة التحديث النظامية نهائياً
+// v2.9.8 (versionCode 29) — نسخة الإنقاذ: ثنائية 2.9.4 المجرّبة + رقم إصدار جديد
 // + مراقب أعطال حي يرفع أي عطل للإدارة فوراً — التوقيع الأصلي فالتحديث مباشر
-const FALLBACK_VERSION = '2.9.7'
+const FALLBACK_VERSION = '2.9.8'
 const FALLBACK_DATE = '2026-10-26T05:35:00Z'
 
 const AR_MONTHS = [
@@ -218,19 +218,19 @@ export default function DownloadClient() {
           </span>
         </a>
 
-        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.7 */}
+        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.8 */}
         <div className="fia-dl-guide">
           <div className="fia-dl-guide-head">
             <ShieldCheck className="fia-dl-guide-icon" />
             <div>
-              <strong>دليل التحديث الذكي — v2.9.7</strong>
+              <strong>دليل التحديث الذكي — v2.9.8</strong>
               <span>الحارس الملكي — نهاية مشكلة «التطبيق توقف» نهائياً + مراقب أعطال حي</span>
             </div>
           </div>
           <div className="fia-dl-guide-rows">
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge fia-dl-badge-gold">الحالة ١</span>
-              <p>لديك أي إصدار سابق (v2.9.1 حتى v2.9.6)؟ — <strong>ثبّت v2.9.7 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك وتقدمك تظل كما هي. وحتى من كان لديه v2.9.5 أو v2.9.6 المعطوبتين يثبّت هذه فوقهما مباشرة.</p>
+              <p>لديك أي إصدار سابق (v2.9.1 حتى v2.9.7)؟ — <strong>ثبّت v2.9.8 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك وتقدمك تظل كما هي. وحتى من كان لديه v2.9.5 أو v2.9.6 أو v2.9.7 يثبّت هذه فوقها مباشرة — v2.9.8 هي ثنائية v2.9.4 المستقرة نفسها.</p>
             </div>
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge">الحالة ٢</span>
