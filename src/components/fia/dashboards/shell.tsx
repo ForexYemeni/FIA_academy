@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Menu, LogOut, Bell, Crown, Star, Sparkles } from 'lucide-react'
+import { Menu, LogOut, Bell, Crown, Star, Sparkles, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
 import { toast } from 'sonner'
 import { NotificationsBell } from '@/components/fia/notifications-bell'
@@ -360,6 +360,21 @@ export function DashboardShell({
               </h1>
             </div>
             <div className="flex items-center gap-2">
+              {/* 👑 v10.16 — زر «التحديثات» الملكي: يفتح بطاقة التحديث الملكية المتحركة
+                  على الطلب في كل اللوحات (تطبيق/متصفح) — حتى تكون الميزة مرئية ومجرّبة دائماً */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 rounded-xl border border-gold/35 bg-gold/[0.07] hover:bg-gold/15 hover:border-gold/60 text-navy font-extrabold px-2.5 sm:px-3 shadow-sm"
+                title="بطاقة التحديث الملكية — فحص أحدث إصدار"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('fia-check-updates'))
+                  toast('👑 جاري فحص أحدث إصدار…', { description: 'ستظهر بطاقة التحديث الملكية خلال لحظات' })
+                }}
+              >
+                <RefreshCw className="w-4 h-4 text-gold sm:ml-1.5" />
+                <span className="hidden sm:inline text-[12px]">التحديثات</span>
+              </Button>
               <NotificationsBell />
             </div>
           </div>

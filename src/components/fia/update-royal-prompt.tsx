@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * 👑✨ UpdateRoyalPrompt — بطاقة التحديث الملكية (v10.11)
+ * 👑✨ UpdateRoyalPrompt — بطاقة التحديث الملكية (v10.16)
  * ============================================================================
  * تظهر داخل التطبيق فقط (WebView) حين يكون هناك إصدار أحدث من نقطة
  * /api/app-version — بطاقة سينمائية وسط الشاشة تعرض **المميزات الجديدة فقط**
@@ -10,11 +10,20 @@
  * • الأجهزة على APK قديم (بلا getAppVersion) تتبع نافذة النظام الاحتياطية
  * • «لاحقاً» تؤجل البطاقة لهذه الجلسة فقط (sessionStorage)
  * • لا تمس أي منطق مصادقة أو إشعارات — طبقة عرض مستقلة تماماً
+ *
+ * 👑 v10.16 — الوضع الملكي بلا جسر (لثنائيات APK القديمة بلا getAppVersion):
+ * • الاستدعاء اليدوي: زر «التحديثات» في شريط اللوحات يبثّ حدث window
+ *   «fia-check-updates» فتُفتح البطاقة فوراً وتعرض أحدث إصدار متاح ومميزاته
+ *   وزر «تحديث الآن» يفتح رابط الـ APK — داخل التطبيق يلتقطه مستمع
+ *   التنزيلات الأصلي (DownloadListener) تلقائياً، وفي المتصفح يبدأ التنزيل الطبيعي
+ * • التلقائي بلا جسر: يظهر فقط عند force_update=true داخل التطبيق —
+ *   لأننا لا نعرف إصدار الجهاز بدون الجسر، ولا نريد إزعاجاً كاذباً أبداً
  * ============================================================================
  */
 
 import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, Crown, Download, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface UpdateInfo {
   version_code: number
@@ -29,30 +38,50 @@ const DISMISS_KEY = 'fia-royal-update-dismissed'
 export function UpdateRoyalPrompt() {
   const [info, setInfo] = useState<UpdateInfo | null>(null)
   const [closing, setClosing] = useState(false)
+  // 👑 v10.16 — manual: فُتحت بالاستدعاء اليدوي (زر «التحديثات») — عنوان ولون مختلفان
+  const [manual, setManual] = useState(false)
 
   useEffect(() => {
     let alive = true
-    const check = async () => {
+    const check = async (isManual = false) => {
       try {
         const bridge = (window as any)?.FIANativeBridge
-        // متصفح أو APK قديم — لا بطاقة ويب (نافذة النظام تتكفل بالتحديث)
-        if (!bridge || typeof bridge.getAppVersion !== 'function') return
-        const installedRaw = await bridge.getAppVersion()
-        const installed = Number(installedRaw)
-        if (!installed || Number.isNaN(installed)) return
+        const hasBridge = !!bridge && typeof bridge.getAppVersion === 'function'
+        // كشف WebView (داخل التطبيق) عبر User-Agent — للأجهزة بلا جسر
+        const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+        const isWebView = /;\s*wv\)/i.test(ua)
+        let installed = 0
+        if (hasBridge) {
+          installed = Number(await bridge.getAppVersion())
+          if (!installed || Number.isNaN(installed)) {
+            if (isManual) toast.info('👑 أنت على أحدث إصدار — التطبيق محدّث بالكامل')
+            return
+          }
+        }
         const res = await fetch('/api/app-version', { cache: 'no-store' })
         const data = await res.json()
         if (!alive || !data?.version_code) return
-        if (Number(data.version_code) <= installed) return
+        if (hasBridge && Number(data.version_code) <= installed) {
+          if (isManual) toast.success('👑 أنت على أحدث إصدار — التطبيق محدّث بالكامل')
+          return
+        }
+        if (!hasBridge && !isManual) {
+          // بلا جسر: البطاقة التلقائية فقط عند الإلزام داخل التطبيق
+          // (لا نعرف إصدار الجهاز بدون الجسر — ولا إزعاج كاذب أبداً)
+          if (!isWebView || !data.force_update) return
+        }
         try {
-          if (!data.force_update && sessionStorage.getItem(`${DISMISS_KEY}-${data.version_code}`) === '1') return
+          if (!isManual && !data.force_update && sessionStorage.getItem(`${DISMISS_KEY}-${data.version_code}`) === '1') return
         } catch {}
         // نمنح التطبيق لحظات ليستقر قبل الترفّع بالبطاقة الملكية
-        setTimeout(() => { if (alive) setInfo(data as UpdateInfo) }, 1800)
+        setTimeout(() => { if (alive) { setManual(!!isManual); setInfo(data as UpdateInfo) } }, isManual ? 200 : 1800)
       } catch {}
     }
     check()
-    return () => { alive = false }
+    // 👑 v10.16 — الاستدعاء اليدوي الملكي: زر «التحديثات» في شريط اللوحات يبثّ هذا الحدث
+    const onManual = () => { check(true) }
+    window.addEventListener('fia-check-updates', onManual as EventListener)
+    return () => { alive = false; window.removeEventListener('fia-check-updates', onManual as EventListener) }
   }, [])
 
   const close = useCallback(() => {
@@ -74,7 +103,10 @@ export function UpdateRoyalPrompt() {
         return
       }
     } catch {}
-    window.open(info.apk_url, '_blank')
+    // 👑 v10.16 — بلا جسر: فتح رابط الـ APK مباشرة — داخل التطبيق يلتقطه
+    // مستمع التنزيلات الأصلي (DownloadListener) ويكفل التنزيل والتثبيت،
+    // وفي المتصفح يبدأ التنزيل الطبيعي فوراً
+    try { window.location.href = info.apk_url } catch { window.open(info.apk_url, '_blank') }
     close()
   }, [info, close])
 
@@ -101,11 +133,14 @@ export function UpdateRoyalPrompt() {
               <Crown className="w-8 h-8 text-navy" strokeWidth={2.3} />
             </div>
           </div>
-          <div className="relative mt-3 text-white font-black text-lg">تحديث جديد متاح ✨</div>
+          <div className="relative mt-3 text-white font-black text-lg">{manual ? 'أحدث إصدار متاح 👑' : 'تحديث جديد متاح ✨'}</div>
           <div className="relative mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-gold/15 border border-gold/50 px-3 py-1 text-[11px] font-black text-gold">
             <Crown className="w-3 h-3" />
             الإصدار {info.version_name}
           </div>
+          {manual && (
+            <div className="relative mt-1.5 text-[10px] text-white/60">إن كان هذا نفس رقم إصدارك الحالي فأنت محدّث بالكامل</div>
+          )}
           <button onClick={close} aria-label="إغلاق" className="absolute top-3 left-3 rounded-full border border-white/10 bg-white/10 p-1.5 text-gold/80 hover:text-gold transition-colors">
             <X className="w-4 h-4" />
           </button>

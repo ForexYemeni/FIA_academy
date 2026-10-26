@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import {
   Users, BookOpen, CheckCircle2, Clock, Mail, Phone, Calendar, Eye, Trash2,
   Search, X, GraduationCap, TrendingUp, Wallet, Award, UserPlus, Download,
-  PencilLine, Save, Loader2, Lock,
+  PencilLine, Save, Loader2, Lock, Ban, ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,10 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
   const [enrollUserId, setEnrollUserId] = useState('')
   const [enrollCourseId, setEnrollCourseId] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
+  // 👑 v10.16 — مرسوم الحظر الملكي: حظر/رفع حظر حساب متدرب بقرار الإدارة
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
+  const [banning, setBanning] = useState(false)
 
   useEffect(() => {
     fetch('/api/students?role=student').then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []))
@@ -98,6 +102,39 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
     } catch {}
     return () => { try { supabasePublic.removeChannel(channel) } catch {} }
   }, [])
+
+  // 👑 v10.16 — مرسوم الحظر الملكي: تنفيذ الحظر/رفع الحظر عبر /api/admin/ban
+  // (الـ API يحمي حسابات الإدارة وأعضاء الفريق — لا يمكن حظرهم أبداً)
+  const doBan = async (target: any, banned: boolean, reason: string) => {
+    setBanning(true)
+    try {
+      const res = await fetch('/api/admin/ban', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: target.id, banned, reason }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast.error(data?.error || 'فشل تنفيذ الحظر')
+        return
+      }
+      setItems((prev) => prev.map((x) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null, banned_at: banned ? new Date().toISOString() : null } : x))
+      setSelectedStudent((prev: any) => (prev && prev.id === target.id) ? { ...prev, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null } : prev)
+      toast.success(banned ? `🚫 تم حظر حساب "${target.name}" — ستظهر له بطاقة الحظر الملكية فوراً حتى لو كان التطبيق مفتوحاً` : `✅ رُفع الحظر عن "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
+      setBanTarget(null)
+      setBanReason('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setBanning(false)
+    }
+  }
+
+  // نقطة الدخول: محظور = رفع الحظر مباشرة، غير محظور = فتح حوار مرسوم الحظر
+  const requestBan = (s: any) => {
+    if (s.banned) { doBan(s, false, '') } else { setBanReason(''); setBanTarget(s) }
+  }
+
+  const confirmBan = async () => {
+    if (!banTarget) return
+    await doBan(banTarget, true, banReason.trim() || 'مخالفة سياسات الأكاديمية')
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -340,6 +377,14 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
                       {meta.label}
                     </span>
                   </div>
+                  {/* 👑 v10.16 — شارة الحظر الملكية: الإدارة ترى المحظورين من النظرة الأولى */}
+                  {s.banned && (
+                    <div className="absolute top-2.5 right-2.5 z-10">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-black rounded-full px-2 py-0.5 border border-red-400/60 bg-red-500/25 text-red-100 backdrop-blur-sm shadow-[0_0_12px_rgba(239,68,68,0.45)]">
+                        <Ban className="w-2.5 h-2.5" /> محظور
+                      </span>
+                    </div>
+                  )}
                   <div className="relative flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                       <div className="absolute inset-0 bg-gold/40 blur-sm rounded-2xl scale-90" />
@@ -418,10 +463,15 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
                     <Calendar className="w-2.5 h-2.5 text-gold/70" />
                     <span>انضم في {s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : '-'}</span>
                   </div>
-                  {/* Actions */}
+                  {/* Actions — 👑 v10.16 أُضيف زر مرسوم الحظر الملكي */}
                   <div className="flex gap-1.5 pt-1 border-t border-gold/15">
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => setSelectedStudent(s)}>
                       <Eye className="w-3 h-3 ml-1" /> الملف الكامل
+                    </Button>
+                    <Button size="sm" variant="ghost" className={`h-8 w-9 p-0 ${s.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={s.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب — مرسوم الحظر الملكي'} onClick={() => requestBan(s)}>
+                      {s.banned
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        : <Ban className="w-3.5 h-3.5 text-rose-500" />}
                     </Button>
                     <Button size="sm" variant="ghost" className="h-8 w-9 p-0 hover:bg-gold/10" title="تعديل البيانات (الهاتف/النبذة)" onClick={() => openEdit(s)}>
                       <PencilLine className="w-3.5 h-3.5 text-gold" />
@@ -471,6 +521,17 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
             </div>
 
             <div className="p-5 space-y-4 bg-gradient-to-b from-gold/[0.04] to-white">
+              {/* 👑 v10.16 — لافتة الحظر داخل الملف الكامل */}
+              {selectedStudent.banned && (
+                <div className="rounded-xl border border-red-400/40 bg-red-500/[0.08] p-3 flex items-start gap-2.5">
+                  <ShieldAlert className="w-4.5 h-4.5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[12.5px] font-black text-red-700">هذا الحساب محظور حالياً — التطبيق محجوب عنه ببطاقة الحظر الملكية</div>
+                    {selectedStudent.banned_reason && <div className="text-[11px] text-red-600/90 mt-0.5">السبب: {selectedStudent.banned_reason}</div>}
+                    {selectedStudent.banned_at && <div className="text-[10px] text-muted-foreground mt-0.5">بتاريخ: {new Date(selectedStudent.banned_at).toLocaleString('ar-EG')}</div>}
+                  </div>
+                </div>
+              )}
               {/* Quick stats */}
               <div className="grid grid-cols-3 gap-2.5">
                 <div className="fia-card-hover p-3 bg-gradient-to-br from-navy to-navy-light border border-gold/25 rounded-xl text-center">
@@ -624,6 +685,39 @@ const AdminStudentsRoyal = React.memo(function AdminStudentsRoyal() {
             <Button variant="outline" onClick={() => setEditing(null)} disabled={savingEdit} className="rounded-xl border-gold/30 flex-1">إلغاء</Button>
             <Button onClick={handleSaveEdit} disabled={savingEdit} className="fia-lux-shine flex-1 bg-gradient-to-r from-navy to-navy-light hover:from-navy-light hover:to-navy text-gold rounded-xl shadow-md border border-gold/30">
               {savingEdit ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري الحفظ...</> : <><Save className="w-4 h-4 ml-1" /> حفظ التعديلات</>}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 👑 v10.16 — حوار مرسوم الحظر الملكي: حظر حساب متدرب بقرار الإدارة */}
+      <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o && !banning) setBanTarget(null) }}>
+        <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 25% 40%, #D4AF37 1.5px, transparent 1.5px)',
+              backgroundSize: '20px 20px',
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-2xl bg-red-500/15 border border-red-400/40 flex items-center justify-center mb-2">
+              <Ban className="w-7 h-7 text-red-400" />
+            </div>
+            <DialogTitle className="text-white text-xl font-bold">حظر الحساب: {banTarget?.name}</DialogTitle>
+            <p className="relative text-white/70 text-xs mt-1" dir="ltr">{banTarget?.email}</p>
+          </div>
+          <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
+            <div>
+              <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمتدرب على بطاقة الحظر)</Label>
+              <Textarea value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مثال: مخالفة سياسات الأكاديمية — تكرار إساءة الاستخدام" rows={3} className="min-h-[80px] rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+            </div>
+            <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3 text-[11px] text-navy/80 flex items-start gap-2">
+              <ShieldAlert className="w-3.5 h-3.5 text-gold mt-0.5 flex-shrink-0" />
+              <span>سيظهر للمتدرب فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. حسابات الإدارة وأعضاء الفريق محمية ولا تُحظر أبداً.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 p-4 bg-muted/20 border-t border-gold/15">
+            <Button variant="outline" onClick={() => setBanTarget(null)} disabled={banning} className="rounded-xl border-gold/30 flex-1">إلغاء</Button>
+            <Button onClick={confirmBan} disabled={banning} className="fia-lux-shine flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-rose-600 hover:to-red-600 text-white rounded-xl shadow-md">
+              {banning ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري تنفيذ الحظر…</> : <><Ban className="w-4 h-4 ml-1" /> 🚫 تأكيد الحظر</>}
             </Button>
           </div>
         </DialogContent>

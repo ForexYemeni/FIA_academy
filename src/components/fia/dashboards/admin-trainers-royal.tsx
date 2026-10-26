@@ -10,12 +10,15 @@ import {
   GraduationCap, Plus, Edit, Trash2, Mail, Phone, Lock, Eye, EyeOff, User,
   Award, Briefcase, FileText, Crown, Loader2, CheckCircle2, Users, Sparkles,
   CalendarClock, BadgeCheck, Upload, X, BadgePercent, Landmark, Bitcoin, Wallet, HeartHandshake,
-  Trophy, Star, Globe2, ShieldCheck,
+  Trophy, Star, Globe2, ShieldCheck, Ban, ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { PasswordConfirmDialog } from '@/components/fia/password-confirm-dialog'
 import { supabasePublic } from '@/lib/supabase'
 import { useSpecializationCatalog } from '@/lib/use-specializations'
@@ -41,6 +44,10 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
   const [search, setSearch] = useState('')
   const [titleFilter, setTitleFilter] = useState('')
   const [specFilter, setSpecFilter] = useState('')
+  // 👑 v10.16 — مرسوم الحظر الملكي: حظر/رفع حظر حساب مدرب بقرار الإدارة
+  const [banTarget, setBanTarget] = useState<any | null>(null)
+  const [banReason, setBanReason] = useState('')
+  const [banning, setBanning] = useState(false)
   // ⚡ ROYAL v4.4 — عدادات المتابعين لكل مدرب (متحف المتابعين)
   const [followCounts, setFollowCounts] = useState<Record<string, number>>({})
   // 🎓 الكتالوج المهني الموحد — المسميات والتخصصات من قسم «التخصصات» (بديل القوائم الثابتة)
@@ -126,6 +133,40 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  // 👑 v10.16 — مرسوم الحظر الملكي: تنفيذ الحظر/رفع الحظر عبر /api/admin/ban
+  // (الـ API يحمي حسابات الإدارة وأعضاء الفريق — لا يمكن حظرهم أبداً)
+  const doBan = async (target: any, banned: boolean, reason: string) => {
+    setBanning(true)
+    try {
+      const res = await fetch('/api/admin/ban', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: target.id, banned, reason }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast.error(data?.error || 'فشل تنفيذ الحظر')
+        return
+      }
+      setItems((prev) => prev.map((x) => x.id === target.id ? { ...x, banned, banned_reason: banned ? (reason || 'مخالفة سياسات الأكاديمية') : null, banned_at: banned ? new Date().toISOString() : null } : x))
+      toast.success(banned ? `🚫 تم حظر حساب المدرب "${target.name}" — ستظهر له بطاقة الحظر الملكية فوراً` : `✅ رُفع الحظر عن المدرب "${target.name}" — عاد الحساب للعمل بشكل طبيعي فوراً`)
+      setBanTarget(null)
+      setBanReason('')
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setBanning(false)
+    }
+  }
+
+  // نقطة الدخول: أعضاء الفريق محميون — محظور = رفع الحظر مباشرة، غير محظور = حوار مرسوم الحظر
+  const requestBan = (t: any) => {
+    const isTeam = t.password && t.password.startsWith('__TEAM_MEMBER__')
+    if (isTeam) { toast.error('أعضاء الفريق من الإدارة — لا يمكن حظرهم'); return }
+    if (t.banned) { doBan(t, false, '') } else { setBanReason(''); setBanTarget(t) }
+  }
+
+  const confirmBan = async () => {
+    if (!banTarget) return
+    await doBan(banTarget, true, banReason.trim() || 'مخالفة سياسات الأكاديمية')
   }
 
   // Filters
@@ -277,16 +318,27 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
                         {t.payment_method_type === 'عملات رقمية' ? <Bitcoin className="w-3 h-3" /> : <Landmark className="w-3 h-3" />} {t.payment_method_name}
                       </span>
                     )}
+                    {/* 👑 v10.16 — شارة الحظر الملكية */}
+                    {t.banned && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-100 bg-red-500/25 border border-red-400/60 rounded-full px-2 py-0.5 shadow-[0_0_12px_rgba(239,68,68,0.45)]">
+                        <Ban className="w-3 h-3" /> محظور
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-1 pt-1.5 border-t border-gold/15 text-right">
                     {t.email && <LuxRow icon={Mail}><span dir="ltr">{t.email}</span></LuxRow>}
                     {t.phone && <LuxRow icon={Phone}><span dir="ltr">{t.phone}</span></LuxRow>}
                     {!t.email && !t.phone && <div className="text-[10px] text-muted-foreground text-center py-1">لا توجد بيانات تواصل</div>}
                   </div>
-                  {/* Actions */}
+                  {/* Actions — 👑 v10.16 أُضيف زر مرسوم الحظر الملكي */}
                   <div className="flex gap-1.5 pt-1.5 border-t border-gold/15">
                     <Button size="sm" variant="outline" className="flex-1 h-8 text-[11px] rounded-lg border-gold/35 hover:border-gold hover:bg-gold/10 font-bold" onClick={() => { setEditing(t); setOpen(true) }}>
                       <Edit className="w-3 h-3 ml-1" /> تعديل
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={isTeamMember} className={`h-8 w-9 p-0 disabled:opacity-30 disabled:cursor-not-allowed ${t.banned ? 'hover:bg-emerald-500/10' : 'hover:bg-rose-500/10'}`} title={isTeamMember ? 'أعضاء الفريق من الإدارة — لا يمكن حظرهم' : t.banned ? 'رفع الحظر — إعادة تفعيل الحساب فوراً' : 'حظر الحساب — مرسوم الحظر الملكي'} onClick={() => requestBan(t)}>
+                      {t.banned
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        : <Ban className="w-3.5 h-3.5 text-rose-500" />}
                     </Button>
                     <Button size="sm" variant="outline" disabled={isTeamMember || checkingTeam} className="h-8 w-9 p-0 border-rose-500/30 text-rose-500 hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => requestDelete(t)} title={isTeamMember ? 'لا يمكن حذف عضو الفريق' : 'حذف'}>
                       {checkingTeam ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
@@ -300,6 +352,39 @@ const AdminTrainersRoyal = React.memo(function AdminTrainersRoyal() {
       )}
 
       {open && <TrainerDialogRoyal open={open} onOpenChange={setOpen} initial={editing} onSaved={load} />}
+
+      {/* 👑 v10.16 — حوار مرسوم الحظر الملكي: حظر حساب مدرب بقرار الإدارة */}
+      <Dialog open={!!banTarget} onOpenChange={(o) => { if (!o && !banning) setBanTarget(null) }}>
+        <DialogContent className="sm:max-w-md p-0 border-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="relative bg-gradient-to-br from-navy via-navy-light to-navy px-5 pt-5 pb-5 text-center overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: 'radial-gradient(circle at 25% 40%, #D4AF37 1.5px, transparent 1.5px)',
+              backgroundSize: '20px 20px',
+            }} />
+            <div className="relative w-14 h-14 mx-auto rounded-2xl bg-red-500/15 border border-red-400/40 flex items-center justify-center mb-2">
+              <Ban className="w-7 h-7 text-red-400" />
+            </div>
+            <DialogTitle className="text-white text-xl font-bold">حظر الحساب: {banTarget?.name}</DialogTitle>
+            <p className="relative text-white/70 text-xs mt-1" dir="ltr">{banTarget?.email}</p>
+          </div>
+          <div className="p-5 bg-gradient-to-b from-navy/5 to-white space-y-4">
+            <div>
+              <Label className="text-xs font-bold text-navy mb-1.5 block">سبب الحظر (يظهر للمدرب على بطاقة الحظر)</Label>
+              <Textarea value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="مثال: مخالفة سياسات الأكاديمية — تكرار إساءة الاستخدام" rows={3} className="min-h-[80px] rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
+            </div>
+            <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3 text-[11px] text-navy/80 flex items-start gap-2">
+              <ShieldAlert className="w-3.5 h-3.5 text-gold mt-0.5 flex-shrink-0" />
+              <span>سيظهر للمدرب فوراً بطاقة حظر ملكية تحجب التطبيق كاملاً — حتى لو كان مفتوحاً الآن — وسيبقى بإمكانه مراسلة الإدارة عبر الدردشة الفورية أو قنوات التواصل. أعضاء الفريق وحسابات الإدارة محمية ولا تُحظر أبداً.</span>
+            </div>
+          </div>
+          <div className="flex gap-2 p-4 bg-muted/20 border-t border-gold/15">
+            <Button variant="outline" onClick={() => setBanTarget(null)} disabled={banning} className="rounded-xl border-gold/30 flex-1">إلغاء</Button>
+            <Button onClick={confirmBan} disabled={banning} className="fia-lux-shine flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-rose-600 hover:to-red-600 text-white rounded-xl shadow-md">
+              {banning ? <><Loader2 className="w-4 h-4 ml-1 animate-spin" /> جاري تنفيذ الحظر…</> : <><Ban className="w-4 h-4 ml-1" /> 🚫 تأكيد الحظر</>}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PasswordConfirmDialog
         open={!!deleteTarget}
