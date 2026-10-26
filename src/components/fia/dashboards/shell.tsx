@@ -113,6 +113,19 @@ export function DashboardShell({
   const logout = useAuth((s) => s.logout)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // 🚫 v10.18 — «لا تحديث أثناء القائمة المفتوحة» داخل APK:
+  // القائمة الجانبية مفتوحة → نُطفئ السحب-للتحديث الأصلي (SwipeRefreshLayout)
+  // عبر جسر FIANativeBridge.setPullToRefreshEnabled — وعند الإغلاق يُعاد تشغيله.
+  // آمن تماماً على المتصفح وعلى نسخ APK الأقدم (فحص وجود الدالة قبل النداء).
+  useEffect(() => {
+    try {
+      const bridge = (window as any)?.FIANativeBridge
+      if (bridge && typeof bridge.setPullToRefreshEnabled === 'function') {
+        bridge.setPullToRefreshEnabled(!mobileOpen)
+      }
+    } catch {}
+  }, [mobileOpen])
+
   // ⚡ v6.6 — عدادات القائمة الجانبية الملكية:
   // مصدر الحقيقة = إشعارات الجرس المنشورة (بلا أي طلب شبكي إضافي).
   // لكل قسم نحسب عدد الإشعارات غير المقروءة التي تشير إليه

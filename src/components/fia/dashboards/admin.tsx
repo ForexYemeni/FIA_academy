@@ -12,7 +12,7 @@ import {
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
   Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
   ClipboardCheck, Landmark, Megaphone, BellRing, CalendarDays,
-  Wrench, Timer,
+  Wrench, Timer, ClipboardCopy, ClipboardList,
 } from 'lucide-react'
 import { fiaAnnounceType, fiaFormatArabicDate, broadcastSettingsUpdated } from '@/components/fia/lux-experience'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
@@ -3988,6 +3988,62 @@ const AdminSite = React.memo(function AdminSite() {
   const [bcResult, setBcResult] = useState<null | { sent: number; breakdown: { students: number; trainers: number; admins: number }; title: string; message: string; at: string }>(null)
   const [errReports, setErrReports] = useState<any[]>([])
   const [errLoading, setErrLoading] = useState(false)
+
+  // 👑 v10.18 — «نسخ كبرومبت جاهز 100%»: يحوّل تقريراً أو السجل كاملاً إلى
+  // موجز تشخيص مُهندل يُلصق مباشرة في أي مساعد ذكي — بلا فقدان أي تفصيلة.
+  const copyTextSmart = async (text: string) => {
+    try {
+      if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'; ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus(); ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch { return false }
+  }
+  const buildErrorPrompt = (reports: any[]) => {
+    const one = (r: any, i: number) => {
+      const body = String(r.body || '')
+      const lines = body.split('\n')
+      const message = lines[0] || 'خطأ غير موصوف'
+      const stack = lines.filter((l) => !/^(الصفحة:|التتبع:)/.test(l.trim())).slice(1).join('\n').trim()
+      const pageLine = (lines.find((l) => l.startsWith('الصفحة:')) || '').replace('الصفحة:', '').trim()
+      const page = pageLine || String(r.link || '') || 'غير معروفة'
+      const when = r.created_at ? new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }) : 'غير معروف'
+      return [
+        `### خطأ #${i + 1}`,
+        `- العنوان: ${String(r.title || '').replace(/^[^\s]*\s*/, '')}`,
+        `- الرسالة: ${message}`,
+        `- الصفحة: ${page}`,
+        `- الوقت: ${when}`,
+        stack ? `- التتبع الكامل (Stack Trace):\n\`\`\`\n${stack}\n\`\`\`` : '- التتبع: غير متوفر',
+      ].join('\n')
+    }
+    const list = reports.slice(0, 20).map(one).join('\n\n')
+    return [
+      'مرحباً، أرسل لك تقرير أخطاء حقيقي من موقع وتطبيق «أكاديمية المستقبل الدولية» (Next.js 15 App Router + Supabase + Vercel).',
+      'أرجو تحليل السبب الجذري لكل خطأ ثم إعطائي إصلاحاً دقيقاً جاهزاً للتطبيق، مع بيان الملف المسؤول إن أمكن.',
+      '',
+      '## تقارير الأخطاء (من سجل الأخطاء الحي المدمج في الموقع — يلتقط window.onerror و unhandledrejection):',
+      '',
+      list,
+      '',
+      'ملاحظة: مسارات الـ chunks في التتبع هي ملفات Next.js مُصغّرة على الإنتاج — إذا كان الخطأ ambiguous أخبرني بأي مكوّن/صفحة أضبط لك تحديداً.',
+    ].join('\n')
+  }
+  const copyOneReport = async (r: any) => {
+    const ok = await copyTextSmart(buildErrorPrompt([r]))
+    ok ? toast.success('نُسخ التقرير كبرومبت جاهز — الصقه مباشرة') : toast.error('تعذر النسخ — انسخه يدوياً')
+  }
+  const copyAllReports = async () => {
+    const ok = await copyTextSmart(buildErrorPrompt(errReports))
+    ok ? toast.success(`نُسخ السجل كاملاً (${Math.min(errReports.length, 20)} تقريراً) كبرومبت جاهز`) : toast.error('تعذر النسخ — انسخه يدوياً')
+  }
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
   // دورات الرسائل الجماعية + سجل الأخطاء عند فتح تبويبهما
@@ -5150,13 +5206,24 @@ const AdminSite = React.memo(function AdminSite() {
                     <div className="text-white font-black text-sm">سجل الأخطاء الحي</div>
                     <div className="text-gold/80 text-[11px] mt-0.5">كل خلل في أي جهاز يصلك إشعاراً فورياً — وهنا يُرصد السجل الكامل</div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      if (!confirm('مسح سجل الأخطاء كاملاً؟')) return
-                      try { await fetch('/api/error-reports', { method: 'DELETE' }); setErrReports([]); toast.success('مُسح السجل بنجاح') } catch {}
-                    }}
-                    className="text-[10px] font-black text-red-300 bg-red-500/10 border border-red-400/40 rounded-full px-3 py-1.5 hover:bg-red-500/20 transition-colors flex-shrink-0"
-                  >مسح السجل</button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* 👑 v10.18 — نسخ السجل كاملاً كبرومبت جاهز 100% */}
+                    <button
+                      onClick={copyAllReports}
+                      className="text-[10px] font-black text-gold bg-gold/10 border border-gold/40 rounded-full px-3 py-1.5 hover:bg-gold/20 transition-colors flex items-center gap-1"
+                      title="نسخ السجل كاملاً كموجز تشخيص جاهز للإرسال"
+                    >
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      نسخ كبرومبت جاهز
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('مسح سجل الأخطاء كاملاً؟')) return
+                        try { await fetch('/api/error-reports', { method: 'DELETE' }); setErrReports([]); toast.success('مُسح السجل بنجاح') } catch {}
+                      }}
+                      className="text-[10px] font-black text-red-300 bg-red-500/10 border border-red-400/40 rounded-full px-3 py-1.5 hover:bg-red-500/20 transition-colors flex-shrink-0"
+                    >مسح السجل</button>
+                  </div>
                 </div>
               </div>
               <div className="relative p-4">
@@ -5188,6 +5255,15 @@ const AdminSite = React.memo(function AdminSite() {
                             <div className="text-[10px] text-muted-foreground mt-1 break-all" dir="ltr">{r.link || ''}</div>
                             <div className="text-[10px] text-muted-foreground/80 mt-0.5">{new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })}</div>
                           </div>
+                          {/* 👑 v10.18 — نسخ التقرير كبرومبت جاهز بنقرة واحدة */}
+                          <button
+                            onClick={() => copyOneReport(r)}
+                            title="نسخ هذا الخطأ كبرومبت تشخيص جاهز"
+                            aria-label="نسخ كبرومبت"
+                            className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/40 text-gold hover:bg-gold/20 flex items-center justify-center flex-shrink-0 transition-colors active:scale-95"
+                          >
+                            <ClipboardCopy className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     ))}

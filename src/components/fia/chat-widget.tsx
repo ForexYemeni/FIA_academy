@@ -38,11 +38,15 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     window.addEventListener('fia-fab:chat', onFabOpen)
     return () => window.removeEventListener('fia-fab:chat', onFabOpen)
   }, [])
-  // 👑 v10.11 — «دردشة فورية مع الإدارة» من بطاقة الحظر الملكية:
-  // يفتح محادثة مباشرة مع حساب الإدارة الأساسي (api/admin/contact)
+  // 🚫 v10.18 — وضع الحظر المفروض: المستخدم المحظور محادثته مع الإدارة فقط —
+  // بلا بحث، بلا رجوع، بلا حذف — وإغلاق النافذة يعيد بطاقة الحظر فوراً.
+  // يُفرض أيضاً لو فُتحت الدردشة من أي مكان آخر وهو محظور.
+  const userBanned = !!user?.banned
+  const [banMode, setBanMode] = useState(false)
   useEffect(() => {
     const onBanChat = (e: Event) => {
       const detail = (e as CustomEvent)?.detail as { id?: string; name?: string; avatar?: string } | null
+      setBanMode(true)
       setOpen(true)
       if (detail?.id) {
         openConversation({ id: detail.id, name: detail.name || 'إدارة الأكاديمية', avatar: detail.avatar })
@@ -51,6 +55,29 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     window.addEventListener('fia-ban:chat-admin', onBanChat)
     return () => window.removeEventListener('fia-ban:chat-admin', onBanChat)
   })
+  // لو فُتحت الدردشة من مركز الأدوات والمستخدم محظور → يُفرض وضع الإدارة فقط
+  useEffect(() => {
+    if (userBanned && open) setBanMode(true)
+    if (!userBanned) setBanMode(false)
+  }, [userBanned, open])
+  // 🚫 v10.18 — في وضع الحظر بلا مستلم محدد (فتح من مركز الأدوات): نجلب هوية
+  // الإدارة تلقائياً ونفتح المحادثة معها مباشرة — لا قائمة ولا بحث أبداً.
+  useEffect(() => {
+    if (!banMode || !open || recipient) return
+    let alive = true
+    fetch('/api/admin/contact')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.id) openConversation({ id: d.id, name: d.name || 'إدارة الأكاديمية', avatar: d.avatar || undefined, role: 'admin' })
+      })
+      .catch(() => {})
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [banMode, open, recipient])
+  const closeChat = useCallback(() => {
+    setOpen(false)
+    if (banMode) window.dispatchEvent(new CustomEvent('fia-ban:chat-closed'))
+  }, [banMode])
   // ⚡ NEW: typing indicator + read receipts + online status
   const [isTyping, setIsTyping] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
@@ -93,6 +120,8 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   }
 
   const goBack = () => {
+    // 🚫 v10.18 — في وضع الحظر: لا رجوع لقائمة البحث إطلاقاً (الإدارة فقط)
+    if (banMode) return
     setView('search')
     setRecipient(null)
     setActiveConvId(null)
@@ -290,7 +319,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const send = async () => {
-    if (!draft.trim() || !user?.id) return
+    if (!draft.trim() || !user?.id || sending) return
     setSending(true)
     const body = draft
     setDraft('')
@@ -299,13 +328,27 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     try {
       let targetId = recipient?.id || ''
       if (!targetId && activeConvId) { const conv = conversations.find((c) => c.id === activeConvId); if (conv?.other_id) targetId = conv.other_id }
-      if (!targetId) { toast.error('فشل'); return }
+      if (!targetId) {
+        toast.error('لم يُحدد مستلم الرسالة — أعد فتح المحادثة')
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+        setDraft(body)
+        return
+      }
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender_id: user.id, recipient_id: targetId, body }) })
       const data = await res.json()
-      if (!res.ok) { toast.error(data.error || 'فشل'); return }
+      if (!res.ok) {
+        toast.error(data.error || 'فشل الإرسال — أعد المحاولة')
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+        setDraft(body)
+        return
+      }
       if (!activeConvId && data.conversation_id) { setActiveConvId(data.conversation_id); loadConversations() }
       setMessages((prev) => prev.map((m) => m.id === optimistic.id ? { ...data.message, sender: optimistic.sender } : m))
-    } catch { toast.error('فشل الإرسال'); setMessages((prev) => prev.filter((m) => m.id !== optimistic.id)) }
+    } catch {
+      toast.error('فشل الإرسال — تحقق من الاتصال')
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+      setDraft(body)
+    }
     finally { setSending(false) }
   }
 
@@ -324,15 +367,21 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
     return ''
   }
 
+  // 🚫 v10.18 — في وضع الحظر: المحادثة مع الإدارة فقط — لا قائمة بحث أبداً
+  const effectiveView: 'search' | 'chat' = banMode ? 'chat' : view
+
   return (
     <>
       {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الدردشة تُفتح من مركز الأدوات (FiaFabHub)
           عبر حدث النافذة الموحد — بلا أي ازدواج أزرار أسفل الشاشة */}
       {/* Overlay */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-[min(860px,calc(100vw-3rem))] h-[min(560px,calc(100vh-8rem))] bg-white rounded-2xl overflow-hidden flex flex-col border-2 border-gold/30" style={{ boxShadow: '0 20px 60px rgba(11, 22, 53, 0.35), 0 0 40px -10px rgba(212, 175, 55, 0.4)' }}>
+        <div
+          className={`fixed bottom-24 right-6 w-[min(860px,calc(100vw-3rem))] h-[min(560px,calc(100vh-8rem))] bg-white rounded-2xl overflow-hidden flex flex-col border-2 border-gold/30 ${banMode ? 'z-[9996]' : 'z-50'}`}
+          style={{ boxShadow: '0 20px 60px rgba(11, 22, 53, 0.35), 0 0 40px -10px rgba(212, 175, 55, 0.4)' }}
+        >
 
-          {view === 'search' ? (
+          {effectiveView === 'search' ? (
             // ==================== VIEW 1: SEARCH ====================
             <>
               {/* ⚡ Magical header */}
@@ -354,7 +403,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                 </div>
                 {/* 👑 v10.5 — زر إغلاق في ترويسة البحث (كان الإغلاق عبر الزر العائم المُزال) */}
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={closeChat}
                   className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors"
                   title="إغلاق"
                   aria-label="إغلاق المحادثات"
@@ -466,7 +515,12 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                   backgroundImage: 'radial-gradient(circle at 12% 50%, #D4AF37 1px, transparent 1px)',
                   backgroundSize: '14px 14px'
                 }} />
-                <button onClick={goBack} className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0" title="رجوع">
+                <button
+                  onClick={goBack}
+                  disabled={banMode}
+                  className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-30 disabled:pointer-events-none"
+                  title={banMode ? 'محادثة الإدارة فقط' : 'رجوع'}
+                >
                   <ArrowRight className="w-4 h-4 text-gold" />
                 </button>
                 <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-gold/40">
@@ -483,7 +537,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                     )}
                   </div>
                 </div>
-                {activeConvId && (
+                {activeConvId && !banMode && (
                   <button
                     onClick={(e) => requestDelete(activeConvId, otherName, e)}
                     className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-red-500/30 text-white flex items-center justify-center flex-shrink-0 transition-colors"
@@ -492,7 +546,7 @@ export function ChatWidget({ initialRecipientId, initialRecipientName }: { initi
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors" title="إغلاق">
+                <button onClick={closeChat} className="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors" title="إغلاق">
                   <X className="w-4 h-4 text-gold" />
                 </button>
               </div>

@@ -11,6 +11,11 @@ export interface User {
    *  `user.password` directly because the login route never returns
    *  the actual password to the client (security best practice). */
   team_role?: string
+  /** 🚫 v10.18 — حالة الحظر: تُضبط لحظة تسجيل الدخول من مسار الدخول نفسه
+   *  ولفحص الحرس الحي — فيرسم SessionGuard بطاقة الحظر فوراً قبل أي صفحة
+   *  (صفر وميض للوحة التحكم) وتبقى عبر إعادة التحميل (persist). */
+  banned?: boolean
+  ban_reason?: string
   avatar?: string | null
   title?: string | null
   bio?: string | null

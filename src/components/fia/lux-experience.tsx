@@ -43,7 +43,9 @@ function fetchSiteSettings(force = false): Promise<any> {
     return Promise.resolve(__settingsCache)
   }
   if (!__settingsPromise) {
-    __settingsPromise = fetch('/api/site-settings')
+    // 👑 v10.18 — التحديث القسري (بعد حفظ الإدارة) يحمل cache-bust كي لا
+    // يعيده كاش حافة Vercel قديماً خلال ثواني s-maxage الستين
+    __settingsPromise = fetch(`/api/site-settings${force ? `?_=${Date.now()}` : ''}`)
       .then((r) => r.json())
       .then((d) => { __settingsCache = d || {}; __settingsAt = Date.now(); __settingsPromise = null; return __settingsCache })
       .catch(() => { __settingsPromise = null; if (!__settingsCache) { __settingsCache = {}; __settingsAt = Date.now() }; return __settingsCache })
@@ -63,7 +65,26 @@ export function useSiteSettings() {
   useEffect(() => {
     let alive = true
     fetchSiteSettings().then((d) => { if (alive) setSettings(d) })
-    return () => { alive = false }
+    // 👑 v10.18 — تحديث حي: حفظ الإعدادات في لوحة الإدارة ينعكس فوراً على
+    // كل المكونات المفتوحة (مفتاح الزاوية، الإعلانات، الشريط، الصيانة…)
+    const onUpdated = () => { fetchSiteSettings(true).then((d) => { if (alive) setSettings(d) }) }
+    // وعند العودة للتطبيق: تحديث صامت إن تجاوزت البيانات مدة صلاحيتها
+    const onFocus = () => {
+      if (__settingsCache && Date.now() - __settingsAt > SETTINGS_TTL) {
+        fetchSiteSettings(true).then((d) => { if (alive) setSettings(d) })
+      }
+    }
+    try {
+      window.addEventListener('fia-settings-updated', onUpdated)
+      window.addEventListener('focus', onFocus)
+    } catch {}
+    return () => {
+      alive = false
+      try {
+        window.removeEventListener('fia-settings-updated', onUpdated)
+        window.removeEventListener('focus', onFocus)
+      } catch {}
+    }
   }, [])
   return settings
 }
@@ -287,6 +308,9 @@ export function LuxRoyalMessage() {
   const list = useMemo(() => readFiaAnnouncements(settings), [settings])
   const latest = list[0] || null
   const meta = latest ? fiaAnnounceType(latest.type) : null
+  // 🚫 v10.18 — مصدر حي لآخر إعلان للمعالجات (يحل أي تقادم إغلاق)
+  const latestIdRef = useRef<string | null>(null)
+  useEffect(() => { latestIdRef.current = latest ? String((latest as any).id) : null }, [latest])
 
   // نبض الشمع فقط إذا آخر إعلان جديد (لم يُقرأ بعد) — في الرئيسية فقط
   useEffect(() => {
@@ -296,31 +320,41 @@ export function LuxRoyalMessage() {
     setPulsing(!read)
   }, [latest?.id, pathname])
 
+  // 🚫 v10.18 — الإصلاح الجذري لخطأ «Cannot access 'b' before initialization»:
+  // كان openLetter/closeLetter مُعرّفَين بعد العائد المبكر — فعندما تكون الزاوية
+  // مطفأة أو لا توجد إعلانات يبقى مستمع المركز العائم مسجلاً على متغير في منطقة
+  // ميتة وينفجر عند الضغط. الآن الدالتان مُعرّفان دائماً قبل أي عائد مبكر.
+  const openLetter = useCallback(() => {
+    setOpen(true)
+    setClosing(false)
+    setPulsing(false)
+    const id = latestIdRef.current
+    if (id) { try { localStorage.setItem('fia-royal-msg-read', id) } catch {} }
+  }, [])
+  const closeLetter = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(() => { setOpen(false); setClosing(false) }, 400)
+  }, [closing])
+
   // 👑 v10.5 — الفتح من مركز الأدوات العائم (FAB) على أي صفحة — بلا زر عائم مستقل
   useEffect(() => {
     const onFabOpen = () => {
-      if (!latest) return
+      if (!latestIdRef.current) {
+        // لا إعلانات — رسالة راقية بدل الانفجار أو الصمت
+        try {
+          import('sonner').then(({ toast }) => toast('لا توجد إعلانات جديدة حالياً', { description: 'ستظهر إعلانات الإدارة هنا فور صدورها' }))
+        } catch {}
+        return
+      }
       openLetter()
     }
     window.addEventListener('fia-fab:announce', onFabOpen)
     return () => window.removeEventListener('fia-fab:announce', onFabOpen)
-  }, [latest?.id])
+  }, [openLetter])
 
   if (!cornerEnabled || !latest || !meta) return null
 
-  // 👑 v10.11 — الإغلاق الملكي: طيّ أنيق بحركة خروج كاملة قبل التفكيك
-  const closeLetter = () => {
-    if (closing) return
-    setClosing(true)
-    setTimeout(() => { setOpen(false); setClosing(false) }, 400)
-  }
-  // 👑 v10.11 — الفتح الملكي: ستارة متوهجة + ختم شمع يهبط + محتوى متدرج الظهور
-  const openLetter = () => {
-    setOpen(true)
-    setClosing(false)
-    setPulsing(false)
-    try { localStorage.setItem('fia-royal-msg-read', String(latest.id)) } catch {}
-  }
   const LatestIcon = meta.icon
 
   return (
@@ -981,6 +1015,11 @@ export function LuxPullToRefresh({ onRefresh, children }: { onRefresh: () => Pro
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (inNative || spinning) return
+    // 🚫 v10.18 — القائمة الجانبية (أو أي نافذة Radix) مفتوحة → لا سحب للتحديث أبداً
+    // (قفل تمرير الجسم يخدع فحص أعلى الصفحة فيُطلق التحديث أثناء التمرير)
+    try {
+      if (document.body?.hasAttribute('data-scroll-locked')) { pulling.current = false; return }
+    } catch {}
     if (getScrollTop() > 2) return
     startY.current = e.touches[0].clientY
     pulling.current = true

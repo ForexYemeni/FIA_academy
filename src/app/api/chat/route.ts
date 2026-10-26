@@ -197,6 +197,52 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
+    // 🚫 v10.18 — «المحظور يراسل الإدارة فقط» — حرس خادمي حديدي:
+    // أي إرسال من حساب محظور إلى غير حساب إداري يُرفض فوراً (403)،
+    // فلا طريق لأي محادثة خارج قناة الإدارة مهما كانت الأداة.
+    try {
+      const { data: senderRow } = await supabaseAdmin
+        .from('users')
+        .select('banned, role')
+        .eq('id', sender_id)
+        .maybeSingle()
+      let senderBanned = !!(senderRow as any)?.banned && (senderRow as any)?.role !== 'admin'
+      if (!senderBanned) {
+        const { data: trainerRow } = await supabaseAdmin
+          .from('trainers')
+          .select('banned, password')
+          .eq('id', sender_id)
+          .maybeSingle()
+        const isTeam = typeof (trainerRow as any)?.password === 'string'
+          && (trainerRow as any).password.startsWith('__TEAM_MEMBER__:')
+        senderBanned = !!(trainerRow as any)?.banned && !isTeam
+      }
+      if (senderBanned) {
+        // المستلم يجب أن يكون حساب إدارة (users.role = admin) — والمؤسس
+        // قد يُراسل بمعرّفه الإداري القياسي (canonical) أو بمعرّف فريقه القديم
+        const { data: recRow } = await supabaseAdmin
+          .from('users')
+          .select('role')
+          .eq('id', canonicalRecipientId)
+          .maybeSingle()
+        if ((recRow as any)?.role !== 'admin') {
+          // وعاء احتياطي: لو كان المعرف معرّف مدرب لعضو فريق (مؤسس)، يُقبل
+          const { data: recTrainer } = await supabaseAdmin
+            .from('trainers')
+            .select('password')
+            .eq('id', canonicalRecipientId)
+            .maybeSingle()
+          const recIsTeam = typeof (recTrainer as any)?.password === 'string'
+            && (recTrainer as any).password.startsWith('__TEAM_MEMBER__:')
+          if (!recIsTeam) {
+            return NextResponse.json({
+              error: 'حسابك موقوف حالياً — يمكنك التواصل مع الإدارة فقط',
+            }, { status: 403 })
+          }
+        }
+      }
+    } catch {}
+
     const senderAliases = await getAliasIds(sender_id)
     const recipientAliases = await getAliasIds(canonicalRecipientId)
 

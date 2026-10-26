@@ -2,12 +2,19 @@
 
 /**
  * ============================================================================
- * 👑✨ FiaFabHub — مركز الأدوات العائم الفاخر (v10.5)
+ * 👑✨ FiaFabHub — مركز الأدوات العائم الفاخر (v10.18)
  * ============================================================================
- * بدلاً من 4 أزرار عائمة متناثرة أسفل الشاشة (الوضع الليلي + الدردشة +
- * الدعم السريع + إعلانات الإدارة) — زر مركزي واحد أنيق، وعند الضغط عليه
- * تنبثق منه أيقونات دائرية فاخرة بحركة متدرجة:
- *   الدعم السريع ← الدردشة ← إعلانات الإدارة ← تواصل معنا ← الوضع الليلي
+ * زر مركزي واحد (+) يسار الشاشة، وعند الضغط عليه تنبثق لوحة شبكية زجاجية
+ * فاخرة فوق الزر مباشرة — كل الأدوات داخلها صفوفاً مرتّبة:
+ *   الدعم السريع ← الدردشة ← إعلانات الإدارة ← مشاركة التطبيق ← تواصل معنا ← الوضع
+ * 🚫 v10.18 — إصلاحات جذرية:
+ *   1) «إعلانات الإدارة» كانت تظهر حتى مع إطفاء الزاوية: تبعية settings
+ *      كانت مفقودة من useMemo — أُصلحت، والأيقونة تختفي فوراً عند الإطفاء.
+ *   2) أيقونات منبثقة عمودية كانت تتداخل مع محتوى الصفحات — صارت لوحة
+ *      واحدة محكمة (شبكة 2×N بشارّة ذهبية) لا تلمس شيئاً خلفها أبداً.
+ *   3) جلب الإعدادات أصبح مشتركاً مُخزّناً (useSiteSettings) بدل طلب مستقل
+ *      لكل تركيب — طلب واحد لكل الصفحات كل 60 ثانية (أداء أوضح).
+ *   4) النقر على «إعلانات الإدارة» بلا إعلانات يُظهر رسالة راقية بدل الصمت.
  * • لا يمس أي منطق مصادقة أو إشعارات — طبقة عرض مستقلة تماماً
  * • التواصل مع الأدوات الأخرى عبر أحداث نافذة مخصصة (fia-fab:*)
  * ============================================================================
@@ -19,6 +26,7 @@ import {
   LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing, Share2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
+import { useSiteSettings, readFiaAnnouncements } from '@/components/fia/lux-experience'
 import { toast } from 'sonner'
 
 const THEME_KEY = 'fia-theme'
@@ -33,26 +41,11 @@ function applyTheme(mode: 'dark' | 'light', animate: boolean) {
   else root.classList.remove('dark')
 }
 
-// قراءة خفيفة لإعدادات الموقع — لمعرفة إن وُجدت إعلانات إدارة + قراءة آخر إعلان
-function useFabSettings() {
-  const [settings, setSettings] = useState<any>(null)
-  useEffect(() => {
-    let alive = true
-    fetch('/api/site-settings')
-      .then((r) => r.json())
-      .then((d) => { if (alive) setSettings(d || {}) })
-      .catch(() => {})
-    return () => { alive = false }
-  }, [])
-  return settings
-}
-
 interface FabItem {
   id: string
   label: string
   icon: any
   grad: string
-  ring: string
   show: boolean
   badge?: boolean
   action: () => void
@@ -61,7 +54,8 @@ interface FabItem {
 export function FiaFabHub() {
   const router = useRouter()
   const user = useAuth((s) => s.user)
-  const settings = useFabSettings()
+  // 👑 v10.18 — إعدادات مشتركة مُخزّنة (طلب واحد لكل التطبيق) + تحديث حي
+  const settings = useSiteSettings()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'dark' | 'light' | null>(null)
   const [announceNew, setAnnounceNew] = useState(false)
@@ -83,10 +77,7 @@ export function FiaFabHub() {
   // هل هناك إعلان إدارة جديد لم يُقرأ؟ (نفس مفتاح القراءة الذي تستخدمه البطاقة)
   useEffect(() => {
     try {
-      const raw = settings?.admin_announcements
-      if (!raw) { setAnnounceNew(false); return }
-      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
-      const list = Array.isArray(arr) ? arr.filter((a: any) => a && a.active !== false && String(a.text || '').trim()) : []
+      const list = readFiaAnnouncements(settings)
       const latest = list[0]
       if (!latest) { setAnnounceNew(false); return }
       setAnnounceNew(localStorage.getItem('fia-royal-msg-read') !== String(latest.id))
@@ -107,10 +98,37 @@ export function FiaFabHub() {
   }, [])
 
   const items = useMemo<FabItem[]>(() => {
+    // 👑 v10.18 — الزاوية الإدارية مطفأة → أداتها تختفي من المركز فوراً
+    // (تبعية settings داخل الـ useMemo الآن صحيحة)
+    const cornerOn = settings?.admin_corner_enabled !== false
+    const hasAnnouncements = cornerOn && readFiaAnnouncements(settings).length > 0
     return [
       {
+        id: 'support', label: 'الدعم السريع', icon: LifeBuoy,
+        grad: 'from-emerald-500 to-teal-600',
+        show: true, action: () => dispatch('fia-fab:support'),
+      },
+      {
+        id: 'chat', label: 'الدردشة', icon: MessageCircle,
+        grad: 'from-sky-500 to-blue-600',
+        show: !!user, action: () => dispatch('fia-fab:chat'),
+      },
+      {
+        id: 'announce', label: 'إعلانات الإدارة', icon: BellRing,
+        grad: 'from-gold to-amber-500',
+        show: cornerOn, badge: announceNew,
+        action: () => {
+          // 👑 v10.18 — لا انفجار TDZ ولا صمت: رسالة راقية إن لم توجد إعلانات
+          if (!hasAnnouncements) {
+            toast('لا توجد إعلانات جديدة حالياً', { description: 'ستظهر إعلانات الإدارة هنا فور صدورها' })
+            return
+          }
+          dispatch('fia-fab:announce')
+        },
+      },
+      {
         id: 'share', label: 'مشاركة التطبيق', icon: Share2,
-        grad: 'from-violet-500 to-purple-600', ring: 'shadow-[0_0_22px_-4px_rgba(139,92,246,0.55)]',
+        grad: 'from-violet-500 to-purple-600',
         show: !isNativeApp,
         action: () => {
           try {
@@ -131,32 +149,17 @@ export function FiaFabHub() {
         },
       },
       {
-        id: 'support', label: 'الدعم السريع', icon: LifeBuoy,
-        grad: 'from-emerald-500 to-teal-600', ring: 'shadow-[0_0_22px_-4px_rgba(16,185,129,0.55)]',
-        show: true, action: () => dispatch('fia-fab:support'),
-      },
-      {
-        id: 'chat', label: 'الدردشة', icon: MessageCircle,
-        grad: 'from-sky-500 to-blue-600', ring: 'shadow-[0_0_22px_-4px_rgba(14,165,233,0.55)]',
-        show: !!user, action: () => dispatch('fia-fab:chat'),
-      },
-      {
-        id: 'announce', label: 'إعلانات الإدارة', icon: BellRing,
-        grad: 'from-gold to-amber-500', ring: 'shadow-[0_0_22px_-4px_rgba(212,175,55,0.6)]',
-        show: settings?.admin_corner_enabled !== false, badge: announceNew, action: () => dispatch('fia-fab:announce'),
-      },
-      {
         id: 'contact', label: 'تواصل معنا', icon: Mail,
-        grad: 'from-purple-500 to-fuchsia-600', ring: 'shadow-[0_0_22px_-4px_rgba(168,85,247,0.55)]',
+        grad: 'from-purple-500 to-fuchsia-600',
         show: true, action: () => router.push('/contact'),
       },
       {
         id: 'theme', label: mode === 'light' ? 'الوضع الليلي' : 'الوضع النهاري', icon: mode === 'light' ? Moon : Sun,
-        grad: 'from-navy via-navy-light to-navy', ring: 'ring-2 ring-gold/40',
+        grad: 'from-navy via-navy-light to-navy',
         show: true, action: toggleTheme,
       },
     ].filter((i) => i.show)
-  }, [user, mode, announceNew, dispatch, router, toggleTheme])
+  }, [user, mode, announceNew, settings, isNativeApp, dispatch, router, toggleTheme])
 
   // Escape يغلق المركز
   useEffect(() => {
@@ -173,45 +176,63 @@ export function FiaFabHub() {
       {/* ستارة خافتة تُغلق بالنقر */}
       {open && (
         <div
-          className="fixed inset-0 z-[58] bg-navy/25 backdrop-blur-[2px] transition-opacity"
+          className="fixed inset-0 z-[58] bg-navy/30 backdrop-blur-[2px] transition-opacity"
           onClick={() => setOpen(false)}
           aria-hidden
         />
       )}
 
-      {/* الأيقونات الدائرية المنبثقة — عمود قوسي فوق الزر المركزي */}
-      <div className="fixed bottom-[88px] left-6 z-[59] flex flex-col-reverse items-center gap-2.5" dir="rtl">
-        {items.map((item, idx) => {
-          const Icon = item.icon
-          const active = open
-          return (
-            <div key={item.id} className="relative flex items-center gap-2.5" style={{ flexDirection: 'row' }}>
-              {/* بطاقة الاسم — تظهر بجانب الأيقونة عند الفتح */}
-              <span
-                className={`whitespace-nowrap rounded-full border border-gold/35 bg-white/95 px-3 py-1 text-[11px] font-extrabold text-navy shadow-lg transition-all duration-300 ${
-                  active ? 'opacity-100 translate-x-0' : 'pointer-events-none opacity-0 translate-x-2'
-                }`}
-                style={{ transitionDelay: `${active ? 60 + idx * 45 : 0}ms` }}
-              >
-                {item.label}
-              </span>
+      {/* 👑 v10.18 — لوحة الأدوات الفاخرة: شبكة زجاجية محكمة فوق الزر مباشرة
+          — كل الأدوات «داخل» مركز + حرفياً وبلا أي تداخل مع الصفحات */}
+      <div
+        className={`fixed bottom-[92px] left-4 sm:left-6 z-[59] w-[min(320px,calc(100vw-2rem))] origin-bottom-left rounded-3xl border border-gold/35 bg-gradient-to-b from-[#0d2452]/97 via-[#0A1F44]/97 to-[#071838]/97 shadow-[0_24px_70px_-18px_rgba(0,0,0,0.75),0_0_40px_-12px_rgba(212,175,55,0.4)] backdrop-blur-xl transition-all duration-300 ${
+          open ? 'opacity-100 scale-100 translate-y-0' : 'pointer-events-none opacity-0 scale-90 translate-y-3'
+        }`}
+        dir="rtl"
+        role="menu"
+        aria-hidden={!open}
+      >
+        {/* ترويسة راقية رفيعة */}
+        <div className="relative px-4 pt-3.5 pb-2.5 overflow-hidden rounded-t-3xl">
+          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)', backgroundSize: '18px 18px',
+          }} />
+          <div className="relative flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rotate-45 bg-gold shadow-[0_0_8px_rgba(212,175,55,0.7)]" />
+            <span className="text-[11px] font-black tracking-[0.14em] text-gold/90">مركز الأدوات السريع</span>
+            <span className="h-px flex-1 bg-gradient-to-l from-gold/30 via-gold/10 to-transparent" />
+          </div>
+        </div>
+
+        {/* الشبكة الملكية — 2 أعمدة × صفوف */}
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3.5">
+          {items.map((item, idx) => {
+            const Icon = item.icon
+            return (
               <button
+                key={item.id}
                 onClick={() => { setOpen(false); item.action() }}
+                role="menuitem"
                 aria-label={item.label}
                 title={item.label}
-                className={`relative w-11 h-11 rounded-full bg-gradient-to-br ${item.grad} ${item.ring} text-white shadow-xl flex items-center justify-center border border-white/25 transition-all duration-300 ${
-                  active ? 'opacity-100 scale-100 translate-y-0' : 'pointer-events-none opacity-0 scale-[0.4] translate-y-3'
-                } hover:scale-110 active:scale-95`}
-                style={{ transitionDelay: `${active ? idx * 45 : 0}ms` }}
+                className={`group relative flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3 text-right transition-all duration-300 hover:border-gold/45 hover:bg-gold/[0.09] active:scale-[0.96] ${
+                  open ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+                }`}
+                style={{ transitionDelay: `${open ? 40 + idx * 35 : 0}ms` }}
               >
-                <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
-                {item.badge && active && (
-                  <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white animate-pulse" />
-                )}
+                <span className={`relative flex w-10 h-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.grad} shadow-md ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-110`}>
+                  <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
+                  {item.badge && (
+                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500 border-2 border-[#0A1F44] animate-pulse" />
+                  )}
+                </span>
+                <span className="flex-1 min-w-0 text-[12px] font-extrabold leading-snug text-white/90 group-hover:text-gold transition-colors">
+                  {item.label}
+                </span>
               </button>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
       {/* الزر المركزي الوحيد */}
@@ -219,7 +240,7 @@ export function FiaFabHub() {
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? 'إغلاق مركز الأدوات' : 'فتح مركز الأدوات'}
         aria-expanded={open}
-        className="fixed bottom-6 left-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-[0_10px_34px_-6px_rgba(11,22,53,0.55),0_0_28px_-6px_rgba(212,175,55,0.5)] flex items-center justify-center ring-2 ring-gold/40 hover:ring-gold/70 transition-all duration-300 hover:scale-105 active:scale-95"
+        className="fixed bottom-6 left-4 sm:left-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-navy via-navy-light to-navy text-gold shadow-[0_10px_34px_-6px_rgba(11,22,53,0.55),0_0_28px_-6px_rgba(212,175,55,0.5)] flex items-center justify-center ring-2 ring-gold/40 hover:ring-gold/70 transition-all duration-300 hover:scale-105 active:scale-95"
       >
         {/* هالة نابضة أنيقة */}
         <span aria-hidden className="absolute inset-0 rounded-full bg-gold/10 animate-pulse" style={{ animationDuration: '3.5s' }} />

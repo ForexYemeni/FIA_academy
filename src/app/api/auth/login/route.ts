@@ -110,6 +110,13 @@ export async function POST(req: NextRequest) {
           password: '', // never return password to client
           role: userRow.role as 'admin' | 'trainer' | 'student',
           team_role: teamRole,
+          // 🚫 v10.18 — «بطاقة الحظر قبل أي شيء»: حالة الحظر تُعاد في لحظة الدخول
+          // نفسها فيحمل المتجر العلم فوراً ويرسم SessionGuard البطاقة من الإطار الأول —
+          // صفر وميض للوحة التحكم أمام المحظور إطلاقاً. الإدارة لا تُحظر أصلاً.
+          banned: !!(userRow as any).banned && userRow.role !== 'admin',
+          ban_reason: (userRow as any).banned
+            ? String((userRow as any).banned_reason || 'مخالفة سياسات الأكاديمية')
+            : undefined,
           avatar: userRow.avatar,
           title: userRow.title,
           bio: mergeLegacyBio(userRow.bio),
@@ -184,6 +191,11 @@ export async function POST(req: NextRequest) {
           phone: trainer.phone || '',
           password: '',
           role: 'trainer' as const,
+          // 🚫 v10.18 — «بطاقة الحظر قبل أي شيء» لمدرب عادي (أعضاء الفريق لا يُحظرون)
+          banned: !!(trainer as any).banned,
+          ban_reason: (trainer as any).banned
+            ? String((trainer as any).banned_reason || 'مخالفة سياسات الأكاديمية')
+            : undefined,
           avatar: trainer.avatar,
           title: trainer.title,
           bio: mergeLegacyBio(trainer.bio),

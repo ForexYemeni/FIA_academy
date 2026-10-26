@@ -47,15 +47,23 @@ import { RoyalBanScreen } from '@/components/fia/royal-ban-screen'
 /** نبضة الحرس — كل 15 ثانية (أسنر من نبضة عرض تعديل النسبة 20s، أخف من أن يُثقل الشبكة) */
 const GUARD_PULSE_MS = 15_000
 
-/** أول نبضة بعد ركوب الحرس بثانيتين — بعد اكتمال الترطيب والرسوم الأولى */
-const FIRST_PULSE_MS = 2_000
+/** 🚫 v10.18 — أول نبضة فورية (0ms): كان تأجيلها ثانيتين يُظهر لوحة التحكم
+ *  أمام المحظور قبل بطاقة الحظر — الآن الفحص يبدأ لحظة ركوب الحرس نفسها. */
+const FIRST_PULSE_MS = 0
 
 export function SessionGuard() {
   const userId = useAuth((s) => s.user?.id)
-  const [banReason, setBanReason] = useState<string | null>(null)
+  // 🚫 v10.18 — العلم الفوري: حالة الحظر من المتجر نفسه (ضُبطت لحظة الدخول أو
+  // الترطيب) — تُرسم بطاقة الحظر من الإطار الأول قبل أي جلب أو رسم صفحات.
+  const storedBanned = useAuth((s) => s.user?.banned)
+  const storedReason = useAuth((s) => s.user?.ban_reason)
+  const [pulseReason, setPulseReason] = useState<string | null>(null)
+
+  const banActive = !!userId && (storedBanned === true || pulseReason !== null)
+  const banReason = pulseReason ?? storedReason ?? 'مخالفة سياسات الأكاديمية'
 
   useEffect(() => {
-    if (!userId) { setBanReason(null); return } // لا جلسة — لا حرس ولا بطاقة
+    if (!userId) { setPulseReason(null); return } // لا جلسة — لا حرس ولا بطاقة
 
     let cancelled = false
     const controller = new AbortController()
@@ -84,9 +92,23 @@ export function SessionGuard() {
         }
 
         // 👑 v10.11 — مرسوم الحظر: بطاقة الحظر الملكية فوراً (بلا خروج)
+        // 🚫 v10.18 — يُطبع العلم أيضاً في المتجر فيبقى عبر إعادة التحميل
         if (data.banned) {
-          setBanReason(String(data.ban_reason || 'مخالفة سياسات الأكاديمية'))
+          setPulseReason(String(data.ban_reason || 'مخالفة سياسات الأكاديمية'))
+          const cur = useAuth.getState().user
+          if (cur?.id === userId && (!cur.banned || cur.ban_reason !== data.ban_reason)) {
+            useAuth.getState().updateUser({
+              banned: true,
+              ban_reason: String(data.ban_reason || 'مخالفة سياسات الأكاديمية'),
+            })
+          }
           return
+        }
+        // رُفع الحظر؟ تُنظّف الحالة من كل أوعيتها
+        setPulseReason(null)
+        const cur2 = useAuth.getState().user
+        if (cur2?.id === userId && cur2.banned) {
+          useAuth.getState().updateUser({ banned: false, ban_reason: undefined })
         }
 
         // 👑 شفاء حي لشارة دور الفريق — نفس بروتوكول إعادة الترطيب v6.9
@@ -120,9 +142,10 @@ export function SessionGuard() {
           { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
           (payload: any) => {
             if (payload?.new?.banned) {
-              setBanReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
+              setPulseReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
             } else if (payload?.new && payload.new.banned === false) {
-              setBanReason(null) // رفع الحظر — عودة الحياة فوراً
+              setPulseReason(null) // رفع الحظر — عودة الحياة فوراً
+              useAuth.getState().updateUser({ banned: false, ban_reason: undefined })
             }
           }
         )
@@ -130,9 +153,10 @@ export function SessionGuard() {
           { event: 'UPDATE', schema: 'public', table: 'trainers', filter: `id=eq.${userId}` },
           (payload: any) => {
             if (payload?.new?.banned) {
-              setBanReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
+              setPulseReason(String(payload.new.banned_reason || 'مخالفة سياسات الأكاديمية'))
             } else if (payload?.new && payload.new.banned === false) {
-              setBanReason(null)
+              setPulseReason(null)
+              useAuth.getState().updateUser({ banned: false, ban_reason: undefined })
             }
           }
         )
@@ -156,12 +180,13 @@ export function SessionGuard() {
   }, [userId])
 
   // 👑 بطاقة الحظر الملكية — شاشة كاملة فوق كل شيء
-  if (banReason && userId) {
+  // 🚫 v10.18 — تُرسم من العلم المخزن فوراً (بلا انتظار أي نبضة/جلب)
+  if (banActive && userId) {
     return (
       <RoyalBanScreen
         reason={banReason}
         onLogout={() => {
-          setBanReason(null)
+          setPulseReason(null)
           useAuth.getState().logout()
         }}
       />

@@ -109,6 +109,17 @@ export const useAuth = create<AuthState>()(
                 state.logout()
                 return
               }
+              // 🚫 v10.18 — «بطاقة الحظر قبل أي شيء»: المحظور عند إعادة فتح التطبيق
+              // يرى البطاقة من الإطار الأول (تُطبع في المتجر قبل رسم أي صفحة)،
+              // وفك الحظر ينظف العلم بنفس اللحظة.
+              if (data.banned) {
+                state.updateUser({
+                  banned: true,
+                  ban_reason: String(data.ban_reason || 'مخالفة سياسات الأكاديمية'),
+                })
+              } else if (state.user.banned) {
+                state.updateUser({ banned: false, ban_reason: undefined })
+              }
               // 👑 v6.9 — «هوية المؤسس الخالدة»: شفاء شارة دور الفريق
               // (المؤسس/قائد/فريق) من الحقيقة الحية للخادم — تُصلح الجلسات
               // المخزّنة القديمة التي سبقت إنشاء علامة الفريق، فتعود شارة

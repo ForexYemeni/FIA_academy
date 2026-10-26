@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Ban, Crown, MessageCircle, Phone, Mail, Send, LogOut, ChevronDown, ShieldAlert } from 'lucide-react'
+import { Ban, Crown, MessageCircle, Phone, Mail, Send, LogOut, ChevronDown, ShieldAlert, Loader2 } from 'lucide-react'
 
 interface RoyalBanScreenProps {
   reason: string
@@ -27,6 +27,19 @@ export function RoyalBanScreen({ reason, onLogout }: RoyalBanScreenProps) {
   const [cardClosing, setCardClosing] = useState(false)
   const [showContacts, setShowContacts] = useState(false)
   const [settings, setSettings] = useState<any>(null)
+  // 👑 v10.18 — هوية الإدارة تُجلب مسبقاً لحظة ظهور البطاقة (لا لحظة الضغط)
+  // فتنفتح المحادثة الفورية بنبضة واحدة مع الحساب الصحيح.
+  const [admin, setAdmin] = useState<{ id: string; name: string; avatar?: string } | null>(null)
+  const [adminLoading, setAdminLoading] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/admin/contact')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d?.id) setAdmin({ id: d.id, name: d.name || 'إدارة الأكاديمية', avatar: d.avatar || undefined }) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   // قنوات التواصل الرسمية — تُجلب عند أول توسيع
   useEffect(() => {
@@ -38,30 +51,53 @@ export function RoyalBanScreen({ reason, onLogout }: RoyalBanScreenProps) {
   }, [showContacts, settings])
 
   const openAdminChat = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/contact')
-      const admin = await res.json()
-      window.dispatchEvent(new CustomEvent('fia-ban:chat-admin', {
-        detail: admin?.id ? { id: admin.id, name: admin.name || 'إدارة الأكاديمية', avatar: admin.avatar || undefined } : null,
-      }))
-      setCardClosing(true)
-      setTimeout(() => setChatMode(true), 380)
-      setTimeout(() => setCardClosing(false), 420)
-    } catch {
-      window.dispatchEvent(new CustomEvent('fia-ban:chat-admin', { detail: null }))
-      setCardClosing(true)
-      setTimeout(() => setChatMode(true), 380)
-      setTimeout(() => setCardClosing(false), 420)
+    // 👑 v10.18 — إن لم تصل هوية الإدارة بعد: محاولة أخيرة فورية ثم رسالة واضحة —
+    // لا يُفتح أي شيء ناقص أبداً، وتبقى البطاقة هي الوجه الوحيد.
+    let target = admin
+    if (!target) {
+      setAdminLoading(true)
+      try {
+        const res = await fetch('/api/admin/contact')
+        const d = res.ok ? await res.json() : null
+        if (d?.id) { target = { id: d.id, name: d.name || 'إدارة الأكاديمية', avatar: d.avatar || undefined }; setAdmin(target) }
+      } catch {}
+      setAdminLoading(false)
     }
-  }, [])
+    if (!target?.id) {
+      try {
+        const { toast } = await import('sonner')
+        toast.error('تعذر فتح المحادثة حالياً — تأكد من الاتصال ثم أعد المحاولة')
+      } catch {}
+      return
+    }
+    window.dispatchEvent(new CustomEvent('fia-ban:chat-admin', {
+      detail: { id: target.id, name: target.name || 'إدارة الأكاديمية', avatar: target.avatar || undefined },
+    }))
+    setCardClosing(true)
+    setTimeout(() => setChatMode(true), 380)
+    setTimeout(() => setCardClosing(false), 420)
+  }, [admin])
 
   const backToCard = useCallback(() => setChatMode(false), [])
 
-  // ════════ وضع الدردشة: شارة صغيرة فقط — الدردشة تعمل بحرية ════════
+  // 👑 v10.18 — إغلاق المحادثة (زر X) يُعيد بطاقة الحظر الكاملة فوراً —
+  // لا يعود المستخدم أبداً إلى الصفحات عبر باب المحادثة.
+  useEffect(() => {
+    const onChatClosed = () => setChatMode(false)
+    window.addEventListener('fia-ban:chat-closed', onChatClosed)
+    return () => window.removeEventListener('fia-ban:chat-closed', onChatClosed)
+  }, [])
+
+  // ════════ وضع الدردشة: حاجز كامل + شارتان — الدردشة وحدها تعمل بحرية ════════
+  // 🚫 v10.18 — إصلاح ثغرة الهروب الكبرى: كان هذا الوضع يُبقي كل الصفحات مفتوحة
+  // خلف شارة صغيرة — الآن حاجز معتم كامل يمنع لمس أي صفحة، والمحادثة وحدها
+  // ترتفع فوقه (z أعلى)، وإغلاقها يعيد البطاقة الكاملة.
   if (chatMode) {
     return (
       <>
-        <div className="fixed top-3 inset-x-0 z-[65] flex justify-center pointer-events-none" dir="rtl">
+        {/* الحاجز الكامل — يمنع أي تفاعل مع الصفحات خلفه */}
+        <div className="fixed inset-0 z-[9990] bg-[#050b1e]/97" aria-hidden />
+        <div className="fixed top-3 inset-x-0 z-[10000] flex justify-center pointer-events-none" dir="rtl">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-red-400/50 bg-gradient-to-l from-[#2a0a12]/95 via-[#3d0f1a]/95 to-[#2a0a12]/95 backdrop-blur px-4 py-1.5 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.7)]">
             <ShieldAlert className="w-4 h-4 text-red-300" />
             <span className="text-[11px] font-black text-white/90">حظرك سارٍ — أرسل رسالتك للإدارة هنا</span>
@@ -72,7 +108,7 @@ export function RoyalBanScreen({ reason, onLogout }: RoyalBanScreenProps) {
         </div>
         <button
           onClick={backToCard}
-          className="fixed bottom-5 left-5 z-[65] flex items-center gap-1.5 rounded-full border border-red-400/50 bg-[#2a0a12]/95 backdrop-blur px-3.5 py-2 text-[11px] font-black text-red-200 shadow-xl active:scale-95 transition-transform"
+          className="fixed bottom-5 left-5 z-[10000] flex items-center gap-1.5 rounded-full border border-red-400/50 bg-[#2a0a12]/95 backdrop-blur px-3.5 py-2 text-[11px] font-black text-red-200 shadow-xl active:scale-95 transition-transform"
           dir="rtl"
         >
           <Ban className="w-3.5 h-3.5" />
@@ -136,9 +172,12 @@ export function RoyalBanScreen({ reason, onLogout }: RoyalBanScreenProps) {
             {/* الأزرار الملكية */}
             <button
               onClick={openAdminChat}
-              className="fia-ban-btn mt-4 w-full h-12 rounded-2xl bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy text-sm font-black flex items-center justify-center gap-2 shadow-[0_10px_30px_-8px_rgba(212,175,55,0.6)] active:scale-[0.97] transition-all"
+              disabled={adminLoading}
+              className="fia-ban-btn mt-4 w-full h-12 rounded-2xl bg-gradient-to-l from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy text-sm font-black flex items-center justify-center gap-2 shadow-[0_10px_30px_-8px_rgba(212,175,55,0.6)] active:scale-[0.97] transition-all disabled:opacity-70"
             >
-              <MessageCircle className="w-4.5 h-4.5" strokeWidth={2.4} />
+              {adminLoading
+                ? <Loader2 className="w-4.5 h-4.5 animate-spin" strokeWidth={2.4} />
+                : <MessageCircle className="w-4.5 h-4.5" strokeWidth={2.4} />}
               دردشة فورية مع الإدارة
             </button>
 

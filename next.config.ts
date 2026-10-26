@@ -77,6 +77,23 @@ const nextConfig: NextConfig = {
           { key: 'Expires', value: '0' },
         ],
       },
+      {
+        // ⚡ v10.18 — كاش حافة ملكي لأكثر المسارات طلباً على كل صفحة:
+        // إعدادات الموقع + فحص الإصدار — بيانات عامة تتغير نادراً.
+        // تُخدَم من حافة Vercel خلال ~10ms بدل بدء دالة باردة كل مرة
+        // (كان هذا أبطأ مسار في كل تحميل صفحة). القاعدة تُطبّق بعد القاعدة
+        // العامة فتتغلب عليها، والتحديث الفوري بعد الحفظ يستخدم cache-bust.
+        source: '/api/site-settings',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=60, stale-while-revalidate=600' },
+        ],
+      },
+      {
+        source: '/api/app-version',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=120, stale-while-revalidate=900' },
+        ],
+      },
       // Security headers — prevent clickjacking, MIME-sniffing, XSS
       {
         source: '/(.*)',

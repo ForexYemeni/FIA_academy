@@ -139,6 +139,11 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        {/* ⚡ v10.18 — preconnect لعنوان Supabase الحي: كل صفحة تحمل نداءات
+            REST + Realtime إلى نفس الأصل — إحماء الاتصال مسبقاً يوفّر
+            DNS + TCP + TLS (~150-400ms) على أول نداء في كل تحميل */}
+        <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'} />
+        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'} />
         {/* 👑 v7.0 — تهيئة الوضع الملكي قبل الرسم الأول: لا وميض أبيض أبداً
             الافتراضي الليل الملكي (dark) — واختيار المستخدم يُحفظ في fia-theme */}
         <script
