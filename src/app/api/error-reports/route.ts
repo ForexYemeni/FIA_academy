@@ -39,12 +39,32 @@ export async function POST(req: NextRequest) {
     const rl = rateLimit(`err:${clientIp(req)}`, 30, 5 * 60 * 1000)
     if (!rl.ok) return tooMany(rl.retryAfterSec)
 
-    const body = await req.json().catch(() => ({}))
-    const message = String(body?.message || '').slice(0, 500)
-    const stack = String(body?.stack || '').slice(0, 3000)
-    const pageUrl = String(body?.url || '').slice(0, 400)
-    const severity = ['critical', 'error', 'warning'].includes(body?.severity) ? body.severity : 'error'
-    const fingerprint = String(body?.fingerprint || '').replace(/[^a-f0-9]/g, '').slice(0, 32)
+    // 👑 v10.14 — دعم تقارير الأعطال الأصلية من APK (نص خام text/plain):
+    // السطر الأول = الملخص (نسخة/جهاز)، والباقي = أثر العطل. بصمة تلقائية من الأثر.
+    const ctype = (req.headers.get('content-type') || '').toLowerCase()
+    let message = ''
+    let stack = ''
+    let pageUrl = ''
+    let severity: 'critical' | 'error' | 'warning' = 'error'
+    let fingerprint = ''
+    if (ctype.includes('text/plain')) {
+      const raw = (await req.text().catch(() => '')).slice(0, 4000)
+      const nl = raw.indexOf('\n')
+      message = (nl === -1 ? raw : raw.slice(0, nl)).slice(0, 500)
+      stack = nl === -1 ? '' : raw.slice(nl + 1).slice(0, 3000)
+      pageUrl = 'android-native'
+      severity = 'critical'
+      if (stack) {
+        fingerprint = Buffer.from(stack.slice(0, 200)).toString('hex').slice(0, 32)
+      }
+    } else {
+      const body = await req.json().catch(() => ({}))
+      message = String(body?.message || '').slice(0, 500)
+      stack = String(body?.stack || '').slice(0, 3000)
+      pageUrl = String(body?.url || '').slice(0, 400)
+      severity = ['critical', 'error', 'warning'].includes(body?.severity) ? body.severity : 'error'
+      fingerprint = String(body?.fingerprint || '').replace(/[^a-f0-9]/g, '').slice(0, 32)
+    }
 
     if (!message) return NextResponse.json({ ok: false }, { status: 400 })
 
