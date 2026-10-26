@@ -24,6 +24,14 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
+  // 🌐 القاعدة الرسمية للنطاق — تحوّل كل روابط OpenGraph/Twitter والروابط النسبية
+  // إلى روابط مطلقة صحيحة على https://fiaacademy.vercel.app (متطلب فاخر لـ Search Console)
+  metadataBase: new URL("https://fiaacademy.vercel.app"),
+  // 🔗 canonical ذكي افتراضي: كل صفحة تُحيل إلى نفسها (./ يُحلّ مقابل metadataBase)
+  // — لا محتوى مكرر في عيون Google مهما كان عدد مسارات الوصول
+  alternates: {
+    canonical: "./",
+  },
   title: "أكاديمية المستقبل الدولية | FIA - التعليم الطبي المعتمد",
   description: "منصة التعليم الطبي المعتمدة الأولى في اليمن. دورات BLS/ACLS، الأمراض المزمنة، التمريض، مكافحة العدوى، طب الطوارئ، صحة الأم والطفل، الصيدلة السريرية وإدارة المنشآت الصحية.",
   keywords: ["أكاديمية المستقبل الدولية", "FIA", "تعليم طبي", "BLS", "ACLS", "تمريض", "طب طوارئ", "شهادات معتمدة", "اليمن", "صنعاء"],

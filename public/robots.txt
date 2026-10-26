@@ -1,5 +1,13 @@
+# 👑 أكاديمية المستقبل الدولية (FIA) — robots.txt ملكي
+# متوافق 100% مع Google Search Console — الخطوة 3: إرسال خريطة الموقع
+# خريطة الموقع الرسمية: https://fiaacademy.vercel.app/sitemap.xml
+
 User-agent: Googlebot
 Allow: /
+Disallow: /api/
+Disallow: /exam
+Disallow: /checkout
+Disallow: /forum
 
 User-agent: Bingbot
 Allow: /
@@ -12,3 +20,10 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /exam
+Disallow: /checkout
+Disallow: /forum
+
+# 🔍 التوجيه الرسمي لخريطة الموقع لكل محركات البحث (Google + Bing + غيرها)
+Sitemap: https://fiaacademy.vercel.app/sitemap.xml
