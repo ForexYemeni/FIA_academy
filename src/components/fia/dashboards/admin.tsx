@@ -12,9 +12,9 @@ import {
   Eraser, Brush, Sparkles, ChevronDown, Tag, Layers, Briefcase, Crown,
   Search, Calendar, MapPin, Target, Send, Facebook, Phone, Hash, Inbox, KeyRound, Wallet, Archive, RotateCcw,
   ClipboardCheck, Landmark, Megaphone, BellRing, CalendarDays,
-  Wrench, Timer, ClipboardCopy, ClipboardList,
+  Wrench, Timer, ClipboardCopy,
 } from 'lucide-react'
-import { fiaAnnounceType, fiaFormatArabicDate, broadcastSettingsUpdated } from '@/components/fia/lux-experience'
+import { broadcastSettingsUpdated } from '@/components/fia/lux-experience'
 import { DashboardShell, StatCard, SectionCard, NavItem } from './shell'
 import { RoyalGridSkeleton, RoyalListSkeleton, RoyalStatsSkeleton } from '@/components/fia/royal-skeleton'
 import { RoyalEmpty } from '@/components/fia/royal-empty-state'
@@ -3973,8 +3973,6 @@ const AdminSite = React.memo(function AdminSite() {
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'basic' | 'about' | 'policies' | 'social' | 'visibility' | 'royal' | 'broadcast' | 'errors'>('basic')
   const [passwordDialog, setPasswordDialog] = useState<{ password: string; pendingSettings: any } | null>(null)
-  // 👑 v10.4 — مركز إعلانات الإدارة: مسوّدة إعلان جديد + قائمة المنشور
-  const [annDraft, setAnnDraft] = useState<{ type: string; text: string; date: string; sig: string }>({ type: 'announce', text: '', date: '', sig: '' })
   // 👑 v10.6 — الرسائل الجماعية الملكية + مراقبة الأخطاء الحية + العروض
   const [bcAudience, setBcAudience] = useState<'all' | 'students' | 'trainers' | 'admins' | 'course'>('students')
   const [bcCourse, setBcCourse] = useState('')
@@ -3989,8 +3987,8 @@ const AdminSite = React.memo(function AdminSite() {
   const [errReports, setErrReports] = useState<any[]>([])
   const [errLoading, setErrLoading] = useState(false)
 
-  // 👑 v10.18 — «نسخ كبرومبت جاهز 100%»: يحوّل تقريراً أو السجل كاملاً إلى
-  // موجز تشخيص مُهندل يُلصق مباشرة في أي مساعد ذكي — بلا فقدان أي تفصيلة.
+  // 👑 v10.19 — «برومبت لكل خطأ على حدة»: كل خطأ ينسخ برومبت تشخيص مستقل 100%
+  // يحمل تفاصيل هذا الخطأ وحده فقط (بلا أي خطأ آخر) — جاهز للصق المباشر.
   const copyTextSmart = async (text: string) => {
     try {
       if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true }
@@ -4006,43 +4004,34 @@ const AdminSite = React.memo(function AdminSite() {
       return ok
     } catch { return false }
   }
-  const buildErrorPrompt = (reports: any[]) => {
-    const one = (r: any, i: number) => {
-      const body = String(r.body || '')
-      const lines = body.split('\n')
-      const message = lines[0] || 'خطأ غير موصوف'
-      const stack = lines.filter((l) => !/^(الصفحة:|التتبع:)/.test(l.trim())).slice(1).join('\n').trim()
-      const pageLine = (lines.find((l) => l.startsWith('الصفحة:')) || '').replace('الصفحة:', '').trim()
-      const page = pageLine || String(r.link || '') || 'غير معروفة'
-      const when = r.created_at ? new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }) : 'غير معروف'
-      return [
-        `### خطأ #${i + 1}`,
-        `- العنوان: ${String(r.title || '').replace(/^[^\s]*\s*/, '')}`,
-        `- الرسالة: ${message}`,
-        `- الصفحة: ${page}`,
-        `- الوقت: ${when}`,
-        stack ? `- التتبع الكامل (Stack Trace):\n\`\`\`\n${stack}\n\`\`\`` : '- التتبع: غير متوفر',
-      ].join('\n')
-    }
-    const list = reports.slice(0, 20).map(one).join('\n\n')
+  // برومبت مستقل مُهندَل لخطأ واحد فقط — من أول السطر لآخره هذا الخطأ وحده
+  const buildSingleErrorPrompt = (r: any) => {
+    const body = String(r.body || '')
+    const lines = body.split('\n')
+    const message = lines[0] || 'خطأ غير موصوف'
+    const rawStack = lines.filter((l) => !/^(الصفحة:|التتبع:)/.test(l.trim())).slice(1).join('\n').trim()
+    const stack = rawStack.replace(/^التتبع:\s*/, '').trim()
+    const pageLine = (lines.find((l) => l.startsWith('الصفحة:')) || '').replace('الصفحة:', '').trim()
+    const page = pageLine || String(r.link || '') || 'غير معروفة'
+    const when = r.created_at ? new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }) : 'غير معروف'
+    const severity = /🚨/.test(String(r.title || '')) ? 'حرج (critical)' : /⚠️/.test(String(r.title || '')) ? 'تحذير (warning)' : 'خطأ (error)'
     return [
-      'مرحباً، أرسل لك تقرير أخطاء حقيقي من موقع وتطبيق «أكاديمية المستقبل الدولية» (Next.js 15 App Router + Supabase + Vercel).',
-      'أرجو تحليل السبب الجذري لكل خطأ ثم إعطائي إصلاحاً دقيقاً جاهزاً للتطبيق، مع بيان الملف المسؤول إن أمكن.',
+      'مرحباً، أرسل لك تقرير خطأ حقيقي **واحد فقط** التُقط تلقائياً من موقع وتطبيق «أكاديمية المستقبل الدولية» (Next.js 15 App Router + Supabase + Vercel).',
+      'أرجو تحليل السبب الجذري لهذا الخطأ ثم إعطائي إصلاحاً دقيقاً جاهزاً للتطبيق، مع بيان الملف والمكوّن المسؤول إن أمكن.',
       '',
-      '## تقارير الأخطاء (من سجل الأخطاء الحي المدمج في الموقع — يلتقط window.onerror و unhandledrejection):',
-      '',
-      list,
+      '## الخطأ (تقرير واحد فقط):',
+      `- الشدة: ${severity}`,
+      `- الرسالة: ${message}`,
+      `- الصفحة: ${page}`,
+      `- وقت الالتقاط: ${when}`,
+      stack ? `- التتبع الكامل (Stack Trace):\n\`\`\`\n${stack}\n\`\`\`` : '- التتبع: غير متوفر لهذا الخطأ',
       '',
       'ملاحظة: مسارات الـ chunks في التتبع هي ملفات Next.js مُصغّرة على الإنتاج — إذا كان الخطأ ambiguous أخبرني بأي مكوّن/صفحة أضبط لك تحديداً.',
     ].join('\n')
   }
   const copyOneReport = async (r: any) => {
-    const ok = await copyTextSmart(buildErrorPrompt([r]))
-    ok ? toast.success('نُسخ التقرير كبرومبت جاهز — الصقه مباشرة') : toast.error('تعذر النسخ — انسخه يدوياً')
-  }
-  const copyAllReports = async () => {
-    const ok = await copyTextSmart(buildErrorPrompt(errReports))
-    ok ? toast.success(`نُسخ السجل كاملاً (${Math.min(errReports.length, 20)} تقريراً) كبرومبت جاهز`) : toast.error('تعذر النسخ — انسخه يدوياً')
+    const ok = await copyTextSmart(buildSingleErrorPrompt(r))
+    ok ? toast.success('نُسخ برومبت هذا الخطأ وحده — الصقه مباشرة') : toast.error('تعذر النسخ — انسخه يدوياً')
   }
   const user = useAuth((s) => s.user)
   useEffect(() => { fetch('/api/site-settings').then((r) => r.json()).then(setSettings) }, [])
@@ -4058,13 +4047,6 @@ const AdminSite = React.memo(function AdminSite() {
         .catch(() => setErrReports([])).finally(() => setErrLoading(false))
     }
   }, [tab])
-  // تاريخ المسوّدة اليوم افتراضياً عند فتح الزاوية — والتاريخ اختياري: يُعرض عند تحديده فقط
-  useEffect(() => {
-    if (tab === 'royal') {
-      setAnnDraft((d) => ({ ...d, date: d.date || new Date().toISOString().slice(0, 10) }))
-    }
-  }, [tab])
-
   // 👑 v10.6.1 — معاينة حية: كم مستلماً حقيقياً ستصل الرسالة؟ تتحدث مع تغيّر الشريحة/الدورة
   useEffect(() => {
     if (tab !== 'broadcast') return
@@ -4123,49 +4105,6 @@ const AdminSite = React.memo(function AdminSite() {
     await save(passwordDialog.password)
   }
 
-  // 👑 v10.4 — أدوات مركز الإعلانات: نشر / إظهار-إخفاء / حذف — كلها بحفظ فوري
-  const allAnnouncements: any[] = (() => {
-    try {
-      const raw = settings?.admin_announcements
-      if (!raw) return []
-      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
-      return Array.isArray(arr) ? arr : []
-    } catch { return [] }
-  })()
-
-  const saveAnnouncements = (next: any[]) => {
-    const nextSettings = { ...settings, admin_announcements: next }
-    setSettings(nextSettings)
-    save(undefined, nextSettings)
-  }
-
-  const publishAnnouncement = () => {
-    const text = annDraft.text.trim()
-    if (!text) { toast.error('اكتب نص الإعلان أولاً'); return }
-    // التاريخ اختياري — تركه فارغاً يخفي شريط التاريخ من الإعلان المنشور
-    const item = {
-      id: `ann-${Date.now()}`,
-      type: annDraft.type,
-      text,
-      date: annDraft.date,
-      signature: annDraft.sig.trim() || 'إدارة أكاديمية المستقبل الدولية',
-      active: true,
-      created_at: new Date().toISOString(),
-    }
-    saveAnnouncements([item, ...allAnnouncements])
-    setAnnDraft((d) => ({ type: d.type, text: '', date: new Date().toISOString().slice(0, 10), sig: '' }))
-    toast.success('نُشر الإعلان — يظهر للطلاب في الصفحة الرئيسية فوراً')
-  }
-
-  const setAnnActive = (id: string, active: boolean) => {
-    saveAnnouncements(allAnnouncements.map((a: any) => (String(a.id) === String(id) ? { ...a, active } : a)))
-  }
-
-  const deleteAnnouncement = (id: string) => {
-    saveAnnouncements(allAnnouncements.filter((a: any) => String(a.id) !== String(id)))
-    toast.success('حُذف الإعلان')
-  }
-
   return (
     <SectionCard title="إعدادات الموقع" description="معلومات الأكاديمية + من نحن + السياسات + التواصل + الإظهار">
       {/* ═══ 👑 v10.5 — الترويسة الفاخرة: لوحة قيادة إعدادات الأكاديمية ═══ */}
@@ -4202,7 +4141,6 @@ const AdminSite = React.memo(function AdminSite() {
           { id: 'policies',   label: 'السياسات',       hint: 'الخصوصية والشروط', icon: Shield,      grad: 'from-slate-600 to-gray-700' },
           { id: 'social',     label: 'التواصل',        hint: 'القنوات الاجتماعية', icon: MessageSquare, grad: 'from-cyan-500 to-blue-600' },
           { id: 'visibility', label: 'الإظهار والتحكم', hint: 'الأقسام + الصيانة + العروض', icon: Eye, grad: 'from-emerald-500 to-teal-600' },
-          { id: 'royal',      label: 'زاوية الإدارة',  hint: 'الإعلانات المختومة', icon: Crown,      grad: 'from-gold to-amber-500' },
           { id: 'broadcast',  label: 'رسائل جماعية',   hint: 'بث إشعار لشريحة كاملة', icon: Send,      grad: 'from-orange-500 to-amber-600' },
           { id: 'errors',     label: 'مراقبة الأخطاء', hint: 'سجل حي بأمر واحد', icon: Activity,    grad: 'from-rose-500 to-red-600' },
         ].map((t) => {
@@ -4245,304 +4183,6 @@ const AdminSite = React.memo(function AdminSite() {
 
       <div className="space-y-4 max-w-3xl">
         {/* 👑 v10.5 — شبكة التبويبات الفاخرة: أيقونة + عنوان + وصف لكل تبويب */}
-        {tab === 'royal' && (
-          <div className="space-y-4">
-            {/* ═══ 👑 v10.17 — مفتاح الزاوية الإدارية الكلي: إيقاف/تشغيل بقرار المؤسس حصراً ═══ */}
-            {(() => {
-              const isFounder = (user as any)?.team_role === 'founder'
-              const cornerOn = settings?.admin_corner_enabled !== false
-              return (
-                <div className={`relative p-4 sm:p-5 rounded-2xl border overflow-hidden ${cornerOn ? 'border-emerald-500/40 bg-gradient-to-br from-white to-emerald-500/[0.06]' : 'border-red-500/45 bg-gradient-to-br from-white to-red-500/[0.07]'}`}>
-                  <div className="absolute -top-6 -left-6 w-20 h-20 rounded-full blur-2xl pointer-events-none" />
-                  <div className="relative flex items-start gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md ${cornerOn ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-red-500 to-rose-600'}`}>
-                      {cornerOn ? <Eye className="w-5 h-5 text-white" /> : <EyeOff className="w-5 h-5 text-white" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-black text-[15px] text-navy flex items-center gap-2 flex-wrap">
-                        الزاوية الإدارية
-                        <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${cornerOn ? 'text-emerald-700 bg-emerald-500/10 border-emerald-500/30' : 'text-red-700 bg-red-500/10 border-red-500/30'}`}>
-                          {cornerOn ? 'تعمل الآن' : 'مطفأة كلياً'}
-                        </span>
-                        {!isFounder && (
-                          <span className="text-[9px] font-black rounded-full px-2 py-0.5 border text-amber-800 bg-amber-500/10 border-amber-500/30">
-                            قرار المؤسس حصراً
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-[11.5px] text-muted-foreground leading-relaxed mt-1">
-                        عند الإطفاء تختفي الزاوية كلياً من كل مكان: بطاقة الرسالة المختومة في الصفحة الرئيسية، وزر «إعلانات الإدارة» في مركز الأدوات العائم — وعند التشغيل تعود كما هي فوراً. الإعلانات المحفوظة لا تُمس أبداً.
-                      </p>
-                      {!isFounder && (
-                        <p className="text-[10.5px] text-amber-700/90 font-bold mt-1.5">
-                          🔒 هذا المفتاح مخصص لحساب المؤسس وحده — حسابك يعرض حالته فقط.
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 pt-1">
-                      <Switch
-                        checked={cornerOn}
-                        disabled={!isFounder || saving}
-                        onCheckedChange={(v) => {
-                          const nextSettings = { ...settings, admin_corner_enabled: v }
-                          setSettings(nextSettings)
-                          save(undefined, nextSettings)
-                          toast.success(v ? 'تشغّلت الزاوية الإدارية — ظهرت للجميع فوراً' : 'أُطفئت الزاوية الإدارية — اختفت من كل مكان فوراً')
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
-            {/* ═══ بطاقة إعلان جديد ═══ */}
-            <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
-              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
-              <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-gold" />
-                </div>
-                إعلان جديد مختوم
-              </h3>
-              <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
-                يصل للطلاب فوراً كشمع عائم في الصفحة الرئيسية — مع نوعه وتوقيع الأكاديمية، والتاريخ يظهر اختيارياً عند تحديده.
-              </p>
-              <div className="relative space-y-3">
-                {/* نوع الإعلان */}
-                <div>
-                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Megaphone className="w-3.5 h-3.5 text-gold" /> نوع الإعلان</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'announce', label: 'إعلان', icon: Megaphone, ring: 'border-gold/60 bg-gold/10', dot: 'bg-gold' },
-                      { id: 'notice', label: 'تنبيه', icon: BellRing, ring: 'border-amber-500/60 bg-amber-500/10', dot: 'bg-amber-500' },
-                      { id: 'warning', label: 'تحذير', icon: AlertTriangle, ring: 'border-red-500/60 bg-red-500/10', dot: 'bg-red-500' },
-                    ].map((t) => {
-                      const active = annDraft.type === t.id
-                      const TIcon = t.icon
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setAnnDraft({ ...annDraft, type: t.id })}
-                          className={`relative flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-2.5 transition-all group ${
-                            active
-                              ? `${t.ring} shadow-md scale-[1.02]`
-                              : 'border-gold/20 bg-white hover:border-gold/40 hover:bg-gold/5'
-                          }`}
-                        >
-                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                            active ? 'bg-gradient-to-br from-navy to-navy-light text-gold shadow-sm' : 'bg-navy/5 text-navy/60 group-hover:text-navy'
-                          }`}>
-                            <TIcon className="w-4 h-4" />
-                          </span>
-                          <span className={`text-[11px] font-black ${active ? 'text-navy' : 'text-muted-foreground'}`}>{t.label}</span>
-                          <span className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full ${t.dot} ${active ? 'opacity-100' : 'opacity-30'}`} />
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                {/* نص الإعلان */}
-                <div>
-                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> نص الإعلان</Label>
-                  <Textarea
-                    value={annDraft.text}
-                    onChange={(e) => setAnnDraft({ ...annDraft, text: e.target.value })}
-                    rows={4}
-                    placeholder="مثال: نعلن عن حاجتنا إلى مدرب معتمد لتخصص — تقدّم الآن عبر صفحة التواصل… أو تنبيه مهم أو تحذير سارٍ للجميع"
-                    className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30 leading-relaxed"
-                  />
-                </div>
-                {/* التاريخ + التوقيع */}
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5">
-                      <CalendarDays className="w-3.5 h-3.5 text-gold" /> تاريخ الإعلان
-                      <span className="text-[9px] font-black text-emerald-700 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">اختياري</span>
-                    </Label>
-                    <Input
-                      type="date"
-                      value={annDraft.date}
-                      onChange={(e) => setAnnDraft({ ...annDraft, date: e.target.value })}
-                      dir="ltr"
-                      className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
-                    />
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <button
-                        type="button"
-                        onClick={() => { const d = new Date(); setAnnDraft({ ...annDraft, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }) }}
-                        className="text-[10px] font-black text-navy bg-gold/15 border border-gold/35 rounded-full px-2.5 py-0.5 hover:bg-gold/25 transition-colors"
-                      >
-                        اليوم
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); setAnnDraft({ ...annDraft, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }) }}
-                        className="text-[10px] font-black text-navy bg-gold/15 border border-gold/35 rounded-full px-2.5 py-0.5 hover:bg-gold/25 transition-colors"
-                      >
-                        غداً
-                      </button>
-                      {annDraft.date ? (
-                        <span className="text-[10px] font-bold text-muted-foreground truncate">
-                          سيظهر: {fiaFormatArabicDate(annDraft.date)}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-muted-foreground truncate">
-                          بدون تاريخ — لن يظهر شريط التاريخ في الإعلان المنشور
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> التوقيع</Label>
-                    <Input value={annDraft.sig} onChange={(e) => setAnnDraft({ ...annDraft, sig: e.target.value })} placeholder="إدارة أكاديمية المستقبل الدولية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
-                  </div>
-                </div>
-                {/* معاينة حية — كما يراها المتدرب تماماً */}
-                <div className="rounded-xl border border-gold/30 overflow-hidden shadow-sm">
-                  <div className="bg-gradient-to-r from-navy via-navy-light to-navy px-3.5 py-2.5 text-white flex items-center gap-2.5">
-                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center flex-shrink-0">
-                      {(() => { const I = fiaAnnounceType(annDraft.type).icon; return <I className="w-3.5 h-3.5 text-navy" /> })()}
-                    </span>
-                    <span className="text-[11px] font-black flex-1">من إدارة الأكاديمية</span>
-                    <span className="text-[9px] font-black text-gold bg-white/10 border border-gold/40 rounded-full px-2 py-0.5">{fiaAnnounceType(annDraft.type).label}</span>
-                  </div>
-                  <div className="bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9] px-4 py-3">
-                    {annDraft.date && (
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-navy text-gold text-[10px] font-black px-3 py-1 border border-gold/45 mb-2">
-                        <CalendarDays className="w-3 h-3" />
-                        {fiaFormatArabicDate(annDraft.date)}
-                      </div>
-                    )}
-                    <p className="text-[12px] leading-6 text-[#2a2113] font-semibold whitespace-pre-wrap" dir="rtl">
-                      {annDraft.text.trim() || 'ستظهر المعاينة هنا مباشرة أثناء الكتابة…'}
-                    </p>
-                    <div className="mt-2.5 flex items-end justify-between">
-                      <span className="text-[10px] text-[#6b5a33] font-bold">{annDraft.sig.trim() || 'إدارة أكاديمية المستقبل الدولية'}</span>
-                      <span className={`w-8 h-8 rounded-full bg-gradient-to-br ${fiaAnnounceType(annDraft.type).seal} border-2 border-black/10 flex items-center justify-center shadow-md rotate-[-8deg]`}>
-                        {(() => { const I = fiaAnnounceType(annDraft.type).icon; return <I className="w-3.5 h-3.5 text-gold/90" /> })()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                {/* زر النشر */}
-                <Button
-                  onClick={publishAnnouncement}
-                  disabled={saving}
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-gold to-amber-500 hover:from-amber-500 hover:to-gold text-navy font-black shadow-lg active:scale-[0.98] transition-all"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
-                  نشر الإعلان المختوم
-                </Button>
-              </div>
-            </div>
-
-            {/* ═══ الرسالة القديمة المحفوظة — تُعرض حتى نشر أول إعلان ═══ */}
-            {allAnnouncements.length === 0 && String(settings.royal_message || '').trim() && (
-              <div className="relative p-4 rounded-2xl border border-amber-500/40 bg-amber-500/[0.06] overflow-hidden">
-                <div className="flex items-start gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <BellRing className="w-4 h-4 text-amber-600" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-xs font-black text-navy mb-1">رسالة محفوظة سابقاً ما تزال معروضة للطلاب</div>
-                    <p className="text-[11px] text-muted-foreground leading-5 line-clamp-2">{settings.royal_message}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">انشر أول إعلان من الأعلى لتتحول تلقائياً إلى مركز الإعلانات المتعدد.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ═══ الإعلانات المنشورة ═══ */}
-            {allAnnouncements.length > 0 && (
-              <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
-                <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
-                <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-                    <Newspaper className="w-4 h-4 text-gold" />
-                  </div>
-                  الإعلانات المنشورة
-                  <span className="text-[10px] font-black text-navy/60 bg-gold/15 border border-gold/30 rounded-full px-2.5 py-0.5">{allAnnouncements.length}</span>
-                </h3>
-                <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
-                  الأحدث في القمة هو ما يظهر على الشمع العائم — وأيقاف أي إعلان يخفيه من الطلاب فوراً دون حذفه.
-                </p>
-                <div className="relative space-y-2.5">
-                  {allAnnouncements.map((a: any) => {
-                    const m = fiaAnnounceType(a.type)
-                    const AIcon = m.icon
-                    return (
-                      <div key={String(a.id)} className={`relative rounded-xl border p-3 transition-all ${
-                        a.active === false ? 'border-gold/15 bg-white/60 opacity-60' : 'border-gold/35 bg-white'
-                      }`}>
-                        <div className="flex items-start gap-3">
-                          <span className={`w-9 h-9 rounded-lg bg-gradient-to-br ${m.seal} flex items-center justify-center flex-shrink-0 shadow-sm border border-black/10`}>
-                            <AIcon className="w-4 h-4 text-gold" />
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${m.badge}`}>{m.label}</span>
-                              {String(a.date || '').trim() && (
-                                <span className="text-[9px] font-bold text-navy/70 flex items-center gap-1">
-                                  <CalendarDays className="w-3 h-3 text-gold" />
-                                  {fiaFormatArabicDate(a.date)}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] leading-5 text-navy/85 line-clamp-2" dir="rtl">{a.text}</p>
-                          </div>
-                          <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                            <Switch
-                              checked={a.active !== false}
-                              onCheckedChange={(v: boolean) => setAnnActive(a.id, v)}
-                            />
-                            <button
-                              onClick={() => deleteAnnouncement(a.id)}
-                              title="حذف نهائي"
-                              className="w-7 h-7 rounded-lg border border-gold/20 text-gold/50 hover:text-red-500 hover:border-red-300 flex items-center justify-center transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="relative p-5 rounded-2xl border border-gold/40 bg-gradient-to-br from-white to-gold/5 overflow-hidden">
-              <div className="absolute -top-6 -right-6 w-20 h-20 bg-gold/15 rounded-full blur-2xl" />
-              <h3 className="relative font-bold text-navy mb-1.5 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-gold" />
-                </div>
-                العدّاد التنازلي للعروض المحدودة
-              </h3>
-              <p className="relative text-[11px] text-muted-foreground mb-4 leading-relaxed">
-                يظهر على كل دورة معدّة كـ«لمدة محدودة» عدّاد ذهبي حي ينتهي بالتاريخ المحدد هنا. اتركه فارغاً لإخفاء العدّاد.
-              </p>
-              <div className="relative grid sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> عنوان العرض (اختياري)</Label>
-                  <Input value={settings.offer_title || ''} onChange={(e) => setSettings({ ...settings, offer_title: e.target.value })} placeholder="خصومات الأكاديمية" className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30" />
-                </div>
-                <div>
-                  <Label className="text-xs font-bold text-navy flex items-center gap-1.5 mb-1.5"><Crown className="w-3.5 h-3.5 text-gold" /> ينتهي في</Label>
-                  <Input
-                    type="datetime-local"
-                    value={settings.offer_ends_at || ''}
-                    onChange={(e) => setSettings({ ...settings, offer_ends_at: e.target.value })}
-                    dir="ltr"
-                    className="rounded-xl border-gold/30 focus:border-gold focus:ring-gold/30"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* BASIC — magical card */}
         {tab === 'basic' && (
           <div className="space-y-4">
@@ -5207,15 +4847,8 @@ const AdminSite = React.memo(function AdminSite() {
                     <div className="text-gold/80 text-[11px] mt-0.5">كل خلل في أي جهاز يصلك إشعاراً فورياً — وهنا يُرصد السجل الكامل</div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* 👑 v10.18 — نسخ السجل كاملاً كبرومبت جاهز 100% */}
-                    <button
-                      onClick={copyAllReports}
-                      className="text-[10px] font-black text-gold bg-gold/10 border border-gold/40 rounded-full px-3 py-1.5 hover:bg-gold/20 transition-colors flex items-center gap-1"
-                      title="نسخ السجل كاملاً كموجز تشخيص جاهز للإرسال"
-                    >
-                      <ClipboardList className="w-3.5 h-3.5" />
-                      نسخ كبرومبت جاهز
-                    </button>
+                    {/* 👑 v10.19 — برومبت لكل خطأ على حدة: زر النسخ داخل كل بطاقة خطأ
+                        (أُزيل زر «نسخ السجل كاملاً» بأمر المالك — لا برومبت للجميع أبداً) */}
                     <button
                       onClick={async () => {
                         if (!confirm('مسح سجل الأخطاء كاملاً؟')) return
@@ -5255,14 +4888,15 @@ const AdminSite = React.memo(function AdminSite() {
                             <div className="text-[10px] text-muted-foreground mt-1 break-all" dir="ltr">{r.link || ''}</div>
                             <div className="text-[10px] text-muted-foreground/80 mt-0.5">{new Date(r.created_at).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' })}</div>
                           </div>
-                          {/* 👑 v10.18 — نسخ التقرير كبرومبت جاهز بنقرة واحدة */}
+                          {/* 👑 v10.19 — نسخ برومبت هذا الخطأ وحده بنقرة واحدة */}
                           <button
                             onClick={() => copyOneReport(r)}
-                            title="نسخ هذا الخطأ كبرومبت تشخيص جاهز"
-                            aria-label="نسخ كبرومبت"
-                            className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/40 text-gold hover:bg-gold/20 flex items-center justify-center flex-shrink-0 transition-colors active:scale-95"
+                            title="نسخ برومبت هذا الخطأ وحده — جاهز للصق المباشر"
+                            aria-label="نسخ برومبت هذا الخطأ"
+                            className="h-8 rounded-lg bg-gold/10 border border-gold/40 text-gold hover:bg-gold/20 flex items-center justify-center gap-1.5 px-2.5 flex-shrink-0 transition-colors active:scale-95"
                           >
                             <ClipboardCopy className="w-4 h-4" />
+                            <span className="text-[9.5px] font-black hidden sm:inline">برومبت هذا الخطأ</span>
                           </button>
                         </div>
                       </div>

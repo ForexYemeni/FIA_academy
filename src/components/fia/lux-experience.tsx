@@ -2,17 +2,16 @@
 
 /**
  * ============================================================================
- * 👑 lux-experience — طبقة التجربة الملكية العالمية (v10.3)
+ * 👑 lux-experience — طبقة التجربة الملكية العالمية (v10.19)
  * ============================================================================
  * مكونات عرض بصرية خالصة — صفر تعديل على قاعدة البيانات أو منطق المصادقة:
  *   1) LuxSplash          — ستارة افتتاحية ملكية (الصفحة الرئيسية، مرة لكل جلسة)
  *   2) LuxOfferCountdown  — عدّاد تنازلي فاخر للعروض المحدودة
- *   3) LuxRoyalMessage    — إعلانات الإدارة المختومة بأنواعها: إعلان/تنبيه/تحذير
- *   4) LuxCommandPalette  — بحث شامل فاخر (Ctrl+K)
- *   5) LuxSupportButton   — زر دعم سريع عائم (الجهة اليسرى)
- *   6) LuxGlobalLayer     — تركيب كل ما سبق في مكان واحد داخل layout
- *   7) LuxPullToRefresh   — سحب للتحديث بحلقة ذهبية (تُركّب حيث يلزم فقط)
- *   8) LuxLessonCelebration — احتفال نهاية الدرس: ختم «أُنجز» + الدرس التالي
+ *   3) LuxCommandPalette  — بحث شامل فاخر (Ctrl+K)
+ *   4) LuxSupportButton   — زر دعم سريع عائم (الجهة اليسرى)
+ *   5) LuxGlobalLayer     — تركيب كل ما سبق في مكان واحد داخل layout
+ *   6) LuxPullToRefresh   — سحب للتحديث بحلقة ذهبية (تُركّب حيث يلزم فقط)
+ *   7) LuxLessonCelebration — احتفال نهاية الدرس: ختم «أُنجز» + الدرس التالي
  * ============================================================================
  */
 
@@ -24,7 +23,6 @@ import {
   LifeBuoy, Mail, Phone, Send, MessageCircle, BookOpen, Home,
   GraduationCap, ShieldCheck, Download, Users, Sparkles, Star,
   CheckCircle2, ChevronLeft, Loader2, RefreshCw,
-  Megaphone, BellRing, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 // 👑 القارئ الملكي للدروس النصية (مشترك مع مؤلّف الدروس في لوحة الإدارة)
 import { LuxRoyalReader } from '@/components/fia/lux-text-lesson'
@@ -228,277 +226,6 @@ export function LuxOfferCountdown({ endsAt, dark = false, title }: { endsAt?: st
   )
 }
 
-// ═══════════════════════ 3) إعلانات الإدارة المختومة ═══════════════════════
-// 👑 v10.4 — ثلاثة أنواع رسمية لكل إعلان (إعلان / تنبيه / تحذير) ولكل نوع شمعته
-// ولونه وأيقونته، والتاريخ مطلوب ومُعروض بشكل بارز في كل بطاقة. تعمل من مفاتيح
-// الإعدادات الإضافية بلا أي ترحيل قاعدة بيانات، مع دعم كامل للرسالة القديمة.
-
-export const FIA_ANNOUNCE_TYPES: Record<string, { label: string; icon: any; seal: string; badge: string; soft: string }> = {
-  announce: {
-    label: 'إعلان', icon: Megaphone,
-    seal: 'from-red-800 via-red-600 to-red-800',
-    badge: 'bg-gold/15 text-[#8a6d1f] border-gold/45',
-    soft: 'from-gold/[0.10] via-transparent to-gold/[0.04]',
-  },
-  notice: {
-    label: 'تنبيه', icon: BellRing,
-    seal: 'from-amber-700 via-amber-500 to-amber-700',
-    badge: 'bg-amber-500/15 text-amber-700 border-amber-500/45',
-    soft: 'from-amber-500/[0.10] via-transparent to-amber-500/[0.04]',
-  },
-  warning: {
-    label: 'تحذير', icon: AlertTriangle,
-    seal: 'from-red-950 via-red-800 to-red-950',
-    badge: 'bg-red-500/15 text-red-700 border-red-500/45',
-    soft: 'from-red-500/[0.10] via-transparent to-red-500/[0.04]',
-  },
-}
-
-export function fiaAnnounceType(t?: string) {
-  return FIA_ANNOUNCE_TYPES[t || 'announce'] || FIA_ANNOUNCE_TYPES.announce
-}
-
-// تنسيق التاريخ إلى عربي أنيق — والنص الحر يُعاد كما هو
-export function fiaFormatArabicDate(iso?: string): string {
-  const s = String(iso || '').trim()
-  if (!s) return ''
-  try {
-    const d = new Date(s)
-    if (isNaN(d.getTime())) return s
-    return d.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  } catch { return s }
-}
-
-// قراءة الإعلانات النشطة من الإعدادات — الأحدث أولاً — مع دعم الرسالة القديمة
-export function readFiaAnnouncements(settings: any): any[] {
-  let list: any[] = []
-  try {
-    const raw = settings?.admin_announcements
-    if (raw) {
-      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
-      if (Array.isArray(arr)) {
-        list = arr.filter((a: any) => a && a.active !== false && String(a.text || '').trim())
-      }
-    }
-  } catch {}
-  if (list.length === 0) {
-    const msg = String(settings?.royal_message || '').trim()
-    if (msg) {
-      list = [{
-        id: `legacy:${msg.slice(0, 80)}`,
-        type: 'announce',
-        text: msg,
-        date: String(settings?.royal_message_date || '').trim(),
-        signature: String(settings?.royal_message_signature || '').trim() || 'إدارة أكاديمية المستقبل الدولية',
-        active: true,
-      }]
-    }
-  }
-  return list
-}
-
-export function LuxRoyalMessage() {
-  const pathname = usePathname()
-  const settings = useSiteSettings()
-  // 👑 v10.17 — مفتاح الزاوية الإدارية الكلي: عند الإطفاء لا تُرسم البطاقة إطلاقاً
-  const cornerEnabled = settings?.admin_corner_enabled !== false
-  const [open, setOpen] = useState(false)
-  const [closing, setClosing] = useState(false)
-  const [pulsing, setPulsing] = useState(false)
-  const list = useMemo(() => readFiaAnnouncements(settings), [settings])
-  const latest = list[0] || null
-  const meta = latest ? fiaAnnounceType(latest.type) : null
-  // 🚫 v10.18 — مصدر حي لآخر إعلان للمعالجات (يحل أي تقادم إغلاق)
-  const latestIdRef = useRef<string | null>(null)
-  useEffect(() => { latestIdRef.current = latest ? String((latest as any).id) : null }, [latest])
-
-  // نبض الشمع فقط إذا آخر إعلان جديد (لم يُقرأ بعد) — في الرئيسية فقط
-  useEffect(() => {
-    if (!latest || pathname !== '/') { setPulsing(false); return }
-    let read = false
-    try { read = localStorage.getItem('fia-royal-msg-read') === String(latest.id) } catch {}
-    setPulsing(!read)
-  }, [latest?.id, pathname])
-
-  // 🚫 v10.18 — الإصلاح الجذري لخطأ «Cannot access 'b' before initialization»:
-  // كان openLetter/closeLetter مُعرّفَين بعد العائد المبكر — فعندما تكون الزاوية
-  // مطفأة أو لا توجد إعلانات يبقى مستمع المركز العائم مسجلاً على متغير في منطقة
-  // ميتة وينفجر عند الضغط. الآن الدالتان مُعرّفان دائماً قبل أي عائد مبكر.
-  const openLetter = useCallback(() => {
-    setOpen(true)
-    setClosing(false)
-    setPulsing(false)
-    const id = latestIdRef.current
-    if (id) { try { localStorage.setItem('fia-royal-msg-read', id) } catch {} }
-  }, [])
-  const closeLetter = useCallback(() => {
-    if (closing) return
-    setClosing(true)
-    setTimeout(() => { setOpen(false); setClosing(false) }, 400)
-  }, [closing])
-
-  // 👑 v10.5 — الفتح من مركز الأدوات العائم (FAB) على أي صفحة — بلا زر عائم مستقل
-  useEffect(() => {
-    const onFabOpen = () => {
-      if (!latestIdRef.current) {
-        // لا إعلانات — رسالة راقية بدل الانفجار أو الصمت
-        try {
-          import('sonner').then(({ toast }) => toast('لا توجد إعلانات جديدة حالياً', { description: 'ستظهر إعلانات الإدارة هنا فور صدورها' }))
-        } catch {}
-        return
-      }
-      openLetter()
-    }
-    window.addEventListener('fia-fab:announce', onFabOpen)
-    return () => window.removeEventListener('fia-fab:announce', onFabOpen)
-  }, [openLetter])
-
-  if (!cornerEnabled || !latest || !meta) return null
-
-  const LatestIcon = meta.icon
-
-  return (
-    <>
-      {/* 👑 v10.5 — الزر العائم المستقل أُزيل: الإعلان يُفتح من مركز الأدوات (FiaFabHub) */}
-
-      {open && (
-        <div
-          className="fixed inset-0 z-[9992] flex items-center justify-center p-4"
-          onClick={closeLetter}
-        >
-          <div
-            className={`absolute inset-0 bg-navy/70 backdrop-blur-sm ${closing ? 'fia-rlm-bd-out' : 'fia-rlm-bd'}`}
-          />
-          <div
-            className={`relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl shadow-2xl border-2 border-gold/50 bg-gradient-to-b from-[#fdf8ec] to-[#f7efd9] fia-letter ${closing ? 'fia-letter-out' : ''}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* ترويسة البطاقة */}
-            <div className="relative bg-gradient-to-r from-navy via-navy-light to-navy px-5 py-4 text-white fia-rlm-stagger" style={{ animationDelay: '.12s' }}>
-              <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
-                backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)',
-                backgroundSize: '18px 18px',
-              }} />
-              <div className="relative flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-md">
-                  <LatestIcon className="w-5 h-5 text-navy" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-black text-sm flex items-center gap-2">
-                    من إدارة الأكاديمية
-                    <span className={`text-[10px] font-black rounded-full px-2.5 py-0.5 border ${meta.badge} bg-navy/40 !text-gold`}>
-                      {meta.label}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-gold/80">أكاديمية المستقبل الدولية</div>
-                </div>
-                <button onClick={closeLetter} className="text-gold/70 hover:text-gold transition-colors" aria-label="إغلاق">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            {/* جسد الإعلان الأحدث — ورق فاخر */}
-            <div className="relative px-6 py-6">
-              <div className="absolute inset-0 opacity-[0.35] pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(#00000008 1px, transparent 1px)',
-                backgroundSize: '100% 28px',
-              }} />
-              {/* التاريخ — يظهر اختيارياً عند تحديده فقط */}
-              {String(latest.date || '').trim() && (
-                <div className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-navy text-gold text-[11px] font-black px-3.5 py-1.5 border border-gold/45 shadow-md fia-rlm-stagger" style={{ animationDelay: '.26s' }}>
-                  <CalendarDays className="w-3.5 h-3.5" />
-                  {fiaFormatArabicDate(latest.date)}
-                </div>
-              )}
-              <p className="relative text-[15px] leading-8 text-[#2a2113] whitespace-pre-wrap font-semibold fia-rlm-stagger" style={{ animationDelay: '.36s' }} dir="rtl">
-                {latest.text}
-              </p>
-              {/* التوقيع والختم — الشمع يهبط ختماً ملكياً */}
-              <div className="relative mt-6 flex items-end justify-between">
-                <div className="text-xs text-[#6b5a33] font-bold fia-rlm-stagger" style={{ animationDelay: '.5s' }}>{latest.signature || 'إدارة أكاديمية المستقبل الدولية'}</div>
-                <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br ${meta.seal} border-2 border-black/10 flex items-center justify-center shadow-lg fia-rlm-seal ${closing ? 'fia-rlm-seal-out' : ''}`}>
-                  <LatestIcon className="w-6 h-6 text-gold/90" />
-                  <span className="absolute inset-1.5 rounded-full border border-gold/40" />
-                </div>
-              </div>
-            </div>
-            {/* بقية الإعلانات السارية */}
-            {list.length > 1 && (
-              <div className="relative border-t border-gold/30 bg-white/50 px-5 py-4 fia-rlm-stagger" style={{ animationDelay: '.6s' }}>
-                <div className="text-[10px] font-black text-[#8a6d1f] uppercase tracking-widest mb-2.5">إعلانات سابقة ما تزال سارية</div>
-                <div className="space-y-2">
-                  {list.slice(1, 6).map((a: any) => {
-                    const m = fiaAnnounceType(a.type)
-                    const Icon = m.icon
-                    return (
-                      <div key={String(a.id)} className={`relative rounded-xl border border-gold/25 bg-gradient-to-l ${m.soft} px-3 py-2.5`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="w-5 h-5 rounded-md bg-navy text-gold flex items-center justify-center flex-shrink-0">
-                            <Icon className="w-3 h-3" />
-                          </span>
-                          <span className={`text-[9px] font-black rounded-full px-2 py-0.5 border ${m.badge}`}>{m.label}</span>
-                          {String(a.date || '').trim() && (
-                            <span className="text-[9px] font-bold text-[#6b5a33] flex items-center gap-1">
-                              <CalendarDays className="w-3 h-3" />
-                              {fiaFormatArabicDate(a.date)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] leading-5 text-[#3d3122]" dir="rtl">{a.text}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-            {/* ✦ خيط ذهبي زخرفي أسفل الرسالة ✦ */}
-            <div aria-hidden className="fia-rlm-stagger relative h-px w-32 mx-auto mb-4 bg-gradient-to-l from-transparent via-gold/70 to-transparent" style={{ animationDelay: '.68s' }} />
-          </div>
-        </div>
-      )}
-
-      <style jsx global>{`
-        .fia-seal-pulse { animation: sealPulse 2.2s ease-in-out infinite; }
-        @keyframes sealPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.5), 0 10px 30px -8px rgba(0,0,0,0.5); }
-          50% { box-shadow: 0 0 0 12px rgba(212,175,55,0), 0 10px 30px -8px rgba(0,0,0,0.5); }
-        }
-        /* ✦ الفتح: الستارة تتوهج ثم الرسالة تنزلق بنابض ملكي ✦ */
-        .fia-rlm-bd { animation: rlmBd .4s ease both; }
-        @keyframes rlmBd { from { opacity: 0; } to { opacity: 1; } }
-        .fia-letter { animation: letterIn .55s cubic-bezier(.2,.9,.3,1.18) both; transform-origin: 50% 0%; }
-        @keyframes letterIn {
-          from { opacity: 0; transform: translateY(34px) scale(.9) rotateX(8deg); }
-          to   { opacity: 1; transform: none; }
-        }
-        /* ✦ الإغلاق: طيّ ملكي أنيق — لا اختفاء لحظي جامد ✦ */
-        .fia-rlm-bd-out { animation: rlmBdOut .4s ease both; }
-        @keyframes rlmBdOut { from { opacity: 1; } to { opacity: 0; } }
-        .fia-letter-out { animation: letterOut .4s cubic-bezier(.4,0,.2,1) both !important; }
-        @keyframes letterOut {
-          from { opacity: 1; transform: none; }
-          30%  { opacity: 1; transform: translateY(-8px) scale(.985) rotateX(-4deg); }
-          to   { opacity: 0; transform: translateY(26px) scale(.92) rotateX(7deg); }
-        }
-        /* ✦ المحتوى يظهر بتدرج راقٍ بعد وصول الرسالة ✦ */
-        .fia-rlm-stagger { animation: rlmRise .5s cubic-bezier(.2,.8,.3,1) both; }
-        @keyframes rlmRise {
-          from { opacity: 0; transform: translateY(10px); }
-          to   { opacity: 1; transform: none; }
-        }
-        /* ✦ ختم الشمع يهبط هبوطاً ختامياً ✦ */
-        .fia-rlm-seal { animation: rlmSeal .65s cubic-bezier(.2,1.4,.4,1) .42s both; }
-        @keyframes rlmSeal {
-          0%   { opacity: 0; transform: scale(2.4) rotate(-28deg); }
-          62%  { opacity: 1; transform: scale(.92) rotate(2deg); }
-          100% { transform: scale(1) rotate(-8deg); }
-        }
-        .fia-rlm-seal-out { animation: rlmSealOut .3s ease both !important; }
-        @keyframes rlmSealOut { from { opacity: 1; } to { opacity: 0; transform: scale(1.5) rotate(-20deg); } }
-      `}</style>
-    </>
-  )
-}
 
 // ═══════════════════════ 4) البحث الشامل الملكي (Ctrl+K) ═══════════════════════
 
@@ -787,7 +514,6 @@ export function LuxGlobalLayer() {
   return (
     <>
       <LuxSplash />
-      <LuxRoyalMessage />
       <LuxCommandPalette />
       <LuxSupportButton />
       <LuxMaintenanceGuard />

@@ -45,6 +45,11 @@ export const metadata: Metadata = {
     title: "أكاديمية المستقبل الدولية",
     statusBarStyle: "black-translucent",
   },
+  // 🔍 Google Search Console verification — يُخرج حرفياً:
+  // <meta name="google-site-verification" content="2l15Y5BtjjL4Pc1YF1LRhqSet4tVd_aQKyKoZi8gk64" />
+  verification: {
+    google: "2l15Y5BtjjL4Pc1YF1LRhqSet4tVd_aQKyKoZi8gk64",
+  },
   // Reduce DNS lookup time by preconnecting to the external origins
   // we use most: Supabase (DB + Realtime), Telegram (image storage),
   // OneSignal (push). Without preconnect, the browser does a DNS

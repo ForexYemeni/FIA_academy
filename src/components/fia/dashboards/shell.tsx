@@ -382,7 +382,7 @@ export function DashboardShell({
                 title="بطاقة التحديث — فحص أحدث إصدار"
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('fia-check-updates'))
-                  toast('جاري فحص أحدث إصدار…', { description: 'ستظهر بطاقة التحديث خلال لحظات' })
+                  toast('جاري الفحص الفعلي من خوادم الأكاديمية…', { description: 'الحقيقة الكاملة خلال لحظات: محدّث أم تحديث جديد بمميزاته' })
                 }}
               >
                 <RefreshCw className="w-4 h-4 text-gold sm:ml-1.5" />

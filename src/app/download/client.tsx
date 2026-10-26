@@ -28,12 +28,12 @@ import {
 } from 'lucide-react'
 
 // 👑 رابط APK الاحتياطي — الرابط الفعلي يُشتق تلقائياً من الإصدار الحي أدناه
-const FALLBACK_APK = '/apk/Future-International-Academy-v2.9.8.apk'
+const FALLBACK_APK = '/apk/Future-International-Academy-v2.9.10.apk'
 
 // 🧾 بيانات الإصدار — احتياط فقط، الإصدار يُجلب حياً من /api/app-version
 // v2.9.8 (versionCode 29) — نسخة الإنقاذ: ثنائية 2.9.4 المجرّبة + رقم إصدار جديد
 // + مراقب أعطال حي يرفع أي عطل للإدارة فوراً — التوقيع الأصلي فالتحديث مباشر
-const FALLBACK_VERSION = '2.9.8'
+const FALLBACK_VERSION = '2.9.10'
 const FALLBACK_DATE = '2026-10-26T05:35:00Z'
 
 const AR_MONTHS = [

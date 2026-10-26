@@ -2,19 +2,19 @@
 
 /**
  * ============================================================================
- * 👑✨ FiaFabHub — مركز الأدوات العائم الفاخر (v10.18)
+ * 👑✨ FiaFabHub — مركز الأدوات العائم الدائري الفاخر (v10.19)
  * ============================================================================
- * زر مركزي واحد (+) يسار الشاشة، وعند الضغط عليه تنبثق لوحة شبكية زجاجية
- * فاخرة فوق الزر مباشرة — كل الأدوات داخلها صفوفاً مرتّبة:
- *   الدعم السريع ← الدردشة ← إعلانات الإدارة ← مشاركة التطبيق ← تواصل معنا ← الوضع
- * 🚫 v10.18 — إصلاحات جذرية:
- *   1) «إعلانات الإدارة» كانت تظهر حتى مع إطفاء الزاوية: تبعية settings
- *      كانت مفقودة من useMemo — أُصلحت، والأيقونة تختفي فوراً عند الإطفاء.
- *   2) أيقونات منبثقة عمودية كانت تتداخل مع محتوى الصفحات — صارت لوحة
- *      واحدة محكمة (شبكة 2×N بشارّة ذهبية) لا تلمس شيئاً خلفها أبداً.
- *   3) جلب الإعدادات أصبح مشتركاً مُخزّناً (useSiteSettings) بدل طلب مستقل
- *      لكل تركيب — طلب واحد لكل الصفحات كل 60 ثانية (أداء أوضح).
- *   4) النقر على «إعلانات الإدارة» بلا إعلانات يُظهر رسالة راقية بدل الصمت.
+ * زر مركزي واحد (+) يسار الشاشة، وعند الضغط عليه **تنبثق الأدوات دائرياً**
+ * حول الزر على قوس فاخر — كل أداة دائرة زجاجية مستقلة تحمل تسميتها:
+ *   الدعم السريع ← الدردشة ← مشاركة التطبيق ← تواصل معنا ← الوضع
+ * 👑 v10.19 — إعادة تصميم جذرية بأمر المالك:
+ *   1) اللوحة الشبكية السابقة «سيئة وغير مناسبة» — استُبدلت بقوس دائري
+ *      حقيقي (Radial Fan) تفُتح عناصره بالتسلسل حول زر + كأنها ساعة فاخرة.
+ *   2) أيقونة المشاركة تعود داخل المركز **دائماً** (حتى داخل التطبيق) —
+ *      داخل APK تستدعي FIANativeBridge.shareApp (نظام المشاركة الأصلي)،
+ *      وفي المتصفح navigator.share أو نسخ الرابط.
+ *   3) «إعلانات الإدارة» حُذفت كلياً مع حذف زاوية الإدارة نفسها (v10.19).
+ *   4) جلب الإعدادات مشترك مُخزّن (useSiteSettings) — طلب واحد لكل التطبيق.
  * • لا يمس أي منطق مصادقة أو إشعارات — طبقة عرض مستقلة تماماً
  * • التواصل مع الأدوات الأخرى عبر أحداث نافذة مخصصة (fia-fab:*)
  * ============================================================================
@@ -23,10 +23,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, BellRing, Share2,
+  LifeBuoy, MessageCircle, Mail, Moon, Sun, Plus, Share2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-store'
-import { useSiteSettings, readFiaAnnouncements } from '@/components/fia/lux-experience'
 import { toast } from 'sonner'
 
 const THEME_KEY = 'fia-theme'
@@ -47,24 +46,17 @@ interface FabItem {
   icon: any
   grad: string
   show: boolean
-  badge?: boolean
   action: () => void
 }
+
+/** نصف قطر القوس الدائري — يتقلص قليلاً على أصغر الشاشات */
+const ARC_RADIUS = 'min(150px, 38vw)'
 
 export function FiaFabHub() {
   const router = useRouter()
   const user = useAuth((s) => s.user)
-  // 👑 v10.18 — إعدادات مشتركة مُخزّنة (طلب واحد لكل التطبيق) + تحديث حي
-  const settings = useSiteSettings()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'dark' | 'light' | null>(null)
-  const [announceNew, setAnnounceNew] = useState(false)
-  // 👑 v10.17 — رصد الثنائية الأصلية: داخل التطبيق (APK) يوجد زر مشاركة أصلي،
-  // فتُخفى مشاركة المركز العائم لتبقى أيقونة مشاركة واحدة فقط (إصلاح التكرار).
-  const [isNativeApp, setIsNativeApp] = useState(false)
-  useEffect(() => {
-    try { setIsNativeApp(!!(window as any)?.FIANativeBridge) } catch {}
-  }, [])
 
   // مزامنة الوضع الليلي مع سكربت التهيئة
   useEffect(() => {
@@ -73,16 +65,6 @@ export function FiaFabHub() {
       setMode(t)
     } catch { setMode('dark') }
   }, [])
-
-  // هل هناك إعلان إدارة جديد لم يُقرأ؟ (نفس مفتاح القراءة الذي تستخدمه البطاقة)
-  useEffect(() => {
-    try {
-      const list = readFiaAnnouncements(settings)
-      const latest = list[0]
-      if (!latest) { setAnnounceNew(false); return }
-      setAnnounceNew(localStorage.getItem('fia-royal-msg-read') !== String(latest.id))
-    } catch { setAnnounceNew(false) }
-  }, [settings])
 
   const toggleTheme = useCallback(() => {
     setMode((prev) => {
@@ -97,11 +79,29 @@ export function FiaFabHub() {
     window.dispatchEvent(new CustomEvent(name))
   }, [])
 
+  // 👑 v10.19 — المشاركة دائماً داخل المركز: جسر أصلي في APK وإلا المشاركة
+  // الأصلية للمتصفح وإلا نسخ الرابط — لا تكرار مع أي زر آخر بعد الآن.
+  const shareNow = useCallback(() => {
+    try {
+      const bridge = (window as any)?.FIANativeBridge
+      if (bridge && typeof bridge.shareApp === 'function') { bridge.shareApp(); return }
+    } catch {}
+    const shareData = {
+      title: 'أكاديمية المستقبل الدولية',
+      text: '👑 حمّل تطبيق أكاديمية المستقبل الدولية — تعلّم بأسلوب احترافي',
+      url: 'https://fiaacademy.vercel.app/download',
+    }
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        (navigator as any).share(shareData).catch(() => {})
+        return
+      }
+    } catch {}
+    try { navigator.clipboard?.writeText(shareData.url) } catch {}
+    toast.success('🔗 تم نسخ رابط التطبيق — شاركه بفخر!')
+  }, [])
+
   const items = useMemo<FabItem[]>(() => {
-    // 👑 v10.18 — الزاوية الإدارية مطفأة → أداتها تختفي من المركز فوراً
-    // (تبعية settings داخل الـ useMemo الآن صحيحة)
-    const cornerOn = settings?.admin_corner_enabled !== false
-    const hasAnnouncements = cornerOn && readFiaAnnouncements(settings).length > 0
     return [
       {
         id: 'support', label: 'الدعم السريع', icon: LifeBuoy,
@@ -114,39 +114,9 @@ export function FiaFabHub() {
         show: !!user, action: () => dispatch('fia-fab:chat'),
       },
       {
-        id: 'announce', label: 'إعلانات الإدارة', icon: BellRing,
-        grad: 'from-gold to-amber-500',
-        show: cornerOn, badge: announceNew,
-        action: () => {
-          // 👑 v10.18 — لا انفجار TDZ ولا صمت: رسالة راقية إن لم توجد إعلانات
-          if (!hasAnnouncements) {
-            toast('لا توجد إعلانات جديدة حالياً', { description: 'ستظهر إعلانات الإدارة هنا فور صدورها' })
-            return
-          }
-          dispatch('fia-fab:announce')
-        },
-      },
-      {
         id: 'share', label: 'مشاركة التطبيق', icon: Share2,
         grad: 'from-violet-500 to-purple-600',
-        show: !isNativeApp,
-        action: () => {
-          try {
-            const bridge = (window as any)?.FIANativeBridge
-            if (bridge && typeof bridge.shareApp === 'function') { bridge.shareApp(); return }
-          } catch {}
-          const shareData = {
-            title: 'أكاديمية المستقبل الدولية',
-            text: '👑 حمّل تطبيق أكاديمية المستقبل الدولية — تعلّم بأسلوب احترافي',
-            url: 'https://fiaacademy.vercel.app/download',
-          }
-          if (typeof navigator !== 'undefined' && (navigator as any).share) {
-            (navigator as any).share(shareData).catch(() => {})
-          } else {
-            try { navigator.clipboard?.writeText(shareData.url) } catch {}
-            toast.success('🔗 تم نسخ رابط التطبيق — شاركه بفخر!')
-          }
-        },
+        show: true, action: shareNow,
       },
       {
         id: 'contact', label: 'تواصل معنا', icon: Mail,
@@ -159,7 +129,7 @@ export function FiaFabHub() {
         show: true, action: toggleTheme,
       },
     ].filter((i) => i.show)
-  }, [user, mode, announceNew, settings, isNativeApp, dispatch, router, toggleTheme])
+  }, [user, mode, dispatch, router, toggleTheme, shareNow])
 
   // Escape يغلق المركز
   useEffect(() => {
@@ -170,6 +140,12 @@ export function FiaFabHub() {
   }, [open])
 
   const isDark = mode !== 'light'
+  const count = items.length
+
+  // 👑 القوس الدائري: العناصر موزعة على ربع دائرة من «أعلى» (90°) إلى «اليمين» (0°)
+  // — الزر في الزاوية السفلية-اليسرى فالقوس ينبسط فوقه ناحية اليمين بسلاسة.
+  // زاوية العنصر i (من الأعلى إلى اليمين): θ_i = 90 - i * step، بحيث step = 90/(n-1)
+  const angleFor = (i: number) => (count <= 1 ? 90 : 90 - (i * 90) / (count - 1))
 
   return (
     <>
@@ -182,60 +158,62 @@ export function FiaFabHub() {
         />
       )}
 
-      {/* 👑 v10.18 — لوحة الأدوات الفاخرة: شبكة زجاجية محكمة فوق الزر مباشرة
-          — كل الأدوات «داخل» مركز + حرفياً وبلا أي تداخل مع الصفحات */}
+      {/* 👑 v10.19 — الأدوات الدائرية المنبثقة حول الزر على قوس ربع دائرة:
+          كل أداة دائرة زجاجية فاخرة بتدرجها الخاص + تسمية ذهبية تحتها،
+          تنبثق بالتسلسل من مركز الزر إلى موضعها على القوس */}
       <div
-        className={`fixed bottom-[92px] left-4 sm:left-6 z-[59] w-[min(320px,calc(100vw-2rem))] origin-bottom-left rounded-3xl border border-gold/35 bg-gradient-to-b from-[#0d2452]/97 via-[#0A1F44]/97 to-[#071838]/97 shadow-[0_24px_70px_-18px_rgba(0,0,0,0.75),0_0_40px_-12px_rgba(212,175,55,0.4)] backdrop-blur-xl transition-all duration-300 ${
-          open ? 'opacity-100 scale-100 translate-y-0' : 'pointer-events-none opacity-0 scale-90 translate-y-3'
-        }`}
+        className="fixed bottom-6 left-4 sm:left-6 z-[59] w-0 h-0"
         dir="rtl"
         role="menu"
         aria-hidden={!open}
       >
-        {/* ترويسة راقية رفيعة */}
-        <div className="relative px-4 pt-3.5 pb-2.5 overflow-hidden rounded-t-3xl">
-          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
-            backgroundImage: 'radial-gradient(circle at 15% 50%, #D4AF37 1.2px, transparent 1.2px)', backgroundSize: '18px 18px',
-          }} />
-          <div className="relative flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rotate-45 bg-gold shadow-[0_0_8px_rgba(212,175,55,0.7)]" />
-            <span className="text-[11px] font-black tracking-[0.14em] text-gold/90">مركز الأدوات السريع</span>
-            <span className="h-px flex-1 bg-gradient-to-l from-gold/30 via-gold/10 to-transparent" />
-          </div>
-        </div>
-
-        {/* الشبكة الملكية — 2 أعمدة × صفوف */}
-        <div className="grid grid-cols-2 gap-2 px-3 pb-3.5">
-          {items.map((item, idx) => {
-            const Icon = item.icon
-            return (
+        {items.map((item, idx) => {
+          const Icon = item.icon
+          const angle = angleFor(idx)
+          const rad = (angle * Math.PI) / 180
+          // الإحداثيات من مركز الزر (28px = نصف قطر زر 56px):
+          // x يميناً موجب، y أعلى موجب (نستخدم translate سالباً للأعلى)
+          const x = Math.cos(rad) // 0..1 (يمين)
+          const y = Math.sin(rad) // 0..1 (أعلى)
+          return (
+            <div
+              key={item.id}
+              className="absolute"
+              style={{
+                bottom: 0,
+                left: 0,
+                transform: open
+                  ? `translate(calc(28px + ${x} * ${ARC_RADIUS} - 50%), calc(-28px - ${y} * ${ARC_RADIUS} - 50%)) scale(1)`
+                  : 'translate(calc(28px - 50%), calc(-28px - 50%)) scale(0.2)',
+                opacity: open ? 1 : 0,
+                pointerEvents: open ? 'auto' : 'none',
+                transition: `transform 420ms cubic-bezier(.2,1.35,.4,1) ${open ? 30 + idx * 55 : 0}ms, opacity 260ms ease ${open ? 30 + idx * 55 : 0}ms`,
+              }}
+            >
               <button
-                key={item.id}
                 onClick={() => { setOpen(false); item.action() }}
                 role="menuitem"
                 aria-label={item.label}
                 title={item.label}
-                className={`group relative flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3 text-right transition-all duration-300 hover:border-gold/45 hover:bg-gold/[0.09] active:scale-[0.96] ${
-                  open ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-                }`}
-                style={{ transitionDelay: `${open ? 40 + idx * 35 : 0}ms` }}
+                className="group relative flex flex-col items-center gap-1.5 outline-none"
               >
-                <span className={`relative flex w-10 h-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.grad} shadow-md ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-110`}>
-                  <Icon className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
-                  {item.badge && (
-                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-red-500 border-2 border-[#0A1F44] animate-pulse" />
-                  )}
+                <span
+                  className={`relative flex w-[52px] h-[52px] items-center justify-center rounded-full bg-gradient-to-br ${item.grad} shadow-[0_10px_26px_-8px_rgba(0,0,0,0.55)] ring-2 ring-gold/45 group-hover:ring-gold group-active:scale-90 transition-all duration-200`}
+                >
+                  {/* لمعة زجاجية علوية */}
+                  <span aria-hidden className="absolute inset-[3px] rounded-full bg-gradient-to-b from-white/25 to-transparent opacity-70" />
+                  <Icon className="relative w-[22px] h-[22px] text-white drop-shadow-sm" strokeWidth={2.3} />
                 </span>
-                <span className="flex-1 min-w-0 text-[12px] font-extrabold leading-snug text-white/90 group-hover:text-gold transition-colors">
+                <span className="whitespace-nowrap rounded-full border border-gold/40 bg-[#0A1F44]/92 px-2 py-[3px] text-[9.5px] font-black leading-none text-gold shadow-md backdrop-blur-md">
                   {item.label}
                 </span>
               </button>
-            )
-          })}
-        </div>
+            </div>
+          )
+        })}
       </div>
 
-      {/* الزر المركزي الوحيد */}
+      {/* الزر المركزي الوحيد — يلتف (+) إلى (×) عند الفتح */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? 'إغلاق مركز الأدوات' : 'فتح مركز الأدوات'}
@@ -248,13 +226,6 @@ export function FiaFabHub() {
           className={`relative w-6 h-6 transition-transform duration-300 ${open ? 'rotate-[135deg]' : ''}`}
           strokeWidth={2.4}
         />
-        {/* شارة إعلان غير مقروء على المركز نفسه */}
-        {announceNew && !open && (
-          <span className="absolute -top-0.5 -left-0.5 flex">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-gold opacity-60 animate-ping" />
-            <span className="relative w-3.5 h-3.5 rounded-full bg-gradient-to-br from-gold to-amber-500 border-2 border-white shadow-sm" />
-          </span>
-        )}
         {/* نقطة الوضع الحالي — تظهر فقط في الوضع النهاري */}
         {!isDark && !open && (
           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-300 border-2 border-white shadow-sm" aria-hidden />
