@@ -27,13 +27,15 @@ import {
   Star,
 } from 'lucide-react'
 
-const APK_URL = '/apk/Future-International-Academy-v2.9.4.apk'
+const APK_URL = '/apk/Future-International-Academy-v2.9.6.apk'
 
 // 🧾 بيانات الإصدار الرسمي — تُحدّث مع كل إصدار جديد من التطبيق
-// v2.9.4 (versionCode 25) — إزالة «مكتبتي» دون إنترنت نهائياً (بقرار الإدارة)
-// + فتح فوري لمعاينة الدروس (كاش ملكي + تحضير مسبق) — التوقيع الأصلي فالتحديث مباشر دون حذف
-const FALLBACK_VERSION = '2.9.4'
-const FALLBACK_DATE = '2026-10-25T23:30:00Z'
+// v2.9.6 (versionCode 27) — إصلاح الاستقرار الملكي الكامل + التجربة الملكية الشاملة
+// (بطاقة تحديث ملكية + إيقاف تحديث الصفحة + مركز الأدوات + توست وسط الشاشة
+// + إعلانات سينمائية + بطاقة «أُنجز» أسرع + حظر الحسابات) — التوقيع الأصلي فالتحديث مباشر
+// 👑 الإصدار يُجلب حياً من /api/app-version — الثوابت أدناه احتياط فقط
+const FALLBACK_VERSION = '2.9.6'
+const FALLBACK_DATE = '2026-10-26T03:36:00Z'
 
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -64,6 +66,23 @@ export default function DownloadClient() {
   const [size, setSize] = useState<string | null>(null)
   const [qr, setQr] = useState<string>('')
   const [pressed, setPressed] = useState(false)
+
+  // 👑 جلب الإصدار حياً من نقطة app-version — الصفحة تتحدث نفسها مع كل إصدار جديد
+  useEffect(() => {
+    let alive = true
+    try {
+      fetch('/api/app-version', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!alive || !d?.version_name) return
+          setVersion(d.version_name)
+        })
+        .catch(() => {})
+    } catch {}
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // جلب حجم ملف التطبيق المستضاف على الموقع نفسه — بقيم ثابتة للإصدار والتاريخ
   useEffect(() => {
@@ -197,19 +216,19 @@ export default function DownloadClient() {
           </span>
         </a>
 
-        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.4 */}
+        {/* 👑 بطاقة دليل التحديث الفاخرة — v2.9.6 */}
         <div className="fia-dl-guide">
           <div className="fia-dl-guide-head">
             <ShieldCheck className="fia-dl-guide-icon" />
             <div>
-              <strong>دليل التحديث الذكي — v2.9.4</strong>
-              <span>إزالة «مكتبتي» نهائياً + فتح فوري للدروس — التحديث المباشر يعمل</span>
+              <strong>دليل التحديث الذكي — v2.9.6</strong>
+              <span>استقرار ملكي كامل + التجربة الملكية الشاملة — التحديث المباشر يعمل</span>
             </div>
           </div>
           <div className="fia-dl-guide-rows">
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge fia-dl-badge-gold">الحالة ١</span>
-              <p>لديك التطبيق الأصلي (v2.9.1 أو v2.9.2 أو v2.9.3)؟ — <strong>ثبّت v2.9.4 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك وتقدمك تظل كما هي. ملفات «مكتبتي» القديمة تُنقّى تلقائياً عند أول تشغيل.</p>
+              <p>لديك أي إصدار سابق (v2.9.1 حتى v2.9.5)؟ — <strong>ثبّت v2.9.6 فوقه مباشرة دون أي حذف</strong> — نفس التوقيع الرسمي، وبياناتك ودوراتك وتقدمك تظل كما هي. وحتى من كان لديه v2.9.5 المعطوبة يثبّت هذه فوقها مباشرة.</p>
             </div>
             <div className="fia-dl-guide-row">
               <span className="fia-dl-guide-badge">الحالة ٢</span>
