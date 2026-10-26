@@ -31,10 +31,10 @@ const nextConfig: NextConfig = {
     'pdfjs-dist',
   ],
   // === IMAGE OPTIMIZATION ===
-  // Enable Next.js's built-in image optimization — it converts
-  // uploaded images to WebP/AVIF on the fly + caches them at the
-  // edge. This reduces image size by ~60% on average.
+  // ⚡ v10.22 — unoptimized لتوافق Cloudflare Workers (لا sharp في edge).
+  // الصور تُخدم كما هي من CDN Cloudflare المجاني — نفس الجودة، صفر معالجة.
   images: {
+    unoptimized: true,
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     remotePatterns: [

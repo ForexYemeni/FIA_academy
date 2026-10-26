@@ -74,3 +74,8 @@ android-fia/local.properties
 *.apk
 !download/*.apk
 !public/apk/*.apk
+
+# Cloudflare (v10.22)
+.open-next/
+.wrangler/
+.dev.vars
